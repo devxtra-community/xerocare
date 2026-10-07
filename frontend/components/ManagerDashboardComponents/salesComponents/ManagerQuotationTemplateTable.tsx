@@ -68,24 +68,24 @@ import { QuotationViewDialog } from '../../employeeComponents/QuotationViewDialo
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    ASSIGNED: 'bg-indigo-100 text-indigo-700',
-    RETAKEN: 'bg-red-100 text-red-700',
-    DRAFT: 'bg-slate-100 text-slate-600',
-    SENT: 'bg-blue-100 text-blue-600',
-    SENT_TO_CUSTOMER: 'bg-blue-100 text-blue-600',
-    ACCEPTED: 'bg-green-100 text-green-700',
-    CUSTOMER_ACCEPTED: 'bg-green-100 text-green-700',
-    APPROVED: 'bg-green-100 text-green-700',
-    FINANCE_APPROVED: 'bg-green-100 text-green-700',
-    EMPLOYEE_APPROVED: 'bg-yellow-100 text-yellow-700',
-    REJECTED: 'bg-red-100 text-red-700',
-    FINANCE_REJECTED: 'bg-red-100 text-red-700',
-    CUSTOMER_REJECTED: 'bg-red-100 text-red-700',
-    EXPIRED: 'bg-orange-100 text-orange-700',
-    PENDING: 'bg-yellow-100 text-yellow-700',
-    PAID: 'bg-green-100 text-green-700',
-    ACTIVE_LEASE: 'bg-green-100 text-green-700',
-    TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
+    ASSIGNED: 'bg-primary/10 text-primary',
+    RETAKEN: 'bg-destructive/10 text-destructive',
+    DRAFT: 'bg-muted text-foreground',
+    SENT: 'bg-primary/10 text-primary',
+    SENT_TO_CUSTOMER: 'bg-primary/10 text-primary',
+    ACCEPTED: 'bg-success/10 text-success',
+    CUSTOMER_ACCEPTED: 'bg-success/10 text-success',
+    APPROVED: 'bg-success/10 text-success',
+    FINANCE_APPROVED: 'bg-success/10 text-success',
+    EMPLOYEE_APPROVED: 'bg-warning/10 text-warning',
+    REJECTED: 'bg-destructive/10 text-destructive',
+    FINANCE_REJECTED: 'bg-destructive/10 text-destructive',
+    CUSTOMER_REJECTED: 'bg-destructive/10 text-destructive',
+    EXPIRED: 'bg-warning/10 text-warning',
+    PENDING: 'bg-warning/10 text-warning',
+    PAID: 'bg-success/10 text-success',
+    ACTIVE_LEASE: 'bg-success/10 text-success',
+    TRANSACTION_COMPLETED: 'bg-success/10 text-success font-bold border-success/30',
   };
 
   const label: Record<string, string> = {
@@ -111,7 +111,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Badge
       className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none ${
-        map[status] ?? 'bg-slate-100 text-slate-600'
+        map[status] ?? 'bg-muted text-foreground'
       }`}
     >
       {label[status] ?? status}
@@ -121,9 +121,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, string> = {
-    PRODUCT_SALE: 'bg-blue-50 text-blue-600 border-blue-200',
-    RENT: 'bg-green-50 text-green-600 border-green-200',
-    LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
+    PRODUCT_SALE: 'bg-primary/10 text-primary border-primary/30',
+    RENT: 'bg-success/10 text-success border-success/30',
+    LEASE: 'bg-lease/10 text-lease border-lease/30',
   };
   return (
     <Badge
@@ -464,14 +464,14 @@ export default function ManagerQuotationTemplateTable() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-primary">Quotation Templates</h2>
+          <h2 className="text-xl font-medium text-primary">Quotation Templates</h2>
           <p className="text-sm text-muted-foreground">
             Create product templates and assign them to sales employee portfolios
           </p>
         </div>
         <div className="flex gap-2 self-start sm:self-auto">
           <Button
-            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-primary-foreground gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={() => setFormOpen(true)}
           >
             <Plus size={16} /> Create Template
@@ -480,9 +480,9 @@ export default function ManagerQuotationTemplateTable() {
       </div>
 
       {/* Search */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
         <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by number, product, type..."
             value={search}
@@ -493,7 +493,7 @@ export default function ManagerQuotationTemplateTable() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border p-4">
         <div className="overflow-x-auto mb-4">
           <Table className="min-w-[750px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
@@ -529,17 +529,17 @@ export default function ManagerQuotationTemplateTable() {
                             onClick={() => handleToggleDrillDown(q.id)}
                           >
                             {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-slate-500" />
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             ) : (
-                              <ChevronRight className="h-4 w-4 text-slate-500" />
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
                             )}
                           </Button>
                         </TableCell>
-                        <TableCell className="text-blue-500 font-bold tracking-tight">
+                        <TableCell className="text-primary font-bold tracking-tight">
                           {q.invoiceNumber}
                         </TableCell>
                         <TableCell
-                          className="font-semibold text-slate-700 max-w-[250px] truncate"
+                          className="font-semibold text-foreground max-w-[250px] truncate"
                           title={getProductNames(q)}
                         >
                           {getProductNames(q)}
@@ -571,7 +571,7 @@ export default function ManagerQuotationTemplateTable() {
                               setViewingTemplate(q);
                               setViewDialogOpen(true);
                             }}
-                            className="h-8 text-xs font-bold text-slate-600 border-slate-200 hover:bg-background hover:text-slate-600 gap-1"
+                            className="h-8 text-xs font-bold text-foreground border-border hover:bg-background hover:text-foreground gap-1"
                           >
                             <Eye size={12} />
                             View
@@ -592,7 +592,7 @@ export default function ManagerQuotationTemplateTable() {
                               setEditingTemplate(q);
                               setEditTemplateOpen(true);
                             }}
-                            className="h-8 text-xs font-bold text-amber-600 border-amber-200 hover:bg-background hover:text-amber-600 gap-1"
+                            className="h-8 text-xs font-bold text-warning border-warning/30 hover:bg-background hover:text-warning gap-1"
                           >
                             <Pencil size={12} />
                             Edit
@@ -601,7 +601,7 @@ export default function ManagerQuotationTemplateTable() {
                             variant="ghost"
                             size="sm"
                             onClick={() => promptDeleteTemplate(q.id)}
-                            className="h-8 w-8 p-0 text-red-500 hover:bg-transparent hover:text-red-500"
+                            className="h-8 w-8 p-0 text-destructive hover:bg-transparent hover:text-destructive"
                             title="Delete Template"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -611,11 +611,11 @@ export default function ManagerQuotationTemplateTable() {
 
                       {/* Drill-down panel */}
                       {isExpanded && (
-                        <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-t-0">
+                        <TableRow className="bg-muted/50 hover:bg-muted/50 border-t-0">
                           <TableCell colSpan={7} className="p-4 pl-12 pr-6">
-                            <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm space-y-4">
+                            <div className="bg-card rounded-xl border border-border p-4 shadow-sm space-y-4">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-slate-500">
+                                <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                                   Sales Assignment Tracking
                                 </h4>
                                 {assignments.length > 0 && (
@@ -623,7 +623,7 @@ export default function ManagerQuotationTemplateTable() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleBulkRetake(q.id)}
-                                    className="h-7 text-[10px] font-bold text-red-700 border-red-200 hover:bg-red-50 gap-1 uppercase"
+                                    className="h-7 text-[10px] font-bold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1 uppercase"
                                   >
                                     <RotateCcw size={10} />
                                     Retake All Assignments
@@ -642,7 +642,7 @@ export default function ManagerQuotationTemplateTable() {
                                 </p>
                               ) : (
                                 <Table className="min-w-full text-xs">
-                                  <TableHeader className="bg-slate-50">
+                                  <TableHeader className="bg-muted">
                                     <TableRow>
                                       <TableHead className="font-bold">EMPLOYEE</TableHead>
                                       <TableHead className="font-bold">ASSIGNED AT</TableHead>
@@ -656,8 +656,8 @@ export default function ManagerQuotationTemplateTable() {
                                   </TableHeader>
                                   <TableBody>
                                     {assignments.map((asg) => (
-                                      <TableRow key={asg.id} className="hover:bg-slate-50/30">
-                                        <TableCell className="font-bold text-slate-700">
+                                      <TableRow key={asg.id} className="hover:bg-muted/30">
+                                        <TableCell className="font-bold text-foreground">
                                           {asg.assignedEmployeeName}
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
@@ -669,10 +669,10 @@ export default function ManagerQuotationTemplateTable() {
                                             minute: '2-digit',
                                           })}
                                         </TableCell>
-                                        <TableCell className="font-semibold text-blue-600">
+                                        <TableCell className="font-semibold text-primary">
                                           {asg.invoiceNumber}
                                         </TableCell>
-                                        <TableCell className="font-semibold text-slate-600">
+                                        <TableCell className="font-semibold text-foreground">
                                           {asg.customerName || 'Pending Customer'}
                                         </TableCell>
                                         <TableCell>
@@ -684,7 +684,7 @@ export default function ManagerQuotationTemplateTable() {
                                               variant="ghost"
                                               size="sm"
                                               onClick={() => handleRetake(asg.id, q.id)}
-                                              className="h-7 text-[10px] font-bold text-red-500 hover:bg-red-50 uppercase"
+                                              className="h-7 text-[10px] font-bold text-destructive hover:bg-destructive/10 uppercase"
                                               title="Retake assignment"
                                             >
                                               Retake
@@ -721,18 +721,18 @@ export default function ManagerQuotationTemplateTable() {
       {/* Assignment Modal */}
       {assignModalOpen && selectedTemplate && (
         <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-          <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6 flex flex-col max-h-[85vh]">
+          <DialogContent className="sm:max-w-md bg-card border border-border rounded-xl shadow-lg p-6 flex flex-col max-h-[85vh]">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold text-slate-800">
+              <DialogTitle className="text-lg font-bold text-foreground">
                 Assign Quotation Template
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500">
+              <DialogDescription className="text-xs text-muted-foreground">
                 Select one or more Sales Employees to dispatch template{' '}
-                <strong className="text-slate-700">{selectedTemplate.invoiceNumber}</strong>.
+                <strong className="text-foreground">{selectedTemplate.invoiceNumber}</strong>.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto my-4 min-h-[200px] border border-slate-100 rounded-lg p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto my-4 min-h-[200px] border border-border rounded-lg p-3 space-y-2">
               {loadingEmployees ? (
                 <div className="flex items-center justify-center h-48">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -752,26 +752,26 @@ export default function ManagerQuotationTemplateTable() {
                           isChecked ? prev.filter((id) => id !== emp.id) : [...prev, emp.id],
                         );
                       }}
-                      className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-all hover:bg-slate-50
-                        ${isChecked ? 'border-primary bg-primary/5' : 'border-slate-100 bg-white'}`}
+                      className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-all hover:bg-muted
+                        ${isChecked ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
                     >
                       <div className="flex items-center gap-3">
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {}} // handled by div click
-                          className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
+                          className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary"
                         />
                         <div>
-                          <p className="text-xs font-bold text-slate-800">
+                          <p className="text-xs font-bold text-foreground">
                             {emp.first_name} {emp.last_name}
                           </p>
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-[10px] text-muted-foreground">
                             {emp.email} • {emp.employee_job || 'SALES'}
                           </p>
                         </div>
                       </div>
-                      <Badge className="text-[9px] bg-slate-100 text-slate-600 shadow-none border-none">
+                      <Badge className="text-[9px] bg-muted text-foreground shadow-none border-none">
                         {emp.reporting_manager ? 'Branch Staff' : 'HQ'}
                       </Badge>
                     </div>
@@ -784,13 +784,13 @@ export default function ManagerQuotationTemplateTable() {
               <Button
                 variant="ghost"
                 onClick={() => setAssignModalOpen(false)}
-                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+                className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleAssignSubmit}
-                className="bg-primary text-white font-bold text-xs uppercase tracking-wider px-5"
+                className="bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider px-5"
               >
                 Assign Selected
               </Button>
@@ -826,16 +826,16 @@ export default function ManagerQuotationTemplateTable() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6 flex flex-col gap-4">
-          <div className="flex items-center gap-3 text-red-600">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-red-50 flex items-center justify-center">
+        <DialogContent className="sm:max-w-md bg-card border border-border rounded-xl shadow-lg p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3 text-destructive">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-destructive/10 flex items-center justify-center">
               <Trash2 className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-base font-bold text-slate-800">
+              <DialogTitle className="text-base font-bold text-foreground">
                 Delete Quotation Template
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500 mt-0.5">
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
                 This action cannot be undone. Are you sure you want to delete this template?
               </DialogDescription>
             </div>
@@ -849,14 +849,14 @@ export default function ManagerQuotationTemplateTable() {
                 setTemplateIdToDelete(null);
               }}
               disabled={isDeleting}
-              className="text-xs font-bold uppercase tracking-wider text-slate-500 border-slate-200"
+              className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-border"
             >
               Cancel
             </Button>
             <Button
               onClick={handleDeleteTemplate}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider px-6 gap-1"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold text-xs uppercase tracking-wider px-6 gap-1"
             >
               {isDeleting ? 'Deleting...' : 'Yes, Delete'}
             </Button>
@@ -883,12 +883,12 @@ function CategoryCard({ icon: Icon, label, desc, color, onClick }: CategoryCardP
       onClick={onClick}
       className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 bg-card flex flex-col gap-3 ${color}`}
     >
-      <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-50 flex items-center justify-center text-slate-700">
+      <div className="h-10 w-10 shrink-0 rounded-lg bg-muted flex items-center justify-center text-foreground">
         <Icon size={20} strokeWidth={2.5} />
       </div>
       <div>
-        <h4 className="font-bold text-sm text-slate-800">{label}</h4>
-        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-1">
+        <h4 className="font-bold text-sm text-foreground">{label}</h4>
+        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-1">
           {desc}
         </p>
       </div>
@@ -1682,12 +1682,12 @@ function QuotationTemplateFormModal({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-100 rounded-xl shadow-lg p-6 overflow-hidden">
+      <DialogContent className="sm:max-w-4xl max-h-[92vh] flex flex-col bg-card border border-border rounded-xl shadow-lg p-6 overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-800">
+          <DialogTitle className="text-xl font-bold text-foreground">
             {template ? 'Edit Quotation Template' : 'Create Quotation Template'}
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
+          <DialogDescription className="text-xs text-muted-foreground">
             {template
               ? 'Update the details and items of your quotation template'
               : 'Configure product-focused template quotation without attaching customer info'}
@@ -1696,7 +1696,7 @@ function QuotationTemplateFormModal({
 
         {step === 1 ? (
           <div className="flex-1 overflow-y-auto space-y-6 py-4">
-            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest text-center">
+            <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest text-center">
               Select Quotation Deal Type
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1706,8 +1706,8 @@ function QuotationTemplateFormModal({
                 desc="Direct product and spare part sales"
                 color={
                   activeCategory === 'SALE'
-                    ? 'border-blue-500 bg-blue-50/10'
-                    : 'border-slate-100 hover:border-blue-300'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/30'
                 }
                 onClick={() => {
                   setActiveCategory('SALE');
@@ -1721,8 +1721,8 @@ function QuotationTemplateFormModal({
                 desc="Fixed limits or CPC excess models"
                 color={
                   activeCategory === 'RENT'
-                    ? 'border-green-500 bg-green-50/10'
-                    : 'border-slate-100 hover:border-green-300'
+                    ? 'border-success bg-success/10'
+                    : 'border-border hover:border-success/30'
                 }
                 onClick={() => {
                   setActiveCategory('RENT');
@@ -1736,8 +1736,8 @@ function QuotationTemplateFormModal({
                 desc="EMI or FSM monthly rental contracts"
                 color={
                   activeCategory === 'LEASE'
-                    ? 'border-purple-500 bg-purple-50/10'
-                    : 'border-slate-100 hover:border-purple-300'
+                    ? 'border-lease bg-lease/10'
+                    : 'border-border hover:border-lease/30'
                 }
                 onClick={() => {
                   setActiveCategory('LEASE');
@@ -1751,7 +1751,7 @@ function QuotationTemplateFormModal({
               <div className="flex justify-end pt-6 border-t">
                 <Button
                   onClick={() => setStep(2)}
-                  className="bg-primary text-white font-bold text-xs uppercase tracking-wider px-6"
+                  className="bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider px-6"
                 >
                   Continue to Details
                 </Button>
@@ -1760,8 +1760,8 @@ function QuotationTemplateFormModal({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto pr-1 py-4 space-y-6 max-h-[70vh]">
-            <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <span className="text-xs font-bold text-slate-700">
+            <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
+              <span className="text-xs font-bold text-foreground">
                 Selected Type: <strong className="uppercase text-primary">{activeCategory}</strong>
               </span>
               <Button
@@ -1771,7 +1771,7 @@ function QuotationTemplateFormModal({
                   setStep(1);
                   setSaleItems([]);
                 }}
-                className="h-8 text-[10px] font-bold text-slate-500 hover:text-primary uppercase"
+                className="h-8 text-[10px] font-bold text-muted-foreground hover:text-primary uppercase"
               >
                 Change Category
               </Button>
@@ -1779,9 +1779,9 @@ function QuotationTemplateFormModal({
 
             {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price */}
             {activeCategory === 'SALE' && (
-              <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+              <div className="bg-card p-5 rounded-xl border border-border shadow-sm space-y-2">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-400" /> Transaction Type
+                  <span className="w-2 h-2 rounded-full bg-lease/20" /> Transaction Type
                 </label>
                 <Select
                   value={transactionType}
@@ -1802,18 +1802,18 @@ function QuotationTemplateFormModal({
 
             {/* Warranty Configuration — Sale and Lease only */}
             {(activeCategory === 'SALE' || activeCategory === 'LEASE') && (
-              <div className="bg-card p-5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-sm space-y-4">
+              <div className="bg-card p-5 rounded-xl border border-warning/30 bg-warning/10 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" /> Warranty Configuration
+                  <label className="text-[11px] font-bold text-warning uppercase flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-warning/20" /> Warranty Configuration
                   </label>
-                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                  <Badge className="bg-warning/10 text-warning hover:bg-warning/10 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
                     {activeCategory === 'SALE' ? 'SALE SPECIFIC' : 'LEASE SPECIFIC'}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Warranty Type
                     </label>
                     <Select
@@ -1822,7 +1822,7 @@ function QuotationTemplateFormModal({
                         setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both')
                       }
                     >
-                      <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
+                      <SelectTrigger className="h-9 text-sm border-warning/30 bg-card shadow-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1839,7 +1839,7 @@ function QuotationTemplateFormModal({
                   {(warrantyType === 'duration' || warrantyType === 'both') && (
                     <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Duration Value
                         </label>
                         <Input
@@ -1847,18 +1847,18 @@ function QuotationTemplateFormModal({
                           placeholder="e.g. 6"
                           value={warrantyDurationValue}
                           onChange={(e) => setWarrantyDurationValue(e.target.value)}
-                          className="h-9 text-sm border-amber-100 shadow-sm"
+                          className="h-9 text-sm border-warning/30 shadow-sm"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Unit
                         </label>
                         <Select
                           value={warrantyDurationUnit}
                           onValueChange={(v) => setWarrantyDurationUnit(v as 'months' | 'years')}
                         >
-                          <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
+                          <SelectTrigger className="h-9 text-sm border-warning/30 bg-card">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1872,7 +1872,7 @@ function QuotationTemplateFormModal({
 
                   {(warrantyType === 'copies' || warrantyType === 'both') && (
                     <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Warranty Copy Limit (Total)
                       </label>
                       <Input
@@ -1880,7 +1880,7 @@ function QuotationTemplateFormModal({
                         placeholder="e.g. 100000"
                         value={warrantyCopyLimit}
                         onChange={(e) => setWarrantyCopyLimit(e.target.value)}
-                        className="h-9 text-sm border-amber-100 shadow-sm"
+                        className="h-9 text-sm border-warning/30 shadow-sm"
                       />
                     </div>
                   )}
@@ -1890,9 +1890,9 @@ function QuotationTemplateFormModal({
 
             {/* Rent details */}
             {activeCategory === 'RENT' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-6 border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-6 border-border">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground">
                     Rent Type
                   </label>
                   <Select value={rentType} onValueChange={handleRentTypeChange}>
@@ -1912,7 +1912,7 @@ function QuotationTemplateFormModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground">
                     Billing Cycle
                   </label>
                   <Select value={rentPeriod} onValueChange={setRentPeriod}>
@@ -1929,7 +1929,7 @@ function QuotationTemplateFormModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground">
                     Monthly Base Rent ({currency})
                   </label>
                   <Input
@@ -1943,7 +1943,7 @@ function QuotationTemplateFormModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground">
                     Discount Percent (%)
                   </label>
                   <Input
@@ -1956,7 +1956,7 @@ function QuotationTemplateFormModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground">
                     Duration (Months)
                   </label>
                   <Input
@@ -1972,10 +1972,10 @@ function QuotationTemplateFormModal({
 
             {/* Lease details */}
             {activeCategory === 'LEASE' && (
-              <div className="space-y-4 border-b pb-6 border-slate-100">
+              <div className="space-y-4 border-b pb-6 border-border">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-500">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground">
                       Lease Scheme
                     </label>
                     <Select
@@ -2000,7 +2000,7 @@ function QuotationTemplateFormModal({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-500">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground">
                       Tenure (Months)
                     </label>
                     <Input
@@ -2013,7 +2013,7 @@ function QuotationTemplateFormModal({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-500">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground">
                       Total Valuation ({currency})
                     </label>
                     <Input
@@ -2030,9 +2030,9 @@ function QuotationTemplateFormModal({
                 </div>
 
                 {leaseType === 'EMI' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-3 rounded-lg border">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground">
                         Monthly EMI ({currency})
                       </label>
                       <Input
@@ -2042,18 +2042,18 @@ function QuotationTemplateFormModal({
                           setMonthlyEmiAmount(e.target.value);
                           setLastEditedLease('PERIODIC');
                         }}
-                        className="text-xs h-9 font-bold text-primary bg-white"
+                        className="text-xs h-9 font-bold text-primary bg-card"
                       />
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-lg border">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground">
                         Rent Type
                       </label>
                       <Select value={rentType} onValueChange={handleRentTypeChange}>
-                        <SelectTrigger className="text-xs h-9 bg-white">
+                        <SelectTrigger className="text-xs h-9 bg-card">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2068,11 +2068,11 @@ function QuotationTemplateFormModal({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground">
                         Billing Cycle
                       </label>
                       <Select value={rentPeriod} onValueChange={setRentPeriod}>
-                        <SelectTrigger className="text-xs h-9 bg-white">
+                        <SelectTrigger className="text-xs h-9 bg-card">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2085,7 +2085,7 @@ function QuotationTemplateFormModal({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground">
                         Monthly Base Rent ({currency})
                       </label>
                       <Input
@@ -2096,19 +2096,19 @@ function QuotationTemplateFormModal({
                           setLastEditedLease('PERIODIC');
                         }}
                         disabled={rentType.startsWith('CPC')}
-                        className="text-xs h-9 bg-white"
+                        className="text-xs h-9 bg-card"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground">
                         Discount Percent (%)
                       </label>
                       <Input
                         type="number"
                         value={discountPercent}
                         onChange={(e) => setDiscountPercent(e.target.value)}
-                        className="text-xs h-9 bg-white"
+                        className="text-xs h-9 bg-card"
                       />
                     </div>
                   </div>
@@ -2118,8 +2118,8 @@ function QuotationTemplateFormModal({
 
             {/* Security Deposit (Rental / Lease only) */}
             {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
-              <div className="space-y-3 bg-card p-4 rounded-xl border border-violet-100">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-violet-600">
+              <div className="space-y-3 bg-card p-4 rounded-xl border border-lease/30">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-lease">
                   Payment Timing
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
@@ -2131,7 +2131,7 @@ function QuotationTemplateFormModal({
                       value={paymentTiming}
                       onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
                     >
-                      <SelectTrigger className="text-xs h-9 bg-white">
+                      <SelectTrigger className="text-xs h-9 bg-card">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2145,7 +2145,7 @@ function QuotationTemplateFormModal({
                       </SelectContent>
                     </Select>
                   </div>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-muted-foreground">
                     {rentType === 'CPC' || rentType === 'CPC_COMBO'
                       ? 'Cost-per-copy is billed after the fact, so postpaid is the only option.'
                       : paymentTiming === 'ADVANCE'
@@ -2156,13 +2156,13 @@ function QuotationTemplateFormModal({
               </div>
             )}
             {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
-              <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              <div className="space-y-3 bg-muted p-4 rounded-xl border border-border">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   First Month Advance Payment
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700">
+                    <label className="text-[10px] font-bold text-foreground">
                       Amount ({currency})
                     </label>
                     <Input
@@ -2173,16 +2173,16 @@ function QuotationTemplateFormModal({
                         setSecurityDepositAmount(val);
                       }}
                       placeholder="e.g. 1000"
-                      className="text-xs h-9 bg-white"
+                      className="text-xs h-9 bg-card"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700">Deposit Mode</label>
+                    <label className="text-[10px] font-bold text-foreground">Deposit Mode</label>
                     <Select
                       value={securityDepositMode}
                       onValueChange={(val: 'CASH' | 'CHEQUE') => setSecurityDepositMode(val)}
                     >
-                      <SelectTrigger className="text-xs h-9 bg-white">
+                      <SelectTrigger className="text-xs h-9 bg-card">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2198,20 +2198,20 @@ function QuotationTemplateFormModal({
             {/* Product selection panel */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Select Products
                 </h4>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={addManualItem}
-                  className="h-8 text-xs font-bold text-slate-600 gap-1"
+                  className="h-8 text-xs font-bold text-foreground gap-1"
                 >
                   <Plus size={12} /> Add Custom Item
                 </Button>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border space-y-3">
+              <div className="p-3 bg-muted rounded-xl border space-y-3">
                 <ProductSelect
                   onSelect={addItem}
                   mode={activeItemTab}
@@ -2245,8 +2245,8 @@ function QuotationTemplateFormModal({
                     <TableBody>
                       {saleItems.map((item, i) => (
                         <React.Fragment key={i}>
-                          <TableRow className="bg-white">
-                            <TableCell className="font-bold text-slate-700">
+                          <TableRow className="bg-card">
+                            <TableCell className="font-bold text-foreground">
                               {item.isManual ? (
                                 <div className="grid grid-cols-4 gap-2">
                                   <Input
@@ -2299,7 +2299,7 @@ function QuotationTemplateFormModal({
                                     }
                                     readOnly={!item.isEditable}
                                     className={`text-xs h-8 text-right w-24 ml-auto font-bold ${
-                                      !item.isEditable ? 'bg-slate-50 text-slate-500' : ''
+                                      !item.isEditable ? 'bg-muted text-muted-foreground' : ''
                                     }`}
                                   />
                                 </TableCell>
@@ -2309,10 +2309,10 @@ function QuotationTemplateFormModal({
                                     value={item.discount}
                                     onChange={(e) => updateItemField(i, 'discount', e.target.value)}
                                     placeholder={`max ${item.maxDiscount}`}
-                                    className="text-xs h-8 text-right w-24 ml-auto font-bold text-red-600"
+                                    className="text-xs h-8 text-right w-24 ml-auto font-bold text-destructive"
                                   />
                                 </TableCell>
-                                <TableCell className="text-right font-bold text-slate-800">
+                                <TableCell className="text-right font-bold text-foreground">
                                   {formatCurrency(item.quantity * item.unitPrice, currency)}
                                 </TableCell>
                               </>
@@ -2322,7 +2322,7 @@ function QuotationTemplateFormModal({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeItem(i)}
-                                className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
                               >
                                 <Trash2 size={14} />
                               </Button>
@@ -2332,7 +2332,7 @@ function QuotationTemplateFormModal({
                           {/* Slabs / limits config row for Rent & FSM Lease */}
                           {(activeCategory === 'RENT' ||
                             (activeCategory === 'LEASE' && leaseType === 'FSM')) && (
-                            <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
                               <TableCell colSpan={3} className="p-3 pl-8">
                                 <div className="space-y-4">
                                   {/* Limit configuration */}
@@ -2340,7 +2340,7 @@ function QuotationTemplateFormModal({
                                     {rentType === 'FIXED_LIMIT' && (
                                       <>
                                         <div className="space-y-1">
-                                          <label className="text-[9px] font-bold text-slate-500">
+                                          <label className="text-[9px] font-bold text-muted-foreground">
                                             BW Included Limit
                                           </label>
                                           <Input
@@ -2350,11 +2350,11 @@ function QuotationTemplateFormModal({
                                               updateItemField(i, 'bwIncludedLimit', e.target.value)
                                             }
                                             placeholder="e.g. 3000"
-                                            className="text-xs h-8 bg-white"
+                                            className="text-xs h-8 bg-card"
                                           />
                                         </div>
                                         <div className="space-y-1">
-                                          <label className="text-[9px] font-bold text-slate-500">
+                                          <label className="text-[9px] font-bold text-muted-foreground">
                                             Color Included Limit
                                           </label>
                                           <Input
@@ -2368,7 +2368,7 @@ function QuotationTemplateFormModal({
                                               )
                                             }
                                             placeholder="e.g. 500"
-                                            className="text-xs h-8 bg-white"
+                                            className="text-xs h-8 bg-card"
                                           />
                                         </div>
                                       </>
@@ -2376,7 +2376,7 @@ function QuotationTemplateFormModal({
 
                                     {rentType === 'FIXED_COMBO' && (
                                       <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-slate-500">
+                                        <label className="text-[9px] font-bold text-muted-foreground">
                                           Combined Limit
                                         </label>
                                         <Input
@@ -2390,7 +2390,7 @@ function QuotationTemplateFormModal({
                                             )
                                           }
                                           placeholder="e.g. 4000"
-                                          className="text-xs h-8 bg-white"
+                                          className="text-xs h-8 bg-card"
                                         />
                                       </div>
                                     )}
@@ -2401,7 +2401,7 @@ function QuotationTemplateFormModal({
                                     {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                       <>
                                         <div className="space-y-1">
-                                          <label className="text-[9px] font-bold text-slate-500">
+                                          <label className="text-[9px] font-bold text-muted-foreground">
                                             BW Excess Rate ({currency})
                                           </label>
                                           <Input
@@ -2412,11 +2412,11 @@ function QuotationTemplateFormModal({
                                               updateItemField(i, 'bwExcessRate', e.target.value)
                                             }
                                             placeholder="e.g. 0.035"
-                                            className="text-xs h-8 bg-white font-bold"
+                                            className="text-xs h-8 bg-card font-bold"
                                           />
                                         </div>
                                         <div className="space-y-1">
-                                          <label className="text-[9px] font-bold text-slate-500">
+                                          <label className="text-[9px] font-bold text-muted-foreground">
                                             Color Excess Rate ({currency})
                                           </label>
                                           <Input
@@ -2427,7 +2427,7 @@ function QuotationTemplateFormModal({
                                               updateItemField(i, 'colorExcessRate', e.target.value)
                                             }
                                             placeholder="e.g. 0.350"
-                                            className="text-xs h-8 bg-white font-bold"
+                                            className="text-xs h-8 bg-card font-bold"
                                           />
                                         </div>
                                       </>
@@ -2435,7 +2435,7 @@ function QuotationTemplateFormModal({
 
                                     {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
                                       <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-slate-500">
+                                        <label className="text-[9px] font-bold text-muted-foreground">
                                           Combined Excess Rate ({currency})
                                         </label>
                                         <Input
@@ -2446,7 +2446,7 @@ function QuotationTemplateFormModal({
                                             updateItemField(i, 'combinedExcessRate', e.target.value)
                                           }
                                           placeholder="e.g. 0.050"
-                                          className="text-xs h-8 bg-white font-bold"
+                                          className="text-xs h-8 bg-card font-bold"
                                         />
                                       </div>
                                     )}
@@ -2456,7 +2456,7 @@ function QuotationTemplateFormModal({
                                   {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
                                     <div className="space-y-3">
                                       <div className="flex justify-between items-center border-t pt-2 mt-2">
-                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                        <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">
                                           Excess Charging Slabs (Optional)
                                         </span>
                                       </div>
@@ -2464,9 +2464,9 @@ function QuotationTemplateFormModal({
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* BW Slabs */}
                                         {rentType === 'CPC' && (
-                                          <div className="space-y-2 bg-white p-2.5 rounded-lg border">
+                                          <div className="space-y-2 bg-card p-2.5 rounded-lg border">
                                             <div className="flex justify-between items-center">
-                                              <span className="text-[9px] font-bold text-slate-600">
+                                              <span className="text-[9px] font-bold text-foreground">
                                                 Black & White Slabs
                                               </span>
                                               <Button
@@ -2496,7 +2496,9 @@ function QuotationTemplateFormModal({
                                                   }
                                                   className="text-[10px] h-7 px-1 text-center"
                                                 />
-                                                <span className="text-slate-400 font-bold">-</span>
+                                                <span className="text-muted-foreground font-bold">
+                                                  -
+                                                </span>
                                                 <Input
                                                   type="number"
                                                   value={slab.to}
@@ -2532,7 +2534,7 @@ function QuotationTemplateFormModal({
                                                   variant="ghost"
                                                   size="sm"
                                                   onClick={() => removeSlabRange(i, 'bw', sIdx)}
-                                                  className="h-6 w-6 p-0 text-red-500"
+                                                  className="h-6 w-6 p-0 text-destructive"
                                                 >
                                                   ×
                                                 </Button>
@@ -2543,9 +2545,9 @@ function QuotationTemplateFormModal({
 
                                         {/* Color Slabs */}
                                         {rentType === 'CPC' && (
-                                          <div className="space-y-2 bg-white p-2.5 rounded-lg border">
+                                          <div className="space-y-2 bg-card p-2.5 rounded-lg border">
                                             <div className="flex justify-between items-center">
-                                              <span className="text-[9px] font-bold text-slate-600">
+                                              <span className="text-[9px] font-bold text-foreground">
                                                 Color Slabs
                                               </span>
                                               <Button
@@ -2575,7 +2577,9 @@ function QuotationTemplateFormModal({
                                                   }
                                                   className="text-[10px] h-7 px-1 text-center"
                                                 />
-                                                <span className="text-slate-400 font-bold">-</span>
+                                                <span className="text-muted-foreground font-bold">
+                                                  -
+                                                </span>
                                                 <Input
                                                   type="number"
                                                   value={slab.to}
@@ -2611,7 +2615,7 @@ function QuotationTemplateFormModal({
                                                   variant="ghost"
                                                   size="sm"
                                                   onClick={() => removeSlabRange(i, 'color', sIdx)}
-                                                  className="h-6 w-6 p-0 text-red-500"
+                                                  className="h-6 w-6 p-0 text-destructive"
                                                 >
                                                   ×
                                                 </Button>
@@ -2622,9 +2626,9 @@ function QuotationTemplateFormModal({
 
                                         {/* Combo Slabs */}
                                         {rentType === 'CPC_COMBO' && (
-                                          <div className="space-y-2 bg-white p-2.5 rounded-lg border col-span-2">
+                                          <div className="space-y-2 bg-card p-2.5 rounded-lg border col-span-2">
                                             <div className="flex justify-between items-center">
-                                              <span className="text-[9px] font-bold text-slate-600">
+                                              <span className="text-[9px] font-bold text-foreground">
                                                 Combined Slabs
                                               </span>
                                               <Button
@@ -2654,7 +2658,9 @@ function QuotationTemplateFormModal({
                                                   }
                                                   className="text-[10px] h-7 px-1 text-center"
                                                 />
-                                                <span className="text-slate-400 font-bold">-</span>
+                                                <span className="text-muted-foreground font-bold">
+                                                  -
+                                                </span>
                                                 <Input
                                                   type="number"
                                                   value={slab.to}
@@ -2690,7 +2696,7 @@ function QuotationTemplateFormModal({
                                                   variant="ghost"
                                                   size="sm"
                                                   onClick={() => removeSlabRange(i, 'combo', sIdx)}
-                                                  className="h-6 w-6 p-0 text-red-500"
+                                                  className="h-6 w-6 p-0 text-destructive"
                                                 >
                                                   ×
                                                 </Button>
@@ -2715,7 +2721,7 @@ function QuotationTemplateFormModal({
 
             {/* Notes / remarks */}
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+              <label className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">
                 Internal Remarks / Notes
               </label>
               <Textarea
@@ -2730,14 +2736,14 @@ function QuotationTemplateFormModal({
               <Button
                 variant="ghost"
                 onClick={() => setStep(1)}
-                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+                className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
               >
                 Back
               </Button>
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting || saleItems.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-8"
+                className="bg-success hover:bg-success/90 text-success-foreground font-bold text-xs uppercase tracking-wider px-8"
               >
                 {isSubmitting ? 'Saving Template...' : 'Save Template'}
               </Button>

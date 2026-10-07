@@ -66,14 +66,14 @@ export default function MonthlyRevenueBarChart() {
     fetchData();
   }, [selectedYear]);
 
-  if (!isClient) return <div className="h-[320px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[320px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm border border-primary/30 flex flex-col p-4">
       <div className="flex items-center justify-between pb-4">
         <div>
-          <h4 className="text-sm font-semibold text-gray-800">Monthly Revenue Source</h4>
-          <p className="text-[10px] text-gray-500">Breakdown of revenue by month</p>
+          <h4 className="text-sm font-semibold text-foreground">Monthly Revenue Source</h4>
+          <p className="text-[10px] text-muted-foreground">Breakdown of revenue by month</p>
         </div>
         <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
       </div>
@@ -96,12 +96,12 @@ export default function MonthlyRevenueBarChart() {
               tick={{ fill: 'var(--chart-slate)', fontSize: 10 }}
             />
             <Tooltip
-              cursor={{ fill: '#f8fafc' }}
+              cursor={{ fill: 'var(--muted)' }}
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   return (
-                    <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-50 flex flex-col gap-2 min-w-[120px]">
-                      <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
+                    <div className="bg-card p-4 rounded-xl shadow-lg border border-border flex flex-col gap-2 min-w-[120px]">
+                      <p className="text-xs font-bold text-foreground mb-2">{label}</p>
                       {(payload as { name: string; value: number; color: string }[]).map(
                         (entry, index: number) => (
                           <div key={index} className="flex items-center gap-2">
@@ -119,8 +119,8 @@ export default function MonthlyRevenueBarChart() {
                       )}
                       <div className="border-t pt-1 mt-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[12px] font-bold text-gray-800">Total:</span>
-                          <span className="text-[12px] font-bold text-gray-800">
+                          <span className="text-[12px] font-bold text-foreground">Total:</span>
+                          <span className="text-[12px] font-bold text-foreground">
                             {getActiveCurrency()}
                             {(payload as { value: number }[])
                               .reduce((sum: number, entry) => sum + entry.value, 0)
@@ -143,7 +143,7 @@ export default function MonthlyRevenueBarChart() {
                 paddingBottom: '20px',
                 fontSize: '10px',
                 fontWeight: 500,
-                color: '#64748b',
+                color: 'var(--chart-slate-dark)',
               }}
             />
             <Bar

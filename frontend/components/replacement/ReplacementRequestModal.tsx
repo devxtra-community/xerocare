@@ -43,8 +43,10 @@ interface Props {
 function Row({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-800 break-words">{value ?? '—'}</p>
+      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm font-semibold text-foreground break-words">{value ?? '—'}</p>
     </div>
   );
 }
@@ -128,16 +130,16 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
       <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl p-0 border-0 shadow-2xl">
         <DialogTitle className="sr-only">Request Machine Replacement</DialogTitle>
 
-        <div className="bg-white p-5 border-b border-slate-100 sticky top-0 z-10">
+        <div className="bg-card p-5 border-b border-border sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-red-50 flex items-center justify-center">
-              <Wrench size={18} className="text-red-600" />
+            <div className="h-9 w-9 rounded-full bg-destructive/10 flex items-center justify-center">
+              <Wrench size={18} className="text-destructive" />
             </div>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                 Request Machine Replacement
               </p>
-              <p className="text-base font-black text-slate-800">
+              <p className="text-base font-black text-foreground">
                 {ctx?.contract.invoiceNumber ?? '…'}
               </p>
             </div>
@@ -146,12 +148,12 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <div className="p-5 space-y-6">
             {/* ── Context, all read-only ─────────────────────────────── */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+            <div className="rounded-xl border border-border bg-muted/60 p-4 space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <Row label="Customer" value={ctx?.contract.customerName} />
                 <Row label="Request date" value={fmt(new Date().toISOString())} />
@@ -163,11 +165,11 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
 
               {ctx && ctx.machines.length > 1 && (
                 <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Which machine is being replaced?
                   </Label>
                   <Select value={allocationId} onValueChange={setAllocationId}>
-                    <SelectTrigger className="h-10 bg-white text-xs font-bold">
+                    <SelectTrigger className="h-10 bg-card text-xs font-bold">
                       <SelectValue placeholder="Select the machine…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -182,7 +184,7 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
               )}
 
               {machine && (
-                <div className="flex gap-4 rounded-lg border border-slate-200 bg-white p-3">
+                <div className="flex gap-4 rounded-lg border border-border bg-card p-3">
                   {machine.product?.image_url && (
                     <Image
                       src={machine.product.image_url}
@@ -190,24 +192,24 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
                       width={112}
                       height={112}
                       unoptimized
-                      className="rounded-lg border border-slate-100 object-cover shrink-0"
+                      className="rounded-lg border border-border object-cover shrink-0"
                       style={{ width: 112, height: 112 }}
                     />
                   )}
                   <div className="min-w-0 space-y-1">
-                    <p className="text-sm font-black text-slate-800">
+                    <p className="text-sm font-black text-foreground">
                       {machine.product?.name ?? 'Machine'}
                     </p>
-                    <p className="font-mono text-xs text-slate-600">{machine.serialNumber}</p>
+                    <p className="font-mono text-xs text-foreground">{machine.serialNumber}</p>
                     {(machine.product?.brand || machine.product?.model_name) && (
-                      <p className="text-[11px] font-semibold text-slate-500">
+                      <p className="text-[11px] font-semibold text-muted-foreground">
                         {[machine.product?.brand, machine.product?.model_name]
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
                     )}
                     {machine.product?.description && (
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
                         {machine.product.description}
                       </p>
                     )}
@@ -219,7 +221,7 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
             {/* ── What the employee actually fills in ─────────────────── */}
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Replacement reason *
                 </Label>
                 <Select value={reason} onValueChange={setReason}>
@@ -237,7 +239,7 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Notes *
                 </Label>
                 <Textarea
@@ -249,7 +251,7 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Proof photos * — at least one
                 </Label>
                 <Input
@@ -264,13 +266,13 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
                     {photos.map((f, i) => (
                       <span
                         key={`${f.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold text-foreground"
                       >
                         {f.name}
                         <button
                           type="button"
                           onClick={() => setPhotos((p) => p.filter((_, j) => j !== i))}
-                          className="text-slate-400 hover:text-red-500"
+                          className="text-muted-foreground hover:text-destructive"
                           aria-label={`Remove ${f.name}`}
                         >
                           <X size={12} />
@@ -284,7 +286,7 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4 sticky bottom-0">
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted p-4 sticky bottom-0">
           <Button
             variant="outline"
             onClick={onClose}
@@ -296,7 +298,7 @@ export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCr
           <Button
             onClick={submit}
             disabled={!canSubmit}
-            className="h-9 bg-red-600 text-xs font-black text-white hover:bg-red-700"
+            className="h-9 bg-destructive text-xs font-black text-destructive-foreground hover:bg-destructive/90"
           >
             {saving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
             Send to Finance for Approval

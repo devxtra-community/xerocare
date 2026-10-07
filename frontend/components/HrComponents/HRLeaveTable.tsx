@@ -181,10 +181,12 @@ export default function HRLeaveTable() {
 
   const getStatusBadge = (status: LeaveStatus) => {
     const variants: Record<LeaveStatus, { className: string }> = {
-      [LeaveStatus.PENDING]: { className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-      [LeaveStatus.APPROVED]: { className: 'bg-green-100 text-green-700 border-green-300' },
-      [LeaveStatus.REJECTED]: { className: 'bg-red-100 text-red-700 border-red-300' },
-      [LeaveStatus.CANCELLED]: { className: 'bg-gray-100 text-gray-700 border-gray-300' },
+      [LeaveStatus.PENDING]: { className: 'bg-warning/10 text-warning border-warning/30' },
+      [LeaveStatus.APPROVED]: { className: 'bg-success/10 text-success border-success/30' },
+      [LeaveStatus.REJECTED]: {
+        className: 'bg-destructive/10 text-destructive border-destructive/30',
+      },
+      [LeaveStatus.CANCELLED]: { className: 'bg-muted text-foreground border-border' },
     };
 
     const config = variants[status];
@@ -232,7 +234,7 @@ export default function HRLeaveTable() {
 
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <Table>
-            <TableHeader className="bg-muted/50/50">
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                   Employee ID
@@ -267,12 +269,12 @@ export default function HRLeaveTable() {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : paginatedLeaves.length > 0 ? (
                 paginatedLeaves.map((leave) => (
-                  <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
+                  <TableRow key={leave.id} className="hover:bg-muted/50 transition-colors">
                     <TableCell className="px-3 py-1.5 font-medium text-primary">
                       {leave.employee.display_id || '---'}
                     </TableCell>
@@ -312,7 +314,7 @@ export default function HRLeaveTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                           title="View Letter"
                           onClick={() => {
                             setSelectedLeave(leave);
@@ -326,7 +328,7 @@ export default function HRLeaveTable() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
                               title="Approve"
                               onClick={() => handleApprove(leave)}
                               disabled={isProcessing}
@@ -336,7 +338,7 @@ export default function HRLeaveTable() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                               title="Reject"
                               onClick={() => handleRejectClick(leave)}
                               disabled={isProcessing}
@@ -381,7 +383,7 @@ export default function HRLeaveTable() {
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="rejection_reason">
-              Rejection Reason <span className="text-red-500">*</span>
+              Rejection Reason <span className="text-destructive">*</span>
             </Label>
             <Textarea
               id="rejection_reason"
@@ -432,7 +434,7 @@ export default function HRLeaveTable() {
               </Button>
             </div>
           </DialogHeader>
-          <div className="p-8 space-y-6 bg-white dark:bg-slate-950">
+          <div className="p-8 space-y-6 bg-card dark:bg-foreground">
             <div className="flex justify-between text-sm">
               <div className="space-y-1">
                 <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
@@ -495,9 +497,11 @@ export default function HRLeaveTable() {
             </div>
 
             {selectedLeave?.status === LeaveStatus.REJECTED && (
-              <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-lg">
-                <p className="text-xs font-bold text-red-600 uppercase mb-1">Rejection Reason:</p>
-                <p className="text-sm text-red-700">{selectedLeave.rejection_reason}</p>
+              <div className="mt-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+                <p className="text-xs font-bold text-destructive uppercase mb-1">
+                  Rejection Reason:
+                </p>
+                <p className="text-sm text-destructive">{selectedLeave.rejection_reason}</p>
               </div>
             )}
           </div>
@@ -509,7 +513,7 @@ export default function HRLeaveTable() {
               <>
                 <Button
                   variant="outline"
-                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-10 px-6 font-semibold"
+                  className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive h-10 px-6 font-semibold"
                   onClick={() => {
                     setIsLetterOpen(false);
                     handleRejectClick(selectedLeave);
@@ -519,7 +523,7 @@ export default function HRLeaveTable() {
                   Reject
                 </Button>
                 <Button
-                  className="bg-green-600 hover:bg-green-700 text-white h-10 px-6 font-semibold shadow-sm"
+                  className="bg-success hover:bg-success/90 text-success-foreground h-10 px-6 font-semibold shadow-sm"
                   onClick={() => {
                     handleApprove(selectedLeave);
                     setIsLetterOpen(false);

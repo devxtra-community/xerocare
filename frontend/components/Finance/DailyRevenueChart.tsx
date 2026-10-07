@@ -125,7 +125,7 @@ export default function DailyRevenueChart({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-primary" />
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
             Breakdown
           </span>
         </div>

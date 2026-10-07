@@ -100,7 +100,7 @@ export default function AuditLogTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}`}
+                className={`border-none ${index % 2 === 1 ? 'bg-primary/10' : 'bg-card'}`}
               >
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-muted-foreground">
                   {item.date}
@@ -113,20 +113,20 @@ export default function AuditLogTable() {
                   style={{
                     color:
                       item.action === 'IN'
-                        ? '#16a34a'
+                        ? 'var(--success)'
                         : item.action === 'OUT'
-                          ? '#dc2626'
+                          ? 'var(--destructive)'
                           : item.action === 'TRANSFER'
                             ? 'var(--primary)'
-                            : '#d97706',
+                            : 'var(--warning)',
                   }}
                 >
                   {item.action}
                 </TableCell>
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center font-bold text-gray-700">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center font-bold text-foreground">
                   {item.qty}
                 </TableCell>
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-600">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                   {item.fromTo}
                 </TableCell>
               </TableRow>

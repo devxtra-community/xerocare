@@ -116,9 +116,9 @@ export function RecordCustomerApprovalDialog({
   return (
     <Modal isOpen={open} onClose={onClose} maxWidth="3xl" title="Record the customer's approval">
       <div className="space-y-4">
-        <div className="flex gap-3 rounded-xl bg-amber-50 border border-amber-100 p-3">
-          <ShieldCheck className="size-5 shrink-0 text-amber-600" />
-          <p className="text-xs leading-relaxed text-amber-800">
+        <div className="flex gap-3 rounded-xl bg-warning/10 border border-warning/30 p-3">
+          <ShieldCheck className="size-5 shrink-0 text-warning" />
+          <p className="text-xs leading-relaxed text-warning">
             You&apos;re recording a decision the customer has <strong>already made</strong> — you
             are not approving on their behalf. Once recorded this <strong>cannot be undone</strong>:
             the estimate is locked, spare parts are reserved from stock, and repair work can begin
@@ -132,20 +132,20 @@ export function RecordCustomerApprovalDialog({
         <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
-                Who approved it? <span className="text-red-500">*</span>
+              <label className="mb-1 block text-xs font-semibold text-foreground">
+                Who approved it? <span className="text-destructive">*</span>
               </label>
               <input
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Customer / contact person's full name"
-                className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs"
+                className="h-9 w-full rounded-xl border border-border bg-muted px-3 text-xs"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
-                How did they confirm? <span className="text-red-500">*</span>
+              <label className="mb-1 block text-xs font-semibold text-foreground">
+                How did they confirm? <span className="text-destructive">*</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {CHANNELS.map((c) => (
@@ -153,8 +153,8 @@ export function RecordCustomerApprovalDialog({
                     key={c.value}
                     className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
                       confirmedVia === c.value
-                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 bg-slate-50 text-slate-600'
+                        ? 'border-success/30 bg-success/10 text-success'
+                        : 'border-border bg-muted text-foreground'
                     }`}
                   >
                     <input
@@ -171,7 +171,7 @@ export function RecordCustomerApprovalDialog({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-foreground">
                 Note (optional)
               </label>
               <textarea
@@ -179,25 +179,25 @@ export function RecordCustomerApprovalDialog({
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
                 placeholder="e.g. Confirmed with Mr. Rahul over the phone at 3:15 PM"
-                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                className="w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 text-xs"
               />
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">
-                Customer signature <span className="text-red-500">*</span>
+              <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                Customer signature <span className="text-destructive">*</span>
               </label>
 
-              <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+              <div className="flex rounded-xl border border-border overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setSignMethod('CAPTURE')}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
                     signMethod === 'CAPTURE'
-                      ? 'bg-slate-800 text-white'
-                      : 'bg-white text-slate-400 hover:bg-slate-50'
+                      ? 'bg-foreground text-primary-foreground'
+                      : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   <PenLine size={12} />
@@ -208,8 +208,8 @@ export function RecordCustomerApprovalDialog({
                   onClick={() => setSignMethod('UPLOAD')}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
                     signMethod === 'UPLOAD'
-                      ? 'bg-slate-800 text-white'
-                      : 'bg-white text-slate-400 hover:bg-slate-50'
+                      ? 'bg-foreground text-primary-foreground'
+                      : 'bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   <Upload size={12} />
@@ -219,7 +219,7 @@ export function RecordCustomerApprovalDialog({
 
               {signMethod === 'CAPTURE' ? (
                 <div className="mt-2.5">
-                  <p className="mb-1.5 text-[11px] font-bold text-slate-500">
+                  <p className="mb-1.5 text-[11px] font-bold text-muted-foreground">
                     Hand the device to the customer to sign below
                   </p>
                   <ESignatureCanvas
@@ -232,30 +232,32 @@ export function RecordCustomerApprovalDialog({
                 </div>
               ) : (
                 <div className="mt-2.5 space-y-2.5">
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-[11px] font-bold leading-relaxed text-amber-700">
+                  <div className="rounded-xl border border-warning/30 bg-warning/10 p-2.5 text-[11px] font-bold leading-relaxed text-warning">
                     Upload a photo or scan of the physically-signed estimate. This is recorded as
                     the customer&apos;s consent proof.
                   </div>
 
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="cursor-pointer rounded-xl border-2 border-dashed border-slate-200 p-3 text-center transition-all hover:border-slate-400 hover:bg-slate-50"
+                    className="cursor-pointer rounded-xl border-2 border-dashed border-border p-3 text-center transition-all hover:border-border hover:bg-muted"
                   >
                     {uploadFile ? (
                       <div className="flex items-center justify-center gap-2">
-                        <FileText size={14} className="text-slate-500" />
-                        <span className="max-w-[180px] truncate text-xs font-bold text-slate-700">
+                        <FileText size={14} className="text-muted-foreground" />
+                        <span className="max-w-[180px] truncate text-xs font-bold text-foreground">
                           {uploadFile.name}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-muted-foreground">
                           ({(uploadFile.size / 1024 / 1024).toFixed(1)} MB)
                         </span>
                       </div>
                     ) : (
                       <>
-                        <Upload size={18} className="mx-auto mb-1 text-slate-300" />
-                        <p className="text-xs font-bold text-slate-400">Click to select file</p>
-                        <p className="mt-0.5 text-[10px] text-slate-300">
+                        <Upload size={18} className="mx-auto mb-1 text-muted-foreground" />
+                        <p className="text-xs font-bold text-muted-foreground">
+                          Click to select file
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
                           JPG, PNG, PDF · max 15 MB
                         </p>
                       </>
@@ -279,17 +281,17 @@ export function RecordCustomerApprovalDialog({
                   />
 
                   <div>
-                    <label className="mb-1 block text-[11px] font-semibold text-slate-600">
-                      How was the signed copy obtained? <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-[11px] font-semibold text-foreground">
+                      How was the signed copy obtained? <span className="text-destructive">*</span>
                     </label>
                     <textarea
                       value={attestationNote}
                       onChange={(e) => setAttestationNote(e.target.value)}
                       rows={2}
                       placeholder="e.g. Signed copy received via WhatsApp from customer on 2026-09-13"
-                      className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      className="w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 text-xs"
                     />
-                    <p className="mt-1 text-[10px] text-slate-400">
+                    <p className="mt-1 text-[10px] text-muted-foreground">
                       This note is required and stored as an audit record.
                     </p>
                   </div>
@@ -299,7 +301,7 @@ export function RecordCustomerApprovalDialog({
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border bg-muted p-3 text-xs text-foreground">
           <input
             type="checkbox"
             checked={ack}
@@ -315,7 +317,7 @@ export function RecordCustomerApprovalDialog({
         {/* Sticky, because this form is long: the confirmation checkbox and the action it
             gates were the two things furthest from each other, and staff had to scroll
             back down to a button they had already passed. */}
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-3">
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-card pt-3">
           <Button variant="outline" onClick={onClose} disabled={isBusy}>
             Cancel
           </Button>
@@ -326,7 +328,7 @@ export function RecordCustomerApprovalDialog({
             disabled={!canSubmit}
             className={cn(
               buttonVariants({ variant: 'success' }),
-              'bg-green-600 text-white hover:bg-green-700',
+              'bg-success text-success-foreground hover:bg-success/90',
             )}
           >
             <CheckCircle2 className="mr-1.5 size-4" />

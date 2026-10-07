@@ -73,63 +73,63 @@ export default function InstallationSigningPage() {
 
   if (state === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="h-7 w-7 animate-spin text-slate-400" />
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (state === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <AlertTriangle size={28} className="mx-auto mb-3 text-amber-500" />
-          <p className="text-base font-black text-slate-800">This link cannot be opened</p>
-          <p className="mt-1 text-xs font-bold text-slate-500">{error}</p>
+      <div className="flex min-h-screen items-center justify-center bg-muted p-6">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+          <AlertTriangle size={28} className="mx-auto mb-3 text-warning" />
+          <p className="text-base font-black text-foreground">This link cannot be opened</p>
+          <p className="mt-1 text-xs font-bold text-muted-foreground">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8">
+    <div className="min-h-screen bg-muted py-8">
       <div className="mx-auto w-full max-w-2xl px-4">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600">
-            <ClipboardCheck size={18} className="text-white" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
+            <ClipboardCheck size={18} className="text-primary-foreground" />
           </div>
           <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
               Xerocare
             </p>
-            <p className="text-base font-black text-slate-800">Installation Report</p>
+            <p className="text-base font-black text-foreground">Installation Report</p>
           </div>
         </div>
 
         {detail && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <InstallationReportView detail={detail} />
           </div>
         )}
 
         {state === 'signed' ? (
-          <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-            <CheckCircle2 size={26} className="mx-auto mb-2 text-emerald-600" />
-            <p className="text-sm font-black text-emerald-800">
+          <div className="mt-5 rounded-2xl border border-success/30 bg-success/10 p-6 text-center">
+            <CheckCircle2 size={26} className="mx-auto mb-2 text-success" />
+            <p className="text-sm font-black text-success">
               Thank you — your signature is recorded
             </p>
-            <p className="mt-1 text-[11px] text-emerald-700">
+            <p className="mt-1 text-[11px] text-success">
               You can close this page. A copy stays on your contract record.
             </p>
           </div>
         ) : (
-          <div className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-black text-slate-700">
+          <div className="mt-5 space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-xs font-black text-foreground">
               Please confirm the installation above
             </p>
 
             <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Your name *
               </Label>
               <Input
@@ -146,7 +146,7 @@ export default function InstallationSigningPage() {
             />
 
             <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Remarks (optional)
               </Label>
               <Textarea
@@ -159,7 +159,7 @@ export default function InstallationSigningPage() {
             <Button
               disabled={!name.trim() || !signatureData || saving}
               onClick={submit}
-              className="h-10 w-full bg-emerald-600 text-xs font-black text-white hover:bg-emerald-700"
+              className="h-10 w-full bg-success text-xs font-black text-success-foreground hover:bg-success/90"
             >
               {saving ? (
                 <Loader2 size={14} className="mr-1.5 animate-spin" />
@@ -168,7 +168,7 @@ export default function InstallationSigningPage() {
               )}
               Sign &amp; Confirm Installation
             </Button>
-            <p className="text-center text-[10px] font-bold text-slate-400">
+            <p className="text-center text-[10px] font-bold text-muted-foreground">
               Save your signature first, then confirm.
             </p>
           </div>

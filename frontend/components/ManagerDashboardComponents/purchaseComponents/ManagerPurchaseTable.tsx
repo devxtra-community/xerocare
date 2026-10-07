@@ -108,9 +108,9 @@ export default function ManagerPurchaseTable() {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+    <div className="bg-muted min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <div className="flex justify-between items-center">
-        <h3 className="text-2xl font-black text-slate-800 italic tracking-tight">
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground italic tracking-tight">
           Lot Amount Records
         </h3>
       </div>
@@ -123,43 +123,43 @@ export default function ManagerPurchaseTable() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
-          <p className="text-[11px] font-black uppercase tracking-widest text-green-700">
+        <div className="rounded-2xl border border-success/30 bg-success/10 p-5 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-widest text-success">
             Domestic Spend
           </p>
-          <p className="mt-1 text-2xl font-black text-green-800">
+          <p className="mt-1 text-2xl font-black text-success">
             {formatCurrency(domesticSpend, currency)}
           </p>
-          <p className="mt-1 text-xs font-medium text-green-600/80">
+          <p className="mt-1 text-xs font-medium text-success/80">
             Vendor country matches branch country
           </p>
         </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
-          <p className="text-[11px] font-black uppercase tracking-widest text-blue-700">
+        <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-widest text-primary">
             International Spend
           </p>
-          <p className="mt-1 text-2xl font-black text-blue-800">
+          <p className="mt-1 text-2xl font-black text-primary">
             {formatCurrency(internationalSpend, currency)}
           </p>
-          <p className="mt-1 text-xs font-medium text-blue-600/80">Cross-border vendor purchases</p>
+          <p className="mt-1 text-xs font-medium text-primary/80">Cross-border vendor purchases</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search lot or vendor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-11 rounded-xl border-slate-200 bg-white"
+            className="pl-9 h-11 rounded-xl border-border bg-card"
           />
         </div>
 
         <select
           value={originFilter}
           onChange={(e) => setOriginFilter(e.target.value as 'ALL' | PurchaseOrigin)}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
+          className="h-11 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground"
           aria-label="Filter by purchase origin"
         >
           <option value="ALL">All Origins</option>
@@ -168,17 +168,17 @@ export default function ManagerPurchaseTable() {
         </select>
 
         <Button
-          className="bg-primary hover:bg-primary/90 text-white gap-2 h-11 px-6 rounded-xl font-bold italic shadow-lg shadow-primary/10 transition-all active:scale-95"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 h-11 px-6 rounded-xl font-bold italic shadow-lg shadow-primary/10 transition-all active:scale-95"
           onClick={() => setAddOpen(true)}
         >
           <Plus size={18} /> Add Lot Amount
         </Button>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+      <div className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden">
         <Table pagination={{ pageSize: 10 }}>
           <TableHeader>
-            <tr className="bg-slate-50/50">
+            <tr className="bg-muted/50">
               {[
                 'Order ID',
                 'Lot Reference',
@@ -191,7 +191,7 @@ export default function ManagerPurchaseTable() {
               ].map((h) => (
                 <TableHead
                   key={h}
-                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic px-3 py-3 whitespace-nowrap"
+                  className="text-[10px] font-black text-muted-foreground uppercase tracking-widest italic px-3 py-3 whitespace-nowrap"
                 >
                   {h}
                 </TableHead>
@@ -203,7 +203,7 @@ export default function ManagerPurchaseTable() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-12">
-                  <div className="flex items-center justify-center gap-2 text-slate-400 animate-pulse font-bold italic">
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground animate-pulse font-bold italic">
                     <div className="h-2 w-2 bg-primary rounded-full animate-bounce" />
                     Syncing Ledger...
                   </div>
@@ -211,20 +211,20 @@ export default function ManagerPurchaseTable() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-slate-400 italic">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground italic">
                   No lot amount records found matching your search.
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((p) => (
-                <TableRow key={p.id} className="group hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="px-3 py-3 font-bold text-slate-700 whitespace-nowrap">
+                <TableRow key={p.id} className="group hover:bg-muted/50 transition-colors">
+                  <TableCell className="px-3 py-3 font-bold text-foreground whitespace-nowrap">
                     #{p.id.slice(0, 8)}
                   </TableCell>
-                  <TableCell className="px-3 py-3 font-medium text-slate-500 whitespace-nowrap">
+                  <TableCell className="px-3 py-3 font-medium text-muted-foreground whitespace-nowrap">
                     {p.lot?.lotNumber || p.lotId.slice(0, 8)}
                   </TableCell>
-                  <TableCell className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">
+                  <TableCell className="px-3 py-3 font-black text-foreground whitespace-nowrap">
                     {formatDualCurrency(
                       p.totalAmount,
                       p.currencyCode || currency,
@@ -233,7 +233,7 @@ export default function ManagerPurchaseTable() {
                       p.exchangeRate,
                     )}
                   </TableCell>
-                  <TableCell className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">
+                  <TableCell className="px-3 py-3 font-bold text-success whitespace-nowrap">
                     {formatCurrency(p.paidAmount, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-bold text-primary whitespace-nowrap">
@@ -249,10 +249,10 @@ export default function ManagerPurchaseTable() {
                     <span
                       className={`px-2 py-1 rounded-full text-[10px] font-black italic border whitespace-nowrap ${
                         p.status === 'PAID'
-                          ? 'bg-green-100 text-green-700 border-green-200'
+                          ? 'bg-success/10 text-success border-success/30'
                           : p.status === 'PARTIAL'
-                            ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                            : 'bg-red-100 text-red-700 border-red-200'
+                            ? 'bg-warning/10 text-warning border-warning/30'
+                            : 'bg-destructive/10 text-destructive border-destructive/30'
                       }`}
                     >
                       {p.status}
@@ -264,28 +264,28 @@ export default function ManagerPurchaseTable() {
                   <TableCell className="px-3 py-3">
                     <div className="flex items-center gap-2.5">
                       <button
-                        className="text-slate-400 hover:text-primary transition-colors"
+                        className="text-muted-foreground hover:text-primary transition-colors"
                         onClick={() => handleView(p)}
                         title="Details"
                       >
                         <Eye size={16} />
                       </button>
                       <button
-                        className="text-slate-400 hover:text-slate-700 transition-colors"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
                         onClick={() => handleEdit(p)}
                         title="Edit"
                       >
                         <Edit size={16} />
                       </button>
                       <button
-                        className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                        className="text-success hover:text-success transition-colors"
                         onClick={() => handleRecordCost(p)}
                         title="Add Cost"
                       >
                         <Banknote size={16} />
                       </button>
                       <button
-                        className="text-emerald-500 hover:text-emerald-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="text-success hover:text-success transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         onClick={() => handleRecordPayment(p)}
                         disabled={p.status === 'PAID'}
                         title="Record Payment"

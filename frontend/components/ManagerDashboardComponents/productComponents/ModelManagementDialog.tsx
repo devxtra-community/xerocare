@@ -70,11 +70,11 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <div className="bg-card rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl">
         <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold">Model Management</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
+          <h2 className="text-xl font-medium">Model Management</h2>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
             <X size={20} />
           </button>
         </div>
@@ -122,7 +122,7 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                   className: 'font-semibold text-[11px] text-primary uppercase w-[100px]',
                   cell: (model: Model) => (
                     <>
-                      <span className="font-bold text-blue-600">{model.quantity}</span>
+                      <span className="font-bold text-primary">{model.quantity}</span>
                       <span className="text-[10px] text-muted-foreground ml-1 font-medium">
                         units
                       </span>
@@ -140,13 +140,13 @@ export function ModelManagementDialog({ open, onClose }: ModelManagementDialogPr
                           setEditingModel(model);
                           setIsFormOpen(true);
                         }}
-                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                        className="text-primary hover:text-primary transition-colors"
                       >
                         <Edit2 size={16} />
                       </button>
                       <button
                         onClick={() => setDeleteId(model.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors"
+                        className="text-destructive hover:text-destructive transition-colors"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -242,14 +242,14 @@ function ModelForm({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/50 p-4">
       <div className="bg-card rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-bold mb-4">{initialData ? 'Edit Model' : 'Add New Model'}</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">
-                Brand <span className="text-red-500">*</span>
+                Brand <span className="text-destructive">*</span>
               </label>
               <SearchableSelect
                 options={brands.map((brand) => ({
@@ -264,7 +264,7 @@ function ModelForm({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Model Name <span className="text-red-500">*</span>
+                Model Name <span className="text-destructive">*</span>
               </label>
               <Input
                 required
@@ -274,7 +274,7 @@ function ModelForm({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Model No <span className="text-red-500">*</span>
+                Model No <span className="text-destructive">*</span>
               </label>
               <Input
                 required

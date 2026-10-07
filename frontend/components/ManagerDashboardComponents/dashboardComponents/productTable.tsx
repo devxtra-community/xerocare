@@ -119,14 +119,14 @@ export default function DashbordTable() {
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Product
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search model or product..."
                 value={searchQuery}
@@ -137,12 +137,12 @@ export default function DashbordTable() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Filter by Brand
             </label>
             {mounted && (
               <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                   <SelectValue placeholder="All Brands" />
                 </SelectTrigger>
                 <SelectContent>
@@ -158,12 +158,12 @@ export default function DashbordTable() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Filter by Vendor
             </label>
             {mounted && (
               <Select value={selectedVendor} onValueChange={setSelectedVendor}>
-                <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+                <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                   <SelectValue placeholder="All Vendors" />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,7 +185,7 @@ export default function DashbordTable() {
               size="sm"
               variant="outline"
               onClick={resetFilters}
-              className="h-9 text-gray-500 border-gray-200 hover:bg-gray-50 text-xs px-3"
+              className="h-9 text-muted-foreground border-border hover:bg-muted text-xs px-3"
               title="Clear Filters"
             >
               <X className="h-4 w-4" />
@@ -194,7 +194,7 @@ export default function DashbordTable() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-gray-100 p-4">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border p-4">
         <div className="overflow-x-auto mb-4">
           <Table>
             <TableHeader>
@@ -225,10 +225,10 @@ export default function DashbordTable() {
                       (item as { id?: string }).id ||
                       `${item.model_id}-${item.warehouse_id}-${index}`
                     }
-                    className={index % 2 ? 'bg-blue-50/30' : 'bg-card'}
+                    className={index % 2 ? 'bg-primary/10' : 'bg-card'}
                   >
                     <TableCell>
-                      <div className="h-10 w-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center shadow-sm text-black">
+                      <div className="h-10 w-10 rounded-lg bg-muted border border-border overflow-hidden flex items-center justify-center shadow-sm text-foreground">
                         {item.image_url ? (
                           <Image
                             src={item.image_url}
@@ -238,7 +238,7 @@ export default function DashbordTable() {
                             className="h-full w-full object-contain p-1"
                           />
                         ) : (
-                          <div className="text-[8px] text-gray-400 font-bold uppercase">
+                          <div className="text-[8px] text-muted-foreground font-bold uppercase">
                             No Image
                           </div>
                         )}
@@ -247,9 +247,9 @@ export default function DashbordTable() {
                     <TableCell className="font-medium text-primary ">
                       {item.product_name || 'N/A'}
                     </TableCell>
-                    <TableCell className="text-slate-600">{item.model_name || 'N/A'}</TableCell>
-                    <TableCell className="text-slate-600">{item.brand || '-'}</TableCell>
-                    <TableCell className="text-slate-600">
+                    <TableCell className="text-foreground">{item.model_name || 'N/A'}</TableCell>
+                    <TableCell className="text-foreground">{item.brand || '-'}</TableCell>
+                    <TableCell className="text-foreground">
                       {item.vendor_name || item.vendor_id || 'N/A'}
                     </TableCell>
                     <TableCell className="font-bold text-primary">{item.total_qty}</TableCell>
@@ -259,11 +259,11 @@ export default function DashbordTable() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="bg-gray-100 p-3 rounded-full text-black">
+                      <div className="bg-muted p-3 rounded-full text-foreground">
                         <span className="text-2xl">📦</span>
                       </div>
                       <p className="font-medium">No inventory found</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         Try adjusting your filters or search term.
                       </p>
                     </div>

@@ -153,14 +153,14 @@ export default function AddPurchaseDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none shadow-2xl">
         <div className="bg-primary px-6 py-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
-            <Calculator className="h-6 w-6 text-white" />
+          <div className="h-10 w-10 rounded-lg bg-card flex items-center justify-center">
+            <Calculator className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <DialogTitle className="text-xl font-bold text-white">
+            <DialogTitle className="text-xl font-bold text-primary-foreground">
               {editMode ? 'Edit Costs' : 'New Lot Amount Record'}
             </DialogTitle>
-            <DialogDescription className="text-white/70 text-sm">
+            <DialogDescription className="text-primary-foreground text-sm">
               Manage financial tracking for procurement lots.
             </DialogDescription>
           </div>
@@ -168,17 +168,17 @@ export default function AddPurchaseDialog({
 
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-6 bg-white overflow-y-auto max-h-[85vh]"
+          className="p-6 space-y-6 bg-card overflow-y-auto max-h-[85vh]"
         >
           {/* Lot Selection Section */}
-          <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 italic transition-all hover:border-primary/20">
+          <div className="space-y-3 bg-muted p-4 rounded-xl border border-border italic transition-all hover:border-primary/20">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <Label className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Boxes className="h-4 w-4 text-primary" />
                 Select Procurement Lot *
               </Label>
               {editMode && (
-                <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                   ID: {formData.lotId.slice(0, 8)}
                 </span>
               )}
@@ -198,7 +198,7 @@ export default function AddPurchaseDialog({
               disabled={editMode || loadingLots}
             />
             {!editMode && (
-              <p className="text-[10px] text-slate-500 flex items-center gap-1">
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                 <Info className="h-3 w-3" />
                 Only lots that don&apos;t already have a lot amount record will be processed
                 successfully.
@@ -207,7 +207,7 @@ export default function AddPurchaseDialog({
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
+            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 border-b pb-2">
               <Calculator className="h-4 w-4 text-primary" />
               Additional Costs Breakdown
             </h4>
@@ -217,13 +217,13 @@ export default function AddPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="documentationFee"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <FileCheck className="h-3.5 w-3.5" />
                   Documentation Fee
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -244,13 +244,13 @@ export default function AddPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="labourCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Users className="h-3.5 w-3.5" />
                   Labour Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -271,13 +271,13 @@ export default function AddPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="handlingFee"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Package className="h-3.5 w-3.5" />
                   Handling Fee
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -298,13 +298,13 @@ export default function AddPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="transportationCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Truck className="h-3.5 w-3.5" />
                   Transportation Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -325,13 +325,13 @@ export default function AddPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="shippingCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Globe className="h-3.5 w-3.5" />
                   Shipping Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -352,13 +352,13 @@ export default function AddPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="groundfieldCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Wrench className="h-3.5 w-3.5" />
                   Groundfield Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -378,12 +378,12 @@ export default function AddPurchaseDialog({
           </div>
 
           {isInternational && (
-            <div className="space-y-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2 border-b border-amber-200 pb-2">
+            <div className="space-y-4 bg-warning/10 border border-warning/30 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-warning flex items-center gap-2 border-b border-warning/30 pb-2">
                 <Landmark className="h-4 w-4" />
                 International Purchase Details
               </h4>
-              <p className="text-[11px] text-amber-700 -mt-2">
+              <p className="text-[11px] text-warning -mt-2">
                 This lot is an International purchase — customs duty is tracked separately from the
                 landed cost total above and is expensed on its own Chart of Accounts line (5015),
                 not added into the total.
@@ -394,7 +394,7 @@ export default function AddPurchaseDialog({
                 <div className="space-y-2">
                   <Label
                     htmlFor="importInvoiceNo"
-                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                    className="text-xs font-semibold text-foreground flex items-center gap-2"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     Import Invoice No
@@ -412,7 +412,7 @@ export default function AddPurchaseDialog({
                 <div className="space-y-2">
                   <Label
                     htmlFor="customsEntryNo"
-                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                    className="text-xs font-semibold text-foreground flex items-center gap-2"
                   >
                     <Hash className="h-3.5 w-3.5" />
                     Customs Entry No
@@ -430,13 +430,13 @@ export default function AddPurchaseDialog({
                 <div className="space-y-2">
                   <Label
                     htmlFor="customsDuty"
-                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                    className="text-xs font-semibold text-foreground flex items-center gap-2"
                   >
                     <Landmark className="h-3.5 w-3.5" />
                     Customs Duty
                   </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       {currencyCode}
                     </span>
                     <Input
@@ -456,7 +456,7 @@ export default function AddPurchaseDialog({
                 <div className="space-y-2">
                   <Label
                     htmlFor="goodsOrService"
-                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                    className="text-xs font-semibold text-foreground flex items-center gap-2"
                   >
                     <Package className="h-3.5 w-3.5" />
                     Goods / Service
@@ -480,14 +480,14 @@ export default function AddPurchaseDialog({
             </div>
           )}
 
-          <div className="bg-slate-900 rounded-2xl p-5 text-white flex flex-col sm:flex-row justify-between items-center gap-4 italic shadow-xl shadow-slate-200">
+          <div className="bg-foreground rounded-2xl p-5 text-primary-foreground flex flex-col sm:flex-row justify-between items-center gap-4 italic shadow-xl shadow-foreground/10">
             <div className="space-y-1 text-center sm:text-left">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Financial Summary Preview
               </p>
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase font-bold">Base (Lot)</p>
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold">Base (Lot)</p>
                   <p className="text-sm font-bold">
                     {(() => {
                       const lot = lots.find((l) => l.id === formData.lotId);
@@ -497,10 +497,10 @@ export default function AddPurchaseDialog({
                     })()}
                   </p>
                 </div>
-                <Plus className="h-3 w-3 text-slate-600" />
+                <Plus className="h-3 w-3 text-foreground" />
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase font-bold">Extras</p>
-                  <p className="text-sm font-bold text-blue-400">
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold">Extras</p>
+                  <p className="text-sm font-bold text-primary">
                     {formatCurrency(
                       formData.documentationFee +
                         formData.labourCost +
@@ -514,10 +514,10 @@ export default function AddPurchaseDialog({
                 </div>
                 {isInternational && Number(formData.customsDuty) > 0 && (
                   <div>
-                    <p className="text-[9px] text-slate-500 uppercase font-bold">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">
                       Customs Duty (separate)
                     </p>
-                    <p className="text-sm font-bold text-amber-400">
+                    <p className="text-sm font-bold text-warning">
                       {formatCurrency(Number(formData.customsDuty), currencyCode)}
                     </p>
                   </div>
@@ -525,7 +525,7 @@ export default function AddPurchaseDialog({
               </div>
             </div>
             <div className="text-center sm:text-right">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Estimated Total Cost
               </p>
               <p className="text-2xl font-black text-primary">
@@ -544,7 +544,7 @@ export default function AddPurchaseDialog({
                 })()}
               </p>
               {isInternational && Number(formData.customsDuty) > 0 && (
-                <p className="text-[10px] text-amber-400 mt-0.5">
+                <p className="text-[10px] text-warning mt-0.5">
                   + {formatCurrency(Number(formData.customsDuty), currencyCode)} customs duty
                   (tracked separately)
                 </p>
@@ -552,7 +552,7 @@ export default function AddPurchaseDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 !mt-10 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 !mt-10 border-t border-border">
             <Button
               type="button"
               variant="outline"

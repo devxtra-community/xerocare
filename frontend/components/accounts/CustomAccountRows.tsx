@@ -78,30 +78,30 @@ export default function CustomAccountRows({
         return (
           <div
             key={a.id}
-            className={`grid grid-cols-12 px-5 py-3 items-center hover:bg-blue-50/50 transition-colors text-sm ${inactive ? 'opacity-50' : ''}`}
+            className={`grid grid-cols-12 px-5 py-3 items-center hover:bg-primary/10 transition-colors text-sm ${inactive ? 'opacity-50' : ''}`}
           >
             <span className="col-span-1 font-mono text-xs text-muted-foreground font-medium">
               {a.code}
             </span>
             <span
-              className={`col-span-4 font-medium text-slate-800 flex items-center gap-1.5 ${isSub ? 'pl-4' : ''}`}
+              className={`col-span-4 font-medium text-foreground flex items-center gap-1.5 ${isSub ? 'pl-4' : ''}`}
             >
               {isSub && <span className="text-muted-foreground">↳</span>}
               <span className={`truncate ${inactive ? 'line-through text-muted-foreground' : ''}`}>
                 {a.name}
               </span>
-              <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+              <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">
                 Custom
               </span>
               {inactive && (
-                <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                   Inactive
                 </span>
               )}
             </span>
             <span className="col-span-5 text-right">
               <span
-                className={`font-bold tabular-nums ${isNeg ? 'text-red-600' : 'text-slate-800'}`}
+                className={`font-bold tabular-nums ${isNeg ? 'text-destructive' : 'text-foreground'}`}
               >
                 {formatCurrency(val, a.currency)}
               </span>
@@ -111,7 +111,7 @@ export default function CustomAccountRows({
                 <button
                   onClick={() => onPostJournal(a)}
                   title="Post journal entry"
-                  className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                  className="p-1 rounded hover:bg-primary/10 text-primary"
                 >
                   <BookPlus className="h-3.5 w-3.5" />
                 </button>
@@ -120,7 +120,7 @@ export default function CustomAccountRows({
                 <button
                   onClick={() => onEdit(a)}
                   title="Edit account"
-                  className="p-1 rounded hover:bg-amber-100 text-amber-600"
+                  className="p-1 rounded hover:bg-warning/10 text-warning"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
@@ -129,7 +129,7 @@ export default function CustomAccountRows({
                 <button
                   onClick={() => setPendingDelete(a)}
                   title="Delete account"
-                  className="p-1 rounded hover:bg-red-100 text-red-500"
+                  className="p-1 rounded hover:bg-destructive/10 text-destructive"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -138,7 +138,7 @@ export default function CustomAccountRows({
                 <button
                   onClick={() => setPendingToggle(a)}
                   title="Deactivate account"
-                  className="p-1 rounded hover:bg-orange-100 text-orange-500"
+                  className="p-1 rounded hover:bg-warning/10 text-warning"
                 >
                   <PowerOff className="h-3.5 w-3.5" />
                 </button>
@@ -147,7 +147,7 @@ export default function CustomAccountRows({
                 <button
                   onClick={() => setPendingToggle(a)}
                   title="Reactivate account"
-                  className="p-1 rounded hover:bg-green-100 text-green-600"
+                  className="p-1 rounded hover:bg-success/10 text-success"
                 >
                   <Power className="h-3.5 w-3.5" />
                 </button>
@@ -159,13 +159,13 @@ export default function CustomAccountRows({
 
       {/* Delete confirmation */}
       {pendingDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-5">
-              <h3 className="font-bold text-slate-800 text-base mb-1">Delete Account?</h3>
+              <h3 className="font-bold text-foreground text-base mb-1">Delete Account?</h3>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-mono text-xs text-slate-600">{pendingDelete.code}</span>{' '}
-                <span className="font-medium text-slate-700">{pendingDelete.name}</span>
+                <span className="font-mono text-xs text-foreground">{pendingDelete.code}</span>{' '}
+                <span className="font-medium text-foreground">{pendingDelete.name}</span>
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 This is permanent. Accounts with existing entries or sub-accounts cannot be deleted
@@ -182,7 +182,7 @@ export default function CustomAccountRows({
               <button
                 onClick={() => deleteMut.mutate()}
                 disabled={deleteMut.isPending}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
               >
                 {deleteMut.isPending ? 'Deleting…' : 'Delete'}
               </button>
@@ -193,15 +193,15 @@ export default function CustomAccountRows({
 
       {/* Deactivate / Reactivate confirmation */}
       {pendingToggle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-5">
-              <h3 className="font-bold text-slate-800 text-base mb-1">
+              <h3 className="font-bold text-foreground text-base mb-1">
                 {pendingToggle.isActive ? 'Deactivate Account?' : 'Reactivate Account?'}
               </h3>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-mono text-xs text-slate-600">{pendingToggle.code}</span>{' '}
-                <span className="font-medium text-slate-700">{pendingToggle.name}</span>
+                <span className="font-mono text-xs text-foreground">{pendingToggle.code}</span>{' '}
+                <span className="font-medium text-foreground">{pendingToggle.name}</span>
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 {pendingToggle.isActive
@@ -219,10 +219,10 @@ export default function CustomAccountRows({
               <button
                 onClick={() => toggleActiveMut.mutate()}
                 disabled={toggleActiveMut.isPending}
-                className={`px-4 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-50 transition-colors ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg text-primary-foreground disabled:opacity-50 transition-colors ${
                   pendingToggle.isActive
-                    ? 'bg-orange-600 hover:bg-orange-700'
-                    : 'bg-green-600 hover:bg-green-700'
+                    ? 'bg-warning hover:bg-warning/90'
+                    : 'bg-success hover:bg-success/90'
                 }`}
               >
                 {toggleActiveMut.isPending

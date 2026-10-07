@@ -84,7 +84,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
 
   if (requests.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-muted-foreground bg-card rounded-xl border border-blue-100/30">
+      <div className="flex flex-col items-center justify-center p-8 text-muted-foreground bg-card rounded-xl border border-primary/30">
         <FileText className="h-8 w-8 mb-2 opacity-50" />
         <p className="text-sm">No product requests found.</p>
       </div>
@@ -92,7 +92,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
   }
 
   return (
-    <div className="bg-card rounded-xl shadow-sm overflow-hidden h-full flex flex-col border border-blue-100/30">
+    <div className="bg-card rounded-xl shadow-sm overflow-hidden h-full flex flex-col border border-primary/30">
       <div className="overflow-x-auto flex-1">
         <Table>
           <TableHeader>
@@ -119,7 +119,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
               <TableRow
                 key={req.id}
                 className={`hover:bg-muted/50 transition-colors cursor-pointer ${
-                  index % 2 ? 'bg-blue-50/20' : 'bg-card'
+                  index % 2 ? 'bg-primary/10' : 'bg-card'
                 }`}
                 onClick={() => setSelectedRequest(req)}
               >
@@ -129,16 +129,16 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
                 <TableCell className="px-4 py-3 text-xs font-semibold text-primary">
                   {req.manager?.name || 'Unassigned'}
                 </TableCell>
-                <TableCell className="px-4 py-3 text-xs text-blue-600 font-medium whitespace-nowrap">
+                <TableCell className="px-4 py-3 text-xs text-primary font-medium whitespace-nowrap">
                   {vendorName || 'N/A'}
                 </TableCell>
                 <TableCell
-                  className="px-4 py-3 text-xs text-gray-700 max-w-[200px] truncate"
+                  className="px-4 py-3 text-xs text-foreground max-w-[200px] truncate"
                   title={req.products}
                 >
                   {req.products}
                 </TableCell>
-                <TableCell className="px-4 py-3 text-xs text-right font-bold text-slate-700">
+                <TableCell className="px-4 py-3 text-xs text-right font-bold text-foreground">
                   {formatCurrency(req.total_amount || 0, currency)}
                 </TableCell>
               </TableRow>
@@ -178,7 +178,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
                   <p className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
                     Status
                   </p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success/10 text-success">
                     Sent
                   </span>
                 </div>
@@ -198,7 +198,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
                   <p className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
                     Additional Message
                   </p>
-                  <div className="bg-yellow-50/50 p-4 rounded-lg border border-yellow-100/50 text-sm italic text-foreground">
+                  <div className="bg-warning/10 p-4 rounded-lg border border-warning/30 text-sm italic text-foreground">
                     {selectedRequest.message}
                   </div>
                 </div>

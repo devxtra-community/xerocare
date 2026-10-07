@@ -396,10 +396,10 @@ export default function EmployeeLeaseTable({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-primary">Lease Management</h2>
+        <h2 className="text-xl font-medium text-primary">Lease Management</h2>
         {mode === 'EMPLOYEE' && (
           <Button
-            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-primary-foreground gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={fetchPendingQuotations}
           >
             <Plus size={16} /> New Lease
@@ -407,14 +407,14 @@ export default function EmployeeLeaseTable({
         )}
       </div>
 
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Leases
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by invoice or customer..."
                 value={search}
@@ -424,13 +424,13 @@ export default function EmployeeLeaseTable({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Actions
             </label>
             <Button
               variant="outline"
               onClick={fetchInvoices}
-              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+              className="h-9 text-xs w-full justify-center gap-2 border-border hover:bg-muted"
             >
               Refresh Data
             </Button>
@@ -482,29 +482,29 @@ export default function EmployeeLeaseTable({
                 </TableRow>
               ) : (
                 paginatedInvoices.map((inv, index) => (
-                  <TableRow key={inv.id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
-                    <TableCell className="text-blue-500 font-bold tracking-tight">
+                  <TableRow key={inv.id} className={index % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}>
+                    <TableCell className="text-primary font-bold tracking-tight">
                       {inv.invoiceNumber}
                     </TableCell>
                     <TableCell className="font-bold text-primary">
                       {inv.customerName || 'Walk-in'}
                     </TableCell>
                     <TableCell className="max-w-[250px]">
-                      <div className="text-xs font-medium text-slate-700 truncate">
+                      <div className="text-xs font-medium text-foreground truncate">
                         {inv.items
                           ?.map((item) => getCleanProductName(item.description))
                           .join(', ') || 'No items'}
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <div className="text-[10px] font-bold text-slate-600">
+                      <div className="text-[10px] font-bold text-foreground">
                         {safeFormatDate(inv.startDate)} — {safeFormatDate(inv.endDate)}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-[10px] font-bold px-2 py-0.5 whitespace-nowrap"
+                        className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px] font-bold px-2 py-0.5 whitespace-nowrap"
                       >
                         <Clock className="w-3 h-3 mr-1" />
                         {calculateDays(inv.startDate, inv.endDate)} Days
@@ -523,15 +523,15 @@ export default function EmployeeLeaseTable({
                     </TableCell>
                     <TableCell>
                       {inv.contractStatus === 'COMPLETED' ? (
-                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700">
+                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-muted text-foreground">
                           CONTRACT CLOSED
                         </span>
                       ) : inv.contractStatus === 'ACTIVE' ? (
-                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-blue-100 text-blue-700">
+                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary">
                           CONTRACT ONGOING
                         </span>
                       ) : inv.contractStatus === 'PENDING_CONFIRMATION' ? (
-                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">
+                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-warning/10 text-warning">
                           SETUP NEEDED
                         </span>
                       ) : (
@@ -539,14 +539,14 @@ export default function EmployeeLeaseTable({
                           className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                           ${
                             inv.status === 'PAID' || inv.status === 'FINANCE_APPROVED'
-                              ? 'bg-green-100 text-green-600'
+                              ? 'bg-success/10 text-success'
                               : inv.status === 'PENDING' ||
                                   inv.status === 'TRANSACTION_COMPLETED' ||
                                   inv.status === 'EMPLOYEE_APPROVED'
-                                ? 'bg-blue-100 text-blue-600'
+                                ? 'bg-primary/10 text-primary'
                                 : inv.status === 'FINANCE_REJECTED' || inv.status === 'REJECTED'
-                                  ? 'bg-red-100 text-red-600'
-                                  : 'bg-slate-100 text-slate-600'
+                                  ? 'bg-destructive/10 text-destructive'
+                                  : 'bg-muted text-foreground'
                           }`}
                         >
                           {inv.status === 'TRANSACTION_COMPLETED' ||
@@ -868,10 +868,10 @@ function QuotationConverterDialog({
 
         <div className="px-6 pb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search quotation number or customer..."
-              className="pl-9 h-10 bg-slate-50 border-slate-100 rounded-xl font-bold text-xs"
+              className="pl-9 h-10 bg-muted border-border rounded-xl font-bold text-xs"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -884,9 +884,9 @@ function QuotationConverterDialog({
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="text-center py-12 text-muted-foreground bg-muted/50 rounded-2xl border-2 border-dashed border-border">
               <FileText className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p className="font-bold text-slate-900 text-sm">
+              <p className="font-bold text-foreground text-sm">
                 {search ? 'No matching quotations found.' : 'No pending quotations found.'}
               </p>
               <p className="text-[11px] mt-1">
@@ -910,25 +910,25 @@ function QuotationConverterDialog({
               {filtered.map((q) => (
                 <div
                   key={q.id}
-                  className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all group cursor-pointer active:scale-95"
+                  className="flex items-center justify-between p-4 bg-card border border-border rounded-2xl hover:border-primary hover:shadow-xl transition-all group cursor-pointer active:scale-95"
                   onClick={() => onSelect(q.id)}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-black text-slate-900 tracking-tight text-sm group-hover:text-blue-600">
+                      <span className="font-black text-foreground tracking-tight text-sm group-hover:text-primary">
                         {q.invoiceNumber}
                       </span>
                       <Badge
                         variant="secondary"
-                        className="text-[9px] uppercase font-black px-2 py-0 bg-slate-100 text-slate-600 shadow-none border-none"
+                        className="text-[9px] uppercase font-black px-2 py-0 bg-muted text-foreground shadow-none border-none"
                       >
                         {q.saleType}
                       </Badge>
                     </div>
-                    <p className="text-xs font-bold text-slate-500">
+                    <p className="text-xs font-bold text-muted-foreground">
                       {q.customerName || 'Walk-in'}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
                       {safeFormatDate(q.createdAt, {
                         month: 'short',
                         day: 'numeric',
@@ -937,13 +937,13 @@ function QuotationConverterDialog({
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-slate-900 text-sm tracking-tight mb-2">
+                    <p className="font-black text-foreground text-sm tracking-tight mb-2">
                       {formatCurrency(q.totalAmount || 0, currency)}
                     </p>
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="h-7 px-3 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 border-none hover:bg-blue-600 hover:text-white transition-colors"
+                      className="h-7 px-3 text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 border-none hover:bg-primary/90 hover:text-primary-foreground transition-colors"
                     >
                       Convert
                     </Button>
@@ -954,12 +954,12 @@ function QuotationConverterDialog({
           )}
         </div>
 
-        <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-end items-center">
+        <div className="p-4 bg-muted/50 border-t border-border flex justify-end items-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="font-black text-[10px] uppercase tracking-widest text-slate-500"
+            className="font-black text-[10px] uppercase tracking-widest text-muted-foreground"
           >
             Cancel
           </Button>

@@ -18,7 +18,7 @@ export default function ContractProgressBar({ completed, total }: ContractProgre
         </span>
         <span className="font-semibold text-primary">{percentage}%</span>
       </div>
-      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+      <div className="w-full bg-muted dark:bg-foreground rounded-full h-2 overflow-hidden">
         <div
           className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
           style={{ width: `${percentage}%` }}

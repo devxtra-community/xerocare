@@ -8,7 +8,7 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot="card"
       suppressHydrationWarning
       className={cn(
-        'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-5 px-3 shadow-sm',
+        'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border border-border py-5 px-3 shadow-[0_1px_3px_rgba(15,23,42,0.06)]',
         className,
       )}
       {...props}

@@ -8,9 +8,9 @@ import HRLeaveGraph from '@/components/HrComponents/HRLeaveGraph';
 
 export default function HRAttendancePage() {
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-blue-50/50 min-h-screen font-sans">
+    <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-primary/10 min-h-screen font-sans">
       <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold text-primary">Attendance Management</h2>
+        <h2 className="text-xl sm:text-2xl font-medium text-primary">Attendance Management</h2>
         <p className="text-sm text-muted-foreground font-medium">
           Monitor daily attendance, track leaves, and manage punctuality records.
         </p>
@@ -36,10 +36,10 @@ export default function HRAttendancePage() {
       </div>
 
       {/* Attendance Log Table */}
-      <div className="bg-card rounded-2xl p-6 shadow-sm border border-blue-100/50">
+      <div className="bg-card rounded-2xl p-6 shadow-sm border border-primary/30">
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-primary">Daily Attendance Log</h3>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+          <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">
             Real-time status and cumulative metrics for all staff
           </p>
         </div>

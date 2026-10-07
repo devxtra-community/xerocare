@@ -26,10 +26,10 @@ import Pagination from '@/components/Pagination';
 import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
-  DISPOSED: 'bg-red-100 text-red-700',
-  FULLY_DEPRECIATED: 'bg-gray-100 text-gray-600',
-  SUSPENDED: 'bg-yellow-100 text-yellow-700',
+  ACTIVE: 'bg-success/10 text-success',
+  DISPOSED: 'bg-destructive/10 text-destructive',
+  FULLY_DEPRECIATED: 'bg-muted text-foreground',
+  SUSPENDED: 'bg-warning/10 text-warning',
 };
 
 function DepreciationContent() {
@@ -91,15 +91,17 @@ function DepreciationContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Depreciation & Assets — Consolidated</h1>
-          <p className="text-sm text-gray-500">All branches</p>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">
+            Depreciation & Assets — Consolidated
+          </h1>
+          <p className="text-sm text-muted-foreground">All branches</p>
         </div>
         <button
           onClick={exportExcel}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
         >
           <Download className="h-4 w-4" /> Export
         </button>
@@ -127,46 +129,48 @@ function DepreciationContent() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
             Cost vs Net Book Value (by Category)
           </h3>
           <SimpleBarChart
             data={charts?.costVsNbv ?? []}
             xKey="name"
             bars={[
-              { key: 'cost', color: '#3b82f6', label: 'Cost' },
-              { key: 'nbv', color: '#10b981', label: 'NBV' },
+              { key: 'cost', color: 'var(--chart-blue-mid)', label: 'Cost' },
+              { key: 'nbv', color: 'var(--chart-profit)', label: 'NBV' },
             ]}
             height={240}
             currency={currency}
           />
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Depreciation Charge</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            Monthly Depreciation Charge
+          </h3>
           <SimpleLineChart
             data={charts?.monthlyCharge ?? []}
             xKey="month"
-            lines={[{ key: 'amount', color: '#f59e0b', label: 'Depreciation' }]}
+            lines={[{ key: 'amount', color: 'var(--chart-expense)', label: 'Depreciation' }]}
             height={240}
             currency={currency}
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <div className="flex items-center gap-3 p-4 border-b">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by ID or product..."
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <Select value={methodFilter} onValueChange={setMethodFilter}>
-            <SelectTrigger className="border-orange-200 text-sm">
+            <SelectTrigger className="border-warning/30 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -180,11 +184,11 @@ function DepreciationContent() {
           </Select>
         </div>
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400">Loading…</div>
+          <div className="p-8 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   {[
                     'Asset ID',
@@ -205,33 +209,33 @@ function DepreciationContent() {
               <tbody className="divide-y">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-gray-400">
+                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
                       No assets found
                     </td>
                   </tr>
                 ) : (
                   assetPaging.pageRows.map((a: AssetDepreciationRegister) => (
-                    <tr key={a.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                    <tr key={a.id} className="hover:bg-muted">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                         {a.id.slice(0, 8)}…
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                         {a.productId?.slice(0, 8) ?? '—'}…
                       </td>
                       <td className="px-4 py-3">{String(a.purchaseDate).slice(0, 10)}</td>
                       <td className="px-4 py-3">{formatCurrency(a.purchasePrice, currency)}</td>
-                      <td className="px-4 py-3 text-red-600">
+                      <td className="px-4 py-3 text-destructive">
                         {formatCurrency(a.accumulated, currency)}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-emerald-700">
+                      <td className="px-4 py-3 font-semibold text-success">
                         {formatCurrency(a.nbv, currency)}
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
                         {a.method.replace(/_/g, ' ')}
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[a.status] ?? 'bg-gray-100 text-gray-700'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[a.status] ?? 'bg-muted text-foreground'}`}
                         >
                           {a.status.replace(/_/g, ' ')}
                         </span>
@@ -259,7 +263,7 @@ function DepreciationContent() {
 
 export default function AdminDepreciationPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <DepreciationContent />
     </Suspense>
   );

@@ -70,10 +70,10 @@ function QuickRejectModal({ expense, onClose }: { expense: ExpenseRequest; onClo
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Reject Expense Request</h2>
+          <h2 className="font-bold text-foreground">Reject Expense Request</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -81,7 +81,7 @@ function QuickRejectModal({ expense, onClose }: { expense: ExpenseRequest; onClo
         <div className="px-6 py-4 space-y-3">
           <p className="text-sm text-muted-foreground">
             Expense request from{' '}
-            <span className="font-semibold text-slate-700">{expense.employeeName}</span> for{' '}
+            <span className="font-semibold text-foreground">{expense.employeeName}</span> for{' '}
             <span className="font-semibold">
               {formatCurrency(Number(expense.amount), expense.currency)}
             </span>{' '}
@@ -97,7 +97,7 @@ function QuickRejectModal({ expense, onClose }: { expense: ExpenseRequest; onClo
               placeholder="Explain why… (min 20 characters)"
             />
             {reason && reason.length < 20 && (
-              <p className="text-xs text-red-600 mt-1">Min 20 characters required</p>
+              <p className="text-xs text-destructive mt-1">Min 20 characters required</p>
             )}
           </div>
         </div>
@@ -108,7 +108,7 @@ function QuickRejectModal({ expense, onClose }: { expense: ExpenseRequest; onClo
           <Button
             onClick={() => mut.mutate()}
             disabled={reason.length < 20 || mut.isPending}
-            className="bg-red-600 text-white hover:bg-red-700"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {mut.isPending ? 'Rejecting...' : 'Confirm Rejection'}
           </Button>
@@ -287,7 +287,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
       </div>
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
+      <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -367,7 +367,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                 setDateFrom('');
                 setDateTo('');
               }}
-              className="text-xs text-muted-foreground hover:text-slate-700 underline"
+              className="text-xs text-muted-foreground hover:text-foreground underline"
             >
               Clear filters
             </button>
@@ -379,10 +379,10 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
           requests list below: these never had a submitter and never go through approval,
           so the columns that matter (which account it posted to, whether it is paid) are
           different ones. */}
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-            <Wallet size={14} className="text-emerald-600" />
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+            <Wallet size={14} className="text-success" />
             Expenses Recorded by Accounts
           </h3>
           <span className="text-xs text-muted-foreground">{ownExpenses.length} records</span>
@@ -393,7 +393,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
           </div>
         ) : ownExpenses.length === 0 ? (
           <div className="py-10 text-center">
-            <p className="text-sm font-semibold text-slate-500">No expenses recorded yet</p>
+            <p className="text-sm font-semibold text-muted-foreground">No expenses recorded yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Use Add Expense to book one directly — rent, utilities, salaries and the like.
             </p>
@@ -415,24 +415,26 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
             <TableBody>
               {ownExpensePaging.pageRows.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell className="pl-4 text-xs font-semibold text-slate-600">
+                  <TableCell className="pl-4 text-xs font-semibold text-foreground">
                     {new Date(e.date).toLocaleDateString('en-GB')}
                   </TableCell>
-                  <TableCell className="font-mono text-xs font-bold text-blue-600">
+                  <TableCell className="font-mono text-xs font-bold text-primary">
                     {e.expenseNo}
                   </TableCell>
                   <TableCell className="text-xs">
-                    <span className="font-semibold text-slate-700">
+                    <span className="font-semibold text-foreground">
                       {expenseCategoryLabel(e.category, categoryOptions)}
                     </span>
                     {e.subCategory && (
-                      <span className="block text-[10px] text-slate-400">{e.subCategory}</span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        {e.subCategory}
+                      </span>
                     )}
                   </TableCell>
-                  <TableCell className="max-w-[260px] truncate text-xs text-slate-600">
+                  <TableCell className="max-w-[260px] truncate text-xs text-foreground">
                     {e.description}
                     {e.isPrepayment && (
-                      <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700">
+                      <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">
                         PREPAID
                       </span>
                     )}
@@ -440,22 +442,22 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                   <TableCell className="text-right font-mono text-xs">
                     {formatCurrency(Number(e.amount), e.currency || currency)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs text-slate-500">
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
                     {Number(e.vatAmount) > 0
                       ? formatCurrency(Number(e.vatAmount), e.currency || currency)
                       : '—'}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-black text-slate-800">
+                  <TableCell className="text-right font-mono text-xs font-black text-foreground">
                     {formatCurrency(Number(e.netAmount), e.currency || currency)}
                   </TableCell>
                   <TableCell>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         e.status === 'PAID'
-                          ? 'bg-emerald-100 text-emerald-700'
+                          ? 'bg-success/10 text-success'
                           : e.status === 'REJECTED'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-amber-100 text-amber-700'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-warning/10 text-warning'
                       }`}
                     >
                       {e.status}
@@ -478,9 +480,9 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-700">Employee Expense Requests</h3>
+          <h3 className="text-sm font-bold text-foreground">Employee Expense Requests</h3>
           <span className="text-xs text-muted-foreground">{filtered.length} records</span>
         </div>
         {isLoading ? (
@@ -528,13 +530,13 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                 requestPaging.pageRows.map((r) => {
                   const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.PENDING;
                   return (
-                    <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                    <TableRow key={r.id} className="hover:bg-primary/10 transition-colors">
                       <TableCell className="pl-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
                         {r.submittedAt
                           ? new Date(r.submittedAt).toLocaleDateString()
                           : r.date?.slice(0, 10)}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-blue-600 font-bold whitespace-nowrap">
+                      <TableCell className="font-mono text-xs text-primary font-bold whitespace-nowrap">
                         {r.requestNo}
                       </TableCell>
                       <TableCell>
@@ -561,14 +563,14 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                               rel="noreferrer"
                               title="View receipt"
                               onClick={(e) => e.stopPropagation()}
-                              className="shrink-0 text-blue-500 hover:text-blue-700"
+                              className="shrink-0 text-primary hover:text-primary"
                             >
                               <FileText className="h-3.5 w-3.5" />
                             </a>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-bold text-red-600 whitespace-nowrap">
+                      <TableCell className="text-right font-bold text-destructive whitespace-nowrap">
                         {formatCurrency(Number(r.amount), r.currency)}
                       </TableCell>
                       <TableCell>
@@ -582,7 +584,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => setViewing(r)}
-                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
                             title="View details"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -591,14 +593,14 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                             <>
                               <button
                                 onClick={() => setViewing(r)}
-                                className="px-2 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+                                className="px-2 py-1 rounded-md bg-success text-success-foreground text-[11px] font-semibold hover:bg-success/90"
                               >
                                 <CheckCircle2 className="h-3 w-3 inline mr-0.5" />
                                 Approve
                               </button>
                               <button
                                 onClick={() => setRejecting(r)}
-                                className="px-2 py-1 rounded-md bg-red-100 text-red-600 text-[11px] font-semibold hover:bg-red-200"
+                                className="px-2 py-1 rounded-md bg-destructive/10 text-destructive text-[11px] font-semibold hover:bg-destructive/10"
                               >
                                 <XCircle className="h-3 w-3 inline mr-0.5" />
                                 Reject
@@ -608,7 +610,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                           {r.status === 'APPROVED' && (
                             <button
                               onClick={() => setPaying(r)}
-                              className="px-2 py-1 rounded-md bg-purple-600 text-white text-[11px] font-semibold hover:bg-purple-700"
+                              className="px-2 py-1 rounded-md bg-lease text-lease-foreground text-[11px] font-semibold hover:bg-lease/90"
                             >
                               Pay
                             </button>

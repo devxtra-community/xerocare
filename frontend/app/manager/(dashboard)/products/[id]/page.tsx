@@ -132,18 +132,21 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-blue-50/50 p-6 space-y-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 p-6 space-y-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm font-medium text-slate-500">Loading product details...</p>
+        <p className="text-sm font-medium text-muted-foreground">Loading product details...</p>
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-blue-50/50 p-6 space-y-4">
-        <p className="text-lg font-bold text-slate-800">Product not found</p>
-        <Button onClick={() => router.back()} className="bg-primary hover:opacity-90 text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 p-6 space-y-4">
+        <p className="text-lg font-bold text-foreground">Product not found</p>
+        <Button
+          onClick={() => router.back()}
+          className="bg-primary hover:opacity-90 text-primary-foreground"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
         </Button>
       </div>
@@ -164,34 +167,34 @@ export default function ProductDetailPage() {
     : '—';
 
   return (
-    <div className="min-h-screen bg-blue-50/40 p-4 sm:p-6 md:p-8 space-y-6">
+    <div className="min-h-screen bg-primary/10 p-4 sm:p-6 md:p-8 space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-2xl border border-border shadow-sm">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
             size="icon"
-            className="h-9 w-9 bg-card border-slate-200 text-slate-600 hover:bg-slate-50"
+            className="h-9 w-9 bg-card border-border text-foreground hover:bg-muted"
             onClick={() => router.back()}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg sm:text-xl font-bold text-slate-800">{product.name}</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-foreground">{product.name}</h3>
               <span
                 className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                   product.product_status === 'AVAILABLE'
-                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    ? 'bg-success/10 text-success border border-success/30'
                     : product.product_status === 'RENTED'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                      ? 'bg-primary/10 text-primary border border-primary/30'
+                      : 'bg-warning/10 text-warning border border-warning/30'
                 }`}
               >
                 {product.product_status}
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
+            <p className="text-xs text-muted-foreground font-medium mt-1">
               Model:{' '}
               {product.model
                 ? `${product.model.model_no}${
@@ -200,7 +203,7 @@ export default function ProductDetailPage() {
                       : ''
                   }`
                 : product.model_id || '—'}
-              <span className="mx-2 text-slate-300">•</span>
+              <span className="mx-2 text-muted-foreground">•</span>
               Serial No: {product.serial_no}
             </p>
           </div>
@@ -212,8 +215,8 @@ export default function ProductDetailPage() {
         {/* Left Column: Image, Price, Barcode */}
         <div className="lg:col-span-4 space-y-6">
           {/* Image Container */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col items-center">
-            <div className="aspect-square relative w-full rounded-xl border border-slate-100 bg-slate-50/50 overflow-hidden flex items-center justify-center group">
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm flex flex-col items-center">
+            <div className="aspect-square relative w-full rounded-xl border border-border bg-muted/50 overflow-hidden flex items-center justify-center group">
               {product.imageUrl ? (
                 <>
                   <Image
@@ -224,51 +227,53 @@ export default function ProductDetailPage() {
                     unoptimized
                   />
                   <div
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                    className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
                     onClick={() => setPreviewImage(product.imageUrl || null)}
                   >
-                    <Eye size={20} className="text-white" />
+                    <Eye size={20} className="text-primary-foreground" />
                   </div>
                 </>
               ) : (
-                <Package size={64} className="text-slate-300" />
+                <Package size={64} className="text-muted-foreground" />
               )}
             </div>
           </div>
 
           {/* Pricing Card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm space-y-4">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-2">
               Pricing Details
             </h4>
-            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-              <p className="text-[10px] font-semibold text-blue-600 tracking-wider uppercase mb-1">
+            <div className="bg-primary/10 p-4 rounded-xl border border-primary/30">
+              <p className="text-[10px] font-semibold text-primary tracking-wider uppercase mb-1">
                 Selling Price
               </p>
-              <p className="text-3xl font-extrabold text-blue-800">
+              <p className="text-3xl font-extrabold text-primary">
                 {formatCurrency(product.sale_price, currency)}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
+              <div className="bg-muted p-3 rounded-lg border border-border">
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-0.5">
                   Wholesale Price
                 </p>
-                <p className="text-sm font-semibold text-slate-700">
+                <p className="text-sm font-semibold text-foreground">
                   {formatCurrency(product.wholesale_price || 0, currency)}
                 </p>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">Tax Rate</p>
-                <p className="text-sm font-semibold text-slate-700">{product.tax_rate}%</p>
+              <div className="bg-muted p-3 rounded-lg border border-border">
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-0.5">
+                  Tax Rate
+                </p>
+                <p className="text-sm font-semibold text-foreground">{product.tax_rate}%</p>
               </div>
             </div>
             {product.purchase_price && (
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
+              <div className="bg-muted p-3 rounded-lg border border-border">
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-0.5">
                   Purchase Price
                 </p>
-                <p className="text-sm font-semibold text-slate-700">
+                <p className="text-sm font-semibold text-foreground">
                   {formatCurrency(product.purchase_price, currency)}
                 </p>
               </div>
@@ -276,25 +281,25 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Barcode Card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col items-center">
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm flex flex-col items-center">
             <div className="flex justify-between items-center w-full mb-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                 Product Barcode
               </h4>
               <button
                 onClick={() =>
                   handleCopy(product.barcode_id || `XC-P-${product.serial_no}`, 'Barcode ID')
                 }
-                className="text-slate-400 hover:text-primary p-1 rounded hover:bg-slate-50 transition-colors"
+                className="text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted transition-colors"
               >
                 {copiedField === 'Barcode ID' ? (
-                  <Check size={14} className="text-green-500" />
+                  <Check size={14} className="text-success" />
                 ) : (
                   <Copy size={14} />
                 )}
               </button>
             </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 flex items-center justify-center w-full shadow-inner">
+            <div className="bg-muted p-4 rounded-xl border border-border/50 flex items-center justify-center w-full shadow-inner">
               <Barcode
                 value={product.barcode_id || `XC-P-${product.serial_no}`}
                 width={1.6}
@@ -309,8 +314,8 @@ export default function ProductDetailPage() {
         {/* Right Column: Spec Sheet, Desc, Features, Consumables */}
         <div className="lg:col-span-8 space-y-6">
           {/* Specifications Sheet */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-6 pb-3 border-b border-slate-100">
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-6 pb-3 border-b border-border">
               <Info size={16} className="text-primary" /> Technical Specifications
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
@@ -374,11 +379,11 @@ export default function ProductDetailPage() {
 
           {/* Description */}
           {product.description && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <FileText size={16} className="text-slate-400" /> Description
+            <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-4">
+                <FileText size={16} className="text-muted-foreground" /> Description
               </h4>
-              <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed shadow-inner">
+              <div className="bg-muted p-5 rounded-xl border border-border text-sm text-foreground whitespace-pre-wrap leading-relaxed shadow-inner">
                 {product.description}
               </div>
             </div>
@@ -386,20 +391,22 @@ export default function ProductDetailPage() {
 
           {/* Key Features */}
           {displayFeatures && displayFeatures.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <List size={16} className="text-emerald-500" /> Key Features
+            <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
+              <h4 className="text-xs font-bold text-success uppercase tracking-widest flex items-center gap-2 mb-4">
+                <List size={16} className="text-success" /> Key Features
               </h4>
-              <div className="bg-emerald-50/20 p-5 rounded-xl border border-emerald-100/50 space-y-4">
+              <div className="bg-success/10 p-5 rounded-xl border border-success/30 space-y-4">
                 {displayFeatures.map((f: ProductFeature, i: number) => (
                   <div key={i} className="group">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                      <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                      <p className="text-xs font-bold text-success uppercase tracking-wide">
                         {f.subHeading}
                       </p>
                     </div>
-                    <p className="text-sm text-slate-600 leading-relaxed pl-3.5">{f.description}</p>
+                    <p className="text-sm text-foreground leading-relaxed pl-3.5">
+                      {f.description}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -408,13 +415,13 @@ export default function ProductDetailPage() {
 
           {/* Replacement Consumables */}
           {product.consumables && product.consumables.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <Layers size={16} className="text-slate-400" /> Replacement Consumables
+            <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-4">
+                <Layers size={16} className="text-muted-foreground" /> Replacement Consumables
               </h4>
-              <div className="overflow-hidden border border-slate-200/60 rounded-xl shadow-sm">
+              <div className="overflow-hidden border border-border/60 rounded-xl shadow-sm">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <thead className="bg-muted text-muted-foreground border-b border-border">
                     <tr>
                       <th className="px-4 py-3 font-bold uppercase tracking-wider">Part Number</th>
                       <th className="px-4 py-3 font-bold uppercase tracking-wider">Description</th>
@@ -424,14 +431,14 @@ export default function ProductDetailPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-border">
                     {product.consumables.map((c: ProductConsumable, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-800">
+                      <tr key={i} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-foreground">
                           {c.partName || '—'}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{c.description || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600">{c.yield || '—'}</td>
+                        <td className="px-4 py-3 text-foreground">{c.description || '—'}</td>
+                        <td className="px-4 py-3 text-foreground">{c.yield || '—'}</td>
                         <td className="px-4 py-3 font-bold text-primary text-right">
                           {formatCurrency(Number(c.price || 0), currency)}
                         </td>
@@ -446,8 +453,8 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Service cost analytics for RENT/LEASE/SALE and external machines. */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+      <div className="bg-card rounded-2xl border border-border p-6 shadow-sm space-y-4">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
           Service & Spend History
         </h3>
         <MachineServiceAnalyticsPanel serialNumber={product.serial_no} currency={currency} />
@@ -455,11 +462,11 @@ export default function ProductDetailPage() {
 
       {/* Image Preview Overlay Modal */}
       {previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground backdrop-blur-sm p-4">
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center">
             <button
               onClick={() => setPreviewImage(null)}
-              className="absolute -top-12 right-0 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+              className="absolute -top-12 right-0 p-2 text-primary-foreground hover:text-primary-foreground bg-card hover:bg-card rounded-full transition-colors"
             >
               <X size={24} />
             </button>
@@ -495,22 +502,22 @@ function SpecRow({
   copied?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-100 hover:bg-slate-50/30 px-1 rounded transition-colors">
+    <div className="flex items-center justify-between py-3 border-b border-border hover:bg-muted/30 px-1 rounded transition-colors">
       <div className="flex items-center gap-3">
-        <div className="text-slate-400">{icon}</div>
+        <div className="text-muted-foreground">{icon}</div>
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
             {label}
           </span>
-          <span className="text-sm font-semibold text-slate-700 mt-0.5">{value}</span>
+          <span className="text-sm font-semibold text-foreground mt-0.5">{value}</span>
         </div>
       </div>
       {hasCopy && value && value !== '—' && (
         <button
           onClick={onCopy}
-          className="text-slate-400 hover:text-primary p-1 rounded hover:bg-slate-50 transition-colors"
+          className="text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted transition-colors"
         >
-          {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+          {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
         </button>
       )}
     </div>

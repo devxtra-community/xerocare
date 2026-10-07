@@ -280,7 +280,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
               </Field>
             )}
 
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+            {error && <p className="text-sm text-destructive text-center">{error}</p>}
 
             <Field>
               <Button type="submit" className="w-full" disabled={loading}>
@@ -331,7 +331,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                 </Field>
               </>
             ) : (
-              <div className="p-4 text-center bg-green-50 text-green-700 rounded-lg">
+              <div className="p-4 text-center bg-success/10 text-success rounded-lg">
                 <p>Magic link sent! Check your inbox.</p>
                 <Button
                   variant="link"
@@ -344,7 +344,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
               </div>
             )}
 
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+            {error && <p className="text-sm text-destructive text-center">{error}</p>}
           </FieldGroup>
         </form>
       )}

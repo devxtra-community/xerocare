@@ -206,28 +206,28 @@ export default function AddCostModal({
           put, only the fields scroll. Previously `overflow-hidden` with no height cap
           clipped anything past the bottom of the screen with no way to scroll to it. */}
       <DialogContent className="sm:max-w-[450px] border-none shadow-2xl p-0 overflow-hidden rounded-2xl flex flex-col max-h-[90dvh]">
-        <div className="bg-slate-900 px-6 py-6 text-white shrink-0">
+        <div className="bg-foreground px-6 py-6 text-primary-foreground shrink-0">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Banknote className="text-emerald-400" />
+              <Banknote className="text-success" />
               Add Record Cost
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-2 text-slate-400 text-xs">
+          <div className="mt-2 text-muted-foreground text-xs">
             {isManager
               ? 'Additional lot costs are sent to Finance for approval. The cost is added to the lot and funds deducted only once approved.'
               : 'Record additional expenses related to this lot amount.'}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-white">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-card">
           <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
+              <Label htmlFor="amount" className="text-xs font-bold text-muted-foreground uppercase">
                 Cost Amount
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
                   {currencyCode}
                 </span>
                 <Input
@@ -236,7 +236,7 @@ export default function AddCostModal({
                   step="0.01"
                   min="0.01"
                   required
-                  className="pl-12 h-11 text-lg font-bold border-slate-200 focus:ring-primary"
+                  className="pl-12 h-11 text-lg font-bold border-border focus:ring-primary"
                   value={formData.amount || ''}
                   onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
                   autoFocus
@@ -245,25 +245,25 @@ export default function AddCostModal({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                 <Calendar size={12} /> Date
               </Label>
               <Input
                 type="date"
                 required
-                className="h-10 text-xs border-slate-200"
+                className="h-10 text-xs border-border"
                 value={formData.costDate}
                 onChange={(e) => setFormData({ ...formData, costDate: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase">Cost Type</Label>
+              <Label className="text-xs font-bold text-muted-foreground uppercase">Cost Type</Label>
               <Select
                 value={formData.costType}
                 onValueChange={(val) => setFormData({ ...formData, costType: val })}
               >
-                <SelectTrigger className="h-10 text-xs border-slate-200">
+                <SelectTrigger className="h-10 text-xs border-border">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -278,13 +278,13 @@ export default function AddCostModal({
 
             {formData.costType === 'Other' && (
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase">
+                <Label className="text-xs font-bold text-muted-foreground uppercase">
                   Custom Cost Type *
                 </Label>
                 <Input
                   required
                   placeholder="e.g. Crane Rental, Warehouse Fee..."
-                  className="h-10 text-xs border-slate-200"
+                  className="h-10 text-xs border-border"
                   value={customCostType}
                   onChange={(e) => setCustomCostType(e.target.value)}
                   autoFocus
@@ -295,11 +295,11 @@ export default function AddCostModal({
             {isManager && (
               <>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                     <CreditCard size={12} /> Payment Method
                   </Label>
                   <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger className="h-10 text-xs border-slate-200">
+                    <SelectTrigger className="h-10 text-xs border-border">
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
                     <SelectContent>
@@ -313,11 +313,11 @@ export default function AddCostModal({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase">
                     Pay From Account
                   </Label>
                   {matchingAccounts.length === 0 ? (
-                    <p className="text-[11px] font-medium text-red-600">
+                    <p className="text-[11px] font-medium text-destructive">
                       No{' '}
                       {accountTypeForPaymentMode(paymentMethod) === 'CASH'
                         ? 'Cash in Hand'
@@ -326,7 +326,7 @@ export default function AddCostModal({
                     </p>
                   ) : (
                     <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
-                      <SelectTrigger className="h-10 text-xs border-slate-200">
+                      <SelectTrigger className="h-10 text-xs border-border">
                         <SelectValue placeholder="Select account" />
                       </SelectTrigger>
                       <SelectContent>
@@ -342,26 +342,26 @@ export default function AddCostModal({
                     </Select>
                   )}
                   {balanceError && (
-                    <p className="text-[11px] font-medium text-red-600">{balanceError}</p>
+                    <p className="text-[11px] font-medium text-destructive">{balanceError}</p>
                   )}
                 </div>
               </>
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                 <FileText size={12} /> Description
               </Label>
               <Input
                 placeholder="e.g. Extra workers for unloading"
-                className="h-10 text-xs border-slate-200"
+                className="h-10 text-xs border-border"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                 <Paperclip size={12} /> Attachment (optional)
               </Label>
               <input
@@ -372,15 +372,15 @@ export default function AddCostModal({
                 onChange={handleFileChange}
               />
               {attachment ? (
-                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
-                  <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-border bg-muted text-xs">
+                  <span className="truncate text-foreground font-medium">{attachment.name}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setAttachment(null);
                       if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
-                    className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
                     title="Remove attachment"
                   >
                     <X size={14} />
@@ -390,7 +390,7 @@ export default function AddCostModal({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
+                  className="w-full h-10 rounded-md border border-dashed border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   Attach receipt image or PDF
                 </button>
@@ -399,7 +399,7 @@ export default function AddCostModal({
           </div>
 
           {/* Pinned action bar — always reachable regardless of form length. */}
-          <div className="shrink-0 flex gap-3 border-t border-slate-200 bg-white px-6 py-4">
+          <div className="shrink-0 flex gap-3 border-t border-border bg-card px-6 py-4">
             <Button
               type="button"
               variant="ghost"
@@ -410,7 +410,7 @@ export default function AddCostModal({
             </Button>
             <Button
               type="submit"
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 font-bold"
+              className="flex-1 bg-success hover:bg-success/90 font-bold"
               disabled={loading || (isManager && (matchingAccounts.length === 0 || !!balanceError))}
             >
               {loading

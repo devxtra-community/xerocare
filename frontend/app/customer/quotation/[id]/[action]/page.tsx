@@ -50,37 +50,39 @@ export default function CustomerQuotationPage() {
   }, [id, action]);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col">
+    <div className="min-h-screen bg-linear-to-br from-muted to-muted flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-card rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col">
         {/* Header with Logo Area */}
-        <div className="bg-slate-900 p-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 rounded-2xl mb-4 backdrop-blur-sm border border-white/20">
-            <span className="text-white font-black text-2xl tracking-tighter">XC</span>
+        <div className="bg-foreground p-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-card rounded-2xl mb-4 backdrop-blur-sm border border-border">
+            <span className="text-primary-foreground font-black text-2xl tracking-tighter">XC</span>
           </div>
-          <h2 className="text-white font-extrabold text-xl tracking-tight">XEROCARE</h2>
+          <h2 className="text-primary-foreground font-medium text-xl tracking-tight">XEROCARE</h2>
         </div>
 
         {/* Content Area */}
         <div className="p-10 text-center flex-1">
           {status === 'loading' && (
             <div className="py-10">
-              <Loader2 className="w-16 h-16 text-slate-900 animate-spin mx-auto mb-6 opacity-80" />
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">Processing...</h3>
-              <p className="text-slate-500">Please wait while we record your response.</p>
+              <Loader2 className="w-16 h-16 text-foreground animate-spin mx-auto mb-6 opacity-80" />
+              <h3 className="text-xl sm:text-2xl font-medium text-foreground mb-2">
+                Processing...
+              </h3>
+              <p className="text-muted-foreground">Please wait while we record your response.</p>
             </div>
           )}
 
           {status === 'success' && (
             <div className="py-6 animate-in fade-in zoom-in duration-500">
-              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+              <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-12 h-12 text-success" />
               </div>
-              <h3 className="text-3xl font-black text-slate-900 mb-4">
+              <h3 className="text-xl sm:text-2xl font-medium text-foreground mb-4">
                 {action === 'accept' ? 'Confirmed!' : 'Recorded'}
               </h3>
-              <p className="text-lg text-slate-600 leading-relaxed mb-6">{message}</p>
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 inline-block">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+              <p className="text-lg text-foreground leading-relaxed mb-6">{message}</p>
+              <div className="bg-muted border border-border rounded-xl p-4 inline-block">
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">
                   This window will close automatically
                 </p>
               </div>
@@ -89,20 +91,20 @@ export default function CustomerQuotationPage() {
 
           {status === 'error' && (
             <div className="py-6 animate-in fade-in zoom-in duration-500">
-              <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <XCircle className="w-12 h-12 text-rose-600" />
+              <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <XCircle className="w-12 h-12 text-destructive" />
               </div>
-              <h3 className="text-3xl font-black text-slate-900 mb-4">Oops!</h3>
-              <p className="text-lg text-slate-600 leading-relaxed">{message}</p>
+              <h3 className="text-xl sm:text-2xl font-medium text-foreground mb-4">Oops!</h3>
+              <p className="text-lg text-foreground leading-relaxed">{message}</p>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-8 bg-slate-50 border-t border-slate-100 text-center">
+        <div className="p-8 bg-muted border-t border-border text-center">
           <Link
             href="/"
-            className="inline-flex items-center text-slate-500 hover:text-slate-900 font-semibold transition-colors group"
+            className="inline-flex items-center text-muted-foreground hover:text-foreground font-semibold transition-colors group"
           >
             <Home className="w-4 h-4 mr-2 group-hover:-translate-y-0.5 transition-transform" />
             Back to Website
@@ -112,8 +114,8 @@ export default function CustomerQuotationPage() {
 
       {/* Background Micro-Animations/Decor */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-400/5 blur-[120px] rounded-full"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-400/5 blur-[120px] rounded-full"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-success/20 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full"></div>
       </div>
     </div>
   );

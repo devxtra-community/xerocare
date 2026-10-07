@@ -39,27 +39,27 @@ import { QuotationViewDialog } from '../employeeComponents/QuotationViewDialog';
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    DRAFT: 'bg-slate-50 text-slate-600 border-slate-200',
-    EMPLOYEE_APPROVED: 'bg-blue-50 text-blue-600 border-blue-200',
-    FINANCE_APPROVED: 'bg-green-50 text-green-700 border-green-200',
-    FINANCE_REJECTED: 'bg-red-50 text-red-700 border-red-200',
-    APPROVED: 'bg-green-50 text-green-700 border-green-200',
-    REJECTED: 'bg-red-50 text-red-700 border-red-200',
-    VALIDITY_EXTENSION_REQUESTED: 'bg-amber-50 text-amber-700 border-amber-200',
-    WAITING_FINANCE_APPROVAL: 'bg-amber-50 text-amber-700 border-amber-200',
-    PENDING: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    ACTIVE_CONTRACT: 'bg-green-50 text-green-700 border-green-200',
-    ACTIVE_LEASE: 'bg-green-50 text-green-700 border-green-200',
-    INVOICED: 'bg-blue-50 text-blue-600 border-blue-200',
-    PAID: 'bg-green-50 text-green-700 border-green-200',
-    EXPIRED: 'bg-red-50 text-red-700 border-red-200',
-    CUSTOMER_ACCEPTED: 'bg-green-50 text-green-700 border-green-200',
-    CUSTOMER_REJECTED: 'bg-red-50 text-red-700 border-red-200',
-    CANCELLED: 'bg-slate-50 text-slate-600 border-slate-200',
-    CREDIT_EXCHANGE: 'bg-purple-50 text-purple-700 border-purple-200',
-    PRODUCT_REPLACED: 'bg-purple-50 text-purple-700 border-purple-200',
-    CREDIT_RETURN: 'bg-purple-50 text-purple-700 border-purple-200',
-    CASH_REFUND: 'bg-purple-50 text-purple-700 border-purple-200',
+    DRAFT: 'bg-muted text-foreground border-border',
+    EMPLOYEE_APPROVED: 'bg-primary/10 text-primary border-primary/30',
+    FINANCE_APPROVED: 'bg-success/10 text-success border-success/30',
+    FINANCE_REJECTED: 'bg-destructive/10 text-destructive border-destructive/30',
+    APPROVED: 'bg-success/10 text-success border-success/30',
+    REJECTED: 'bg-destructive/10 text-destructive border-destructive/30',
+    VALIDITY_EXTENSION_REQUESTED: 'bg-warning/10 text-warning border-warning/30',
+    WAITING_FINANCE_APPROVAL: 'bg-warning/10 text-warning border-warning/30',
+    PENDING: 'bg-warning/10 text-warning border-warning/30',
+    ACTIVE_CONTRACT: 'bg-success/10 text-success border-success/30',
+    ACTIVE_LEASE: 'bg-success/10 text-success border-success/30',
+    INVOICED: 'bg-primary/10 text-primary border-primary/30',
+    PAID: 'bg-success/10 text-success border-success/30',
+    EXPIRED: 'bg-destructive/10 text-destructive border-destructive/30',
+    CUSTOMER_ACCEPTED: 'bg-success/10 text-success border-success/30',
+    CUSTOMER_REJECTED: 'bg-destructive/10 text-destructive border-destructive/30',
+    CANCELLED: 'bg-muted text-foreground border-border',
+    CREDIT_EXCHANGE: 'bg-lease/10 text-lease border-lease/30',
+    PRODUCT_REPLACED: 'bg-lease/10 text-lease border-lease/30',
+    CREDIT_RETURN: 'bg-lease/10 text-lease border-lease/30',
+    CASH_REFUND: 'bg-lease/10 text-lease border-lease/30',
   };
   const label: Record<string, string> = {
     DRAFT: 'DRAFT',
@@ -91,7 +91,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Badge
       variant="outline"
-      className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase shadow-none border ${map[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}
+      className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase shadow-none border ${map[status] || 'bg-muted text-foreground border-border'}`}
     >
       {label[status] ?? status}
     </Badge>
@@ -100,11 +100,11 @@ function StatusBadge({ status }: { status: string }) {
 
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, string> = {
-    SALE: 'bg-blue-50 text-blue-600 border-blue-200',
-    RENT: 'bg-orange-50 text-orange-600 border-orange-200',
-    LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
-    PRODUCT_SALE: 'bg-indigo-50 text-indigo-600 border-indigo-200',
-    SPAREPART_SALE: 'bg-cyan-50 text-cyan-600 border-cyan-200',
+    SALE: 'bg-primary/10 text-primary border-primary/30',
+    RENT: 'bg-warning/10 text-warning border-warning/30',
+    LEASE: 'bg-lease/10 text-lease border-lease/30',
+    PRODUCT_SALE: 'bg-primary/10 text-primary border-primary/30',
+    SPAREPART_SALE: 'bg-info/10 text-info border-info/30',
   };
   return (
     <Badge
@@ -374,23 +374,23 @@ export default function FinanceQuotationTable({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-primary">Quotation Review</h2>
+          <h2 className="text-xl font-medium text-primary">Quotation Review</h2>
           <p className="text-sm text-muted-foreground">
             Review and approve or reject employee quotations
           </p>
         </div>
         {pending > 0 && (
-          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
-            <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-sm font-bold text-blue-700">{pending} pending review</span>
+          <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-4 py-2">
+            <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-sm font-bold text-primary">{pending} pending review</span>
           </div>
         )}
       </div>
 
       {/* Search */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
         <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by number, customer, product, employee..."
             value={search}
@@ -401,7 +401,7 @@ export default function FinanceQuotationTable({
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border p-4">
         {/* Scrollbar left visible (as on the employee table): the columns are now sized
             to their content rather than squeezed into fixed percentages, so on a narrow
             screen there IS something to scroll to and hiding the bar would conceal it. */}
@@ -442,10 +442,10 @@ export default function FinanceQuotationTable({
                   return (
                     <TableRow
                       key={q.id}
-                      className={`${isPending ? 'bg-blue-50/30 hover:bg-blue-50/50' : index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
+                      className={`${isPending ? 'bg-primary/10 hover:bg-primary/10' : index % 2 ? 'bg-primary/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                     >
                       <TableCell
-                        className={`${q.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED') ? 'text-rose-500' : 'text-blue-500'} font-bold tracking-tight`}
+                        className={`${q.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED') ? 'text-destructive' : 'text-primary'} font-bold tracking-tight`}
                       >
                         <span
                           title={(() => {
@@ -474,12 +474,12 @@ export default function FinanceQuotationTable({
                         </span>
                       </TableCell>
                       <TableCell
-                        className="font-semibold text-slate-700 max-w-[220px] truncate"
+                        className="font-semibold text-foreground max-w-[220px] truncate"
                         title={getProductNames(q)}
                       >
                         {getProductNames(q) || '—'}
                       </TableCell>
-                      <TableCell className="font-bold text-slate-700 whitespace-nowrap">
+                      <TableCell className="font-bold text-foreground whitespace-nowrap">
                         {q.customerName || 'Walk-in'}
                       </TableCell>
                       <TableCell>
@@ -498,13 +498,13 @@ export default function FinanceQuotationTable({
                             ) {
                               return (
                                 <div>
-                                  <div className="text-violet-700">
+                                  <div className="text-lease">
                                     {formatCurrency(
                                       Number(completedExchange.replacementAmount),
                                       currency,
                                     )}
                                   </div>
-                                  <div className="text-[9px] text-slate-400 line-through">
+                                  <div className="text-[9px] text-muted-foreground line-through">
                                     {formatCurrency(q.totalAmount, currency)}
                                   </div>
                                 </div>
@@ -514,7 +514,7 @@ export default function FinanceQuotationTable({
                           })()}
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-600 whitespace-nowrap">
+                      <TableCell className="text-foreground whitespace-nowrap">
                         {q.employeeName || '—'}
                       </TableCell>
                       <TableCell>
@@ -542,7 +542,7 @@ export default function FinanceQuotationTable({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50 rounded-lg"
+                            className="h-8 w-8 p-0 text-primary hover:bg-primary/10 rounded-lg"
                             title="View Details"
                             onClick={() => handleView(q.id)}
                           >
@@ -554,7 +554,7 @@ export default function FinanceQuotationTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 rounded-lg"
+                                className="h-8 w-8 p-0 text-success hover:bg-success/10 rounded-lg"
                                 title="Approve"
                                 onClick={() => handleApprove(q)}
                               >
@@ -563,7 +563,7 @@ export default function FinanceQuotationTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 rounded-lg"
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 rounded-lg"
                                 title="Reject"
                                 onClick={() => openReject(q)}
                               >

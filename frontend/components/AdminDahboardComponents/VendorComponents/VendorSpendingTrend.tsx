@@ -77,24 +77,28 @@ export default function VendorSpendingTrend({ requests }: VendorSpendingTrendPro
                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
             <XAxis
               dataKey="month"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748B', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10 }}
               tickMargin={10}
             />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10 }}
+            />
             <Tooltip
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
                 padding: '8px',
                 fontSize: '10px',
               }}
-              cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              cursor={{ stroke: 'var(--chart-grid)', strokeWidth: 1 }}
               formatter={(value: number) => [
                 `${getActiveCurrency()} ${value.toLocaleString()}`,
                 'Spend',

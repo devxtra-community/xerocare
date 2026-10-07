@@ -142,30 +142,32 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
                 formatter={(val: number) => [`${getActiveCurrency()} ${formatCompactNumber(val)}`]}
                 contentStyle={{
                   borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  background: '#ffffff',
-                  boxShadow: '0 6px 20px rgba(15,23,42,0.10)',
+                  border: '1px solid var(--chart-grid)',
+                  background: 'var(--card)',
+                  boxShadow: '0 6px 20px color-mix(in srgb, var(--foreground) 10%, transparent)',
                   padding: '8px 10px',
                 }}
                 labelStyle={{
-                  color: '#0f172a',
+                  color: 'var(--foreground)',
                   fontWeight: 700,
                   fontSize: '11px',
                   marginBottom: 4,
                 }}
                 itemStyle={{
                   fontSize: '11px',
-                  color: '#475569',
+                  color: 'var(--muted-foreground)',
                   padding: 0,
                 }}
-                cursor={{ fill: 'rgba(15,23,42,0.04)' }}
+                cursor={{ fill: 'color-mix(in srgb, var(--foreground) 4%, transparent)' }}
               />
               {/* Ink-coloured legend labels — meaning lives in the swatch, not the text. */}
               <Legend
                 iconType="circle"
                 iconSize={8}
                 formatter={(value: string) => (
-                  <span style={{ color: '#475569', fontSize: 11, fontWeight: 600 }}>{value}</span>
+                  <span style={{ color: 'var(--muted-foreground)', fontSize: 11, fontWeight: 600 }}>
+                    {value}
+                  </span>
                 )}
                 wrapperStyle={{ paddingTop: '6px' }}
               />

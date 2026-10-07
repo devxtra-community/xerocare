@@ -118,7 +118,7 @@ export default function RequestProductDialog({
           <div className="space-y-2">
             <div className="flex justify-between items-center w-full">
               <Label htmlFor="products">
-                Product List <span className="text-red-500">*</span>
+                Product List <span className="text-destructive">*</span>
               </Label>
 
               <input
@@ -132,7 +132,7 @@ export default function RequestProductDialog({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
+                className="h-8 gap-1.5 text-xs text-primary border-primary/30 bg-primary/10 hover:bg-primary/10 hover:text-primary"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <UploadCloud size={14} />

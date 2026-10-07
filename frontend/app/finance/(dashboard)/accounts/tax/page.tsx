@@ -51,16 +51,16 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 
 const TAX_STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  RECORDED: 'bg-blue-100 text-blue-700',
-  FILED: 'bg-green-100 text-green-700',
+  PENDING: 'bg-warning/10 text-warning',
+  RECORDED: 'bg-primary/10 text-primary',
+  FILED: 'bg-success/10 text-success',
 };
 
 function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border bg-white p-4 shadow-sm">
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-800">{value}</p>
+      <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
@@ -101,7 +101,7 @@ function FilterBar({
           value={filters.branchIds || '__ALL__'}
           onValueChange={(v) => onChange({ branchIds: v === '__ALL__' ? undefined : v })}
         >
-          <SelectTrigger className="border-orange-200 text-sm bg-white shadow-sm h-10">
+          <SelectTrigger className="border-warning/30 text-sm bg-card shadow-sm h-10">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -145,7 +145,7 @@ function Pagination({
         <button
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
-          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-muted"
         >
           ‹
         </button>
@@ -155,7 +155,7 @@ function Pagination({
         <button
           disabled={page >= pages}
           onClick={() => onChange(page + 1)}
-          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-muted"
         >
           ›
         </button>
@@ -169,7 +169,7 @@ function CountryBreakdownPanel({ breakdown }: { breakdown: CountryBreakdownRow[]
   const [expanded, setExpanded] = useState<string | null>(null);
   if (!breakdown.length) return null;
   return (
-    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
       <div className="px-4 py-3 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
         Bills by Country &amp; State / Emirate
       </div>
@@ -177,35 +177,35 @@ function CountryBreakdownPanel({ breakdown }: { breakdown: CountryBreakdownRow[]
         {breakdown.map((c) => (
           <div key={c.country}>
             <button
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50/40 transition-colors text-sm"
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-primary/10 transition-colors text-sm"
               onClick={() => setExpanded((prev) => (prev === c.country ? null : c.country))}
             >
-              <span className="font-semibold text-slate-800 flex items-center gap-2">
-                <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">
+              <span className="font-semibold text-foreground flex items-center gap-2">
+                <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
                   {c.country}
                 </span>
                 <span className="text-muted-foreground font-normal">
                   {c.count} bill{c.count !== 1 ? 's' : ''}
                 </span>
               </span>
-              <span className="font-bold tabular-nums text-emerald-700">
+              <span className="font-bold tabular-nums text-success">
                 {formatCurrency(c.outputVat, currency)}
               </span>
             </button>
             {expanded === c.country && c.states.length > 0 && (
-              <div className="bg-slate-50 divide-y border-t">
+              <div className="bg-muted divide-y border-t">
                 {c.states.map((s) => (
                   <div
                     key={s.state}
                     className="flex items-center justify-between px-8 py-2 text-xs"
                   >
-                    <span className="text-slate-600">
+                    <span className="text-foreground">
                       {s.state} —{' '}
                       <span className="text-muted-foreground">
                         {s.count} bill{s.count !== 1 ? 's' : ''}
                       </span>
                     </span>
-                    <span className="font-semibold tabular-nums text-slate-700">
+                    <span className="font-semibold tabular-nums text-foreground">
                       {formatCurrency(s.outputVat, currency)}
                     </span>
                   </div>
@@ -308,7 +308,7 @@ function OutputTaxTab({
           <button
             onClick={() => setShowStatement(true)}
             disabled={!rows.length}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-success hover:bg-success/90 text-success-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </button>
@@ -317,13 +317,13 @@ function OutputTaxTab({
 
       <CountryBreakdownPanel breakdown={countryBreakdown} />
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {query.isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+            <RefreshCw className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : query.isError ? (
-          <p className="text-center py-12 text-red-500">Failed to load — try refreshing</p>
+          <p className="text-center py-12 text-destructive">Failed to load — try refreshing</p>
         ) : (
           <>
             <Table>
@@ -382,7 +382,7 @@ function OutputTaxTab({
                   rows.map((r: OutputTaxRow, i) => (
                     <TableRow
                       key={i}
-                      className={`hover:bg-blue-50/40 ${r.isExempt ? 'bg-amber-50/40' : ''}`}
+                      className={`hover:bg-primary/10 ${r.isExempt ? 'bg-warning/10' : ''}`}
                     >
                       <TableCell className="pl-4 font-mono text-xs">{r.invoiceNumber}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
@@ -404,7 +404,7 @@ function OutputTaxTab({
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">
                         {r.isExempt ? (
-                          <span className="px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-semibold">
+                          <span className="px-1.5 py-0.5 rounded border border-warning/30 bg-warning/10 text-warning text-[10px] font-semibold">
                             Exempt
                           </span>
                         ) : r.taxPercent != null ? (
@@ -413,7 +413,7 @@ function OutputTaxTab({
                           '—'
                         )}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold text-emerald-700">
+                      <TableCell className="text-right text-sm font-semibold text-success">
                         {formatCurrency(r.outputVat, r.currencyCode)}
                       </TableCell>
                       <TableCell className="text-right text-sm font-bold">
@@ -424,7 +424,7 @@ function OutputTaxTab({
                       <TableCell className="pr-4">
                         <button
                           onClick={() => onGenerate('output', r)}
-                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
                         >
                           <FileText size={12} /> Generate
                         </button>
@@ -504,8 +504,8 @@ function TaxStatusControl({
     >
       <SelectTrigger
         aria-label="Tax status"
-        className={`h-8 w-[120px] border-0 text-xs font-semibold ring-1 ring-inset ring-black/5 transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-          TAX_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'
+        className={`h-8 w-[120px] border-0 text-xs font-semibold ring-1 ring-inset ring-ring transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+          TAX_STATUS_COLORS[status] ?? 'bg-muted text-foreground'
         }`}
       >
         <SelectValue />
@@ -594,20 +594,20 @@ function InputTaxLocalTab({
           <button
             onClick={() => setShowStatement(true)}
             disabled={!rows.length}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-success hover:bg-success/90 text-success-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </button>
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {query.isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+            <RefreshCw className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : query.isError ? (
-          <p className="text-center py-12 text-red-500">Failed to load — try refreshing</p>
+          <p className="text-center py-12 text-destructive">Failed to load — try refreshing</p>
         ) : (
           <>
             <Table>
@@ -661,7 +661,7 @@ function InputTaxLocalTab({
                   </TableRow>
                 ) : (
                   rows.map((r: InputTaxLocalRow, i) => (
-                    <TableRow key={i} className="hover:bg-blue-50/40">
+                    <TableRow key={i} className="hover:bg-primary/10">
                       <TableCell className="pl-4 text-xs text-muted-foreground">
                         {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '—'}
                       </TableCell>
@@ -685,14 +685,14 @@ function InputTaxLocalTab({
                       <TableCell className="text-right text-xs text-muted-foreground">
                         {r.taxPercent != null ? `${r.taxPercent}%` : '—'}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold text-red-600">
+                      <TableCell className="text-right text-sm font-semibold text-destructive">
                         {r.inputVatAmount != null
                           ? formatCurrency(r.inputVatAmount, r.currencyCode)
                           : '—'}
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`text-xs font-medium ${r.vatClaimable ? 'text-green-700' : 'text-gray-400'}`}
+                          className={`text-xs font-medium ${r.vatClaimable ? 'text-success' : 'text-muted-foreground'}`}
                         >
                           {r.vatClaimable ? 'Yes' : 'No'}
                         </span>
@@ -726,14 +726,14 @@ function InputTaxLocalTab({
                                 periodTo: filters.dateTo,
                               })
                             }
-                            className="mr-2 whitespace-nowrap rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                            className="mr-2 whitespace-nowrap rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                           >
                             Proceed
                           </button>
                         )}
                         <button
                           onClick={() => onGenerate('local', r)}
-                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
                         >
                           <FileText size={12} /> Generate
                         </button>
@@ -841,20 +841,20 @@ function InputTaxInternationalTab({
           <button
             onClick={() => setShowStatement(true)}
             disabled={!rows.length}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-success hover:bg-success/90 text-success-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </button>
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {query.isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+            <RefreshCw className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : query.isError ? (
-          <p className="text-center py-12 text-red-500">Failed to load — try refreshing</p>
+          <p className="text-center py-12 text-destructive">Failed to load — try refreshing</p>
         ) : (
           <>
             <Table>
@@ -920,7 +920,7 @@ function InputTaxInternationalTab({
                   </TableRow>
                 ) : (
                   rows.map((r: InputTaxInternationalRow, i) => (
-                    <TableRow key={i} className="hover:bg-blue-50/40">
+                    <TableRow key={i} className="hover:bg-primary/10">
                       <TableCell className="pl-4 font-mono text-xs">
                         {r.importInvoiceNo ?? '—'}
                       </TableCell>
@@ -941,7 +941,7 @@ function InputTaxInternationalTab({
                           ? formatCurrency(r.taxableAmount, r.currencyCode)
                           : '—'}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold text-orange-600">
+                      <TableCell className="text-right text-sm font-semibold text-warning">
                         {r.importVatReverseCharge != null
                           ? formatCurrency(r.importVatReverseCharge, r.currencyCode)
                           : '—'}
@@ -965,7 +965,7 @@ function InputTaxInternationalTab({
                       <TableCell className="text-xs">{r.currencyCode ?? '—'}</TableCell>
                       <TableCell>
                         <span
-                          className={`text-xs font-medium ${r.vatClaimable ? 'text-green-700' : 'text-gray-400'}`}
+                          className={`text-xs font-medium ${r.vatClaimable ? 'text-success' : 'text-muted-foreground'}`}
                         >
                           {r.vatClaimable ? 'Yes' : 'No'}
                         </span>
@@ -982,7 +982,7 @@ function InputTaxInternationalTab({
                       <TableCell className="pr-4">
                         <button
                           onClick={() => onGenerate('international', r)}
-                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
                         >
                           <FileText size={12} /> Generate
                         </button>
@@ -1080,11 +1080,13 @@ export default function TaxReportPage() {
   };
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Tax Report</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Tax Report
+          </h3>
           <p className="text-muted-foreground text-sm">
             VAT compliance — Output vs Input tax by period
           </p>
@@ -1092,7 +1094,7 @@ export default function TaxReportPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="rounded-xl border bg-card p-4 shadow-sm">
         <FilterBar
           filters={filters}
           onChange={handleFilterChange}
@@ -1114,8 +1116,8 @@ export default function TaxReportPage() {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-muted-foreground hover:text-slate-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {label}

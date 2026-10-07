@@ -56,7 +56,7 @@ export function ModelFormModal({
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="block text-sm font-medium mb-1">
-              Brand <span className="text-red-500">*</span>
+              Brand <span className="text-destructive">*</span>
             </label>
             <SearchableSelect
               options={brands.map((brand) => ({
@@ -71,7 +71,7 @@ export function ModelFormModal({
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              Model Name <span className="text-red-500">*</span>
+              Model Name <span className="text-destructive">*</span>
             </label>
             <Input
               value={formData.model_name}
@@ -82,7 +82,7 @@ export function ModelFormModal({
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              Model No <span className="text-red-500">*</span>
+              Model No <span className="text-destructive">*</span>
             </label>
             <Input
               value={formData.model_no}
@@ -123,7 +123,7 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
       <div className="bg-card rounded-2xl w-full max-w-2xl p-6">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold">{title}</h2>

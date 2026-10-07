@@ -42,46 +42,46 @@ export default function MachineServiceAnalyticsPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-slate-400 text-sm py-4">
+      <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading service history…
       </div>
     );
   }
 
   if (!analytics || analytics.serviceVisitCount === 0) {
-    return <p className="text-sm text-slate-400 py-2">No completed service tickets yet.</p>;
+    return <p className="text-sm text-muted-foreground py-2">No completed service tickets yet.</p>;
   }
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+        <div className="bg-muted rounded-xl p-3">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
             Times Serviced
           </p>
-          <p className="text-lg font-bold text-slate-700">{analytics.serviceVisitCount}</p>
+          <p className="text-lg font-bold text-foreground">{analytics.serviceVisitCount}</p>
         </div>
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+        <div className="bg-muted rounded-xl p-3">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
             Parts Service Cost
           </p>
-          <p className="text-lg font-bold text-slate-700">
+          <p className="text-lg font-bold text-foreground">
             {formatCurrency(analytics.lifetimePartsCost, currency)}
           </p>
         </div>
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+        <div className="bg-muted rounded-xl p-3">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
             Labour Cost
           </p>
-          <p className="text-lg font-bold text-slate-700">
+          <p className="text-lg font-bold text-foreground">
             {formatCurrency(analytics.lifetimeLabourCost, currency)}
           </p>
         </div>
-        <div className="bg-amber-50 rounded-xl p-3">
-          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">
+        <div className="bg-warning/10 rounded-xl p-3">
+          <p className="text-[10px] font-bold text-warning uppercase tracking-wide">
             Lifetime Service Cost
           </p>
-          <p className="text-lg font-bold text-amber-700">
+          <p className="text-lg font-bold text-warning">
             {formatCurrency(analytics.lifetimeSpend, currency)}
           </p>
         </div>
@@ -90,7 +90,7 @@ export default function MachineServiceAnalyticsPanel({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="text-left text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
+            <tr className="text-left text-[10px] font-bold text-muted-foreground uppercase border-b border-border">
               <th className="py-2 pr-2">Ticket</th>
               <th className="py-2 pr-2">Date</th>
               <th className="py-2 pr-2">Context</th>
@@ -102,24 +102,24 @@ export default function MachineServiceAnalyticsPanel({
           </thead>
           <tbody>
             {analytics.tickets.map((t) => (
-              <tr key={t.ticketId} className="border-b border-slate-50">
-                <td className="py-2 pr-2 font-semibold text-slate-700">{t.ticketNumber}</td>
-                <td className="py-2 pr-2 text-slate-500">
+              <tr key={t.ticketId} className="border-b border-border">
+                <td className="py-2 pr-2 font-semibold text-foreground">{t.ticketNumber}</td>
+                <td className="py-2 pr-2 text-muted-foreground">
                   {t.date ? new Date(t.date).toLocaleDateString() : '—'}
                 </td>
-                <td className="py-2 pr-2 text-slate-500">{t.serviceContext}</td>
-                <td className="py-2 pr-2 text-slate-500">
+                <td className="py-2 pr-2 text-muted-foreground">{t.serviceContext}</td>
+                <td className="py-2 pr-2 text-muted-foreground">
                   {t.partsUsed.length === 0
                     ? '—'
                     : t.partsUsed.map((p) => `${p.partName} ×${p.quantity}`).join(', ')}
                 </td>
-                <td className="py-2 pr-2 text-right text-slate-700">
+                <td className="py-2 pr-2 text-right text-foreground">
                   {formatCurrency(t.partsCostInternal, currency)}
                 </td>
-                <td className="py-2 pr-2 text-right text-slate-700">
+                <td className="py-2 pr-2 text-right text-foreground">
                   {formatCurrency(t.labourCost, currency)}
                 </td>
-                <td className="py-2 text-right font-bold text-slate-800">
+                <td className="py-2 text-right font-bold text-foreground">
                   {formatCurrency(t.totalSpend, currency)}
                 </td>
               </tr>
@@ -129,14 +129,14 @@ export default function MachineServiceAnalyticsPanel({
       </div>
 
       {analytics.toner.yieldHistory.length > 0 && (
-        <div className="pt-2 border-t border-slate-100">
-          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
+        <div className="pt-2 border-t border-border">
+          <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-2">
             Toner Replacements ({analytics.toner.totalTonerReplacements})
           </h4>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
+                <tr className="text-left text-[10px] font-bold text-muted-foreground uppercase border-b border-border">
                   <th className="py-2 pr-2">Toner SKU</th>
                   <th className="py-2 pr-2">Installed</th>
                   <th className="py-2 pr-2">Replaced</th>
@@ -145,15 +145,15 @@ export default function MachineServiceAnalyticsPanel({
               </thead>
               <tbody>
                 {analytics.toner.yieldHistory.map((y) => (
-                  <tr key={y.id} className="border-b border-slate-50">
-                    <td className="py-2 pr-2 font-semibold text-slate-700">{y.tonerSku}</td>
-                    <td className="py-2 pr-2 text-slate-500">
+                  <tr key={y.id} className="border-b border-border">
+                    <td className="py-2 pr-2 font-semibold text-foreground">{y.tonerSku}</td>
+                    <td className="py-2 pr-2 text-muted-foreground">
                       {new Date(y.installedDate).toLocaleDateString()}
                     </td>
-                    <td className="py-2 pr-2 text-slate-500">
+                    <td className="py-2 pr-2 text-muted-foreground">
                       {y.replacedDate ? new Date(y.replacedDate).toLocaleDateString() : '—'}
                     </td>
-                    <td className="py-2 text-right text-slate-700">
+                    <td className="py-2 text-right text-foreground">
                       {y.yieldPages != null ? y.yieldPages.toLocaleString() : '—'}
                     </td>
                   </tr>

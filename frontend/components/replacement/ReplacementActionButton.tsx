@@ -89,7 +89,7 @@ export function ReplacementActionButton({ contractId, contractStatus, request, o
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600"
+          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
           title={
             request?.status === 'REJECTED'
               ? `Previous request rejected: ${request.rejectionReason ?? ''} — raise a new one`
@@ -105,7 +105,7 @@ export function ReplacementActionButton({ contractId, contractStatus, request, o
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-amber-500 hover:bg-amber-50 hover:text-amber-600"
+          className="h-8 w-8 text-warning hover:bg-warning/10 hover:text-warning"
           title="Replacement awaiting Finance approval — click to view"
           onClick={() => setShowView(true)}
         >
@@ -117,7 +117,7 @@ export function ReplacementActionButton({ contractId, contractStatus, request, o
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+          className="h-8 w-8 text-success hover:bg-success/10 hover:text-success"
           title="Approved — proceed the replacement"
           onClick={() => setShowSwap(true)}
         >
@@ -129,7 +129,7 @@ export function ReplacementActionButton({ contractId, contractStatus, request, o
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-blue-500 hover:bg-blue-50 hover:text-blue-600"
+          className="h-8 w-8 text-primary hover:bg-primary/10 hover:text-primary"
           title={`Replacement in progress — ${request ? REPLACEMENT_STATUS_LABEL[request.status] : ''}`}
           onClick={() => setShowView(true)}
         >

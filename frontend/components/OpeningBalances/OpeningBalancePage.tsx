@@ -455,7 +455,7 @@ export default function OpeningBalancePage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground dark:text-muted-foreground flex items-center gap-2">
             <FileText className="h-6 w-6 text-primary" />
             Opening Balance & Contract Migrations
           </h1>
@@ -468,7 +468,7 @@ export default function OpeningBalancePage() {
           <Button
             onClick={loadData}
             variant="outline"
-            className="rounded-full p-2 h-10 w-10 flex items-center justify-center border-none bg-card hover:bg-slate-100 transition shadow-sm"
+            className="rounded-full p-2 h-10 w-10 flex items-center justify-center border-none bg-card hover:bg-muted transition shadow-sm"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
@@ -490,19 +490,19 @@ export default function OpeningBalancePage() {
 
       {/* Branch Aggregation Table for Admin & Finance */}
       {['ADMIN', 'FINANCE'].includes(userRole) && entries.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="bg-card dark:bg-foreground p-6 rounded-2xl border border-border dark:border-border shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-lg font-bold text-foreground dark:text-muted-foreground">
               Branch-wise Migration Summary
             </h3>
-            <span className="text-xs text-muted-foreground bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full font-medium">
+            <span className="text-xs text-muted-foreground bg-muted dark:bg-foreground px-3 py-1 rounded-full font-medium">
               Central Office Consolidation
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-semibold uppercase text-slate-500 tracking-wider">
+                <tr className="border-b border-border dark:border-border text-xs font-semibold uppercase text-muted-foreground tracking-wider">
                   <th className="pb-3 pr-4">Branch Name</th>
                   <th className="pb-3 px-4 text-right">Total Migrated</th>
                   <th className="pb-3 px-4 text-right">Remaining Outstanding</th>
@@ -510,7 +510,7 @@ export default function OpeningBalancePage() {
                   <th className="pb-3 pl-4 text-center">Active / Total Entries</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-300">
+              <tbody className="divide-y divide-border dark:divide-border text-sm text-foreground dark:text-muted-foreground">
                 {Object.values(
                   entries.reduce((acc: Record<string, BranchAggregation>, entry) => {
                     const branchKey = entry.branchName || 'Unknown Branch';
@@ -541,26 +541,26 @@ export default function OpeningBalancePage() {
                 ).map((agg: BranchAggregation) => (
                   <tr
                     key={agg.branchName}
-                    className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
+                    className="hover:bg-muted/50 dark:hover:bg-foreground/20 transition-colors"
                   >
-                    <td className="py-3 pr-4 font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="py-3 pr-4 font-semibold text-foreground dark:text-muted-foreground">
                       {agg.branchName}
                     </td>
-                    <td className="py-3 px-4 text-right font-medium text-slate-900 dark:text-slate-100">
+                    <td className="py-3 px-4 text-right font-medium text-foreground dark:text-muted-foreground">
                       {getActiveCurrency()}{' '}
                       {agg.totalMigrated.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </td>
-                    <td className="py-3 px-4 text-right font-medium text-amber-600 dark:text-amber-500">
+                    <td className="py-3 px-4 text-right font-medium text-warning dark:text-warning">
                       {getActiveCurrency()}{' '}
                       {agg.totalRemaining.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </td>
-                    <td className="py-3 px-4 text-right font-medium text-emerald-600 dark:text-emerald-500">
+                    <td className="py-3 px-4 text-right font-medium text-success dark:text-success">
                       {getActiveCurrency()}{' '}
                       {agg.totalPaid.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
@@ -568,7 +568,7 @@ export default function OpeningBalancePage() {
                       })}
                     </td>
                     <td className="py-3 pl-4 text-center text-xs font-semibold">
-                      <span className="bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full">
+                      <span className="bg-muted dark:bg-foreground text-foreground dark:text-muted-foreground px-2.5 py-1 rounded-full">
                         {agg.activeCount} / {agg.totalCount}
                       </span>
                     </td>
@@ -581,14 +581,14 @@ export default function OpeningBalancePage() {
       )}
 
       {/* Search & Filter bar */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col md:flex-row gap-4 bg-card dark:bg-foreground p-4 rounded-2xl border border-border dark:border-border shadow-sm">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by customer or entry number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border-none shadow-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            className="pl-9 h-10 rounded-xl bg-muted dark:bg-foreground border-none shadow-none focus-visible:ring-2 focus-visible:ring-primary/25"
           />
         </div>
 
@@ -596,7 +596,7 @@ export default function OpeningBalancePage() {
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 border-orange-200 text-xs font-medium">
+              <SelectTrigger className="h-10 border-warning/30 text-xs font-medium">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -611,7 +611,7 @@ export default function OpeningBalancePage() {
           </div>
 
           <Select value={filterSettled} onValueChange={setFilterSettled}>
-            <SelectTrigger className="h-10 border-orange-200 text-xs font-medium">
+            <SelectTrigger className="h-10 border-warning/30 text-xs font-medium">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -625,7 +625,7 @@ export default function OpeningBalancePage() {
 
       {/* Main Table */}
       {loading && entries.length === 0 ? (
-        <div className="py-20 text-center text-muted-foreground flex flex-col items-center justify-center gap-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+        <div className="py-20 text-center text-muted-foreground flex flex-col items-center justify-center gap-3 bg-card dark:bg-foreground rounded-2xl border border-border dark:border-border">
           <RefreshCw className="h-8 w-8 animate-spin text-primary" />
           <span>Fetching opening balance entries...</span>
         </div>
@@ -667,12 +667,12 @@ export default function OpeningBalancePage() {
 
       {/* Create Dialog Modal */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogOverlay className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm" />
+        <DialogOverlay className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm" />
         <DialogContent
           showCloseButton={false}
           className="sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6"
         >
-          <DialogHeader className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+          <DialogHeader className="pb-4 border-b border-border dark:border-border flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="text-lg font-bold">Migrate Opening State</DialogTitle>
               <p className="text-xs text-muted-foreground mt-1">
@@ -681,7 +681,7 @@ export default function OpeningBalancePage() {
             </div>
             <button
               onClick={() => setIsCreateOpen(false)}
-              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="p-1 text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -689,13 +689,13 @@ export default function OpeningBalancePage() {
 
           <form
             onSubmit={handleCreateSubmit}
-            className="space-y-6 pt-6 text-slate-700 dark:text-slate-300"
+            className="space-y-6 pt-6 text-foreground dark:text-muted-foreground"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               {/* Customer Selector */}
               <div className="space-y-1.5 col-span-2">
                 <div className="flex justify-between items-center pl-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Select Customer
                   </label>
                   <button
@@ -717,7 +717,7 @@ export default function OpeningBalancePage() {
 
               {/* Balance Type */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Balance Type
                 </label>
                 <Select
@@ -729,7 +729,7 @@ export default function OpeningBalancePage() {
                     })
                   }
                 >
-                  <SelectTrigger className="w-full h-11 border-orange-200 text-sm">
+                  <SelectTrigger className="w-full h-11 border-warning/30 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -744,7 +744,7 @@ export default function OpeningBalancePage() {
 
               {/* Migrated At Date */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Migrated Date (Go-Live)
                 </label>
                 <Input
@@ -753,13 +753,13 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setCreateFormData({ ...createFormData, migratedAt: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
               {/* Original Total Amount */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Original Total Amount ({getActiveCurrency()})
                 </label>
                 <Input
@@ -770,13 +770,13 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setCreateFormData({ ...createFormData, originalTotalAmount: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
               {/* Already Paid Amount */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Already Paid Pre-Go-Live ({getActiveCurrency()})
                 </label>
                 <Input
@@ -786,13 +786,13 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setCreateFormData({ ...createFormData, alreadyPaidAmount: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
               {/* Contract Fields Section */}
               {['RENT_CONTRACT', 'LEASE_CONTRACT'].includes(createFormData.balanceType) && (
-                <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border dark:border-border">
                   <div className="col-span-2">
                     <h4 className="text-xs font-bold text-primary uppercase">
                       Recurring Billing Configuration
@@ -800,7 +800,7 @@ export default function OpeningBalancePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Monthly Billing Amount ({getActiveCurrency()})
                     </label>
                     <Input
@@ -813,12 +813,12 @@ export default function OpeningBalancePage() {
                           monthlyBillingAmount: e.target.value,
                         })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Billing Cycle (In Days)
                     </label>
                     <Input
@@ -828,12 +828,12 @@ export default function OpeningBalancePage() {
                       onChange={(e) =>
                         setCreateFormData({ ...createFormData, billingCycleInDays: e.target.value })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Next Payment Due Date
                     </label>
                     <Input
@@ -842,12 +842,12 @@ export default function OpeningBalancePage() {
                       onChange={(e) =>
                         setCreateFormData({ ...createFormData, nextPaymentDueDate: e.target.value })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Total Contract Months
                     </label>
                     <Input
@@ -860,12 +860,12 @@ export default function OpeningBalancePage() {
                           totalContractMonths: e.target.value,
                         })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5 col-span-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Months Already Completed
                     </label>
                     <Input
@@ -875,14 +875,14 @@ export default function OpeningBalancePage() {
                       onChange={(e) =>
                         setCreateFormData({ ...createFormData, monthsCompleted: e.target.value })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                   </div>
                 </div>
               )}
 
               {/* Machine/Asset Details Section */}
-              <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border dark:border-border">
                 <div className="col-span-2">
                   <h4 className="text-xs font-bold text-primary uppercase">
                     Machine / Asset Details (Optional)
@@ -890,7 +890,7 @@ export default function OpeningBalancePage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Product Brand
                   </label>
                   <Input
@@ -899,12 +899,12 @@ export default function OpeningBalancePage() {
                     onChange={(e) =>
                       setCreateFormData({ ...createFormData, productBrand: e.target.value })
                     }
-                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                    className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Product Model
                   </label>
                   <Input
@@ -913,12 +913,12 @@ export default function OpeningBalancePage() {
                     onChange={(e) =>
                       setCreateFormData({ ...createFormData, productModel: e.target.value })
                     }
-                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                    className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Serial Number
                   </label>
                   <Input
@@ -927,12 +927,12 @@ export default function OpeningBalancePage() {
                     onChange={(e) =>
                       setCreateFormData({ ...createFormData, serialNumber: e.target.value })
                     }
-                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                    className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Product/Asset ID
                   </label>
                   <Input
@@ -941,14 +941,14 @@ export default function OpeningBalancePage() {
                     onChange={(e) =>
                       setCreateFormData({ ...createFormData, productId: e.target.value })
                     }
-                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                    className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                   />
                 </div>
               </div>
 
               {/* Notes */}
-              <div className="space-y-1.5 col-span-2 border-t border-slate-100 dark:border-slate-800 pt-4">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <div className="space-y-1.5 col-span-2 border-t border-border dark:border-border pt-4">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Migration Notes
                 </label>
                 <textarea
@@ -956,16 +956,16 @@ export default function OpeningBalancePage() {
                   placeholder="Provide context regarding this outstanding debt or mid-cycle contract..."
                   value={createFormData.notes}
                   onChange={(e) => setCreateFormData({ ...createFormData, notes: e.target.value })}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                  className="w-full p-3 rounded-xl bg-muted dark:bg-foreground border-none text-sm text-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex justify-end items-center gap-4 pt-4 border-t border-border dark:border-border">
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-sm transition"
+                className="px-4 py-2 hover:bg-muted dark:hover:bg-foreground font-bold rounded-xl text-sm transition"
               >
                 Cancel
               </button>
@@ -979,12 +979,12 @@ export default function OpeningBalancePage() {
 
       {/* Edit Dialog Modal */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogOverlay className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm" />
+        <DialogOverlay className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm" />
         <DialogContent
           showCloseButton={false}
           className="sm:max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6"
         >
-          <DialogHeader className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+          <DialogHeader className="pb-4 border-b border-border dark:border-border flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="text-lg font-bold">Edit Migration Parameters</DialogTitle>
               <p className="text-xs text-muted-foreground mt-1">
@@ -993,7 +993,7 @@ export default function OpeningBalancePage() {
             </div>
             <button
               onClick={() => setIsEditOpen(false)}
-              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="p-1 text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -1001,7 +1001,7 @@ export default function OpeningBalancePage() {
 
           <form
             onSubmit={handleEditSubmit}
-            className="space-y-6 pt-6 text-slate-700 dark:text-slate-300"
+            className="space-y-6 pt-6 text-foreground dark:text-muted-foreground"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {editingEntry &&
@@ -1014,7 +1014,7 @@ export default function OpeningBalancePage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Monthly Billing Amount ({getActiveCurrency()})
                       </label>
                       <Input
@@ -1024,12 +1024,12 @@ export default function OpeningBalancePage() {
                         onChange={(e) =>
                           setEditFormData({ ...editFormData, monthlyBillingAmount: e.target.value })
                         }
-                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                        className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Billing Cycle (In Days)
                       </label>
                       <Input
@@ -1039,12 +1039,12 @@ export default function OpeningBalancePage() {
                         onChange={(e) =>
                           setEditFormData({ ...editFormData, billingCycleInDays: e.target.value })
                         }
-                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                        className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Next Payment Due Date
                       </label>
                       <Input
@@ -1053,12 +1053,12 @@ export default function OpeningBalancePage() {
                         onChange={(e) =>
                           setEditFormData({ ...editFormData, nextPaymentDueDate: e.target.value })
                         }
-                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                        className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Total Contract Months
                       </label>
                       <Input
@@ -1068,12 +1068,12 @@ export default function OpeningBalancePage() {
                         onChange={(e) =>
                           setEditFormData({ ...editFormData, totalContractMonths: e.target.value })
                         }
-                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                        className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                       />
                     </div>
 
                     <div className="space-y-1.5 col-span-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Months Already Completed
                       </label>
                       <Input
@@ -1083,20 +1083,20 @@ export default function OpeningBalancePage() {
                         onChange={(e) =>
                           setEditFormData({ ...editFormData, monthsCompleted: e.target.value })
                         }
-                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                        className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                       />
                     </div>
                   </>
                 )}
 
-              <div className="col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="col-span-2 pt-2 border-t border-border dark:border-border">
                 <h4 className="text-xs font-bold text-primary uppercase">
                   Machine / Asset Details
                 </h4>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Product Brand
                 </label>
                 <Input
@@ -1105,12 +1105,12 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, productBrand: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Product Model
                 </label>
                 <Input
@@ -1119,12 +1119,12 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, productModel: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Serial Number
                 </label>
                 <Input
@@ -1133,24 +1133,24 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, serialNumber: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Product/Asset ID
                 </label>
                 <Input
                   placeholder="e.g. PROD-102"
                   value={editFormData.productId}
                   onChange={(e) => setEditFormData({ ...editFormData, productId: e.target.value })}
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                 />
               </div>
 
-              <div className="space-y-1.5 col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <div className="space-y-1.5 col-span-2 pt-2 border-t border-border dark:border-border">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Migration Notes
                 </label>
                 <textarea
@@ -1158,16 +1158,16 @@ export default function OpeningBalancePage() {
                   placeholder="Update notes..."
                   value={editFormData.notes}
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                  className="w-full p-3 rounded-xl bg-muted dark:bg-foreground border-none text-sm text-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex justify-end items-center gap-4 pt-4 border-t border-border dark:border-border">
               <button
                 type="button"
                 onClick={() => setIsEditOpen(false)}
-                className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-sm transition"
+                className="px-4 py-2 hover:bg-muted dark:hover:bg-foreground font-bold rounded-xl text-sm transition"
               >
                 Cancel
               </button>
@@ -1181,12 +1181,12 @@ export default function OpeningBalancePage() {
 
       {/* Record Payment Dialog */}
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-        <DialogOverlay className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm" />
+        <DialogOverlay className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm" />
         <DialogContent
           showCloseButton={false}
           className="sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6"
         >
-          <DialogHeader className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+          <DialogHeader className="pb-4 border-b border-border dark:border-border flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="text-lg font-bold">Record Payment</DialogTitle>
               <p className="text-xs text-muted-foreground mt-1">
@@ -1203,7 +1203,7 @@ export default function OpeningBalancePage() {
             </div>
             <button
               onClick={() => setIsPaymentOpen(false)}
-              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="p-1 text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -1211,11 +1211,11 @@ export default function OpeningBalancePage() {
 
           <form
             onSubmit={handlePaymentSubmit}
-            className="space-y-5 pt-5 text-slate-700 dark:text-slate-300"
+            className="space-y-5 pt-5 text-foreground dark:text-muted-foreground"
           >
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5 col-span-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Amount ({getActiveCurrency()})
                 </label>
                 <Input
@@ -1227,12 +1227,12 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Payment Mode
                 </label>
                 <Select
@@ -1244,7 +1244,7 @@ export default function OpeningBalancePage() {
                     })
                   }
                 >
-                  <SelectTrigger className="w-full h-11 border-orange-200 text-sm">
+                  <SelectTrigger className="w-full h-11 border-warning/30 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1256,20 +1256,20 @@ export default function OpeningBalancePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   {paymentForm.paymentMode === 'CHEQUE' ? 'Cheque Received Date' : 'Payment Date'}
                 </label>
                 <Input
                   type="date"
                   value={paymentForm.paymentDate || ''}
                   onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
               {paymentForm.paymentMode !== 'CHEQUE' && matchingPaymentAccounts.length > 0 && (
                 <div className="space-y-1.5 col-span-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Cash / Bank Account
                   </label>
                   <Select
@@ -1281,7 +1281,7 @@ export default function OpeningBalancePage() {
                       })
                     }
                   >
-                    <SelectTrigger className="w-full h-11 border-orange-200 text-sm">
+                    <SelectTrigger className="w-full h-11 border-warning/30 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1300,7 +1300,7 @@ export default function OpeningBalancePage() {
               )}
 
               <div className="space-y-1.5 col-span-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Reference Number
                 </label>
                 <Input
@@ -1309,17 +1309,17 @@ export default function OpeningBalancePage() {
                   onChange={(e) =>
                     setPaymentForm({ ...paymentForm, referenceNumber: e.target.value })
                   }
-                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
               {paymentForm.paymentMode === 'CHEQUE' && (
                 <>
-                  <div className="col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="col-span-2 pt-2 border-t border-border dark:border-border">
                     <h4 className="text-xs font-bold text-primary uppercase">Cheque Details</h4>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Cheque Number
                     </label>
                     <Input
@@ -1328,11 +1328,11 @@ export default function OpeningBalancePage() {
                       onChange={(e) =>
                         setPaymentForm({ ...paymentForm, chequeNumber: e.target.value })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Bank Name
                     </label>
                     <Input
@@ -1341,11 +1341,11 @@ export default function OpeningBalancePage() {
                       onChange={(e) =>
                         setPaymentForm({ ...paymentForm, chequeBankName: e.target.value })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Cheque Date (earliest deposit)
                     </label>
                     <Input
@@ -1354,14 +1354,14 @@ export default function OpeningBalancePage() {
                       onChange={(e) =>
                         setPaymentForm({ ...paymentForm, chequeDate: e.target.value })
                       }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                      className="h-11 rounded-xl bg-muted dark:bg-foreground border-none text-sm"
                     />
                   </div>
                 </>
               )}
 
               <div className="space-y-1.5 col-span-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Notes
                 </label>
                 <textarea
@@ -1369,16 +1369,16 @@ export default function OpeningBalancePage() {
                   placeholder="Payment notes..."
                   value={paymentForm.notes || ''}
                   onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                  className="w-full p-3 rounded-xl bg-muted dark:bg-foreground border-none text-sm text-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex justify-end items-center gap-4 pt-4 border-t border-border dark:border-border">
               <button
                 type="button"
                 onClick={() => setIsPaymentOpen(false)}
-                className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-sm transition"
+                className="px-4 py-2 hover:bg-muted dark:hover:bg-foreground font-bold rounded-xl text-sm transition"
               >
                 Cancel
               </button>

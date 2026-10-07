@@ -6,10 +6,10 @@ import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
 import { getActiveCurrency } from '@/lib/currency';
 const data = [
-  { name: 'Sales', value: 450000, color: '#003F7D' },
-  { name: 'Rental', value: 320000, color: '#0284C7' },
-  { name: 'Leasing', value: 280000, color: '#9BD0E5' },
-  { name: 'Service', value: 150000, color: '#CBD5E1' },
+  { name: 'Sales', value: 450000, color: 'var(--primary)' },
+  { name: 'Rental', value: 320000, color: 'var(--chart-blue)' },
+  { name: 'Leasing', value: 280000, color: 'var(--chart-blue-soft)' },
+  { name: 'Service', value: 150000, color: 'var(--chart-blue-lighter)' },
 ];
 
 /**
@@ -43,7 +43,7 @@ export default function RevenueBySourceChart() {
                 outerRadius={80}
                 paddingAngle={3}
                 dataKey="value"
-                stroke="#ffffff"
+                stroke="var(--card)"
                 strokeWidth={2}
                 isAnimationActive={false}
               >
@@ -62,7 +62,9 @@ export default function RevenueBySourceChart() {
                 iconType="circle"
                 iconSize={8}
                 formatter={(value: string) => (
-                  <span style={{ color: '#475569', fontSize: 11, fontWeight: 600 }}>{value}</span>
+                  <span style={{ color: 'var(--muted-foreground)', fontSize: 11, fontWeight: 600 }}>
+                    {value}
+                  </span>
                 )}
                 wrapperStyle={{ paddingTop: '4px' }}
               />

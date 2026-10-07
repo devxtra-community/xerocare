@@ -115,7 +115,7 @@ export default function EmployeeLeaveApplicationDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_date">
-                Start Date <span className="text-red-500">*</span>
+                Start Date <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="start_date"
@@ -128,7 +128,7 @@ export default function EmployeeLeaveApplicationDialog({
 
             <div className="space-y-2">
               <Label htmlFor="end_date">
-                End Date <span className="text-red-500">*</span>
+                End Date <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="end_date"
@@ -142,7 +142,7 @@ export default function EmployeeLeaveApplicationDialog({
 
           <div className="space-y-2">
             <Label htmlFor="leave_type">
-              Leave Type <span className="text-red-500">*</span>
+              Leave Type <span className="text-destructive">*</span>
             </Label>
             <Select
               value={formData.leave_type}
@@ -165,7 +165,7 @@ export default function EmployeeLeaveApplicationDialog({
 
           <div className="space-y-2">
             <Label htmlFor="reason">
-              Reason <span className="text-red-500">*</span>
+              Reason <span className="text-destructive">*</span>
             </Label>
             <Textarea
               id="reason"

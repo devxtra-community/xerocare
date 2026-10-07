@@ -174,18 +174,18 @@ export default function VendorTable({
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-4 pt-4">
         <div className="relative w-full sm:w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search vendors..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
+            className="pl-9 h-10 bg-card border-primary/30 focus:border-primary/30 focus:ring-4 focus:ring-primary/30 outline-none shadow-sm transition-all"
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 bg-card border-blue-400/60">
+              <Button variant="outline" className="gap-2 bg-card border-primary/30">
                 <Filter className="h-4 w-4" />
                 Filter: {filterType}
               </Button>
@@ -202,7 +202,7 @@ export default function VendorTable({
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
-            className="bg-primary text-white gap-2"
+            className="bg-primary text-primary-foreground gap-2"
             onClick={() => {
               setEditingVendor(null);
               setFormOpen(true);
@@ -213,11 +213,11 @@ export default function VendorTable({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-blue-100 bg-card overflow-hidden shadow-sm m-4 mt-0">
+      <div className="rounded-2xl border border-primary/30 bg-card overflow-hidden shadow-sm m-4 mt-0">
         <div className="overflow-x-hidden">
           <Table pagination={{ pageSize: 10 }} className="w-full">
-            <TableHeader className="bg-muted/50/50">
-              <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
+            <TableHeader className="bg-muted/50">
+              <TableRow className="border-b border-primary/30 hover:bg-transparent">
                 <TableHead className="font-bold text-[10px] text-primary uppercase py-3 px-4">
                   Vendor Name
                 </TableHead>
@@ -248,8 +248,8 @@ export default function VendorTable({
                 filteredVendors.map((vendor, index) => (
                   <TableRow
                     key={vendor.id}
-                    className={`border-b border-blue-50/20 hover:bg-blue-50/30 transition-colors ${
-                      index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'
+                    className={`border-b border-primary/30 hover:bg-primary/10 transition-colors ${
+                      index % 2 !== 0 ? 'bg-primary/10' : 'bg-card'
                     }`}
                   >
                     <TableCell className="px-4 py-3 font-semibold text-primary">
@@ -262,40 +262,40 @@ export default function VendorTable({
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           vendor.type === 'Supplier'
-                            ? 'bg-blue-100 text-blue-700'
+                            ? 'bg-primary/10 text-primary'
                             : vendor.type === 'Distributor'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-orange-100 text-orange-700'
+                              ? 'bg-lease/10 text-lease'
+                              : 'bg-warning/10 text-warning'
                         }`}
                       >
                         {vendor.type}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs font-semibold text-gray-800">
+                      <span className="text-xs font-semibold text-foreground">
                         {vendor.contactPerson}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right text-xs font-bold text-gray-700">
+                    <TableCell className="text-right text-xs font-bold text-foreground">
                       {vendor.totalOrders}
                     </TableCell>
                     <TableCell className="text-right font-bold text-primary text-xs">
                       {formatCurrency(vendor.purchaseValue, vendor.currency)}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-red-600 text-xs">
+                    <TableCell className="text-right font-bold text-destructive text-xs">
                       {formatCurrency(vendor.outstandingAmount, vendor.currency)}
                     </TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ${
                           vendor.status === 'Active'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-warning/10 text-warning'
                         }`}
                       >
                         <span
                           className={`h-1 w-1 rounded-full ${
-                            vendor.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'
+                            vendor.status === 'Active' ? 'bg-success' : 'bg-warning'
                           }`}
                         />
                         {vendor.status}
@@ -306,7 +306,7 @@ export default function VendorTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                           onClick={() => router.push(`${basePath}/vendors/${vendor.id}`)}
                         >
                           <Eye className="h-4 w-4" />
@@ -314,7 +314,7 @@ export default function VendorTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-slate-700 hover:bg-slate-100"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() => {
                             setEditingVendor(vendor);
                             setFormOpen(true);
@@ -325,7 +325,7 @@ export default function VendorTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => setDeleteVendorTarget(vendor)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -410,7 +410,7 @@ function CountrySubFields({
   return (
     <>
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           {stateLabel}
         </label>
         {states.length > 0 ? (
@@ -418,7 +418,7 @@ function CountrySubFields({
             value={form.stateProvince ?? ''}
             onValueChange={(v) => setForm((f) => ({ ...f, stateProvince: v, city: undefined }))}
           >
-            <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+            <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-primary/30">
               <SelectValue placeholder={`Select ${stateLabel}`} />
             </SelectTrigger>
             <SelectContent className="rounded-xl max-h-64">
@@ -440,18 +440,20 @@ function CountrySubFields({
                 city: undefined,
               }))
             }
-            className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
           />
         )}
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">City</label>
+        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          City
+        </label>
         {cities.length > 0 ? (
           <Select
             value={form.city ?? ''}
             onValueChange={(v) => setForm((f) => ({ ...f, city: v }))}
           >
-            <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+            <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-primary/30">
               <SelectValue placeholder="Select city" />
             </SelectTrigger>
             <SelectContent className="rounded-xl max-h-64">
@@ -467,7 +469,7 @@ function CountrySubFields({
             placeholder="Enter city"
             value={form.city ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, city: e.target.value || undefined }))}
-            className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
           />
         )}
       </div>
@@ -546,31 +548,31 @@ function VendorFormModal({
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Vendor Name
               </label>
               <Input
                 placeholder="Enter vendor name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Contact Person
               </label>
               <Input
                 placeholder="Enter contact person"
                 value={form.contactPerson}
                 onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Type
               </label>
               <Select
@@ -579,7 +581,7 @@ function VendorFormModal({
                   setForm({ ...form, type: value as VendorFormData['type'] })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -591,38 +593,38 @@ function VendorFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Phone
               </label>
               <Input
                 placeholder="Enter phone number"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Email
               </label>
               <Input
                 placeholder="Enter email address"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Currency
               </label>
               <Select
                 value={form.currency}
                 onValueChange={(value) => setForm({ ...form, currency: value })}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -638,8 +640,8 @@ function VendorFormModal({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Country <span className="text-red-500">*</span>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Country <span className="text-destructive">*</span>
               </label>
               <Select
                 value={form.countryCode ?? ''}
@@ -653,7 +655,7 @@ function VendorFormModal({
                   })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl max-h-64">
@@ -669,7 +671,7 @@ function VendorFormModal({
             <CountrySubFields form={form} setForm={setForm} />
 
             <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Status
               </label>
               <Select
@@ -678,7 +680,7 @@ function VendorFormModal({
                   setForm({ ...form, status: value as VendorFormData['status'] })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -693,7 +695,7 @@ function VendorFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>
@@ -740,13 +742,13 @@ function ConfirmDeleteModal({
     <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <div className="flex items-center gap-4 text-red-600 mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+          <div className="flex items-center gap-4 text-destructive mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
             <DialogTitle className="text-xl font-bold text-primary">Delete Vendor</DialogTitle>
           </div>
-          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+          <DialogDescription className="text-base text-foreground leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?
           </DialogDescription>
         </DialogHeader>
@@ -754,7 +756,7 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>

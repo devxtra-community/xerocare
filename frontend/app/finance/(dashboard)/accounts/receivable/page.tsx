@@ -72,11 +72,11 @@ import { InvoiceAccountView } from '@/components/invoice/InvoiceAccountView';
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
-  Current: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  '1-30 days': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  '31-60 days': 'bg-orange-100 text-orange-700 border-orange-200',
-  '61-90 days': 'bg-red-100 text-red-700 border-red-200',
-  '90+ days': 'bg-red-200 text-red-800 border-red-300',
+  Current: 'bg-success/10 text-success border-success/30',
+  '1-30 days': 'bg-warning/10 text-warning border-warning/30',
+  '31-60 days': 'bg-warning/10 text-warning border-warning/30',
+  '61-90 days': 'bg-destructive/10 text-destructive border-destructive/30',
+  '90+ days': 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
 /**
@@ -139,10 +139,10 @@ function AddReceivableModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Add Receivable</h2>
+          <h2 className="font-bold text-foreground">Add Receivable</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -294,17 +294,17 @@ function PaymentModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Record Payment</h2>
+          <h2 className="font-bold text-foreground">Record Payment</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <div className="p-3 rounded-lg bg-blue-50 text-sm">
-            <p className="font-medium text-slate-800">{receivable.customerName}</p>
+          <div className="p-3 rounded-lg bg-primary/10 text-sm">
+            <p className="font-medium text-foreground">{receivable.customerName}</p>
             <p className="text-muted-foreground text-xs">
               Outstanding: {formatCurrency(receivable.outstanding, receivable.currency)}
             </p>
@@ -335,7 +335,7 @@ function PaymentModal({
             <div>
               <label className="text-xs font-medium text-muted-foreground">Paid To Account</label>
               {matchingAccounts.length === 0 ? (
-                <p className="text-xs font-medium text-red-600 mt-1">
+                <p className="text-xs font-medium text-destructive mt-1">
                   No{' '}
                   {accountTypeForPaymentMode(form.paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
                   account exists for this branch.
@@ -375,8 +375,8 @@ function PaymentModal({
             </Select>
           </div>
           {isCheque ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <p className="text-xs font-semibold text-amber-700">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 space-y-2">
+              <p className="text-xs font-semibold text-warning">
                 Cheque received — bank balance updates when Finance clears it in Accounts → Cheques.
               </p>
               <div>
@@ -459,10 +459,10 @@ function SelectCustomerModal({
 }) {
   const [chosen, setChosen] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Select Customer</h2>
+          <h2 className="font-bold text-foreground">Select Customer</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -731,7 +731,7 @@ export default function AccountsReceivablePage() {
 
   if (isLoading) {
     return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex items-center justify-center">
+      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -739,12 +739,12 @@ export default function AccountsReceivablePage() {
 
   if (isError) {
     return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex items-center justify-center">
-        <div className="rounded-xl bg-red-50 border border-red-200 p-8 text-center space-y-3 max-w-sm w-full">
-          <p className="text-red-700 font-medium">Failed to load receivables. Please retry.</p>
+      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-8 text-center space-y-3 max-w-sm w-full">
+          <p className="text-destructive font-medium">Failed to load receivables. Please retry.</p>
           <button
             onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
           >
             Retry
           </button>
@@ -754,25 +754,27 @@ export default function AccountsReceivablePage() {
   }
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Page header + tab switcher */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Accounts Receivable</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Accounts Receivable
+          </h3>
           <p className="text-muted-foreground">
             Customer balances, aging analysis, and payment receipts
           </p>
         </div>
         {/* Tab pills */}
-        <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="flex items-center gap-1 p-1 bg-card border border-border rounded-xl shadow-sm">
           {(['receivable', 'receipts'] as const).map((t) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
               className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${
                 activeTab === t
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {t === 'receivable' ? 'Receivable' : 'Receipts'}
@@ -825,67 +827,69 @@ export default function AccountsReceivablePage() {
             </div>
 
             {/* Charts section */}
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+            <div className="rounded-2xl bg-card shadow-sm border border-border">
               <button
                 onClick={() => setChartsOpen((o) => !o)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+                className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-2xl"
               >
-                <span className="flex items-center gap-2 font-semibold text-gray-800">
-                  <BarChart2 className="h-4 w-4 text-blue-500" />
+                <span className="flex items-center gap-2 font-semibold text-foreground">
+                  <BarChart2 className="h-4 w-4 text-primary" />
                   AR Analytics
                 </span>
                 {chartsOpen ? (
-                  <ChevronUp className="h-4 w-4 text-gray-400" />
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
               {chartsOpen && (
                 <div className="px-4 pb-4 space-y-4">
                   {/* Aging bar */}
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                       AR Aging Analysis
                     </h4>
                     <SimpleBarChart
                       data={agingTotals}
                       xKey="bucket"
-                      bars={[{ key: 'total', color: '#3b82f6', label: 'Outstanding' }]}
+                      bars={[
+                        { key: 'total', color: 'var(--chart-blue-mid)', label: 'Outstanding' },
+                      ]}
                       height={220}
                       currency={currency}
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         Collection Rate Trend
                       </h4>
                       <SimpleLineChart
                         data={rcvCharts?.collectionRate ?? []}
                         xKey="month"
                         lines={[
-                          { key: 'issued', color: '#3b82f6', label: 'Issued' },
-                          { key: 'collected', color: '#10b981', label: 'Collected' },
+                          { key: 'issued', color: 'var(--chart-blue-mid)', label: 'Issued' },
+                          { key: 'collected', color: 'var(--chart-profit)', label: 'Collected' },
                         ]}
                         height={220}
                         currency={currency}
                       />
                     </div>
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                         By Type
                       </h4>
                       <DonutChart data={rcvCharts?.byType ?? []} height={220} currency={currency} />
                     </div>
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                       Top 10 Customers by Amount
                     </h4>
                     <HorizontalBarChart
                       data={rcvCharts?.topCustomers ?? []}
                       height={240}
-                      color="#3b82f6"
+                      color="var(--chart-blue-mid)"
                       currency={currency}
                     />
                   </div>
@@ -894,7 +898,7 @@ export default function AccountsReceivablePage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-4">
+            <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1063,7 +1067,7 @@ export default function AccountsReceivablePage() {
             </div>
 
             {/* Table */}
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1">
               <Table>
                 <TableHeader className="bg-muted/40">
                   <TableRow>
@@ -1111,28 +1115,28 @@ export default function AccountsReceivablePage() {
                     </TableRow>
                   ) : (
                     receivablePaging.pageRows.map((r) => (
-                      <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
-                        <TableCell className="pl-4 font-medium text-slate-800">
+                      <TableRow key={r.id} className="hover:bg-primary/10 transition-colors">
+                        <TableCell className="pl-4 font-medium text-foreground">
                           {r.customerName}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                        <TableCell className="font-mono text-xs text-primary font-bold">
                           {r.referenceNo}
                         </TableCell>
                         <TableCell>
                           <span
                             className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
                               r.source === 'Invoice'
-                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                ? 'bg-primary/10 text-primary border-primary/30'
                                 : r.source === 'Opening Balance'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-slate-100 text-slate-700 border-slate-200'
+                                  ? 'bg-warning/10 text-warning border-warning/30'
+                                  : 'bg-muted text-foreground border-border'
                             }`}
                           >
                             {r.source}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary/10 text-primary border border-primary/30">
                             {r.type}
                           </span>
                         </TableCell>
@@ -1143,7 +1147,7 @@ export default function AccountsReceivablePage() {
                           <span
                             className={
                               r.aging !== 'Current'
-                                ? 'text-red-600 font-medium'
+                                ? 'text-destructive font-medium'
                                 : 'text-muted-foreground'
                             }
                           >
@@ -1153,10 +1157,10 @@ export default function AccountsReceivablePage() {
                         <TableCell className="text-right text-muted-foreground text-sm">
                           {formatCurrency(r.amount, r.currency)}
                         </TableCell>
-                        <TableCell className="text-right text-emerald-600 font-medium text-sm">
+                        <TableCell className="text-right text-success font-medium text-sm">
                           {formatCurrency(r.amountPaid, r.currency)}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-slate-800">
+                        <TableCell className="text-right font-bold text-foreground">
                           {formatCurrency(r.outstanding ?? 0, r.currency)}
                         </TableCell>
                         <TableCell>
@@ -1175,11 +1179,11 @@ export default function AccountsReceivablePage() {
                                   id: r.id,
                                 })
                               }
-                              className={`${ACTION_BTN} hover:bg-slate-100 hover:ring-1 hover:ring-slate-200`}
+                              className={`${ACTION_BTN} hover:bg-muted hover:ring-1 hover:ring-ring`}
                               title="View full details"
                               aria-label="View full details"
                             >
-                              <Eye className="h-4 w-4 text-slate-400 transition-colors group-hover:text-blue-600" />
+                              <Eye className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
                             </button>
                             {r.isInvoice && (r.type === 'RENT' || r.type === 'LEASE') && (
                               <button
@@ -1189,7 +1193,7 @@ export default function AccountsReceivablePage() {
                                     invoiceNumber: r.referenceNo,
                                   })
                                 }
-                                className={`${ACTION_BTN} hover:bg-indigo-50 hover:ring-1 hover:ring-indigo-200`}
+                                className={`${ACTION_BTN} hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
                                 title={`View bills raised on ${r.referenceNo}`}
                                 aria-label="View bills"
                               >
@@ -1201,17 +1205,17 @@ export default function AccountsReceivablePage() {
                               (r.outstanding ?? 0) > 0.004 && (
                                 <button
                                   onClick={() => setCollectingServiceInvoiceId(r.id)}
-                                  className={`${ACTION_BTN} hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200`}
+                                  className={`${ACTION_BTN} hover:bg-success/10 hover:ring-1 hover:ring-success/30`}
                                   title="Record service collection for Accounts approval"
                                   aria-label="Collect service invoice"
                                 >
-                                  <DollarSign className="h-4 w-4 text-emerald-600 transition-colors group-hover:text-emerald-700" />
+                                  <DollarSign className="h-4 w-4 text-success transition-colors group-hover:text-success" />
                                 </button>
                               )}
                             {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => setPayingFor(r as ManualReceivable)}
-                                className={`${ACTION_BTN} hover:bg-blue-50 hover:ring-1 hover:ring-blue-200`}
+                                className={`${ACTION_BTN} hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
                                 title="Record Payment"
                                 aria-label="Record payment"
                               >

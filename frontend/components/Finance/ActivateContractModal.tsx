@@ -339,10 +339,10 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden bg-white/95 backdrop-blur-sm shadow-2xl border-0">
-        <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden bg-card backdrop-blur-sm shadow-2xl border-0">
+        <DialogHeader className="px-6 py-4 border-b border-border bg-muted/50">
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <span className="bg-green-100 text-green-700 p-1.5 rounded-lg">
+            <span className="bg-success/10 text-success p-1.5 rounded-lg">
               <CheckCircle2 className="w-5 h-5" />
             </span>
             {invoice.saleType === 'RENT' || invoice.saleType === 'LEASE'
@@ -360,9 +360,9 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
           <div className="flex-1 p-6 overflow-y-auto max-h-[70vh] space-y-8">
             {/* Step 1: Upload Document */}
             <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
-              <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground border-b pb-2 flex items-center gap-2">
                 <span
-                  className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold ${contractConfirmationUrl ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}
+                  className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold ${contractConfirmationUrl ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}
                 >
                   1
                 </span>
@@ -370,7 +370,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
               </h3>
 
               {!contractConfirmationUrl ? (
-                <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 bg-slate-50 flex flex-col items-center justify-center gap-3 relative transition-colors hover:bg-slate-100">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted flex flex-col items-center justify-center gap-3 relative transition-colors hover:bg-muted">
                   <input
                     type="file"
                     accept=".pdf, image/*"
@@ -380,32 +380,34 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                   />
                   {isUploading ? (
                     <>
-                      <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                      <p className="text-sm font-medium text-slate-600">Uploading...</p>
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      <p className="text-sm font-medium text-foreground">Uploading...</p>
                     </>
                   ) : (
                     <>
-                      <div className="bg-blue-100 p-3 rounded-full">
-                        <UploadCloud className="w-6 h-6 text-blue-600" />
+                      <div className="bg-primary/10 p-3 rounded-full">
+                        <UploadCloud className="w-6 h-6 text-primary" />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-semibold text-slate-700">
+                        <p className="text-sm font-semibold text-foreground">
                           Click or drag document here
                         </p>
-                        <p className="text-xs text-slate-500 mt-1">PDF or Images up to 10MB</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          PDF or Images up to 10MB
+                        </p>
                       </div>
                     </>
                   )}
                 </div>
               ) : (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+                <div className="bg-success/10 border border-success/30 rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    <CheckCircle2 className="w-6 h-6 text-success" />
                     <div>
-                      <p className="text-sm font-semibold text-green-800">
+                      <p className="text-sm font-semibold text-success">
                         Document Uploaded Successfully
                       </p>
-                      <p className="text-xs text-green-600">
+                      <p className="text-xs text-success">
                         {uploadFile?.name || 'Contract confirmation'}
                       </p>
                     </div>
@@ -413,7 +415,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-slate-500 hover:text-red-500"
+                    className="text-muted-foreground hover:text-destructive"
                     onClick={() => {
                       setContractConfirmationUrl('');
                       setUploadFile(null);
@@ -431,15 +433,15 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                 {/* Deposit */}
                 {isDepositNeeded && (
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                    <h3 className="text-sm font-bold text-foreground border-b pb-2 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-primary/10 text-primary">
                         2
                       </span>
                       Security Deposit
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-slate-500">
+                        <Label className="text-xs text-muted-foreground">
                           Amount ({getActiveCurrency()})
                         </Label>
                         <Input
@@ -448,18 +450,18 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                           value={depositAmount}
                           onChange={(e) => setDepositAmount(e.target.value)}
                           placeholder="0.00"
-                          className="bg-white"
+                          className="bg-card"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-slate-500">Mode of Payment</Label>
+                        <Label className="text-xs text-muted-foreground">Mode of Payment</Label>
                         <Select
                           value={depositMode}
                           onValueChange={(val) =>
                             setDepositMode(val as 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER')
                           }
                         >
-                          <SelectTrigger className="bg-white">
+                          <SelectTrigger className="bg-card">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -471,7 +473,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                         </Select>
                       </div>
                       <div className="space-y-1.5 col-span-2">
-                        <Label className="text-xs text-slate-500">
+                        <Label className="text-xs text-muted-foreground">
                           {depositMode === 'CHEQUE' ? 'Cheque Number' : 'Reference No.'}
                         </Label>
                         <Input
@@ -480,22 +482,24 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                           placeholder={
                             depositMode === 'CHEQUE' ? 'e.g. 001234' : 'Optional reference...'
                           }
-                          className="bg-white"
+                          className="bg-card"
                         />
                       </div>
                       {depositMode === 'CHEQUE' && (
                         <>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500">Name of the Bank</Label>
+                            <Label className="text-xs text-muted-foreground">
+                              Name of the Bank
+                            </Label>
                             <Input
                               value={depositChequeBankName}
                               onChange={(e) => setDepositChequeBankName(e.target.value)}
                               placeholder="e.g. QNB, HSBC..."
-                              className="bg-white"
+                              className="bg-card"
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500">
+                            <Label className="text-xs text-muted-foreground">
                               Cheque Received Date{' '}
                               <span className="font-normal">(received from customer)</span>
                             </Label>
@@ -503,11 +507,11 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                               type="date"
                               value={depositChequeReceivedDate}
                               onChange={(e) => setDepositChequeReceivedDate(e.target.value)}
-                              className="bg-white"
+                              className="bg-card"
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500">
+                            <Label className="text-xs text-muted-foreground">
                               Cheque Date{' '}
                               <span className="font-normal">
                                 (earliest date it can be deposited)
@@ -517,7 +521,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                               type="date"
                               value={depositChequeDate}
                               onChange={(e) => setDepositChequeDate(e.target.value)}
-                              className="bg-white"
+                              className="bg-card"
                             />
                           </div>
                         </>
@@ -529,8 +533,8 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                 {/* Readings */}
                 {needsReadings && rentalItems.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                    <h3 className="text-sm font-bold text-foreground border-b pb-2 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-primary/10 text-primary">
                         {isDepositNeeded ? '3' : '2'}
                       </span>
                       Initial Meter Readings
@@ -545,27 +549,24 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                         const isColor = printColor === 'BOTH' || printColor === 'COLOUR';
 
                         return (
-                          <Card
-                            key={item.id}
-                            className="border-slate-200 bg-slate-50 border shadow-sm"
-                          >
+                          <Card key={item.id} className="border-border bg-muted border shadow-sm">
                             <CardContent className="p-4 space-y-4">
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <p className="text-sm font-bold text-slate-800">
+                                  <p className="text-sm font-bold text-foreground">
                                     {item.description}
                                   </p>
-                                  <p className="text-[10px] font-mono text-slate-400">
+                                  <p className="text-[10px] font-mono text-muted-foreground">
                                     Model ID: {item.modelId || 'N/A'}
                                   </p>
                                 </div>
-                                <Badge variant="outline" className="bg-white">
+                                <Badge variant="outline" className="bg-card">
                                   {(printColor as string).replace('_', ' ')}
                                 </Badge>
                               </div>
 
-                              <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-100">
-                                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                              <div className="space-y-1.5 bg-card p-3 rounded-lg border border-border">
+                                <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                   <Label className="text-xs">Machine Allocation</Label>
                                   {(() => {
                                     const available =
@@ -575,7 +576,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                     return (
                                       <span
                                         className={
-                                          available.length > 0 ? 'text-green-600' : 'text-red-500'
+                                          available.length > 0 ? 'text-success' : 'text-destructive'
                                         }
                                       >
                                         {available.length} items available
@@ -584,8 +585,8 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                   })()}
                                 </div>
                                 {isLoadingProducts ? (
-                                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                                    <Loader2 className="animate-spin h-3.5 w-3.5 text-blue-500" />
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Loader2 className="animate-spin h-3.5 w-3.5 text-primary" />
                                     <span>Checking inventory...</span>
                                   </div>
                                 ) : (
@@ -622,11 +623,11 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                 )}
                               </div>
 
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-white p-3 rounded-lg border border-slate-100">
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-card p-3 rounded-lg border border-border">
                                 {isBw && (
                                   <>
                                     <div className="space-y-1.5">
-                                      <Label className="text-[10px] uppercase font-bold text-slate-500">
+                                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">
                                         B&W A4
                                       </Label>
                                       <Input
@@ -648,7 +649,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                       />
                                     </div>
                                     <div className="space-y-1.5">
-                                      <Label className="text-[10px] uppercase font-bold text-slate-500">
+                                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">
                                         B&W A3
                                       </Label>
                                       <Input
@@ -674,7 +675,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                 {isColor && (
                                   <>
                                     <div className="space-y-1.5">
-                                      <Label className="text-[10px] uppercase font-bold text-slate-500">
+                                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">
                                         Color A4
                                       </Label>
                                       <Input
@@ -696,7 +697,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                       />
                                     </div>
                                     <div className="space-y-1.5">
-                                      <Label className="text-[10px] uppercase font-bold text-slate-500">
+                                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">
                                         Color A3
                                       </Label>
                                       <Input
@@ -731,12 +732,12 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
             )}
           </div>
 
-          <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end items-center gap-3">
+          <div className="p-6 border-t border-border bg-muted flex justify-end items-center gap-3">
             <Button
               variant="outline"
               onClick={onClose}
               disabled={isSubmitting || isUploading}
-              className="border-slate-200 hover:bg-white hover:text-slate-800"
+              className="border-border hover:bg-card hover:text-foreground"
             >
               Cancel
             </Button>
@@ -744,7 +745,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || isUploading || !contractConfirmationUrl}
-              className="bg-green-600 hover:bg-green-700 shadow-green-200 min-w-[140px] font-bold shadow-md transition-all text-white"
+              className="bg-success hover:bg-success/90 shadow-success/10 min-w-[140px] font-bold shadow-md transition-all text-success-foreground"
             >
               {isSubmitting && <Loader2 className="animate-spin mr-2" size={16} />}
               {invoice.saleType === 'RENT' || invoice.saleType === 'LEASE'

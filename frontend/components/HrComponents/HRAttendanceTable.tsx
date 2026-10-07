@@ -113,10 +113,10 @@ export default function HRAttendanceTable() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by ID or name..."
-              className="pl-10 h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl transition-all"
+              className="pl-10 h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -126,7 +126,7 @@ export default function HRAttendanceTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
+                  className="h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl justify-between px-3 min-w-[120px]"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   <span className="truncate">{roleFilter}</span>
@@ -151,7 +151,7 @@ export default function HRAttendanceTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
+                  className="h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl justify-between px-3 min-w-[120px]"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   <span className="truncate">
@@ -176,7 +176,7 @@ export default function HRAttendanceTable() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3 min-w-[120px]"
+                  className="h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl justify-between px-3 min-w-[120px]"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   <span className="truncate">Dept: {departmentFilter}</span>
@@ -198,20 +198,20 @@ export default function HRAttendanceTable() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl"
+            className="h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl"
           >
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
           <Table className="w-full text-left">
-            <TableHeader className="bg-muted/50/50">
-              <TableRow className="border-b border-gray-100 hover:bg-transparent">
+            <TableHeader className="bg-muted/50">
+              <TableRow className="border-b border-border hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee ID
                 </TableHead>
@@ -261,8 +261,8 @@ export default function HRAttendanceTable() {
                 filteredEmployees.map((emp, index) => (
                   <TableRow
                     key={emp.id}
-                    className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                      index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
+                    className={`transition-colors h-11 border-b border-border hover:bg-primary/5 ${
+                      index % 2 === 0 ? 'bg-card' : 'bg-primary/10'
                     }`}
                   >
                     <TableCell className="px-3 py-1.5 font-medium text-primary whitespace-nowrap">
@@ -273,7 +273,7 @@ export default function HRAttendanceTable() {
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] flex-shrink-0 overflow-hidden relative">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] flex-shrink-0 overflow-hidden relative">
                           {emp.profile_image_url ? (
                             <Image
                               src={emp.profile_image_url}
@@ -292,7 +292,7 @@ export default function HRAttendanceTable() {
                       </div>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
-                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-blue-100 text-blue-700">
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-primary/10 text-primary">
                         {emp.role}
                       </span>
                     </TableCell>
@@ -301,12 +301,12 @@ export default function HRAttendanceTable() {
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
                         ${
                           emp.todayStatus === 'Present'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-destructive/10 text-destructive'
                         }`}
                       >
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${emp.todayStatus === 'Present' ? 'bg-green-600' : 'bg-red-600'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${emp.todayStatus === 'Present' ? 'bg-success' : 'bg-destructive'}`}
                         />
                         {emp.todayStatus}
                       </span>
@@ -314,20 +314,24 @@ export default function HRAttendanceTable() {
                     <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <span className="font-bold text-primary">{emp.attendanceCount}</span>
-                        <span className="text-[10px] text-gray-400 font-medium italic">days</span>
+                        <span className="text-[10px] text-muted-foreground font-medium italic">
+                          days
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <span className="font-bold text-primary">{emp.leaveCount}</span>
-                        <span className="text-[10px] text-gray-400 font-medium italic">days</span>
+                        <span className="text-[10px] text-muted-foreground font-medium italic">
+                          days
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end">
                         <Button
                           variant="ghost"
-                          className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10"
                           onClick={() => handleViewDetails(emp)}
                           title="View Attendance Details"
                         >

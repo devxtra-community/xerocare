@@ -46,8 +46,8 @@ function SegmentRow({
 }) {
   const fmt = (n: number) => formatCurrency(n, currency);
   return (
-    <tr className="hover:bg-blue-50/40 transition-colors">
-      <td className="px-4 py-3 text-sm font-medium text-slate-800">{seg.label}</td>
+    <tr className="hover:bg-primary/10 transition-colors">
+      <td className="px-4 py-3 text-sm font-medium text-foreground">{seg.label}</td>
       <td className="px-4 py-3 text-right text-sm tabular-nums">{fmt(seg.revenue)}</td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1.5">
@@ -56,18 +56,18 @@ function SegmentRow({
         </div>
       </td>
       <td
-        className={`px-4 py-3 text-right text-sm font-semibold tabular-nums ${seg.grossProfit < 0 ? 'text-red-600' : 'text-emerald-700'}`}
+        className={`px-4 py-3 text-right text-sm font-semibold tabular-nums ${seg.grossProfit < 0 ? 'text-destructive' : 'text-success'}`}
       >
         {fmt(seg.grossProfit)}
       </td>
       <td className="px-4 py-3 text-right text-xs text-muted-foreground tabular-nums">
         {seg.grossMarginPct === null ? '—' : `${seg.grossMarginPct}%`}
       </td>
-      <td className="px-4 py-3 text-right text-xs text-amber-700 tabular-nums">
+      <td className="px-4 py-3 text-right text-xs text-warning tabular-nums">
         {fmt(seg.allocatedOverhead)}
       </td>
       <td
-        className={`px-4 py-3 text-right text-sm font-bold tabular-nums ${seg.netProfit < 0 ? 'text-red-600' : 'text-slate-800'}`}
+        className={`px-4 py-3 text-right text-sm font-bold tabular-nums ${seg.netProfit < 0 ? 'text-destructive' : 'text-foreground'}`}
       >
         {fmt(seg.netProfit)}
       </td>
@@ -79,14 +79,14 @@ function SegmentRow({
           <button
             onClick={() => onViewSource(seg)}
             title="View Source — underlying revenue transactions"
-            className="text-xs font-medium px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+            className="text-xs font-medium px-2 py-1 rounded-md bg-muted text-foreground hover:bg-muted inline-flex items-center gap-1"
           >
             <Eye className="h-3 w-3" /> Revenue
           </button>
           <button
             onClick={() => onViewDetail(seg)}
             title={isSaleSegment(seg.key) ? 'View by product' : 'View by contract'}
-            className="text-xs font-medium px-2 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 inline-flex items-center gap-1"
+            className="text-xs font-medium px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/10 inline-flex items-center gap-1"
           >
             <Layers className="h-3 w-3" /> {isSaleSegment(seg.key) ? 'Products' : 'Contracts'}
           </button>
@@ -119,9 +119,9 @@ function SegmentTable({
   const fmt = (n: number) => formatCurrency(n, currency);
 
   return (
-    <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+    <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
       <div className={`px-5 py-3.5 border-l-4 ${accent}`}>
-        <h3 className="font-bold text-sm text-slate-800">{title}</h3>
+        <h3 className="font-bold text-sm text-foreground">{title}</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -149,9 +149,9 @@ function SegmentTable({
               />
             ))}
           </tbody>
-          <tfoot className="bg-slate-50/80 border-t-2 border-slate-200">
+          <tfoot className="bg-muted/80 border-t-2 border-border">
             <tr>
-              <td className="px-4 py-2.5 text-sm font-bold text-slate-800">{title} Total</td>
+              <td className="px-4 py-2.5 text-sm font-bold text-foreground">{title} Total</td>
               <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums">
                 {fmt(totalRevenue)}
               </td>
@@ -159,16 +159,16 @@ function SegmentTable({
                 {fmt(totalDirectCost)}
               </td>
               <td
-                className={`px-4 py-2.5 text-right text-sm font-bold tabular-nums ${totalGrossProfit < 0 ? 'text-red-600' : 'text-emerald-700'}`}
+                className={`px-4 py-2.5 text-right text-sm font-bold tabular-nums ${totalGrossProfit < 0 ? 'text-destructive' : 'text-success'}`}
               >
                 {fmt(totalGrossProfit)}
               </td>
               <td className="px-4 py-2.5" />
-              <td className="px-4 py-2.5 text-right text-xs font-semibold text-amber-700 tabular-nums">
+              <td className="px-4 py-2.5 text-right text-xs font-semibold text-warning tabular-nums">
                 {fmt(totalOverhead)}
               </td>
               <td
-                className={`px-4 py-2.5 text-right text-sm font-bold tabular-nums ${totalNetProfit < 0 ? 'text-red-600' : 'text-slate-800'}`}
+                className={`px-4 py-2.5 text-right text-sm font-bold tabular-nums ${totalNetProfit < 0 ? 'text-destructive' : 'text-foreground'}`}
               >
                 {fmt(totalNetProfit)}
               </td>
@@ -210,16 +210,18 @@ function SegmentedPnlContent() {
     });
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Segmented Profit &amp; Loss</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">
+            Segmented Profit &amp; Loss
+          </h1>
+          <p className="text-sm text-muted-foreground">
             All branches (or filtered) — by revenue type and product/contract
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="flex flex-col gap-1 text-xs font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-xs font-medium text-foreground">
             From
             <Input
               type="date"
@@ -228,7 +230,7 @@ function SegmentedPnlContent() {
               className="w-40"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-xs font-medium text-foreground">
             To
             <Input
               type="date"
@@ -255,18 +257,18 @@ function SegmentedPnlContent() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError || !data ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center">
-          <p className="text-red-700 font-medium">
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+          <p className="text-destructive font-medium">
             Failed to load segmented P&amp;L. Please refresh.
           </p>
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+          <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               How to read Direct Cost
             </p>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-slate-600">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-foreground">
               <span className="flex items-center gap-1.5">
                 <CostBasisBadge basis="ACTUAL" /> the real cost of the exact unit/machine involved —
                 trustworthy.
@@ -280,25 +282,25 @@ function SegmentedPnlContent() {
                 machine allocated to a contract) — shown as $0, not a confirmed zero cost.
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              <strong className="text-amber-700">Allocated Overhead</strong> and{' '}
+            <p className="text-xs text-muted-foreground">
+              <strong className="text-warning">Allocated Overhead</strong> and{' '}
               <strong>Net Profit (est.)</strong> spread indirect costs (Salary, office Rent,
               Utilities, Marketing, Maintenance, Insurance, etc.) across segments in proportion to
               each segment&apos;s share of revenue — an estimate, not a traced cost.{' '}
-              <strong className="text-slate-700">Gross Profit</strong> (Revenue − Direct Cost only)
+              <strong className="text-foreground">Gross Profit</strong> (Revenue − Direct Cost only)
               is the defensible figure.
             </p>
           </div>
 
           {(data.dataWarnings.length > 0 || data.currencyWarnings.length > 0) && (
-            <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
-              <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+            <div className="rounded-xl bg-warning/10 border border-warning/30 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-warning font-semibold text-sm">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Reconciliation notes
               </div>
               <ul className="pl-6 list-disc space-y-1">
                 {[...data.dataWarnings, ...data.currencyWarnings].map((w, i) => (
-                  <li key={i} className="text-xs text-amber-700">
+                  <li key={i} className="text-xs text-warning">
                     {w}
                   </li>
                 ))}
@@ -336,7 +338,7 @@ function SegmentedPnlContent() {
 
           <SegmentTable
             title="Sale"
-            accent="border-l-emerald-500 bg-emerald-50/40"
+            accent="border-l-emerald-500 bg-success/10"
             segments={saleSegs}
             currency={currency}
             onViewSource={openSource}
@@ -344,7 +346,7 @@ function SegmentedPnlContent() {
           />
           <SegmentTable
             title="Rent"
-            accent="border-l-blue-500 bg-blue-50/40"
+            accent="border-l-blue-500 bg-primary/10"
             segments={rentSegs}
             currency={currency}
             onViewSource={openSource}
@@ -352,7 +354,7 @@ function SegmentedPnlContent() {
           />
           <SegmentTable
             title="Lease"
-            accent="border-l-purple-500 bg-purple-50/40"
+            accent="border-l-purple-500 bg-lease/10"
             segments={leaseSegs}
             currency={currency}
             onViewSource={openSource}
@@ -407,7 +409,7 @@ function SegmentedPnlContent() {
 
 export default function AdminSegmentedPnlPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <SegmentedPnlContent />
     </Suspense>
   );

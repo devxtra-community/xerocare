@@ -110,7 +110,7 @@ export default function CompletedCollectionsTable({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -119,8 +119,8 @@ export default function CompletedCollectionsTable({
     <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Completed Collections</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-xl font-medium text-foreground">Completed Collections</h2>
+          <p className="text-sm text-muted-foreground">
             View finished contracts and total collected amounts
           </p>
         </div>
@@ -133,7 +133,7 @@ export default function CompletedCollectionsTable({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="overflow-hidden rounded-lg border border-border">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
@@ -148,7 +148,7 @@ export default function CompletedCollectionsTable({
           <TableBody>
             {paginatedCollections.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No completed collections found
                 </TableCell>
               </TableRow>
@@ -160,7 +160,9 @@ export default function CompletedCollectionsTable({
                     <div>
                       <div className="font-medium">{collection.customerName}</div>
                       {collection.customerPhone && (
-                        <div className="text-sm text-slate-500">{collection.customerPhone}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {collection.customerPhone}
+                        </div>
                       )}
                     </div>
                   </TableCell>
@@ -179,14 +181,14 @@ export default function CompletedCollectionsTable({
                       })()}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-medium text-green-600">
+                  <TableCell className="text-right font-medium text-success">
                     {formatCurrency(collection.totalCollected || 0, currency)}
                   </TableCell>
                   <TableCell>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
+                      className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
                       onClick={() => handleShowHistory(collection.contractId)}
                       title="View Usage History"
                     >
@@ -198,7 +200,7 @@ export default function CompletedCollectionsTable({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 px-2 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-blue-50 gap-1"
+                        className="h-7 px-2 text-[10px] font-bold border-primary/30 text-primary hover:bg-primary/10 gap-1"
                         onClick={() => handleSendInvoice(collection)}
                         title="Send to Customer"
                       >
@@ -208,7 +210,7 @@ export default function CompletedCollectionsTable({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 px-2 text-[10px] font-bold border-green-200 text-green-600 hover:bg-green-50 gap-1"
+                        className="h-7 px-2 text-[10px] font-bold border-success/30 text-success hover:bg-success/10 gap-1"
                         onClick={() => handleViewStatement(collection)}
                         title="View Consolidated Statement"
                       >

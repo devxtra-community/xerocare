@@ -157,7 +157,7 @@ export default function ProceedTaxModal({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Receipt size={17} className="text-indigo-600" />
+            <Receipt size={17} className="text-primary" />
             Proceed Tax Payment
           </DialogTitle>
           <DialogDescription className="text-xs">
@@ -170,39 +170,39 @@ export default function ProceedTaxModal({
           <div className="space-y-4">
             {/* Read-only tax facts — the request is raised against this record, and the
                 server re-reads the amount rather than trusting the form. */}
-            <div className="space-y-1.5 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
+            <div className="space-y-1.5 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500">Tax Type</span>
-                <span className="font-bold text-slate-800">
+                <span className="text-muted-foreground">Tax Type</span>
+                <span className="font-bold text-foreground">
                   {target.taxName}
                   {target.taxPercent != null ? ` (${Number(target.taxPercent)}%)` : ''}
                 </span>
               </div>
               {target.vendorName && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Vendor</span>
-                  <span className="font-semibold text-slate-700">{target.vendorName}</span>
+                  <span className="text-muted-foreground">Vendor</span>
+                  <span className="font-semibold text-foreground">{target.vendorName}</span>
                 </div>
               )}
               {target.reference && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Reference</span>
-                  <span className="font-mono text-xs font-semibold text-slate-700">
+                  <span className="text-muted-foreground">Reference</span>
+                  <span className="font-mono text-xs font-semibold text-foreground">
                     {target.reference}
                   </span>
                 </div>
               )}
               {(target.periodFrom || target.periodTo) && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Period</span>
-                  <span className="font-semibold text-slate-700">
+                  <span className="text-muted-foreground">Period</span>
+                  <span className="font-semibold text-foreground">
                     {target.periodFrom ?? '—'} → {target.periodTo ?? '—'}
                   </span>
                 </div>
               )}
-              <div className="flex justify-between border-t border-dashed border-indigo-200 pt-1.5">
-                <span className="font-bold text-slate-600">Tax Amount</span>
-                <span className="font-black text-slate-900">
+              <div className="flex justify-between border-t border-dashed border-primary/30 pt-1.5">
+                <span className="font-bold text-foreground">Tax Amount</span>
+                <span className="font-black text-foreground">
                   {formatCurrency(target.amount, target.currency)}
                 </span>
               </div>
@@ -210,7 +210,7 @@ export default function ProceedTaxModal({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Payment Method
                 </Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -227,7 +227,7 @@ export default function ProceedTaxModal({
                 </Select>
               </div>
               <div>
-                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Payment Date
                 </Label>
                 <Input
@@ -239,7 +239,7 @@ export default function ProceedTaxModal({
               </div>
               {paymentMethod !== 'Cheque' && (
                 <div className="sm:col-span-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Pay From *
                   </Label>
                   <Select value={paidFrom || undefined} onValueChange={setPaidFrom}>
@@ -260,7 +260,7 @@ export default function ProceedTaxModal({
                 </div>
               )}
               <div className="sm:col-span-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Note
                 </Label>
                 <Input
@@ -273,7 +273,7 @@ export default function ProceedTaxModal({
             </div>
 
             {balanceError && (
-              <p className="text-[11px] font-semibold text-red-600">{balanceError}</p>
+              <p className="text-[11px] font-semibold text-destructive">{balanceError}</p>
             )}
           </div>
         )}

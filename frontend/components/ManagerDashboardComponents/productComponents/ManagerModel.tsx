@@ -125,9 +125,9 @@ export default function ManagerModel() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Models</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Models</h3>
         {isAdmin && <BranchFilterBar />}
       </div>
 
@@ -138,7 +138,7 @@ export default function ManagerModel() {
 
       <div className="flex items-center justify-between">
         <div className="relative w-[260px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search model"
             value={search}
@@ -149,7 +149,7 @@ export default function ManagerModel() {
 
         <div className="flex gap-2">
           <Button
-            className="bg-primary text-white gap-2"
+            className="bg-primary text-primary-foreground gap-2"
             onClick={() => {
               setEditing(null);
               setFormOpen(true);
@@ -188,7 +188,7 @@ export default function ManagerModel() {
           <TableBody>
             {filtered.length > 0 ? (
               filtered.map((m, i) => (
-                <TableRow key={m.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                <TableRow key={m.id} className={i % 2 ? 'bg-info/10' : ''}>
                   <TableCell className="px-4 text-center">{m.brandRelation?.name || '-'}</TableCell>
                   <TableCell className="px-4">
                     <div className="flex items-center justify-center gap-2 group">
@@ -199,7 +199,7 @@ export default function ManagerModel() {
                           navigator.clipboard.writeText(m.model_no || '');
                           toast.success('Copied to clipboard');
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                         title="Copy Model ID"
                       >
                         <Copy size={12} />
@@ -207,26 +207,26 @@ export default function ManagerModel() {
                     </div>
                   </TableCell>
                   <TableCell className="px-4 font-medium text-center">{m.model_name}</TableCell>
-                  <TableCell className="px-4 font-semibold text-blue-600 text-center">
+                  <TableCell className="px-4 font-semibold text-primary text-center">
                     {m.quantity}
                   </TableCell>
                   <TableCell className="px-4 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
                       {m.available}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning">
                       {m.rented}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-lease/10 text-lease">
                       {m.leased}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-foreground">
                       {m.sold}
                     </span>
                   </TableCell>
@@ -242,7 +242,7 @@ export default function ManagerModel() {
                         Update
                       </button>
                       <button
-                        className="text-red-600 hover:underline flex items-center gap-1"
+                        className="text-destructive hover:underline flex items-center gap-1"
                         onClick={() => setDeleting(m)}
                       >
                         Delete
@@ -284,7 +284,7 @@ export default function ManagerModel() {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-destructive hover:bg-destructive/90"
                 onClick={(e) => {
                   e.preventDefault();
                   confirmDelete();
@@ -300,7 +300,7 @@ export default function ManagerModel() {
       <AlertDialog open={!!deleteError} onOpenChange={(open) => !open && setDeleteError(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">Cannot Delete Model</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">Cannot Delete Model</AlertDialogTitle>
             <AlertDialogDescription className="text-foreground">
               {deleteError}
             </AlertDialogDescription>

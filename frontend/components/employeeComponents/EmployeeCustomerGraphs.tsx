@@ -23,7 +23,7 @@ interface ChartDataItem {
 }
 
 const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+  <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
     <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-6">{title}</h4>
     <div className="flex-1 w-full min-h-0">{children}</div>
   </div>
@@ -112,9 +112,9 @@ export default function EmployeeCustomerGraphs() {
         {[1, 2].map((i) => (
           <div
             key={i}
-            className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full items-center justify-center"
+            className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full items-center justify-center"
           >
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ))}
       </div>
@@ -130,23 +130,26 @@ export default function EmployeeCustomerGraphs() {
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               dy={10}
               interval={0}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
             />
-            <Tooltip content={<ChartTooltipContent />} cursor={{ fill: '#f1f5f9', opacity: 0.4 }} />
+            <Tooltip
+              content={<ChartTooltipContent />}
+              cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
+            />
             <Bar dataKey="customers" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={10} />
           </BarChart>
         </ResponsiveContainer>
@@ -161,21 +164,21 @@ export default function EmployeeCustomerGraphs() {
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 9, fontWeight: 700 }}
               dy={10}
               interval={2}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 9, fontWeight: 700 }}
               domain={['auto', 'auto']}
             />
             <Tooltip
@@ -187,8 +190,8 @@ export default function EmployeeCustomerGraphs() {
               dataKey="customers"
               stroke="var(--primary)"
               strokeWidth={2}
-              dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: 'var(--primary)', stroke: '#fff', strokeWidth: 2 }}
+              dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 2, stroke: 'var(--card)' }}
+              activeDot={{ r: 6, fill: 'var(--primary)', stroke: 'var(--card)', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>

@@ -34,10 +34,12 @@ export default function RentPage() {
   }, []);
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col space-y-6">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Rent Operations</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Rent Operations
+          </h3>
           <p className="text-muted-foreground">Manage and approve rental agreements</p>
         </div>
 
@@ -45,7 +47,7 @@ export default function RentPage() {
         <EmployeeRentGraphs invoices={invoices} />
 
         <Tabs defaultValue="pending" className="w-full space-y-4">
-          <TabsList className="bg-card border text-slate-600">
+          <TabsList className="bg-card border text-foreground">
             <TabsTrigger value="pending">Pending Approvals</TabsTrigger>
             <TabsTrigger value="quotations">All Quotations</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
@@ -53,35 +55,37 @@ export default function RentPage() {
           </TabsList>
 
           <TabsContent value="pending" className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+            <h3 className="text-xl font-medium text-foreground tracking-tight">
               Pending Finance Approval
             </h3>
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1">
               <FinanceApprovalTable saleType="RENT" />
             </div>
           </TabsContent>
 
           <TabsContent value="quotations" className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">All Rent Contracts</h3>
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+            <h3 className="text-xl font-medium text-foreground tracking-tight">
+              All Rent Contracts
+            </h3>
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1">
               <FinanceQuotationTable saleType="RENT" hideActions={true} />
             </div>
           </TabsContent>
 
           <TabsContent value="collection" className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+            <h3 className="text-xl font-medium text-foreground tracking-tight">
               Monthly Usage &amp; Billing
             </h3>
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1">
               <MonthlyCollectionTable mode="RENT" />
             </div>
           </TabsContent>
 
           <TabsContent value="completed" className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+            <h3 className="text-xl font-medium text-foreground tracking-tight">
               Completed Collections
             </h3>
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1">
               <CompletedCollectionsTable mode="RENT" />
             </div>
           </TabsContent>

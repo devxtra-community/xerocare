@@ -531,17 +531,14 @@ export default function BulkSparePartDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <div className="bg-card rounded-xl w-full max-w-[95vw] h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2">
+          <h2 className="text-xl font-medium flex items-center gap-2">
             <Upload size={20} /> Bulk Spare Part Upload
           </h2>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="p-1 hover:bg-gray-100 rounded-full"
-          >
+          <button onClick={() => onOpenChange(false)} className="p-1 hover:bg-muted rounded-full">
             <X size={20} />
           </button>
         </div>
@@ -559,7 +556,7 @@ export default function BulkSparePartDialog({
               />
               <label
                 htmlFor="excel-upload-sp"
-                className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-success text-success-foreground rounded-md hover:bg-success/90 transition-colors"
               >
                 <FileSpreadsheet size={18} />
                 Upload Excel
@@ -597,31 +594,31 @@ export default function BulkSparePartDialog({
               return (
                 <div
                   key={i}
-                  className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md"
+                  className="border border-border rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md"
                 >
                   {/* Summary header */}
                   <div
                     onClick={() => toggleRowExpanded(i)}
-                    className="p-4 bg-slate-50 border-b flex justify-between items-center cursor-pointer select-none"
+                    className="p-4 bg-muted border-b flex justify-between items-center cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-3">
                       {isValid ? (
                         <span
-                          className="h-2.5 w-2.5 rounded-full bg-green-500 shrink-0"
+                          className="h-2.5 w-2.5 rounded-full bg-success shrink-0"
                           title="Valid"
                         />
                       ) : (
                         <span
-                          className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"
+                          className="h-2.5 w-2.5 rounded-full bg-warning animate-pulse shrink-0"
                           title="Missing required fields"
                         />
                       )}
                       <div className="text-left">
-                        <h4 className="font-bold text-sm text-slate-800">
+                        <h4 className="font-bold text-sm text-foreground">
                           Spare Part #{i + 1}:{' '}
                           <span className="text-primary">{row.part_name || 'Unnamed Part'}</span>
                         </h4>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {row.brand || 'No Brand'} • SKU: {row.sku || 'N/A'} • Qty:{' '}
                           {row.quantity ?? 0} • Price: {row.base_price ?? 0}
                         </p>
@@ -631,7 +628,7 @@ export default function BulkSparePartDialog({
                       <button
                         type="button"
                         onClick={() => handleRemoveRow(i)}
-                        className="text-red-500 hover:text-red-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-destructive hover:text-destructive p-1.5 hover:bg-muted rounded-lg transition-colors"
                         title="Delete"
                       >
                         <Trash2 size={16} />
@@ -639,7 +636,7 @@ export default function BulkSparePartDialog({
                       <button
                         type="button"
                         onClick={() => toggleRowExpanded(i)}
-                        className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-muted rounded-lg transition-colors"
                       >
                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </button>
@@ -648,7 +645,7 @@ export default function BulkSparePartDialog({
 
                   {/* Expanded form body */}
                   {isExpanded && (
-                    <div className="p-6 bg-white space-y-6 text-left border-t">
+                    <div className="p-6 bg-card space-y-6 text-left border-t">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Left column */}
                         <div className="space-y-4">
@@ -927,7 +924,7 @@ export default function BulkSparePartDialog({
               );
             })
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-12">
               <Upload size={48} className="mb-4 opacity-20" />
               <p>Upload an Excel file to view and edit items here</p>
               <p className="text-sm">or click &quot;Add Row&quot; to start manually</p>
@@ -947,7 +944,7 @@ export default function BulkSparePartDialog({
             <Button
               onClick={handleSubmit}
               disabled={rows.length === 0 || isSubmitting}
-              className="gap-2 bg-primary text-white"
+              className="gap-2 bg-primary text-primary-foreground"
             >
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {isSubmitting ? 'Saving...' : 'Save All'}
@@ -962,7 +959,7 @@ export default function BulkSparePartDialog({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-700 mb-1">{label}</label>
+      <label className="block text-xs font-bold text-foreground mb-1">{label}</label>
       {children}
     </div>
   );

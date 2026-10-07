@@ -26,18 +26,18 @@ export default function UnauthorizedPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen w-full items-center justify-center bg-muted">
       <div className="max-w-md w-full mx-4 text-center">
-        <div className="bg-white rounded-2xl shadow-sm border p-10 space-y-6">
+        <div className="bg-card rounded-2xl shadow-sm border p-10 space-y-6">
           <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center">
-              <ShieldX className="h-8 w-8 text-red-600" />
+            <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <ShieldX className="h-8 w-8 text-destructive" />
             </div>
           </div>
 
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-            <p className="mt-2 text-gray-500 text-sm">
+            <h1 className="text-xl sm:text-2xl font-medium text-foreground">Access Denied</h1>
+            <p className="mt-2 text-muted-foreground text-sm">
               You do not have permission to view this page. If you believe this is a mistake,
               contact your administrator.
             </p>
@@ -45,7 +45,7 @@ export default function UnauthorizedPage() {
 
           <button
             onClick={goHome}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             Go to Dashboard
           </button>

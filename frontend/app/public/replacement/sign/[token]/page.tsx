@@ -66,20 +66,20 @@ export default function ReplacementSigningPage() {
 
   if (state === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="h-7 w-7 animate-spin text-slate-400" />
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (state === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-        <div className="max-w-md rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
-          <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-red-500" />
-          <h1 className="text-lg font-black text-slate-800">This link cannot be opened</h1>
-          <p className="mt-2 text-sm text-slate-500">{error}</p>
-          <p className="mt-3 text-xs text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-muted p-6">
+        <div className="max-w-md rounded-2xl border border-destructive/30 bg-card p-8 text-center shadow-sm">
+          <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-destructive" />
+          <h1 className="text-lg font-black text-foreground">This link cannot be opened</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+          <p className="mt-3 text-xs text-muted-foreground">
             Replacement links are valid for 72 hours and can be used once. Ask your account manager
             to send a fresh one.
           </p>
@@ -89,50 +89,50 @@ export default function ReplacementSigningPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8">
+    <div className="min-h-screen bg-muted py-8">
       <div className="mx-auto max-w-3xl px-4">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
-            <Wrench size={18} className="text-slate-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card shadow-sm">
+            <Wrench size={18} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
               Machine Replacement Report
             </p>
-            <h1 className="text-xl font-black text-slate-800">{detail?.request.requestNo}</h1>
+            <h1 className="text-xl font-medium text-foreground">{detail?.request.requestNo}</h1>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           {detail && <ReplacementDetailView detail={detail} />}
         </div>
 
         {state === 'approved' ? (
-          <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-7 text-center">
-            <CheckCircle2 className="mx-auto mb-3 h-9 w-9 text-emerald-600" />
-            <h2 className="text-lg font-black text-emerald-800">Thank you — approval recorded</h2>
-            <p className="mt-1.5 text-sm text-emerald-700">
+          <div className="mt-5 rounded-2xl border border-success/30 bg-success/10 p-7 text-center">
+            <CheckCircle2 className="mx-auto mb-3 h-9 w-9 text-success" />
+            <h2 className="text-lg font-black text-success">Thank you — approval recorded</h2>
+            <p className="mt-1.5 text-sm text-success">
               We have logged your confirmation of this machine replacement. No further action is
               needed.
             </p>
           </div>
         ) : (
-          <div className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mt-5 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div>
-              <h2 className="text-base font-black text-slate-800">Confirm the replacement</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <h2 className="text-base font-black text-foreground">Confirm the replacement</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Please confirm the machine listed above was replaced and the meter readings are
                 correct.
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Your name
               </Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="h-10" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Note (optional)
               </Label>
               <Textarea
@@ -145,7 +145,7 @@ export default function ReplacementSigningPage() {
             <Button
               onClick={approve}
               disabled={!name.trim() || saving}
-              className="h-11 w-full bg-emerald-600 text-sm font-black text-white hover:bg-emerald-700"
+              className="h-11 w-full bg-success text-sm font-black text-success-foreground hover:bg-success/90"
             >
               {saving ? (
                 <Loader2 size={16} className="mr-2 animate-spin" />

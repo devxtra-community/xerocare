@@ -65,13 +65,18 @@ import { ASSET_CATEGORIES, CATEGORY_GROUPS } from '@/lib/assetCategories';
 import { DepreciationPreview } from '@/components/accounts/DepreciationPreview';
 
 const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  FULLY_DEPRECIATED: 'bg-slate-100 text-slate-600 border-slate-200',
-  DISPOSED: 'bg-red-100 text-red-700 border-red-200',
-  SUSPENDED: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  ACTIVE: 'bg-success/10 text-success border-success/30',
+  FULLY_DEPRECIATED: 'bg-muted text-foreground border-border',
+  DISPOSED: 'bg-destructive/10 text-destructive border-destructive/30',
+  SUSPENDED: 'bg-warning/10 text-warning border-warning/30',
 };
 
-const PIE_COLORS = ['#3b82f6', '#94a3b8', '#ef4444', '#f59e0b'];
+const PIE_COLORS = [
+  'var(--chart-blue-mid)',
+  'var(--chart-slate)',
+  'var(--destructive)',
+  'var(--chart-expense)',
+];
 
 // ─── Brand Rule Modal ──────────────────────────────────────────────────────────
 
@@ -111,10 +116,10 @@ function BrandRuleModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">
+          <h2 className="font-bold text-foreground">
             {rule ? 'Edit' : 'Add'} Brand Depreciation Rule
           </h2>
           <button onClick={onClose}>
@@ -436,10 +441,10 @@ function AddAssetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">
+          <h2 className="font-bold text-foreground">
             {asset ? 'Edit Asset' : 'Add Asset to Register'}
           </h2>
           <button onClick={onClose}>
@@ -449,10 +454,10 @@ function AddAssetModal({
 
         <div className="px-6 py-4 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* Branch info (read-only from JWT) */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-            <span className="text-sm text-blue-600">Branch:</span>
-            <span className="text-sm font-medium text-blue-800">{branchDisplayName}</span>
-            <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
+          <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg">
+            <span className="text-sm text-primary">Branch:</span>
+            <span className="text-sm font-medium text-primary">{branchDisplayName}</span>
+            <span className="text-xs text-primary ml-auto">{currentUser?.role}</span>
           </div>
 
           {/* Asset type selector (new assets only) */}
@@ -477,11 +482,11 @@ function AddAssetModal({
                     detectedRuleSource: '',
                   }));
                 }}
-                className={`p-4 border-2 rounded-xl text-left transition ${assetType === 'PRINTER_PRODUCT' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                className={`p-4 border-2 rounded-xl text-left transition ${assetType === 'PRINTER_PRODUCT' ? 'border-primary bg-primary/10' : 'border-border hover:border-border'}`}
               >
                 <div className="text-2xl mb-1">🖨️</div>
                 <div className="text-sm font-semibold">Printer / Copier</div>
-                <div className="text-xs text-gray-400 mt-0.5">From inventory</div>
+                <div className="text-xs text-muted-foreground mt-0.5">From inventory</div>
               </button>
               <button
                 onClick={() => {
@@ -502,11 +507,11 @@ function AddAssetModal({
                     detectedRuleSource: '',
                   }));
                 }}
-                className={`p-4 border-2 rounded-xl text-left transition ${assetType === 'MANUAL_ASSET' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                className={`p-4 border-2 rounded-xl text-left transition ${assetType === 'MANUAL_ASSET' ? 'border-primary bg-primary/10' : 'border-border hover:border-border'}`}
               >
                 <div className="text-2xl mb-1">🏢</div>
                 <div className="text-sm font-semibold">Other Asset</div>
-                <div className="text-xs text-gray-400 mt-0.5">Vehicle, Furniture…</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Vehicle, Furniture…</div>
               </button>
             </div>
           )}
@@ -582,7 +587,7 @@ function AddAssetModal({
                     Product / Serial # *
                   </label>
                   {availableProducts.length === 0 ? (
-                    <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700">
+                    <div className="mt-1 p-3 bg-warning/10 border border-warning/30 rounded text-sm text-warning">
                       No available or returned products for this model in your branch.
                     </div>
                   ) : (
@@ -597,8 +602,8 @@ function AddAssetModal({
                             <span
                               className={`text-xs ml-2 ${
                                 p.product_status === 'RETURNED'
-                                  ? 'text-orange-500'
-                                  : 'text-gray-400'
+                                  ? 'text-warning'
+                                  : 'text-muted-foreground'
                               }`}
                             >
                               ({p.product_status})
@@ -610,12 +615,12 @@ function AddAssetModal({
                   )}
 
                   {form.productId && form.detectedRuleSource && (
-                    <div className="mt-1 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                    <div className="mt-1 p-2 bg-success/10 border border-success/30 rounded text-xs text-success">
                       Depreciation rule auto-filled from {form.detectedRuleSource} settings
                     </div>
                   )}
                   {form.productId && !form.detectedRuleSource && (
-                    <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                    <div className="mt-1 p-2 bg-primary/10 border border-primary/30 rounded text-xs text-primary">
                       No rule found — using default values. Adjust below if needed.
                     </div>
                   )}
@@ -638,7 +643,7 @@ function AddAssetModal({
                   <SelectContent className="max-h-80">
                     {Object.entries(CATEGORY_GROUPS).map(([group, cats]) => (
                       <SelectGroup key={group}>
-                        <SelectLabel className="text-xs text-gray-500 font-semibold uppercase px-2 py-1">
+                        <SelectLabel className="text-xs text-muted-foreground font-semibold uppercase px-2 py-1">
                           {group}
                         </SelectLabel>
                         {cats.map((cat) => (
@@ -657,23 +662,23 @@ function AddAssetModal({
 
               {/* Category info card */}
               {form.assetCategory && selectedCat && (
-                <div className="rounded-lg bg-blue-50 p-3 text-sm space-y-1">
+                <div className="rounded-lg bg-primary/10 p-3 text-sm space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-blue-600">Class:</span>
+                    <span className="text-primary">Class:</span>
                     <span className="font-medium">{selectedCat.class.replace('_', '-')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-blue-600">Depreciable:</span>
+                    <span className="text-primary">Depreciable:</span>
                     <span className="font-medium">{selectedCat.depreciable ? 'Yes' : 'No'}</span>
                   </div>
                   {selectedCat.depreciable && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-blue-600">Default Life:</span>
+                        <span className="text-primary">Default Life:</span>
                         <span className="font-medium">{form.usefulLifeMonths} months</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-blue-600">Annual Rate:</span>
+                        <span className="text-primary">Annual Rate:</span>
                         <span className="font-medium">{form.annualDepreciationPct}%</span>
                       </div>
                     </>
@@ -695,22 +700,22 @@ function AddAssetModal({
 
           {/* Edit mode — show current asset info */}
           {asset && (
-            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+            <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
               <div className="flex justify-between">
-                <span className="text-gray-500">Category:</span>
+                <span className="text-muted-foreground">Category:</span>
                 <span className="font-medium">
                   {ASSET_CATEGORIES[asset.assetCategory]?.label ?? asset.assetCategory ?? 'Printer'}
                 </span>
               </div>
               {asset.assetName && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Name:</span>
+                  <span className="text-muted-foreground">Name:</span>
                   <span className="font-medium">{asset.assetName}</span>
                 </div>
               )}
               {asset.productId && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Product:</span>
+                  <span className="text-muted-foreground">Product:</span>
                   <span className="font-mono text-xs">{asset.productId.slice(0, 16)}…</span>
                 </div>
               )}
@@ -752,8 +757,8 @@ function AddAssetModal({
 
               {/* Depreciation settings */}
               {(assetType === 'PRINTER_PRODUCT' || selectedCat?.depreciable !== false) && (
-                <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
-                  <h4 className="text-sm font-semibold text-gray-700">Depreciation Settings</h4>
+                <div className="border rounded-lg p-4 space-y-3 bg-muted">
+                  <h4 className="text-sm font-semibold text-foreground">Depreciation Settings</h4>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Method</label>
                     <Select
@@ -797,7 +802,7 @@ function AddAssetModal({
                         className="mt-1"
                         min={1}
                       />
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         = {(parseInt(form.usefulLifeMonths) / 12).toFixed(1)} years
                       </p>
                     </div>
@@ -924,7 +929,7 @@ function ScheduleDrawer({
       <div className="w-full max-w-2xl bg-card shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="font-bold text-slate-800">Depreciation Schedule</h2>
+            <h2 className="font-bold text-foreground">Depreciation Schedule</h2>
             <p className="text-xs text-muted-foreground">
               Method: {asset.method} | Useful Life: {asset.usefulLifeMonths} mo
             </p>
@@ -966,14 +971,14 @@ function ScheduleDrawer({
               </TableHeader>
               <TableBody>
                 {schedule.map((r, i) => (
-                  <TableRow key={i} className="hover:bg-blue-50/30">
+                  <TableRow key={i} className="hover:bg-primary/10">
                     <TableCell className="pl-4 font-mono text-xs">
                       {r.year}-{String(r.month).padStart(2, '0')}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
                       {formatCurrency(r.openingNBV, currency)}
                     </TableCell>
-                    <TableCell className="text-right text-xs text-red-600">
+                    <TableCell className="text-right text-xs text-destructive">
                       {formatCurrency(r.monthlyDep, currency)}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
@@ -1162,10 +1167,10 @@ export default function DepreciationPage() {
   };
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Assets & Depreciation
           </h3>
           <p className="text-muted-foreground">
@@ -1175,12 +1180,12 @@ export default function DepreciationPage() {
       </div>
 
       {/* Sub-tab Nav */}
-      <div className="flex gap-1 bg-card rounded-xl p-1 border border-slate-100 shadow-sm w-fit">
+      <div className="flex gap-1 bg-card rounded-xl p-1 border border-border shadow-sm w-fit">
         {(Object.keys(TAB_LABELS) as SubTab[]).map((t) => (
           <button
             key={t}
             onClick={() => setSubTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${subTab === t ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-slate-800'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${subTab === t ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
           >
             {TAB_LABELS[t]}
           </button>
@@ -1191,7 +1196,7 @@ export default function DepreciationPage() {
       {subTab === 'rules' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-slate-700">Brand Depreciation Rules</h4>
+            <h4 className="font-bold text-foreground">Brand Depreciation Rules</h4>
             <Button
               onClick={() => {
                 setEditingBrandRule(undefined);
@@ -1202,7 +1207,7 @@ export default function DepreciationPage() {
               <Plus className="h-4 w-4" /> Add Brand Rule
             </Button>
           </div>
-          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-1">
             <Table>
               <TableHeader className="bg-muted/40">
                 <TableRow>
@@ -1235,7 +1240,7 @@ export default function DepreciationPage() {
                   </TableRow>
                 ) : (
                   brandRules.map((r) => (
-                    <TableRow key={r.id} className="hover:bg-blue-50/50">
+                    <TableRow key={r.id} className="hover:bg-primary/10">
                       <TableCell className="pl-4 font-mono text-xs">
                         {brands.find((b) => b.id === r.brandId)?.name ??
                           r.brandId.slice(0, 12) + '…'}
@@ -1246,7 +1251,7 @@ export default function DepreciationPage() {
                       <TableCell>{r.usefulLifeMonths}</TableCell>
                       <TableCell>{r.salvageValuePct}%</TableCell>
                       <TableCell>
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary/10 text-primary border border-primary/30">
                           {r.method.replace(/_/g, ' ')}
                         </span>
                       </TableCell>
@@ -1257,7 +1262,7 @@ export default function DepreciationPage() {
                               setEditingBrandRule(r);
                               setShowBrandRuleModal(true);
                             }}
-                            className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                            className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -1265,7 +1270,7 @@ export default function DepreciationPage() {
                             onClick={() => {
                               if (confirm('Delete?')) deleteBrandRuleMut.mutate(r.id);
                             }}
-                            className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                            className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1279,14 +1284,14 @@ export default function DepreciationPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-slate-700">
+            <h4 className="font-bold text-foreground">
               Model Rules{' '}
               <span className="text-xs font-normal text-muted-foreground">
                 (override brand rules)
               </span>
             </h4>
           </div>
-          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-1">
             <Table>
               <TableHeader className="bg-muted/40">
                 <TableRow>
@@ -1319,7 +1324,7 @@ export default function DepreciationPage() {
                   </TableRow>
                 ) : (
                   modelRules.map((r) => (
-                    <TableRow key={r.id} className="hover:bg-blue-50/50">
+                    <TableRow key={r.id} className="hover:bg-primary/10">
                       <TableCell className="pl-4 font-mono text-xs">
                         {brands.find((b) => b.id === r.brandId)?.name ??
                           r.brandId.slice(0, 8) + '…'}
@@ -1331,7 +1336,7 @@ export default function DepreciationPage() {
                       <TableCell>{r.usefulLifeMonths}</TableCell>
                       <TableCell>{r.salvageValuePct}%</TableCell>
                       <TableCell className="pr-4">
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-lease/10 text-lease border border-lease/30">
                           {r.method.replace(/_/g, ' ')}
                         </span>
                       </TableCell>
@@ -1367,17 +1372,17 @@ export default function DepreciationPage() {
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : isError ? (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center space-y-3">
-              <p className="text-red-700 font-medium">Failed to load asset register.</p>
+            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center space-y-3">
+              <p className="text-destructive font-medium">Failed to load asset register.</p>
               <button
                 onClick={() => refetch()}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+                className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
               >
                 Retry
               </button>
             </div>
           ) : (
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1 overflow-x-auto">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1 overflow-x-auto">
               <Table pagination={{ pageSize: 10 }}>
                 <TableHeader className="bg-muted/40">
                   <TableRow>
@@ -1421,23 +1426,23 @@ export default function DepreciationPage() {
                     assets.map((a) => {
                       const catMeta = ASSET_CATEGORIES[a.assetCategory];
                       return (
-                        <TableRow key={a.id} className="hover:bg-blue-50/50 transition-colors">
+                        <TableRow key={a.id} className="hover:bg-primary/10 transition-colors">
                           <TableCell className="pl-4 text-xs">
                             {a.assetName ? (
                               <span className="font-medium">{a.assetName}</span>
                             ) : a.productId ? (
                               <div className="space-y-0.5">
                                 {a.brand_name || a.model_name ? (
-                                  <div className="font-medium text-slate-800">
+                                  <div className="font-medium text-foreground">
                                     {[a.brand_name, a.model_name].filter(Boolean).join(' ')}
                                   </div>
                                 ) : null}
                                 {a.serial_no ? (
-                                  <div className="font-mono text-blue-600 text-[10px]">
+                                  <div className="font-mono text-primary text-[10px]">
                                     S/N: {a.serial_no}
                                   </div>
                                 ) : (
-                                  <div className="font-mono text-blue-400 text-[10px]">
+                                  <div className="font-mono text-primary text-[10px]">
                                     {a.productId.slice(0, 12)}…
                                   </div>
                                 )}
@@ -1458,7 +1463,7 @@ export default function DepreciationPage() {
                           <TableCell className="text-right text-sm">
                             {formatCurrency(Number(a.purchasePrice), currency)}
                           </TableCell>
-                          <TableCell className="text-right text-sm text-red-600 font-medium">
+                          <TableCell className="text-right text-sm text-destructive font-medium">
                             {formatCurrency(Number(a.monthlyDep) || 0, currency)}
                           </TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">
@@ -1467,14 +1472,14 @@ export default function DepreciationPage() {
                             {formatCurrency(Number(a.accumulated) || 0, currency)}
                             {Number(a.unpostedDepreciation ?? 0) > 0.005 && (
                               <div
-                                className="text-[10px] font-semibold text-amber-600"
+                                className="text-[10px] font-semibold text-warning"
                                 title="Depreciation for periods that were already closed before this asset was registered. Post those periods to recognise it."
                               >
                                 +{formatCurrency(Number(a.unpostedDepreciation), currency)} unposted
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-bold text-slate-800">
+                          <TableCell className="text-right font-bold text-foreground">
                             {/* ?? not || — a fully-depreciated asset's NBV is legitimately 0,
                                 and || would show its full cost instead. */}
                             {formatCurrency(Number(a.nbv) ?? Number(a.purchasePrice), currency)}
@@ -1490,7 +1495,7 @@ export default function DepreciationPage() {
                             <div className="flex gap-1">
                               <button
                                 onClick={() => setScheduleAsset(a)}
-                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                 title="View Schedule"
                               >
                                 <Calendar className="h-3.5 w-3.5" />
@@ -1500,7 +1505,7 @@ export default function DepreciationPage() {
                                   setEditingAsset(a);
                                   setShowAddAsset(true);
                                 }}
-                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                 title="Edit"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -1508,7 +1513,7 @@ export default function DepreciationPage() {
                               {a.status === 'ACTIVE' && (
                                 <button
                                   onClick={() => setDisposeTarget(a)}
-                                  className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                  className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                                   title="Dispose"
                                 >
                                   <AlertCircle className="h-3.5 w-3.5" />
@@ -1556,14 +1561,14 @@ export default function DepreciationPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+            <div className="rounded-2xl bg-card shadow-sm border border-border">
               <div className="px-4 py-3 border-b border-border">
                 <h3 className="text-base font-bold text-primary">NBV by Brand</h3>
               </div>
               <div className="p-4">
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={brandNBVData} barSize={32}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--muted)" />
                     <XAxis
                       dataKey="brand"
                       tick={{ fontSize: 10 }}
@@ -1580,13 +1585,18 @@ export default function DepreciationPage() {
                       formatter={(v: number) => formatCurrency(v, currency)}
                       contentStyle={{ borderRadius: '10px', fontSize: '12px' }}
                     />
-                    <Bar dataKey="nbv" name="NBV" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                    <Bar
+                      dataKey="nbv"
+                      name="NBV"
+                      fill="var(--chart-blue-mid)"
+                      radius={[6, 6, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+            <div className="rounded-2xl bg-card shadow-sm border border-border">
               <div className="px-4 py-3 border-b border-border">
                 <h3 className="text-base font-bold text-primary">Assets by Status</h3>
               </div>
@@ -1614,27 +1624,27 @@ export default function DepreciationPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Cost vs NBV by Brand</h3>
+            <div className="rounded-2xl bg-card shadow-sm border border-border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Cost vs NBV by Brand</h3>
               <SimpleBarChart
                 data={depCharts?.costVsNBV ?? []}
                 xKey="brand"
                 bars={[
-                  { key: 'cost', color: '#94a3b8', label: 'Cost' },
-                  { key: 'nbv', color: '#3b82f6', label: 'NBV' },
+                  { key: 'cost', color: 'var(--chart-slate)', label: 'Cost' },
+                  { key: 'nbv', color: 'var(--chart-blue-mid)', label: 'NBV' },
                 ]}
                 height={200}
                 currency={currency}
               />
             </div>
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            <div className="rounded-2xl bg-card shadow-sm border border-border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">
                 Monthly Depreciation Charge
               </h3>
               <SimpleLineChart
                 data={depCharts?.monthlyCharge ?? []}
                 xKey="month"
-                lines={[{ key: 'amount', color: '#f59e0b', label: 'Dep. Charge' }]}
+                lines={[{ key: 'amount', color: 'var(--chart-expense)', label: 'Dep. Charge' }]}
                 height={200}
                 currency={currency}
               />
@@ -1648,7 +1658,7 @@ export default function DepreciationPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-bold text-slate-700">Monthly Depreciation Journal</h4>
+              <h4 className="font-bold text-foreground">Monthly Depreciation Journal</h4>
               <p className="text-xs text-muted-foreground">
                 Close a period to recognise its depreciation. Each period can only be posted once
                 per branch, and an asset is never charged before it was bought or past its salvage
@@ -1659,7 +1669,7 @@ export default function DepreciationPage() {
               <Plus className="h-4 w-4" /> Post Depreciation
             </Button>
           </div>
-          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-1">
             <Table pagination={{ pageSize: 10 }}>
               <TableHeader className="bg-muted/40">
                 <TableRow>
@@ -1689,16 +1699,16 @@ export default function DepreciationPage() {
                   </TableRow>
                 ) : (
                   journals.map((j) => (
-                    <TableRow key={j.id} className="hover:bg-blue-50/50">
+                    <TableRow key={j.id} className="hover:bg-primary/10">
                       <TableCell className="pl-4 font-mono text-sm font-bold">
                         {j.periodYear}-{String(j.periodMonth).padStart(2, '0')}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-slate-800">
+                      <TableCell className="text-right font-bold text-foreground">
                         {formatCurrency(Number(j.totalAmount), currency)}
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${j.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${j.status === 'POSTED' ? 'bg-success/10 text-success border-success/30' : 'bg-warning/10 text-warning border-warning/30'}`}
                         >
                           {j.status}
                         </span>
@@ -1741,9 +1751,9 @@ export default function DepreciationPage() {
       )}
 
       {disposeTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <h2 className="font-bold text-slate-800">Mark as Disposed</h2>
+            <h2 className="font-bold text-foreground">Mark as Disposed</h2>
             <p className="text-sm text-muted-foreground">
               {disposeTarget.assetName ?? disposeTarget.productId?.slice(0, 16) ?? 'Asset'}
             </p>
@@ -1769,7 +1779,7 @@ export default function DepreciationPage() {
               <Button
                 onClick={() => disposeMut.mutate(disposeTarget.id)}
                 disabled={disposeMut.isPending}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               >
                 {disposeMut.isPending ? 'Disposing…' : 'Confirm Dispose'}
               </Button>
@@ -1779,9 +1789,9 @@ export default function DepreciationPage() {
       )}
 
       {postingJournal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <h2 className="font-bold text-slate-800">Post Depreciation</h2>
+            <h2 className="font-bold text-foreground">Post Depreciation</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Month</label>

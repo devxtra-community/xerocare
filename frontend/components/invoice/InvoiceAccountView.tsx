@@ -281,26 +281,28 @@ export function InvoiceAccountView({
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
-                <p className="text-xs font-bold text-slate-500 uppercase">Total Amount</p>
-                <p className="text-xl font-bold text-slate-800">
+              <div className="bg-muted p-4 rounded-xl border border-border flex flex-col justify-center">
+                <p className="text-xs font-bold text-muted-foreground uppercase">Total Amount</p>
+                <p className="text-xl font-bold text-foreground">
                   {formatCurrency(summary.totalAmount, invoiceCurrency)}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">Invoice: {summary.invoiceNumber}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Invoice: {summary.invoiceNumber}
+                </p>
               </div>
-              <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex flex-col justify-center">
-                <p className="text-xs font-bold text-green-600 uppercase">Total Paid</p>
-                <p className="text-xl font-bold text-green-700">
+              <div className="bg-success/10 p-4 rounded-xl border border-success/30 flex flex-col justify-center">
+                <p className="text-xs font-bold text-success uppercase">Total Paid</p>
+                <p className="text-xl font-bold text-success">
                   {formatCurrency(summary.totalPaid, invoiceCurrency)}
                 </p>
               </div>
-              <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col justify-center">
-                <p className="text-xs font-bold text-orange-600 uppercase">Pending Balance</p>
-                <p className="text-xl font-bold text-orange-700">
+              <div className="bg-warning/10 p-4 rounded-xl border border-warning/30 flex flex-col justify-center">
+                <p className="text-xs font-bold text-warning uppercase">Pending Balance</p>
+                <p className="text-xl font-bold text-warning">
                   {formatCurrency(collectibleBalance, invoiceCurrency)}
                 </p>
                 {paymentContext === 'SERVICE_COMPLETION' && (pendingApprovalAmount ?? 0) > 0 && (
-                  <p className="mt-1 text-[11px] text-orange-700">
+                  <p className="mt-1 text-[11px] text-warning">
                     {formatCurrency(pendingApprovalAmount ?? 0, invoiceCurrency)} awaiting approval
                   </p>
                 )}
@@ -308,7 +310,7 @@ export function InvoiceAccountView({
             </div>
 
             {summary.currencyWarnings && summary.currencyWarnings.length > 0 && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700 text-xs">
+              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-warning text-xs">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
                   {summary.currencyWarnings.map((w) => (
@@ -320,7 +322,7 @@ export function InvoiceAccountView({
 
             {/* Action Bar */}
             <div className="flex justify-between items-center bg-card border rounded-lg p-3">
-              <h3 className="font-bold text-slate-700 px-2">Payment Ledger</h3>
+              <h3 className="font-bold text-foreground px-2">Payment Ledger</h3>
               {collectibleBalance > 0 && (
                 <Button onClick={() => setShowForm(!showForm)} className="gap-2 bg-primary">
                   <Plus size={16} /> Record Payment
@@ -332,12 +334,12 @@ export function InvoiceAccountView({
             {showForm && collectibleBalance > 0 && (
               <form
                 onSubmit={handleSubmit}
-                className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 animate-in slide-in-from-top-4 duration-200"
+                className="bg-muted p-5 rounded-xl border border-border space-y-4 animate-in slide-in-from-top-4 duration-200"
               >
-                <h4 className="font-bold text-slate-700">Record New Payment</h4>
+                <h4 className="font-bold text-foreground">Record New Payment</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">
+                    <label className="text-xs font-bold text-muted-foreground">
                       Amount Paid ({paidCurrency || invoiceCurrency})
                     </label>
                     <Input
@@ -367,14 +369,16 @@ export function InvoiceAccountView({
                             ≈ {formatCurrency(converted, invoiceCurrency)}
                           </p>
                         ) : (
-                          <p className="text-[11px] text-red-500">
+                          <p className="text-[11px] text-destructive">
                             No exchange rate on file for {paidCurrency} → {invoiceCurrency}
                           </p>
                         );
                       })()}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">Currency Paid In</label>
+                    <label className="text-xs font-bold text-muted-foreground">
+                      Currency Paid In
+                    </label>
                     <SearchableSelect
                       options={currencyOptions()}
                       value={paidCurrency}
@@ -385,7 +389,7 @@ export function InvoiceAccountView({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">Payment Mode</label>
+                    <label className="text-xs font-bold text-muted-foreground">Payment Mode</label>
                     <Select
                       value={paymentMode}
                       onValueChange={(v) => {
@@ -408,7 +412,7 @@ export function InvoiceAccountView({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">
+                    <label className="text-xs font-bold text-muted-foreground">
                       {paymentMode === 'CHEQUE'
                         ? 'Cheque Received Date (received from customer)'
                         : 'Payment Date'}
@@ -421,7 +425,7 @@ export function InvoiceAccountView({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">
+                    <label className="text-xs font-bold text-muted-foreground">
                       {paymentMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference Number'}
                     </label>
                     {paymentMode === 'CHEQUE' ? (
@@ -432,7 +436,7 @@ export function InvoiceAccountView({
                         onChange={(e) => setChequeNumber(e.target.value)}
                       />
                     ) : (
-                      <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                      <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground italic">
                         Auto-generated on save — {autoReferencePreview(paymentMode)}
                       </div>
                     )}
@@ -441,7 +445,7 @@ export function InvoiceAccountView({
                 {(paymentMode === 'BANK_TRANSFER' || paymentMode === 'CHEQUE') &&
                   customerBankAccounts.length > 0 && (
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500">
+                      <label className="text-xs font-bold text-muted-foreground">
                         Pay From Customer Bank Account (Optional)
                       </label>
                       <Select
@@ -484,13 +488,13 @@ export function InvoiceAccountView({
 
                 {/* Cheque-specific fields */}
                 {paymentMode === 'CHEQUE' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="col-span-full text-xs font-bold text-amber-700">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                    <p className="col-span-full text-xs font-bold text-warning">
                       Cheque details — this will create a PENDING cheque record. Cash at Bank
                       increases only when you deposit the cheque in Accounts → Cheques.
                     </p>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500">
+                      <label className="text-xs font-bold text-muted-foreground">
                         Name of the Customer&apos;s Bank *
                       </label>
                       <Input
@@ -501,7 +505,7 @@ export function InvoiceAccountView({
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500">
+                      <label className="text-xs font-bold text-muted-foreground">
                         Cheque Date *{' '}
                         <span className="font-normal">(earliest date it can be deposited)</span>
                       </label>
@@ -515,7 +519,9 @@ export function InvoiceAccountView({
                   </div>
                 )}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500">Remarks (Optional)</label>
+                  <label className="text-xs font-bold text-muted-foreground">
+                    Remarks (Optional)
+                  </label>
                   <Textarea
                     placeholder="Any notes about this payment..."
                     value={remarks}
@@ -524,7 +530,7 @@ export function InvoiceAccountView({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500">
+                  <label className="text-xs font-bold text-muted-foreground">
                     Payment Proof (Optional) — screenshot or PDF receipt
                   </label>
                   <Input
@@ -533,7 +539,7 @@ export function InvoiceAccountView({
                     onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
                   />
                   {receiptFile && (
-                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Paperclip size={12} /> {receiptFile.name}
                     </p>
                   )}
@@ -555,9 +561,9 @@ export function InvoiceAccountView({
             )}
 
             {/* Ledger Table */}
-            <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <div className="rounded-xl border border-border overflow-hidden bg-card">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-100 text-slate-600 font-bold text-xs uppercase">
+                <thead className="bg-muted text-foreground font-bold text-xs uppercase">
                   <tr>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Amount</th>
@@ -566,21 +572,21 @@ export function InvoiceAccountView({
                     <th className="px-4 py-3">Proof</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {summary.payments.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                         <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         No payments recorded yet
                       </td>
                     </tr>
                   ) : (
                     summary.payments.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50">
+                      <tr key={p.id} className="hover:bg-muted">
                         <td className="px-4 py-3 font-medium">
                           {new Date(p.paymentDate).toLocaleDateString()}
                         </td>
-                        <td className="px-4 py-3 font-bold text-green-600">
+                        <td className="px-4 py-3 font-bold text-success">
                           {formatDualCurrency(
                             p.amountPaid,
                             p.currencyCode || invoiceCurrency,
@@ -590,14 +596,14 @@ export function InvoiceAccountView({
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">
+                          <span className="bg-muted text-foreground px-2 py-1 rounded text-[10px] font-bold">
                             {p.paymentMode}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <p className="text-xs font-semibold">{p.referenceNumber || '-'}</p>
                           {p.remarks && (
-                            <p className="text-[10px] text-slate-500 mt-0.5">{p.remarks}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{p.remarks}</p>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -611,7 +617,7 @@ export function InvoiceAccountView({
                               <FileText size={12} /> View
                             </a>
                           ) : (
-                            <span className="text-xs text-slate-300">-</span>
+                            <span className="text-xs text-muted-foreground">-</span>
                           )}
                         </td>
                       </tr>

@@ -109,16 +109,16 @@ export function InstallationReportModal({
       <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl p-0 border-0 shadow-2xl">
         <DialogTitle className="sr-only">Installation Report</DialogTitle>
 
-        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white p-5 print:hidden">
+        <div className="sticky top-0 z-10 border-b border-border bg-card p-5 print:hidden">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100">
-              <ClipboardCheck size={17} className="text-slate-500" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+              <ClipboardCheck size={17} className="text-muted-foreground" />
             </div>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                 Installation Report
               </p>
-              <p className="text-base font-black text-slate-800">
+              <p className="text-base font-black text-foreground">
                 {detail?.request.invoiceNumber ?? '…'}
               </p>
             </div>
@@ -127,7 +127,7 @@ export function InstallationReportModal({
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : detail ? (
           <div className="space-y-5 p-5">
@@ -137,35 +137,35 @@ export function InstallationReportModal({
               variant="ghost"
               size="sm"
               onClick={() => window.print()}
-              className="h-8 w-full border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400 print:hidden"
+              className="h-8 w-full border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground print:hidden"
             >
               <Printer size={12} className="mr-1" /> Print / Save PDF
             </Button>
 
             {!completed && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center print:hidden">
-                <p className="text-xs font-black text-amber-800">
+              <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-center print:hidden">
+                <p className="text-xs font-black text-warning">
                   This installation is not finished yet
                 </p>
-                <p className="mt-0.5 text-[11px] text-amber-700">
+                <p className="mt-0.5 text-[11px] text-warning">
                   The report can be signed once the job is completed.
                 </p>
               </div>
             )}
 
             {completed && !signed && (
-              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 print:hidden">
-                <p className="text-xs font-black text-slate-700">Customer sign-off</p>
+              <div className="space-y-4 rounded-xl border border-border bg-muted p-4 print:hidden">
+                <p className="text-xs font-black text-foreground">Customer sign-off</p>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Signed by *
                   </Label>
                   <Input
                     value={signatureName}
                     onChange={(e) => setSignatureName(e.target.value)}
                     placeholder="Name of the person signing"
-                    className="h-9 bg-white text-sm"
+                    className="h-9 bg-card text-sm"
                   />
                 </div>
 
@@ -179,13 +179,13 @@ export function InstallationReportModal({
                 />
 
                 <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Remarks (optional)
                   </Label>
                   <Textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    className="min-h-[60px] bg-white text-sm"
+                    className="min-h-[60px] bg-card text-sm"
                     placeholder="Anything the customer noted at handover…"
                   />
                 </div>
@@ -193,7 +193,7 @@ export function InstallationReportModal({
                 <Button
                   disabled={!signatureName.trim() || !signatureData || signing}
                   onClick={sign}
-                  className="h-9 w-full bg-emerald-600 text-xs font-black text-white hover:bg-emerald-700"
+                  className="h-9 w-full bg-success text-xs font-black text-success-foreground hover:bg-success/90"
                 >
                   {signing ? (
                     <Loader2 size={14} className="mr-1.5 animate-spin" />
@@ -203,19 +203,19 @@ export function InstallationReportModal({
                   Record Customer Signature
                 </Button>
 
-                <div className="space-y-2 border-t border-slate-200 pt-4">
-                  <p className="text-xs font-black text-slate-700">
+                <div className="space-y-2 border-t border-border pt-4">
+                  <p className="text-xs font-black text-foreground">
                     Or send the customer a link to sign
                   </p>
                   {link && (
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-                      <span className="flex-1 break-all text-xs font-bold text-slate-700">
+                    <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3">
+                      <span className="flex-1 break-all text-xs font-bold text-foreground">
                         {link}
                       </span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 shrink-0 p-0 text-slate-500"
+                        className="h-8 w-8 shrink-0 p-0 text-muted-foreground"
                         onClick={() => {
                           navigator.clipboard.writeText(link);
                           toast.success('Link copied');
@@ -244,22 +244,22 @@ export function InstallationReportModal({
             )}
 
             {signed && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center print:hidden">
-                <CheckCircle2 size={20} className="mx-auto mb-2 text-emerald-600" />
-                <p className="text-sm font-black text-emerald-800">
+              <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-center print:hidden">
+                <CheckCircle2 size={20} className="mx-auto mb-2 text-success" />
+                <p className="text-sm font-black text-success">
                   Customer signed this installation report
                 </p>
-                <p className="mt-0.5 text-[11px] text-emerald-700">{detail.signature.name}</p>
+                <p className="mt-0.5 text-[11px] text-success">{detail.signature.name}</p>
               </div>
             )}
           </div>
         ) : null}
 
-        <div className="sticky bottom-0 flex items-center justify-end border-t border-slate-100 bg-slate-50 p-4 print:hidden">
+        <div className="sticky bottom-0 flex items-center justify-end border-t border-border bg-muted p-4 print:hidden">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-9 text-xs font-black text-slate-500"
+            className="h-9 text-xs font-black text-muted-foreground"
           >
             Close
           </Button>

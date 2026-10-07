@@ -42,21 +42,21 @@ export default function OpeningBalanceDetailPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/40 backdrop-blur-sm">
-      <div className="w-full max-w-xl h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col p-6 overflow-y-auto animate-slide-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-end bg-foreground/50 backdrop-blur-sm">
+      <div className="w-full max-w-xl h-full bg-card dark:bg-foreground shadow-2xl flex flex-col p-6 overflow-y-auto animate-slide-in">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-4 border-b border-border dark:border-border">
           <div>
             <span className="text-xs font-semibold text-primary uppercase tracking-wider">
               Migration Entry Details
             </span>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+            <h2 className="text-xl font-medium text-foreground dark:text-muted-foreground mt-1">
               {entry.entryNumber}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="p-1 rounded-full text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-foreground transition"
           >
             <X className="h-6 w-6" />
           </button>
@@ -68,8 +68,8 @@ export default function OpeningBalanceDetailPanel({
           <div
             className={`p-4 rounded-2xl flex items-start gap-3 ${
               entry.isFullySettled
-                ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400'
-                : 'bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400'
+                ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success'
+                : 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning'
             }`}
           >
             <div className="mt-0.5">
@@ -89,31 +89,31 @@ export default function OpeningBalanceDetailPanel({
 
           {/* Customer & General Details */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-foreground dark:text-muted-foreground uppercase tracking-wider">
               General Information
             </h3>
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl">
+            <div className="grid grid-cols-2 gap-4 bg-muted dark:bg-foreground/30 p-4 rounded-2xl">
               <div>
                 <span className="text-xs text-muted-foreground block">Customer Name</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                <span className="font-semibold text-foreground dark:text-muted-foreground">
                   {customerName}
                 </span>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Balance Type</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                <span className="font-semibold text-foreground dark:text-muted-foreground">
                   {getBalanceTypeLabel(entry.balanceType)}
                 </span>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Migrated At (Go-Live)</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                <span className="font-semibold text-foreground dark:text-muted-foreground">
                   {new Date(entry.migratedAt).toLocaleDateString()}
                 </span>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Branch ID</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                <span className="font-semibold text-foreground dark:text-muted-foreground text-xs">
                   {entry.branchId.slice(0, 8)}...
                 </span>
               </div>
@@ -122,31 +122,31 @@ export default function OpeningBalanceDetailPanel({
 
           {/* Financial Breakdown */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-foreground dark:text-muted-foreground uppercase tracking-wider">
               Financial Context
             </h3>
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl text-center">
+              <div className="p-3 bg-muted dark:bg-foreground/30 rounded-2xl text-center">
                 <span className="text-[10px] text-muted-foreground uppercase block font-medium">
                   Original Contract Value
                 </span>
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                <span className="text-sm font-bold text-foreground dark:text-muted-foreground">
                   {getActiveCurrency()} {Number(entry.originalTotalAmount).toLocaleString()}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl text-center">
+              <div className="p-3 bg-muted dark:bg-foreground/30 rounded-2xl text-center">
                 <span className="text-[10px] text-muted-foreground uppercase block font-medium">
                   Paid Pre-Go-Live
                 </span>
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                <span className="text-sm font-bold text-foreground dark:text-muted-foreground">
                   {getActiveCurrency()} {Number(entry.alreadyPaidAmount).toLocaleString()}
                 </span>
               </div>
-              <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl text-center">
-                <span className="text-[10px] text-emerald-800 dark:text-emerald-400 uppercase block font-medium">
+              <div className="p-3 bg-success/10 dark:bg-success/20 rounded-2xl text-center">
+                <span className="text-[10px] text-success dark:text-success uppercase block font-medium">
                   Remaining Outstanding
                 </span>
-                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                <span className="text-sm font-bold text-success dark:text-success">
                   {getActiveCurrency()} {Number(entry.remainingBalance).toLocaleString()}
                 </span>
               </div>
@@ -156,29 +156,29 @@ export default function OpeningBalanceDetailPanel({
           {/* Contract Billing Details */}
           {isContract && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-foreground dark:text-muted-foreground uppercase tracking-wider">
                 Contract Details
               </h3>
-              <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl space-y-4">
+              <div className="bg-muted dark:bg-foreground/30 p-4 rounded-2xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-xs text-muted-foreground block">
                       Monthly Billing Rate
                     </span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold text-foreground dark:text-muted-foreground">
                       {getActiveCurrency()}{' '}
                       {Number(entry.monthlyBillingAmount || 0).toLocaleString()} / Month
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground block">Billing Cycle</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold text-foreground dark:text-muted-foreground">
                       {entry.billingCycleInDays || 30} Days
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground block">Next Payment Due</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+                    <span className="font-semibold text-foreground dark:text-muted-foreground flex items-center gap-1.5 mt-0.5">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                       {entry.nextPaymentDueDate
                         ? new Date(entry.nextPaymentDueDate).toLocaleDateString()
@@ -187,7 +187,7 @@ export default function OpeningBalanceDetailPanel({
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground block">Remaining Value</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold text-foreground dark:text-muted-foreground">
                       {getActiveCurrency()}{' '}
                       {Number(entry.remainingContractValue || 0).toLocaleString()}
                     </span>
@@ -195,7 +195,7 @@ export default function OpeningBalanceDetailPanel({
                 </div>
 
                 {entry.totalContractMonths && entry.monthsCompleted !== undefined && (
-                  <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                  <div className="pt-2 border-t border-border/50 dark:border-border/50">
                     <ContractProgressBar
                       completed={entry.monthsCompleted}
                       total={entry.totalContractMonths}
@@ -209,31 +209,31 @@ export default function OpeningBalanceDetailPanel({
           {/* Machine / Asset Details */}
           {hasMachineDetails && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-foreground dark:text-muted-foreground uppercase tracking-wider">
                 Machine / Asset details
               </h3>
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl">
+              <div className="grid grid-cols-2 gap-4 bg-muted dark:bg-foreground/30 p-4 rounded-2xl">
                 <div>
                   <span className="text-xs text-muted-foreground block">Brand</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="font-semibold text-foreground dark:text-muted-foreground">
                     {entry.productBrand || 'N/A'}
                   </span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground block font-medium">Model</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="font-semibold text-foreground dark:text-muted-foreground">
                     {entry.productModel || 'N/A'}
                   </span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground block">Serial Number</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs font-mono">
+                  <span className="font-semibold text-foreground dark:text-muted-foreground text-xs font-mono">
                     {entry.serialNumber || 'N/A'}
                   </span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground block">Product/Asset ID</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs font-mono">
+                  <span className="font-semibold text-foreground dark:text-muted-foreground text-xs font-mono">
                     {entry.productId || 'N/A'}
                   </span>
                 </div>
@@ -244,10 +244,10 @@ export default function OpeningBalanceDetailPanel({
           {/* Notes */}
           {entry.notes && (
             <div className="space-y-2">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-foreground dark:text-muted-foreground uppercase tracking-wider">
                 Migration Notes
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl leading-relaxed whitespace-pre-line">
+              <p className="text-sm text-foreground dark:text-muted-foreground bg-muted dark:bg-foreground/30 p-4 rounded-2xl leading-relaxed whitespace-pre-line">
                 {entry.notes}
               </p>
             </div>
@@ -256,10 +256,10 @@ export default function OpeningBalanceDetailPanel({
 
         {/* Footer Actions */}
         {entry.invoiceId && (
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+          <div className="pt-4 border-t border-border dark:border-border flex items-center justify-end">
             <button
               onClick={() => onNavigateToInvoice(entry.invoiceId!)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-sm transition shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/95 text-primary-foreground font-semibold rounded-xl text-sm transition shadow-sm"
             >
               <DollarSign className="h-4 w-4" />
               Reconcile Payments / View Invoice Ledger

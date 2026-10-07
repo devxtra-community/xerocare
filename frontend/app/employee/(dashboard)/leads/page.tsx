@@ -54,12 +54,12 @@ export default function LeadsPage() {
 
   return (
     <ProtectedRoute requiredModules={['crm']}>
-      <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+      <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
         <div className="flex flex-col space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div>
-                <h3 className="text-xl sm:text-2xl font-bold text-primary">Lead Management</h3>
+                <h3 className="text-xl sm:text-2xl font-medium text-foreground">Lead Management</h3>
                 <p className="text-sm text-muted-foreground font-medium">
                   Manage your prospects and track their status.
                 </p>
@@ -73,11 +73,11 @@ export default function LeadsPage() {
                 disabled={loading}
                 className="h-11 w-11 rounded-xl bg-card shadow-sm border-border hover:bg-muted/50"
               >
-                <RefreshCw className={`h-4 w-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 text-foreground ${loading ? 'animate-spin' : ''}`} />
               </Button>
               <Button
                 onClick={handleAddNew}
-                className="h-11 px-6 rounded-xl bg-primary text-white font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
               >
                 <Plus size={18} />
                 <span>Add New Lead</span>
@@ -90,21 +90,21 @@ export default function LeadsPage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold text-primary">All Leads</h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider">
+                <h3 className="text-xl font-medium text-primary">All Leads</h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
                   {filteredLeads.length} Total
                 </span>
               </div>
             </div>
 
-            <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Search Leads
                   </label>
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search by name, email or phone..."
                       value={search}
@@ -114,13 +114,13 @@ export default function LeadsPage() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Actions
                   </label>
                   <Button
                     variant="outline"
                     onClick={fetchLeads}
-                    className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+                    className="h-9 text-xs w-full justify-center gap-2 border-border hover:bg-muted"
                   >
                     Refresh Data
                   </Button>

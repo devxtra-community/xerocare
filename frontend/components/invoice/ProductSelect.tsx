@@ -108,13 +108,13 @@ export function ProductSelect({
       let statusNode: React.ReactNode = null;
       if (item.product_status === ProductStatus.DAMAGED) {
         statusNode = (
-          <span className="text-red-600 font-extrabold ml-1.5 animation-pulse"> [DAMAGED]</span>
+          <span className="text-destructive font-extrabold ml-1.5 animation-pulse"> [DAMAGED]</span>
         );
       } else if (item.product_status === ProductStatus.RETURNED) {
-        statusNode = <span className="text-green-600 font-extrabold ml-1.5"> [RETURNED]</span>;
+        statusNode = <span className="text-success font-extrabold ml-1.5"> [RETURNED]</span>;
       } else if (item.product_status && item.product_status !== ProductStatus.AVAILABLE) {
         statusNode = (
-          <span className="text-slate-400 font-bold ml-1.5">
+          <span className="text-muted-foreground font-bold ml-1.5">
             {' '}
             [{item.product_status.toUpperCase()}]
           </span>

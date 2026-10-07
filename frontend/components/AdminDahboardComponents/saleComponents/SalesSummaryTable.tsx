@@ -228,26 +228,26 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
             <tbody>
               {filteredData.length > 0 ? (
                 salesPaging.pageRows.map((row, index) => (
-                  <tr key={index} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}>
+                  <tr key={index} className={index % 2 === 1 ? 'bg-primary/10' : 'bg-card'}>
                     <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                       {row.productId}
                     </td>
                     <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                       {row.product}
                     </td>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                       {row.model}
                     </td>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                       {row.quantity}
                     </td>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                       {row.price}
                     </td>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                       {row.month}
                     </td>
-                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                       {row.year}
                     </td>
                   </tr>

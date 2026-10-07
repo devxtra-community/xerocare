@@ -21,14 +21,14 @@ import Pagination from '@/components/Pagination';
 import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const TYPE_COLORS: Record<string, string> = {
-  SHARE_CAPITAL: 'bg-blue-100 text-blue-700',
-  RETAINED_EARNINGS: 'bg-emerald-100 text-emerald-700',
-  RESERVES: 'bg-purple-100 text-purple-700',
-  OWNER_CONTRIBUTION: 'bg-indigo-100 text-indigo-700',
-  DIVIDEND: 'bg-red-100 text-red-700',
-  PROFIT_TRANSFER: 'bg-green-100 text-green-700',
-  LOSS_TRANSFER: 'bg-orange-100 text-orange-700',
-  OTHER: 'bg-gray-100 text-gray-700',
+  SHARE_CAPITAL: 'bg-primary/10 text-primary',
+  RETAINED_EARNINGS: 'bg-success/10 text-success',
+  RESERVES: 'bg-lease/10 text-lease',
+  OWNER_CONTRIBUTION: 'bg-primary/10 text-primary',
+  DIVIDEND: 'bg-destructive/10 text-destructive',
+  PROFIT_TRANSFER: 'bg-success/10 text-success',
+  LOSS_TRANSFER: 'bg-warning/10 text-warning',
+  OTHER: 'bg-muted text-foreground',
 };
 
 function EquityContent() {
@@ -101,15 +101,15 @@ function EquityContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Equity — Consolidated</h1>
-          <p className="text-sm text-gray-500">All branches in AED</p>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">Equity — Consolidated</h1>
+          <p className="text-sm text-muted-foreground">All branches in AED</p>
         </div>
         <button
           onClick={() => setShowStatement(true)}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
         >
           <FileText className="h-4 w-4" /> Generate Statement
         </button>
@@ -117,7 +117,7 @@ function EquityContent() {
 
       <BranchFilterBar />
 
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-primary to-primary rounded-xl p-6 text-primary-foreground">
         <p className="text-sm font-medium opacity-80 mb-1">Net Equity (Consolidated)</p>
         <p className="text-4xl font-bold">{formatCurrency(summary?.netEquity ?? 0, currency)}</p>
         <div className="flex gap-6 mt-4 text-sm">
@@ -147,29 +147,29 @@ function EquityContent() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Equity Composition</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Equity Composition</h3>
           <DonutChart data={charts?.composition ?? []} height={240} currency={currency} />
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Equity Growth Trend</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Equity Growth Trend</h3>
           <SimpleLineChart
             data={charts?.growthTrend ?? []}
             xKey="month"
-            lines={[{ key: 'equity', color: '#6366f1', label: 'Equity' }]}
+            lines={[{ key: 'equity', color: 'var(--chart-indigo)', label: 'Equity' }]}
             height={240}
             currency={currency}
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <div className="px-4 py-3 border-b">
-          <h3 className="text-sm font-semibold text-gray-700">Recent Equity Entries</h3>
+          <h3 className="text-sm font-semibold text-foreground">Recent Equity Entries</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+            <thead className="bg-muted text-xs uppercase text-muted-foreground">
               <tr>
                 {['Entry No', 'Date', 'Type', 'Description', 'Amount', 'Currency'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-medium">
@@ -181,29 +181,31 @@ function EquityContent() {
             <tbody className="divide-y">
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-muted-foreground">
                     No equity entries found
                   </td>
                 </tr>
               ) : (
                 entryPaging.pageRows.map((e) => (
-                  <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.entryNo}</td>
+                  <tr key={e.id} className="hover:bg-muted">
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {e.entryNo}
+                    </td>
                     <td className="px-4 py-3">{String(e.date).slice(0, 10)}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[e.type] ?? 'bg-gray-100 text-gray-700'}`}
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[e.type] ?? 'bg-muted text-foreground'}`}
                       >
                         {e.type.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 max-w-[200px] truncate text-gray-600">
+                    <td className="px-4 py-3 max-w-[200px] truncate text-foreground">
                       {e.description}
                     </td>
                     <td className="px-4 py-3 font-semibold">
                       {formatCurrency(e.amount, currency)}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{e.currency}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{e.currency}</td>
                   </tr>
                 ))
               )}
@@ -234,7 +236,7 @@ function EquityContent() {
 
 export default function AdminEquityPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <EquityContent />
     </Suspense>
   );

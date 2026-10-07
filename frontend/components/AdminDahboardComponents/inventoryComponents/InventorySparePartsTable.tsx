@@ -145,14 +145,14 @@ export default function InventorySparePartsTable({
   return (
     <div className="space-y-4">
       {/* Filters Section */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Part Name / Code
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search spare parts..."
                 value={search}
@@ -162,11 +162,11 @@ export default function InventorySparePartsTable({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Warehouse
             </label>
             <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Warehouses" />
               </SelectTrigger>
               <SelectContent>
@@ -180,11 +180,11 @@ export default function InventorySparePartsTable({
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Branch
             </label>
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
@@ -201,11 +201,11 @@ export default function InventorySparePartsTable({
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Brand
             </label>
             <Select value={brandFilter} onValueChange={setBrandFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Brands" />
               </SelectTrigger>
               <SelectContent>
@@ -224,7 +224,7 @@ export default function InventorySparePartsTable({
             size="sm"
             variant="outline"
             onClick={clearFilters}
-            className="h-9 text-gray-500 border-gray-200 hover:bg-gray-50 text-xs px-3"
+            className="h-9 text-muted-foreground border-border hover:bg-muted text-xs px-3"
             title="Clear Filters"
           >
             <FilterX className="h-4 w-4" />
@@ -277,47 +277,47 @@ export default function InventorySparePartsTable({
                 currentData.map((item, index) => (
                   <TableRow
                     key={`${item.id}-${index}`}
-                    className={`hover:bg-muted/50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+                    className={`hover:bg-muted/50 transition-colors ${index % 2 ? 'bg-info/10' : ''}`}
                   >
                     <TableCell className="px-6 py-4 text-foreground font-medium">
                       {item.part_name}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-gray-600 font-mono text-[11px]">
+                    <TableCell className="px-6 py-4 text-foreground font-mono text-[11px]">
                       {item.sku}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-blue-600 font-mono text-[11px] font-medium">
+                    <TableCell className="px-6 py-4 text-primary font-mono text-[11px] font-medium">
                       {item.mpn || '-'}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-gray-600 font-medium">
+                    <TableCell className="px-6 py-4 text-foreground font-medium">
                       {item.brand}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-blue-700 font-bold text-[11px]">
+                    <TableCell className="px-6 py-4 text-primary font-bold text-[11px]">
                       {item.branch_name || 'N/A'}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-gray-600">
+                    <TableCell className="px-6 py-4 text-foreground">
                       {item.warehouse_name || '-'}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
                       <span
                         className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                           item.quantity > 10
-                            ? 'bg-green-100 text-green-700'
+                            ? 'bg-success/10 text-success'
                             : item.quantity > 0
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-warning/10 text-warning'
+                              : 'bg-destructive/10 text-destructive'
                         }`}
                       >
                         {item.quantity}
                       </span>
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-center font-semibold text-gray-700">
+                    <TableCell className="px-6 py-4 text-center font-semibold text-foreground">
                       {formatCurrency(item.price || 0, currency)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right pr-6">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-gray-400 hover:text-primary"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
                         onClick={() => router.push(`/admin/spare-parts/${item.id}`)}
                       >
                         <Eye className="h-4 w-4" />
@@ -336,7 +336,7 @@ export default function InventorySparePartsTable({
           </Table>
         </div>
 
-        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card text-primary font-bold">
+        <div className="p-4 border-t border-border flex items-center justify-between bg-card text-primary font-bold">
           <Pagination
             page={currentPage}
             totalPages={totalPages}

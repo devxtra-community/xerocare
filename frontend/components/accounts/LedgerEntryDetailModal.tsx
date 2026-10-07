@@ -73,11 +73,11 @@ function PairedLedgerLines({ rows, currency }: { rows: LedgerPairedRow[]; curren
         <tbody className="divide-y divide-border">
           {rows.map((r, i) => (
             <tr key={i}>
-              <td className="px-3 py-2 text-xs font-medium text-slate-800">{r.account}</td>
-              <td className="px-3 py-2 text-right text-blue-600 font-semibold">
+              <td className="px-3 py-2 text-xs font-medium text-foreground">{r.account}</td>
+              <td className="px-3 py-2 text-right text-primary font-semibold">
                 {r.debit > 0 ? formatCurrency(r.debit, r.currency || currency) : '—'}
               </td>
-              <td className="px-3 py-2 text-right text-emerald-600 font-semibold">
+              <td className="px-3 py-2 text-right text-success font-semibold">
                 {r.credit > 0 ? formatCurrency(r.credit, r.currency || currency) : '—'}
               </td>
             </tr>

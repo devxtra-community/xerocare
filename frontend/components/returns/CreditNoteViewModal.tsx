@@ -41,27 +41,27 @@ interface Props {
 
 /* ── helpers ── */
 const STATUS_CONFIG: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
-  DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600', Icon: Clock },
-  PENDING_APPROVAL: { label: 'Pending Finance', color: 'bg-amber-100 text-amber-700', Icon: Send },
-  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700', Icon: CheckCircle2 },
-  REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-600', Icon: XCircle },
-  COMPLETED: { label: 'Completed', color: 'bg-blue-100 text-blue-700', Icon: CheckCircle2 },
+  DRAFT: { label: 'Draft', color: 'bg-muted text-foreground', Icon: Clock },
+  PENDING_APPROVAL: { label: 'Pending Finance', color: 'bg-warning/10 text-warning', Icon: Send },
+  APPROVED: { label: 'Approved', color: 'bg-success/10 text-success', Icon: CheckCircle2 },
+  REJECTED: { label: 'Rejected', color: 'bg-destructive/10 text-destructive', Icon: XCircle },
+  COMPLETED: { label: 'Completed', color: 'bg-primary/10 text-primary', Icon: CheckCircle2 },
 };
 
 const TYPE_CONFIG: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
   DIRECT_REFUND: {
     label: 'Direct Refund',
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    color: 'bg-success/10 text-success border-success/30',
     Icon: Banknote,
   },
   REPLACEMENT: {
     label: 'Replacement',
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
+    color: 'bg-primary/10 text-primary border-primary/30',
     Icon: RefreshCw,
   },
   CREDIT_EXCHANGE: {
     label: 'Credit Exchange',
-    color: 'bg-violet-50 text-violet-700 border-violet-200',
+    color: 'bg-lease/10 text-lease border-lease/30',
     Icon: CreditCard,
   },
 };
@@ -81,14 +81,14 @@ function InfoRow({
 }) {
   if (!value) return null;
   return (
-    <div className="flex items-start justify-between py-2.5 border-b border-slate-50 last:border-0">
-      <span className="flex items-center gap-2 text-xs text-slate-400 font-medium min-w-0 shrink-0">
+    <div className="flex items-start justify-between py-2.5 border-b border-border last:border-0">
+      <span className="flex items-center gap-2 text-xs text-muted-foreground font-medium min-w-0 shrink-0">
         <Icon className="h-3.5 w-3.5 shrink-0" />
         {label}
       </span>
       <span
         className={`text-xs font-semibold text-right max-w-[55%] break-words ${
-          accent ? 'text-primary' : 'text-slate-700'
+          accent ? 'text-primary' : 'text-foreground'
         } ${mono ? 'font-mono' : ''}`}
       >
         {value}
@@ -106,12 +106,12 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
 
   const status = STATUS_CONFIG[record.status] ?? {
     label: record.status,
-    color: 'bg-slate-100 text-slate-600',
+    color: 'bg-muted text-foreground',
     Icon: Clock,
   };
   const type = TYPE_CONFIG[record.type] ?? {
     label: record.type.replace('_', ' '),
-    color: 'bg-slate-50 text-slate-600 border-slate-200',
+    color: 'bg-muted text-foreground border-border',
     Icon: RotateCcw,
   };
   const StatusIcon = status.Icon;
@@ -137,8 +137,8 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
 
         {showDocument ? (
           <div className="flex max-h-[90vh] flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3 print:hidden">
-              <p className="text-sm font-black tracking-tight text-slate-800">
+            <div className="flex items-center justify-between border-b border-border bg-card px-5 py-3 print:hidden">
+              <p className="text-sm font-black tracking-tight text-foreground">
                 Credit Note Document
               </p>
               <div className="flex items-center gap-2">
@@ -150,14 +150,14 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                 </Button>
                 <button
                   onClick={onClose}
-                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors print:hidden"
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors print:hidden"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto bg-slate-100 p-4 print:overflow-visible print:bg-white print:p-0">
-              <div className="mx-auto max-w-[800px] bg-white shadow-sm print:max-w-none print:shadow-none">
+            <div className="flex-1 overflow-y-auto bg-muted p-4 print:overflow-visible print:bg-card print:p-0">
+              <div className="mx-auto max-w-[800px] bg-card shadow-sm print:max-w-none print:shadow-none">
                 <CreditNoteDocumentBody record={record} currency={currency} />
               </div>
             </div>
@@ -167,25 +167,27 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
             {/* ── Header ── */}
             <div
               className="relative px-6 pt-5 pb-4"
-              style={{ background: 'linear-gradient(135deg,#f0f4ff 0%,#e8edff 100%)' }}
+              style={{
+                background: 'linear-gradient(135deg, var(--background) 0%, var(--accent) 100%)',
+              }}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
-                    <RotateCcw className="h-4.5 w-4.5 text-white" />
+                    <RotateCcw className="h-4.5 w-4.5 text-primary-foreground" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                       Credit Note
                     </p>
-                    <h2 className="text-lg font-bold text-slate-800 leading-tight">
+                    <h2 className="text-lg font-bold text-foreground leading-tight">
                       {record.creditNoteNo}
                     </h2>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors mt-0.5"
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-card transition-colors mt-0.5"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -212,7 +214,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
             <div className="p-6 space-y-5 overflow-y-auto" style={{ maxHeight: '65vh' }}>
               {/* Item Info */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                   {record.itemCategory === 'SPARE_PART' ? (
                     <>
                       <Wrench className="h-3 w-3" /> Spare Part Details
@@ -228,8 +230,8 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                       record.itemCategory === 'SPARE_PART'
-                        ? 'bg-orange-50 text-orange-700 border-orange-200'
-                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                        ? 'bg-warning/10 text-warning border-warning/30'
+                        : 'bg-primary/10 text-primary border-primary/30'
                     }`}
                   >
                     {record.itemCategory === 'SPARE_PART' ? (
@@ -243,7 +245,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                     )}
                   </span>
                 </div>
-                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
+                <div className="rounded-xl bg-muted border border-border px-4">
                   <InfoRow
                     icon={Package}
                     label={record.itemCategory === 'SPARE_PART' ? 'Part Name' : 'Product'}
@@ -301,19 +303,21 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {/* Customer & Invoice */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                     <User className="h-3 w-3" /> Customer
                   </p>
-                  <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3">
-                    <p className="text-xs font-bold text-slate-700">{record.customerName || '—'}</p>
+                  <div className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-3">
+                    <p className="text-xs font-bold text-foreground">
+                      {record.customerName || '—'}
+                    </p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                     <FileText className="h-3 w-3" /> Invoice
                   </p>
-                  <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3">
-                    <p className="text-xs font-bold text-slate-700">
+                  <div className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-3">
+                    <p className="text-xs font-bold text-foreground">
                       {record.invoiceNumber || '—'}
                     </p>
                   </div>
@@ -322,10 +326,10 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
 
               {/* Timeline */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                   <Calendar className="h-3 w-3" /> Timeline
                 </p>
-                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
+                <div className="rounded-xl bg-muted border border-border px-4">
                   <InfoRow icon={Calendar} label="Created" value={createdDate} />
                   {updatedDate && (
                     <InfoRow icon={Calendar} label="Last Updated" value={updatedDate} />
@@ -336,11 +340,11 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {/* Notes */}
               {record.notes && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                     <StickyNote className="h-3 w-3" /> Notes
                   </p>
-                  <div className="rounded-xl bg-amber-50/60 border border-amber-100 px-4 py-3">
-                    <p className="text-xs text-slate-600 leading-relaxed">{record.notes}</p>
+                  <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-3">
+                    <p className="text-xs text-foreground leading-relaxed">{record.notes}</p>
                   </div>
                 </div>
               )}
@@ -348,23 +352,22 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {/* Finance Note (if approved) */}
               {record.financeNote && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Finance Note
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3 text-success" /> Finance Note
                   </p>
-                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
-                    <p className="text-xs text-emerald-700 leading-relaxed">{record.financeNote}</p>
+                  <div className="rounded-xl bg-success/10 border border-success/30 px-4 py-3">
+                    <p className="text-xs text-success leading-relaxed">{record.financeNote}</p>
                   </div>
                 </div>
               )}
 
               {record.returnedMachineDisposition && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Returned Machine
-                    Destination
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3 text-success" /> Returned Machine Destination
                   </p>
-                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
-                    <p className="text-xs font-bold text-emerald-700 leading-relaxed">
+                  <div className="rounded-xl bg-success/10 border border-success/30 px-4 py-3">
+                    <p className="text-xs font-bold text-success leading-relaxed">
                       {record.returnedMachineDisposition === 'WORKING_STOCK'
                         ? 'Working stock — available to use or sell'
                         : record.returnedMachineDisposition === 'DAMAGED'
@@ -378,11 +381,11 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {/* Damage Reason (if approved) */}
               {record.damageReason && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                     <StickyNote className="h-3 w-3" /> Damage Reason
                   </p>
-                  <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3">
-                    <p className="text-xs text-orange-700 leading-relaxed">{record.damageReason}</p>
+                  <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-3">
+                    <p className="text-xs text-warning leading-relaxed">{record.damageReason}</p>
                   </div>
                 </div>
               )}
@@ -390,11 +393,11 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {/* Payment Mode (if selected) */}
               {record.paymentMode && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Banknote className="h-3 w-3" /> Settlement Method
                   </p>
-                  <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
-                    <p className="text-xs font-bold text-indigo-700 leading-relaxed uppercase tracking-wider">
+                  <div className="rounded-xl bg-primary/10 border border-primary/30 px-4 py-3">
+                    <p className="text-xs font-bold text-primary leading-relaxed uppercase tracking-wider">
                       {record.paymentMode.replace('_', ' ')}
                     </p>
                   </div>
@@ -404,11 +407,13 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {/* Rejection Reason */}
               {record.rejectionReason && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                    <XCircle className="h-3 w-3 text-red-500" /> Rejection Reason
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <XCircle className="h-3 w-3 text-destructive" /> Rejection Reason
                   </p>
-                  <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3">
-                    <p className="text-xs text-red-600 leading-relaxed">{record.rejectionReason}</p>
+                  <div className="rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3">
+                    <p className="text-xs text-destructive leading-relaxed">
+                      {record.rejectionReason}
+                    </p>
                   </div>
                 </div>
               )}
@@ -417,35 +422,35 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
               {(record.status === 'PRODUCT_REPLACED' || record.status === 'COMPLETED') &&
                 (record.replacementSerialNumber || record.replacementSparePartId) && (
                   <div className="space-y-4 pt-4 border-t border-dashed">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                      <RefreshCw className="h-3 w-3 text-blue-500" />{' '}
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <RefreshCw className="h-3 w-3 text-primary" />{' '}
                       {record.type === 'REPLACEMENT' ? 'Replacement' : 'Exchange'} Finalization
                     </p>
 
-                    <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 space-y-3">
-                      <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
-                        <div className="bg-white p-1.5 rounded-lg border border-blue-100">
+                    <div className="rounded-xl bg-primary/10 border border-primary/30 p-4 space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-primary/30">
+                        <div className="bg-card p-1.5 rounded-lg border border-primary/30">
                           {record.itemCategory === 'SPARE_PART' ? (
-                            <Wrench className="h-4 w-4 text-blue-600" />
+                            <Wrench className="h-4 w-4 text-primary" />
                           ) : (
-                            <Package className="h-4 w-4 text-blue-600" />
+                            <Package className="h-4 w-4 text-primary" />
                           )}
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase font-bold text-blue-400">
+                          <p className="text-[10px] uppercase font-bold text-primary">
                             {record.itemCategory === 'SPARE_PART'
                               ? 'Replacement Spare Part'
                               : 'New Unit Assigned'}
                           </p>
                           {record.itemCategory === 'SPARE_PART' ? (
-                            <p className="text-xs font-bold text-blue-900">
+                            <p className="text-xs font-bold text-primary">
                               {record.replacementSparePartName} ({record.replacementSparePartSku})
                               {record.replacementQuantity != null
                                 ? ` × ${record.replacementQuantity}`
                                 : ''}
                             </p>
                           ) : (
-                            <p className="text-xs font-bold text-blue-900">
+                            <p className="text-xs font-bold text-primary">
                               Serial No: {record.replacementSerialNumber}
                             </p>
                           )}
@@ -454,28 +459,28 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
 
                       <div className="grid grid-cols-2 gap-4 text-xs">
                         <div className="space-y-1">
-                          <p className="text-blue-500 font-medium">New Item Price</p>
-                          <p className="font-bold text-blue-900">
+                          <p className="text-primary font-medium">New Item Price</p>
+                          <p className="font-bold text-primary">
                             {formatCurrency(record.replacementAmount || 0, currency)}
                           </p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-blue-500 font-medium">Returned Credit</p>
-                          <p className="font-bold text-blue-900">
+                          <p className="text-primary font-medium">Returned Credit</p>
+                          <p className="font-bold text-primary">
                             - {formatCurrency(record.productAmount, currency)}
                           </p>
                         </div>
                         {record.replacementDiscount !== undefined &&
                           record.replacementDiscount > 0 && (
                             <div className="space-y-1">
-                              <p className="text-emerald-600 font-medium">Extra Discount</p>
-                              <p className="font-bold text-emerald-700">
+                              <p className="text-success font-medium">Extra Discount</p>
+                              <p className="font-bold text-success">
                                 - {formatCurrency(record.replacementDiscount || 0, currency)}
                               </p>
                             </div>
                           )}
-                        <div className="col-span-2 pt-2 border-t border-blue-200 flex justify-between items-center mt-1">
-                          <p className="font-bold text-blue-900">
+                        <div className="col-span-2 pt-2 border-t border-primary/30 flex justify-between items-center mt-1">
+                          <p className="font-bold text-primary">
                             {(record.replacementAmount || 0) -
                               record.productAmount -
                               (record.replacementDiscount || 0) >=
@@ -483,7 +488,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                               ? 'Payable Gap'
                               : 'Refundable Balance'}
                           </p>
-                          <p className="text-sm font-black text-blue-900">
+                          <p className="text-sm font-black text-primary">
                             {formatCurrency(
                               Math.abs(
                                 (record.replacementAmount || 0) -
@@ -501,7 +506,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
             </div>
 
             {/* ── Footer ── */}
-            <div className="flex justify-between gap-2 px-6 py-4 border-t border-slate-100 bg-white">
+            <div className="flex justify-between gap-2 px-6 py-4 border-t border-border bg-card">
               <Button size="sm" onClick={() => setShowDocument(true)} className="rounded-lg px-5">
                 <FileText className="mr-1 h-3.5 w-3.5" /> View Credit Note Document
               </Button>
@@ -509,7 +514,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                 variant="outline"
                 size="sm"
                 onClick={onClose}
-                className="rounded-lg px-5 border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="rounded-lg px-5 border-border text-foreground hover:bg-muted"
               >
                 Close
               </Button>

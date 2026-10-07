@@ -17,7 +17,7 @@ export function NavBadge({ count }: { count: number }) {
       role="status"
       aria-label={label}
       title={label}
-      className="flex h-2 w-2 shrink-0 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"
+      className="flex h-2 w-2 shrink-0 rounded-full bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"
     />
   );
 }

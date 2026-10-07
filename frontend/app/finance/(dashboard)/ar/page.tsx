@@ -8,7 +8,7 @@ export default function ARDashboardPage() {
     <div className="space-y-6 p-4 sm:p-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Accounts Receivable</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold">Accounts Receivable</h1>
         <div className="flex gap-2">
           <Button variant="outline">Send Reminders</Button>
           <Button>Create Invoice</Button>
@@ -53,7 +53,7 @@ function SummaryCard({
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className={`text-2xl font-bold ${variant === 'danger' ? 'text-red-600' : ''}`}>
+        <p className={`text-2xl font-bold ${variant === 'danger' ? 'text-destructive' : ''}`}>
           {value}
         </p>
       </CardContent>

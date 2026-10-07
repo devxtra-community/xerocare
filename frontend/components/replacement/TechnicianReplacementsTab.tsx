@@ -94,7 +94,7 @@ export function TechnicianReplacementsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-card p-4 shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="mb-2 overflow-x-auto">
           <Table pagination={{ pageSize: 10 }} className="min-w-[900px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
@@ -127,37 +127,37 @@ export function TechnicianReplacementsTab() {
               ) : (
                 rows.map((r) => (
                   <TableRow key={r.id} className="transition-colors hover:bg-muted/50">
-                    <TableCell className="font-mono text-xs font-bold text-blue-600">
+                    <TableCell className="font-mono text-xs font-bold text-primary">
                       {r.requestNo}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap font-bold text-slate-700">
+                    <TableCell className="whitespace-nowrap font-bold text-foreground">
                       {r.customerName}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-slate-600">
+                    <TableCell className="font-mono text-xs text-foreground">
                       {r.contractNumber}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap font-mono text-[11px] text-slate-600">
-                      <span className="text-red-600">{r.oldSerialNumber}</span>
+                    <TableCell className="whitespace-nowrap font-mono text-[11px] text-foreground">
+                      <span className="text-destructive">{r.oldSerialNumber}</span>
                       {' → '}
-                      <span className="text-emerald-700">{r.newSerialNumber ?? '—'}</span>
+                      <span className="text-success">{r.newSerialNumber ?? '—'}</span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {fmt(r.assignedAt)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {r.workDurationSeconds != null ? (
-                        <span className="font-mono text-xs font-bold text-slate-700">
+                        <span className="font-mono text-xs font-bold text-foreground">
                           {formatWorkDuration(r.workDurationSeconds)}
                         </span>
                       ) : r.workStartedAt ? (
-                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-600">
+                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-success">
                           <Timer className="h-3 w-3 animate-pulse" />
                           {formatWorkDuration(
                             Math.floor((now - new Date(r.workStartedAt).getTime()) / 1000),
                           )}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-300">—</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -170,7 +170,7 @@ export function TechnicianReplacementsTab() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 rounded-lg p-0 text-blue-500 hover:bg-blue-50"
+                          className="h-8 w-8 rounded-lg p-0 text-primary hover:bg-primary/10"
                           title="View job details"
                           onClick={() => setViewingId(r.id)}
                         >
@@ -181,7 +181,7 @@ export function TechnicianReplacementsTab() {
                             variant="ghost"
                             size="sm"
                             disabled={startingId === r.id}
-                            className="h-8 w-8 rounded-lg p-0 text-emerald-600 hover:bg-emerald-50"
+                            className="h-8 w-8 rounded-lg p-0 text-success hover:bg-success/10"
                             title="Start the job — begins timing the swap"
                             onClick={() => start(r)}
                           >
@@ -196,7 +196,7 @@ export function TechnicianReplacementsTab() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 rounded-lg p-0 text-primary hover:bg-blue-50"
+                            className="h-8 w-8 rounded-lg p-0 text-primary hover:bg-primary/10"
                             title="Finish the job — record both meters"
                             onClick={() => setInstallingId(r.id)}
                           >
@@ -207,7 +207,7 @@ export function TechnicianReplacementsTab() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 rounded-lg p-0 text-emerald-600 hover:bg-emerald-50"
+                            className="h-8 w-8 rounded-lg p-0 text-success hover:bg-success/10"
                             title="Replacement report"
                             onClick={() => setReportId(r.id)}
                           >

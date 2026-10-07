@@ -26,11 +26,14 @@ export function MachineMeterLine({
   return (
     <div className="col-span-2">
       {label}:{' '}
-      <span className="font-semibold text-slate-700">
+      <span className="font-semibold text-foreground">
         {Number(machine.meterReading).toLocaleString()}
       </span>
       {(source || date) && (
-        <span className="text-slate-400"> · {[source, date].filter(Boolean).join(' · ')}</span>
+        <span className="text-muted-foreground">
+          {' '}
+          · {[source, date].filter(Boolean).join(' · ')}
+        </span>
       )}
     </div>
   );

@@ -40,10 +40,10 @@ import { useTablePagination } from '@/lib/hooks/useTablePagination';
 type SubTab = 'register' | 'rules' | 'journal';
 
 const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  FULLY_DEPRECIATED: 'bg-slate-100 text-slate-600 border-slate-200',
-  DISPOSED: 'bg-red-100 text-red-700 border-red-200',
-  SUSPENDED: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  ACTIVE: 'bg-success/10 text-success border-success/30',
+  FULLY_DEPRECIATED: 'bg-muted text-foreground border-border',
+  DISPOSED: 'bg-destructive/10 text-destructive border-destructive/30',
+  SUSPENDED: 'bg-warning/10 text-warning border-warning/30',
 };
 
 // ─── Brand Rule Modal ─────────────────────────────────────────────────────────
@@ -75,10 +75,10 @@ function BrandRuleModal({ rule, onClose }: { rule?: DepreciationBrandRule; onClo
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">
+          <h2 className="font-bold text-foreground">
             {rule ? 'Edit' : 'Add'} Brand Depreciation Rule
           </h2>
           <button onClick={onClose}>
@@ -217,10 +217,10 @@ function AssetModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">{isEdit ? 'Edit Asset' : 'Add Asset'}</h2>
+          <h2 className="font-bold text-foreground">{isEdit ? 'Edit Asset' : 'Add Asset'}</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -450,7 +450,7 @@ function AssetsContent() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {!isSingleBranch && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700">
+        <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-2.5 text-sm text-warning">
           Write actions are disabled when viewing multiple branches. Select a single branch to add,
           edit, or dispose assets.
         </div>
@@ -476,25 +476,27 @@ function AssetsContent() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Cost vs Net Book Value</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Cost vs Net Book Value</h3>
           <SimpleBarChart
             data={charts?.costVsNbv ?? []}
             xKey="name"
             bars={[
-              { key: 'cost', color: '#3b82f6', label: 'Cost' },
-              { key: 'nbv', color: '#10b981', label: 'NBV' },
+              { key: 'cost', color: 'var(--chart-blue-mid)', label: 'Cost' },
+              { key: 'nbv', color: 'var(--chart-profit)', label: 'NBV' },
             ]}
             height={220}
             currency={currency}
           />
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Depreciation Charge</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            Monthly Depreciation Charge
+          </h3>
           <SimpleLineChart
             data={charts?.monthlyCharge ?? []}
             xKey="month"
-            lines={[{ key: 'amount', color: '#f59e0b', label: 'Depreciation' }]}
+            lines={[{ key: 'amount', color: 'var(--chart-expense)', label: 'Depreciation' }]}
             height={220}
             currency={currency}
           />
@@ -502,12 +504,12 @@ function AssetsContent() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-card rounded-xl p-1 border border-slate-100 shadow-sm w-fit">
+      <div className="flex gap-1 bg-card rounded-xl p-1 border border-border shadow-sm w-fit">
         {(Object.entries(TAB_LABELS) as [SubTab, string][]).map(([t, label]) => (
           <button
             key={t}
             onClick={() => setActiveTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-slate-700'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             {label}
           </button>
@@ -516,20 +518,20 @@ function AssetsContent() {
 
       {/* Asset Register Tab */}
       {activeTab === 'register' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
           <div className="flex items-center gap-3 p-4 border-b flex-wrap">
             <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name, ID…"
-                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <button
               onClick={exportExcel}
-              className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 hover:bg-gray-50"
+              className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 hover:bg-muted"
             >
               <Download className="h-4 w-4" /> Export
             </button>
@@ -546,11 +548,11 @@ function AssetsContent() {
             )}
           </div>
           {loadingAssets ? (
-            <div className="p-8 text-center text-gray-400">Loading…</div>
+            <div className="p-8 text-center text-muted-foreground">Loading…</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+                <thead className="bg-muted text-xs uppercase text-muted-foreground border-b">
                   <tr>
                     {[
                       'Name / ID',
@@ -571,33 +573,35 @@ function AssetsContent() {
                 <tbody className="divide-y">
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-gray-400">
+                      <td colSpan={8} className="text-center py-8 text-muted-foreground">
                         No assets found
                       </td>
                     </tr>
                   ) : (
                     assetPaging.pageRows.map((a) => (
-                      <tr key={a.id} className="hover:bg-gray-50">
+                      <tr key={a.id} className="hover:bg-muted">
                         <td className="px-4 py-3">
-                          <p className="font-medium text-slate-800">{a.assetName ?? '—'}</p>
-                          <p className="font-mono text-xs text-gray-400">{a.id.slice(0, 8)}…</p>
+                          <p className="font-medium text-foreground">{a.assetName ?? '—'}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {a.id.slice(0, 8)}…
+                          </p>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
                           {String(a.purchaseDate).slice(0, 10)}
                         </td>
                         <td className="px-4 py-3">{formatCurrency(a.purchasePrice, currency)}</td>
-                        <td className="px-4 py-3 text-red-600">
+                        <td className="px-4 py-3 text-destructive">
                           {formatCurrency(a.accumulated, currency)}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-emerald-700">
+                        <td className="px-4 py-3 font-semibold text-success">
                           {formatCurrency(a.nbv, currency)}
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
                           {a.method?.replace(/_/g, ' ') ?? '—'}
                         </td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[a.status] ?? 'bg-gray-100 text-gray-700 border-gray-200'}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[a.status] ?? 'bg-muted text-foreground border-border'}`}
                           >
                             {a.status?.replace(/_/g, ' ') ?? '—'}
                           </span>
@@ -610,7 +614,7 @@ function AssetsContent() {
                                   setEditing(a);
                                   setShowAdd(true);
                                 }}
-                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                 title="Edit"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -620,7 +624,7 @@ function AssetsContent() {
                                   if (confirm('Dispose this asset? This cannot be undone.'))
                                     disposeMut.mutate(a.id);
                                 }}
-                                className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                                 title="Dispose"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -664,9 +668,9 @@ function AssetsContent() {
               </Button>
             )}
           </div>
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground border-b">
                 <tr>
                   {['Brand ID', 'Annual %', 'Life (months)', 'Salvage %', 'Method', 'Actions'].map(
                     (h) => (
@@ -680,20 +684,20 @@ function AssetsContent() {
               <tbody className="divide-y">
                 {brandRules.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No brand rules defined
                     </td>
                   </tr>
                 ) : (
                   brandRules.map((r) => (
-                    <tr key={r.brandId} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                    <tr key={r.brandId} className="hover:bg-muted">
+                      <td className="px-4 py-3 font-mono text-xs text-foreground">
                         {r.brandId.slice(0, 12)}…
                       </td>
                       <td className="px-4 py-3 font-semibold">{r.annualDepreciationPct}%</td>
                       <td className="px-4 py-3">{r.usefulLifeMonths}</td>
                       <td className="px-4 py-3">{r.salvageValuePct}%</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
                         {r.method?.replace(/_/g, ' ') ?? '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -704,7 +708,7 @@ function AssetsContent() {
                                 setEditingRule(r);
                                 setShowRuleModal(true);
                               }}
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                              className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -713,7 +717,7 @@ function AssetsContent() {
                                 if (confirm('Delete this brand rule?'))
                                   deleteBrandRule.mutate(r.brandId);
                               }}
-                              className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                              className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -743,12 +747,12 @@ function AssetsContent() {
               </Button>
             )}
           </div>
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
             {loadingJournals ? (
-              <div className="p-8 text-center text-gray-400">Loading…</div>
+              <div className="p-8 text-center text-muted-foreground">Loading…</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+                <thead className="bg-muted text-xs uppercase text-muted-foreground border-b">
                   <tr>
                     {['Period', 'Total Charge', 'Assets', 'Posted At'].map((h) => (
                       <th key={h} className="px-4 py-3 text-left font-medium">
@@ -760,21 +764,21 @@ function AssetsContent() {
                 <tbody className="divide-y">
                   {journals.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-8 text-gray-400">
+                      <td colSpan={4} className="text-center py-8 text-muted-foreground">
                         No journals posted yet
                       </td>
                     </tr>
                   ) : (
                     journals.map((j, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
+                      <tr key={i} className="hover:bg-muted">
                         <td className="px-4 py-3 font-medium">
                           {j.periodYear}-{String(j.periodMonth).padStart(2, '0')}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-slate-700">
+                        <td className="px-4 py-3 font-semibold text-foreground">
                           {formatCurrency(j.totalAmount, currency)}
                         </td>
-                        <td className="px-4 py-3 text-gray-500">{j.assetCount ?? '—'}</td>
-                        <td className="px-4 py-3 text-xs text-gray-400">
+                        <td className="px-4 py-3 text-muted-foreground">{j.assetCount ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
                           {j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '—'}
                         </td>
                       </tr>
@@ -808,9 +812,9 @@ function AssetsContent() {
         />
       )}
       {postingJournal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <h2 className="font-bold text-slate-800">
+            <h2 className="font-bold text-foreground">
               Post Depreciation — {now.toLocaleString('default', { month: 'long' })}{' '}
               {now.getFullYear()}
             </h2>
@@ -838,10 +842,10 @@ function AssetsContent() {
 
 export default function AdminAssetsPage() {
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Assets &amp; Depreciation
           </h3>
           <p className="text-muted-foreground">Asset management — across branches</p>

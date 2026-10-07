@@ -347,7 +347,7 @@ export default function MonthlyCollectionTable({
   if (loading) {
     return (
       <div className="flex justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -360,7 +360,7 @@ export default function MonthlyCollectionTable({
       cell: (alertItem: CollectionAlert) => (
         <button
           onClick={() => handleViewDetails(alertItem)}
-          className="font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+          className="font-bold text-primary hover:text-primary hover:underline transition-colors"
         >
           {alertItem.invoiceNumber}
         </button>
@@ -371,10 +371,10 @@ export default function MonthlyCollectionTable({
       header: 'CUSTOMER',
       cell: (alertItem: CollectionAlert) => (
         <div className="flex flex-col">
-          <span className="font-bold text-slate-900">
+          <span className="font-bold text-foreground">
             {alertItem.customerName || 'Unknown Customer'}
           </span>
-          <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+          <span className="text-[10px] text-muted-foreground font-bold uppercase mt-0.5">
             {alertItem.customerPhone || alertItem.customerId}
           </span>
         </div>
@@ -384,7 +384,7 @@ export default function MonthlyCollectionTable({
       id: 'items',
       header: 'ITEMS',
       cell: (alertItem: CollectionAlert) => (
-        <div className="text-xs font-medium text-slate-700 max-w-[200px] truncate">
+        <div className="text-xs font-medium text-foreground max-w-[200px] truncate">
           {contractItems[alertItem.contractId] || 'Loading...'}
         </div>
       ),
@@ -401,15 +401,15 @@ export default function MonthlyCollectionTable({
           const startStr = safeFormatDate(alertItem.usageData.billingPeriodStart, 'MMM dd');
           const endStr = safeFormatDate(alertItem.usageData.billingPeriodEnd, 'MMM dd, yyyy');
           if (startStr === 'N/A' || endStr === 'N/A') {
-            return <span className="text-xs text-slate-400">N/A</span>;
+            return <span className="text-xs text-muted-foreground">N/A</span>;
           }
           return (
-            <div className="text-xs text-slate-600 font-semibold">
+            <div className="text-xs text-foreground font-semibold">
               {startStr} - {endStr}
             </div>
           );
         }
-        return <span className="text-xs text-slate-400">N/A</span>;
+        return <span className="text-xs text-muted-foreground">N/A</span>;
       },
     },
     {
@@ -418,9 +418,7 @@ export default function MonthlyCollectionTable({
       cell: (alertItem: CollectionAlert) => {
         const isFinalMonth = alertItem.type === 'SUMMARY_PENDING';
         if (isFinalMonth)
-          return (
-            <span className="text-blue-600 font-bold">{getActiveCurrency()} 0 (Adjusted)</span>
-          );
+          return <span className="text-primary font-bold">{getActiveCurrency()} 0 (Adjusted)</span>;
         const isLease = alertItem.saleType === 'LEASE';
         const amount = isLease
           ? alertItem.monthlyLeaseAmount || alertItem.monthlyEmiAmount || alertItem.monthlyRent || 0
@@ -434,22 +432,22 @@ export default function MonthlyCollectionTable({
       cell: (alertItem: CollectionAlert) => (
         <div className="flex flex-wrap gap-1">
           {alertItem.type === 'USAGE_PENDING' && (
-            <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
               Usage Pending
             </Badge>
           )}
           {alertItem.type === 'SUMMARY_PENDING' && (
-            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
               Tenure reached
             </Badge>
           )}
           {alertItem.type === 'INVOICE_PENDING' && (
-            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
               Usage Completed
             </Badge>
           )}
           {alertItem.contractStatus === 'COMPLETED' && (
-            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
               Completed
             </Badge>
           )}
@@ -463,7 +461,7 @@ export default function MonthlyCollectionTable({
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 rounded-full"
+          className="h-8 w-8 p-0 text-primary hover:bg-primary/10 rounded-full"
           onClick={() => handleShowHistory(alertItem)}
         >
           <HistoryIcon className="h-4 w-4" />
@@ -480,7 +478,7 @@ export default function MonthlyCollectionTable({
             size="sm"
             variant="ghost"
             onClick={() => handleViewDetails(alertItem)}
-            className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-all"
             title="View Details"
           >
             <Eye className="h-4 w-4" />
@@ -492,7 +490,7 @@ export default function MonthlyCollectionTable({
               variant="ghost"
               onClick={() => handleGenerateOrViewAdvanceBill(alertItem)}
               disabled={generatingAdvanceBillFor === alertItem.contractId}
-              className="h-9 w-9 p-0 rounded-full transition-all hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200"
+              className="h-9 w-9 p-0 rounded-full transition-all hover:bg-success/10 hover:ring-1 hover:ring-success/30"
               title={
                 advanceBillStatusMap[alertItem.contractId]?.advanceBillId
                   ? securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment
@@ -504,7 +502,7 @@ export default function MonthlyCollectionTable({
               }
             >
               {generatingAdvanceBillFor === alertItem.contractId ? (
-                <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />
+                <RefreshCw className="h-4 w-4 animate-spin text-success" />
               ) : (
                 // Same mark the Rent/Lease Contract Actions menu uses for this bill, so
                 // one action looks the same wherever Finance meets it.
@@ -523,7 +521,7 @@ export default function MonthlyCollectionTable({
                 variant="ghost"
                 onClick={() => handleGenerateOrViewSecurityDepositBill(alertItem)}
                 disabled={generatingSecurityDepositBillFor === alertItem.contractId}
-                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200"
+                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-success/10 hover:ring-1 hover:ring-success/30"
                 title={
                   securityDepositBillStatusMap[alertItem.contractId]?.securityDepositBillId
                     ? 'View Security Deposit Bill'
@@ -531,7 +529,7 @@ export default function MonthlyCollectionTable({
                 }
               >
                 {generatingSecurityDepositBillFor === alertItem.contractId ? (
-                  <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />
+                  <RefreshCw className="h-4 w-4 animate-spin text-success" />
                 ) : (
                   <SecurityBillMark size={22} />
                 )}
@@ -544,7 +542,7 @@ export default function MonthlyCollectionTable({
                 size="sm"
                 variant="ghost"
                 onClick={() => setDepositCollectTarget(alertItem)}
-                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-blue-50 hover:ring-1 hover:ring-blue-200"
+                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-primary/10 hover:ring-1 hover:ring-primary/30"
                 title="Collect Security Deposit — not yet recorded for this contract"
               >
                 <AdvancePaymentMark size={22} />
@@ -556,7 +554,7 @@ export default function MonthlyCollectionTable({
               <Button
                 size="sm"
                 onClick={() => handleRecordUsage(alertItem)}
-                className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs font-bold rounded-xl"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-4 text-xs font-bold rounded-xl"
               >
                 <PlusCircle className="h-3 w-3 mr-2" />
                 Record Usage
@@ -588,7 +586,7 @@ export default function MonthlyCollectionTable({
               <Button
                 size="sm"
                 onClick={() => openCollect(alertItem)}
-                className="h-8 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-8 px-3 text-xs font-bold rounded-xl bg-success hover:bg-success/90 text-success-foreground"
               >
                 <DollarSign className="h-3 w-3 mr-1" />
                 Collect
@@ -607,8 +605,10 @@ export default function MonthlyCollectionTable({
     <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Monthly Collections</h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <h2 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Monthly Collections
+          </h2>
+          <p className="text-sm text-muted-foreground font-medium">
             Manage billing and usage for active contracts
           </p>
         </div>
@@ -676,9 +676,9 @@ export default function MonthlyCollectionTable({
       <Dialog open={!!collectTarget} onOpenChange={(v) => !v && setCollectTarget(null)}>
         <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
           <DialogTitle className="sr-only">Collect Periodic Payment</DialogTitle>
-          <div className="bg-emerald-600 p-5 text-white">
+          <div className="bg-success p-5 text-success-foreground">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-full bg-card flex items-center justify-center">
                 <DollarSign size={18} />
               </div>
               <div>
@@ -692,7 +692,7 @@ export default function MonthlyCollectionTable({
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   Amount
                 </Label>
                 <Input
@@ -704,7 +704,7 @@ export default function MonthlyCollectionTable({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   {collectMode === 'CHEQUE' ? 'Cheque Received Date' : 'Date'}
                 </Label>
                 <Input
@@ -716,7 +716,7 @@ export default function MonthlyCollectionTable({
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Payment Mode
               </Label>
               <Select
@@ -742,7 +742,7 @@ export default function MonthlyCollectionTable({
                 return (
                   matching.length > 0 && (
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                         Account
                       </Label>
                       <Select value={collectAccountId} onValueChange={setCollectAccountId}>
@@ -767,7 +767,7 @@ export default function MonthlyCollectionTable({
             {collectMode === 'CHEQUE' && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Cheque No.
                   </Label>
                   <Input
@@ -777,7 +777,7 @@ export default function MonthlyCollectionTable({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Bank
                   </Label>
                   <Input
@@ -787,7 +787,7 @@ export default function MonthlyCollectionTable({
                   />
                 </div>
                 <div className="space-y-1 col-span-2">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Cheque Date (earliest date it can be deposited)
                   </Label>
                   <Input
@@ -800,7 +800,7 @@ export default function MonthlyCollectionTable({
               </div>
             )}
             <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Reference {collectMode === 'CHEQUE' ? '(optional)' : ''}
               </Label>
               {collectMode === 'CHEQUE' ? (
@@ -811,7 +811,7 @@ export default function MonthlyCollectionTable({
                   className="h-9 text-sm"
                 />
               ) : (
-                <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground italic">
                   Auto-generated on save — {autoReferencePreview(collectMode)}
                 </div>
               )}
@@ -825,7 +825,7 @@ export default function MonthlyCollectionTable({
                 Cancel
               </Button>
               <Button
-                className="flex-1 h-9 text-xs font-black bg-emerald-600 hover:bg-emerald-700"
+                className="flex-1 h-9 text-xs font-black bg-success hover:bg-success/90"
                 onClick={handleCollectPayment}
                 disabled={isSavingCollect || !collectAmount}
               >

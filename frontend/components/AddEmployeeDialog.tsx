@@ -97,7 +97,7 @@ export default function AddEmployeeDialog() {
         <Button className="rounded-full">Add Employee</Button>
       </DialogTrigger>
 
-      <DialogOverlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-md" />
+      <DialogOverlay className="fixed inset-0 z-50 bg-foreground/50" />
 
       <DialogContent showCloseButton={false} className="sm:max-w-xl">
         <DialogHeader>
@@ -107,7 +107,7 @@ export default function AddEmployeeDialog() {
         <div className="space-y-6 pt-6">
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 First Name
               </label>
               <Input
@@ -115,11 +115,11 @@ export default function AddEmployeeDialog() {
                 placeholder="John"
                 value={formData.firstName}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Last Name
               </label>
               <Input
@@ -127,12 +127,12 @@ export default function AddEmployeeDialog() {
                 placeholder="Doe"
                 value={formData.lastName}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Role
               </label>
               <RoleSelect
@@ -142,7 +142,7 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Email Address
               </label>
               <Input
@@ -151,12 +151,12 @@ export default function AddEmployeeDialog() {
                 placeholder="john.doe@example.com"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Contract Expiry
               </label>
               <Input
@@ -164,11 +164,11 @@ export default function AddEmployeeDialog() {
                 name="expireDate"
                 value={formData.expireDate}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Salary
               </label>
               <Input
@@ -177,19 +177,19 @@ export default function AddEmployeeDialog() {
                 type="number"
                 value={formData.salary}
                 onChange={handleInputChange}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Branch
               </label>
               <select
                 name="branchId"
                 value={formData.branchId}
                 onChange={handleInputChange}
-                className="w-full h-12 px-3 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 text-sm"
+                className="w-full h-12 px-3 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30 text-sm"
               >
                 <option value="">Select Branch</option>
                 {branches.map((branch) => (
@@ -201,25 +201,25 @@ export default function AddEmployeeDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Profile Image
               </label>
               <Input
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleFileChange(e, 'profile_image')}
-                className="h-12 rounded-xl bg-card border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
+                className="h-12 rounded-xl bg-card border-none shadow-sm text-xs file:bg-primary/10 file:text-primary file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 ID Proof
               </label>
               <Input
                 type="file"
                 accept="application/pdf,image/*"
                 onChange={(e) => handleFileChange(e, 'id_proof')}
-                className="h-12 rounded-xl bg-card border-none shadow-sm text-xs file:bg-blue-50 file:text-blue-600 file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
+                className="h-12 rounded-xl bg-card border-none shadow-sm text-xs file:bg-primary/10 file:text-primary file:border-none file:rounded-lg file:px-2 file:py-1 file:mr-2 flex items-center"
               />
             </div>
           </div>
@@ -228,7 +228,7 @@ export default function AddEmployeeDialog() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>

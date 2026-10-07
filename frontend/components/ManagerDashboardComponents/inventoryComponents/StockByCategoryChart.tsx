@@ -12,10 +12,10 @@ import {
 } from 'recharts';
 
 const data = [
-  { category: 'Printer', units: 450, color: '#6366f1' },
-  { category: 'Spare', units: 820, color: '#3b82f6' },
-  { category: 'Consumable', units: 1200, color: '#0ea5e9' },
-  { category: 'Accessory', units: 300, color: '#06b6d4' },
+  { category: 'Printer', units: 450, color: 'var(--primary)' },
+  { category: 'Spare', units: 820, color: 'var(--chart-blue)' },
+  { category: 'Consumable', units: 1200, color: 'var(--chart-blue-soft)' },
+  { category: 'Accessory', units: 300, color: 'var(--chart-blue-lighter)' },
 ];
 
 /**
@@ -40,7 +40,7 @@ export default function StockByCategoryChart() {
             strokeDasharray="3 3"
             horizontal={true}
             vertical={false}
-            stroke="#f1f5f9"
+            stroke="var(--muted)"
           />
           <XAxis type="number" hide />
           <YAxis
@@ -48,15 +48,15 @@ export default function StockByCategoryChart() {
             type="category"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fontWeight: 500, fill: '#64748b' }}
+            tick={{ fontSize: 11, fontWeight: 500, fill: 'var(--chart-slate-dark)' }}
             width={80}
           />
           <Tooltip
-            cursor={{ fill: '#f8fafc' }}
+            cursor={{ fill: 'var(--muted)' }}
             contentStyle={{
               borderRadius: '8px',
               border: 'none',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+              boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
               fontSize: '11px',
             }}
           />

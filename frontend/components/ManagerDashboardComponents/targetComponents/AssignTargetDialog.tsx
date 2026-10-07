@@ -189,7 +189,7 @@ export default function AssignTargetDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Employee
             </label>
             <Autocomplete
@@ -203,7 +203,7 @@ export default function AssignTargetDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Target Month
               </label>
               <Input
@@ -216,7 +216,7 @@ export default function AssignTargetDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Target Amount ({currencyCode})
               </label>
               <Input
@@ -233,7 +233,7 @@ export default function AssignTargetDialog({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Incentive Tiers
               </label>
               <Button type="button" size="sm" variant="outline" onClick={addTier}>
@@ -286,7 +286,7 @@ export default function AssignTargetDialog({
                           variant="ghost"
                           onClick={() => removeTier(tier.rowId)}
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -298,7 +298,7 @@ export default function AssignTargetDialog({
 
           {tiers.length > 0 && amountNum > 0 && (
             <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Example Payout Preview
               </p>
               <div className="grid grid-cols-4 gap-2 text-xs">
@@ -309,7 +309,7 @@ export default function AssignTargetDialog({
                   return (
                     <div
                       key={level}
-                      className="rounded-lg bg-white dark:bg-slate-900 p-2 text-center border"
+                      className="rounded-lg bg-card dark:bg-foreground p-2 text-center border"
                     >
                       <div className="font-bold text-primary">{level}%</div>
                       <div className="text-muted-foreground">

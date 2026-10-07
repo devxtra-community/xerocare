@@ -63,43 +63,43 @@ export default function InventoryActionsTable() {
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
-            <TableHead className="font-semibold text-gray-700">Date</TableHead>
-            <TableHead className="font-semibold text-gray-700">Printer Model</TableHead>
-            <TableHead className="font-semibold text-gray-700">Branch / Warehouse</TableHead>
-            <TableHead className="font-semibold text-gray-700">Vendor</TableHead>
-            <TableHead className="font-semibold text-gray-700">Action</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-right">Approved By</TableHead>
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="font-semibold text-foreground">Date</TableHead>
+            <TableHead className="font-semibold text-foreground">Printer Model</TableHead>
+            <TableHead className="font-semibold text-foreground">Branch / Warehouse</TableHead>
+            <TableHead className="font-semibold text-foreground">Vendor</TableHead>
+            <TableHead className="font-semibold text-foreground">Action</TableHead>
+            <TableHead className="font-semibold text-foreground text-right">Approved By</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {currentData.map((item, idx) => (
             <TableRow
               key={idx}
-              className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
+              className={`hover:bg-muted/50 ${idx % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}`}
             >
               <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                 {item.date}
               </TableCell>
               <TableCell className="font-medium text-foreground">{item.model}</TableCell>
-              <TableCell className="text-gray-600">{item.branch}</TableCell>
-              <TableCell className="text-gray-600">{item.vendor}</TableCell>
+              <TableCell className="text-foreground">{item.branch}</TableCell>
+              <TableCell className="text-foreground">{item.vendor}</TableCell>
               <TableCell>
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     item.action === 'Rented'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-success/10 text-success'
                       : item.action === 'Returned'
-                        ? 'bg-gray-100 text-gray-700'
+                        ? 'bg-muted text-foreground'
                         : item.action === 'Service'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-blue-100 text-blue-700'
+                          ? 'bg-destructive/10 text-destructive'
+                          : 'bg-primary/10 text-primary'
                   }`}
                 >
                   {item.action}
                 </span>
               </TableCell>
-              <TableCell className="text-right text-gray-600">{item.approvedBy}</TableCell>
+              <TableCell className="text-right text-foreground">{item.approvedBy}</TableCell>
             </TableRow>
           ))}
         </TableBody>

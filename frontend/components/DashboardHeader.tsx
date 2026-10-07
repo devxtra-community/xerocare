@@ -1,6 +1,17 @@
 'use client';
 
-import { Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor, User } from 'lucide-react';
+import {
+  Bell,
+  HelpCircle,
+  ChevronDown,
+  Menu,
+  LogOut,
+  Key,
+  Monitor,
+  User,
+  Moon,
+  Sun,
+} from 'lucide-react';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -57,6 +68,21 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(null);
   const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState(false);
   const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('xerocare-theme');
+    const darkMode = savedTheme === 'dark';
+    document.documentElement.classList.toggle('dark', darkMode);
+    setIsDarkMode(darkMode);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDarkMode = !isDarkMode;
+    document.documentElement.classList.toggle('dark', nextDarkMode);
+    window.localStorage.setItem('xerocare-theme', nextDarkMode ? 'dark' : 'light');
+    setIsDarkMode(nextDarkMode);
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -177,40 +203,52 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-sidebar text-white">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-card text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <div
         className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2"
         suppressHydrationWarning
       >
         <div className="flex items-center gap-2" suppressHydrationWarning>
-          <SidebarTrigger className="lg:hidden text-white hover:bg-card/10">
+          <SidebarTrigger className="lg:hidden text-foreground hover:bg-primary/10 hover:text-primary">
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
-          <h1 className="text-base sm:text-lg font-semibold">{title}</h1>
+          <h1 className="text-base sm:text-lg font-medium text-foreground">{title}</h1>
         </div>
 
         {/* Right: Icons and User Profile */}
         <div className="flex items-center gap-2 sm:gap-4" suppressHydrationWarning>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-muted dark:border-border dark:bg-foreground dark:text-warning dark:hover:bg-foreground"
+            onClick={toggleTheme}
+            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-pressed={isDarkMode}
+            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild id="notification-trigger">
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-white hover:bg-card/10 h-8 w-8 sm:h-10 sm:w-10 relative"
+                className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 data-[state=open]:border-primary/30 data-[state=open]:bg-primary/10"
                 suppressHydrationWarning
               >
-                <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Bell className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.8} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold">
-                    {unreadCount}
+                  <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-border bg-destructive px-1 text-[9px] font-semibold leading-none text-destructive-foreground shadow-sm">
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="w-80 bg-card text-black max-h-[400px] overflow-y-auto"
+              className="w-80 bg-card text-foreground max-h-[400px] overflow-y-auto"
             >
               <div className="flex items-center justify-between px-4 py-2">
                 <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
@@ -230,7 +268,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                 const unread = notifications.filter((n) => !n.is_read);
                 if (unread.length === 0) {
                   return (
-                    <div className="p-8 text-center text-sm text-gray-500">
+                    <div className="p-8 text-center text-sm text-muted-foreground">
                       {notifications.length === 0 ? 'No notifications yet' : "You're all caught up"}
                     </div>
                   );
@@ -247,11 +285,11 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                       >
                         {notification.title}
                       </span>
-                      <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                         {formatNotificationTime(notification.createdAt)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 line-clamp-2">{notification.message}</p>
+                    <p className="text-xs text-foreground line-clamp-2">{notification.message}</p>
                     {!notification.is_read && (
                       <div className="mt-1 flex w-full justify-end">
                         <div className="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -277,7 +315,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
           <Button
             variant="ghost"
             size="icon"
-            className="hidden sm:flex text-white hover:bg-card/10"
+            className="hidden sm:flex text-foreground hover:bg-primary/10 hover:text-primary"
             onClick={() => setIsHelpDialogOpen(true)}
             title="About Xerocare"
           >
@@ -289,11 +327,11 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
             <DropdownMenuTrigger asChild id="user-menu-trigger">
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-white/20 hover:bg-card/5 py-2 px-1 rounded transition-colors h-auto"
+                className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-border hover:bg-muted py-2 px-1 rounded-md transition-colors h-auto"
                 suppressHydrationWarning
               >
                 <div
-                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0 overflow-hidden relative"
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs sm:text-sm font-semibold shrink-0 overflow-hidden relative"
                   suppressHydrationWarning
                 >
                   {user.profile_image_url ? (
@@ -313,24 +351,26 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                   suppressHydrationWarning
                 >
                   <div className="flex items-center gap-1.5 max-w-full">
-                    <span className="text-sm font-medium truncate text-white">{user.name}</span>
+                    <span className="text-sm font-medium truncate text-foreground">
+                      {user.name}
+                    </span>
                     {user.role && (
-                      <span className="text-[10px] text-white/85 bg-white/10 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap shrink-0">
+                      <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap shrink-0">
                         {user.role}
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-white/70 truncate">{user.email}</span>
+                  <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                 </div>
-                <ChevronDown className="hidden sm:block h-4 w-4 text-white/70" />
+                <ChevronDown className="hidden sm:block h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="w-64 p-2 bg-white border-slate-200 shadow-xl rounded-2xl"
+              className="w-64 p-2 bg-card border-border shadow-xl rounded-2xl"
             >
-              <div className="flex items-center gap-3 p-3 mb-1 bg-slate-50 rounded-xl">
-                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm overflow-hidden relative">
+              <div className="flex items-center gap-3 p-3 mb-1 bg-muted rounded-xl">
+                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0 shadow-sm overflow-hidden relative">
                   {user.profile_image_url ? (
                     <Image
                       src={user.profile_image_url}
@@ -345,14 +385,14 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5 max-w-full">
-                    <span className="text-sm font-bold text-slate-900 truncate">{user.name}</span>
+                    <span className="text-sm font-bold text-foreground truncate">{user.name}</span>
                     {user.role && (
                       <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0">
                         {user.role}
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-slate-500 truncate font-medium">
+                  <span className="text-[10px] text-muted-foreground truncate font-medium">
                     {user.email}
                   </span>
                 </div>

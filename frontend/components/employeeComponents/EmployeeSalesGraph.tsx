@@ -45,28 +45,32 @@ export default function EmployeeSalesGraph() {
                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorRent" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-soft)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--chart-blue-soft)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorLease" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-light)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--chart-blue-light)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#6b7280', fontSize: 12 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
               dy={10}
             />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+            />
             <Tooltip
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
                 padding: '8px',
                 fontSize: '12px',
               }}
@@ -84,7 +88,7 @@ export default function EmployeeSalesGraph() {
               type="monotone"
               dataKey="rent"
               stackId="1"
-              stroke="#60a5fa"
+              stroke="var(--chart-blue-soft)"
               fill="url(#colorRent)"
               strokeWidth={2}
             />
@@ -92,7 +96,7 @@ export default function EmployeeSalesGraph() {
               type="monotone"
               dataKey="lease"
               stackId="1"
-              stroke="#93c5fd"
+              stroke="var(--chart-blue-light)"
               fill="url(#colorLease)"
               strokeWidth={2}
             />

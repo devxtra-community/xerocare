@@ -486,7 +486,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   });
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden relative">
       <AddModelDialog
         open={modelDialogOpen}
         onOpenChange={setModelDialogOpen}
@@ -497,29 +497,29 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
         onOpenChange={setBrandDialogOpen}
         onSuccess={fetchData}
       />
-      <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="p-4 sm:p-6 border-b border-border bg-muted/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h3 className="text-lg font-semibold text-slate-800">
+          <h3 className="text-lg font-semibold text-foreground">
             {isEditMode ? `Edit RFQ Draft${rfqNumber ? ` — ${rfqNumber}` : ''}` : 'Draft New RFQ'}
           </h3>
         </div>
       </div>
 
       {loadingRfq ? (
-        <div className="p-12 text-center text-slate-500 text-sm">Loading draft...</div>
+        <div className="p-12 text-center text-muted-foreground text-sm">Loading draft...</div>
       ) : (
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
           {/* Vendors Section */}
           <section className="space-y-4">
-            <h4 className="font-semibold text-slate-700 text-base border-b pb-2">
+            <h4 className="font-semibold text-foreground text-base border-b pb-2">
               1. Select Vendors
             </h4>
 
             <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search Vendor by Name or Vendor ID"
                 value={vendorSearchQuery}
@@ -537,14 +537,14 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
                       isSelected
                         ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'border-slate-200 hover:border-primary/40 hover:bg-slate-50'
+                        : 'border-border hover:border-primary/40 hover:bg-muted'
                     }`}
                   >
                     <div className="mt-0.5 flex-shrink-0">
                       {isSelected ? (
                         <CheckCircle2 className="h-5 w-5 text-primary fill-primary/10" />
                       ) : (
-                        <div className="h-5 w-5 rounded border border-slate-300 bg-white" />
+                        <div className="h-5 w-5 rounded border border-border bg-card" />
                       )}
                       <input
                         type="checkbox"
@@ -554,33 +554,33 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                       />
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="font-medium text-slate-800 text-sm truncate">
+                      <span className="font-medium text-foreground text-sm truncate">
                         {vendor.name}
                       </span>
-                      <span className="text-xs text-slate-500 truncate">{vendor.email}</span>
+                      <span className="text-xs text-muted-foreground truncate">{vendor.email}</span>
                     </div>
                   </label>
                 );
               })}
             </div>
             {vendors.length === 0 && (
-              <p className="text-sm text-slate-500">No vendors available.</p>
+              <p className="text-sm text-muted-foreground">No vendors available.</p>
             )}
             {vendors.length > 0 && sortedVendors.length === 0 && (
-              <p className="text-sm text-slate-500">No vendors match your search.</p>
+              <p className="text-sm text-muted-foreground">No vendors match your search.</p>
             )}
           </section>
 
           {/* Items Section */}
           <section className="space-y-4">
             <div className="flex justify-between items-end border-b pb-2">
-              <h4 className="font-semibold text-slate-700 text-base">2. Request Items</h4>
+              <h4 className="font-semibold text-foreground text-base">2. Request Items</h4>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-9 gap-1.5 text-xs text-slate-600 hover:text-slate-900"
+                  className="h-9 gap-1.5 text-xs text-foreground hover:text-foreground"
                   onClick={downloadSampleExcel}
                 >
                   <DownloadCloud size={14} />
@@ -600,7 +600,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-9 gap-1.5 text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
+                      className="h-9 gap-1.5 text-xs text-primary border-primary/30 bg-primary/10 hover:bg-primary/10 hover:text-primary"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <UploadCloud size={14} />
@@ -626,14 +626,14 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
               {items.map((item, index) => (
                 <div
                   key={index}
-                  className="flex flex-col gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200"
+                  className="flex flex-col gap-3 p-4 rounded-lg bg-muted border border-border"
                 >
                   {/* Row 1: Type & Model/Brand */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 font-medium">Type</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">Type</Label>
                       <select
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-slate-300"
+                        className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-border"
                         value={item.itemType}
                         onChange={(e) => updateItem(index, 'itemType', e.target.value as ItemType)}
                       >
@@ -645,11 +645,13 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                     {item.itemType === ItemType.PRODUCT ? (
                       <div className="space-y-1">
                         <div className="flex justify-between items-center h-4 mb-1">
-                          <Label className="text-xs text-slate-500 font-medium">Model *</Label>
+                          <Label className="text-xs text-muted-foreground font-medium">
+                            Model *
+                          </Label>
                           <button
                             type="button"
                             onClick={() => setModelDialogOpen(true)}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                           >
                             + Request New Model?
                           </button>
@@ -668,11 +670,13 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                     ) : (
                       <div className="space-y-1">
                         <div className="flex justify-between items-center h-4 mb-1">
-                          <Label className="text-xs text-slate-500 font-medium">Brand *</Label>
+                          <Label className="text-xs text-muted-foreground font-medium">
+                            Brand *
+                          </Label>
                           <button
                             type="button"
                             onClick={() => setBrandDialogOpen(true)}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                           >
                             + Create Brand?
                           </button>
@@ -700,7 +704,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                           <div className="flex gap-4">
                             <div className="flex-1 space-y-1">
                               <div className="flex justify-between items-center h-4 mb-1">
-                                <Label className="text-xs text-slate-500 font-medium">
+                                <Label className="text-xs text-muted-foreground font-medium">
                                   New Product Name
                                 </Label>
                                 <button
@@ -710,7 +714,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                                     updateItem(index, 'customProductName', undefined);
                                     updateItem(index, 'hsCode', undefined);
                                   }}
-                                  className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                                  className="text-[10px] text-destructive hover:text-destructive font-medium transition-colors"
                                 >
                                   Cancel
                                 </button>
@@ -725,7 +729,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                               />
                             </div>
                             <div className="w-[120px] space-y-1">
-                              <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                              <Label className="text-xs text-muted-foreground font-medium h-4 mb-1 block">
                                 HS Code *
                               </Label>
                               <Input
@@ -739,7 +743,9 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                         ) : (
                           <div className="space-y-1">
                             <div className="flex justify-between items-center h-4 mb-1">
-                              <Label className="text-xs text-slate-500 font-medium">Product</Label>
+                              <Label className="text-xs text-muted-foreground font-medium">
+                                Product
+                              </Label>
                               {item.modelId && (
                                 <button
                                   type="button"
@@ -747,7 +753,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                                     updateItem(index, 'isRequestingNewProduct', true);
                                     updateItem(index, 'productId', undefined);
                                   }}
-                                  className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                  className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                                 >
                                   + Request New Product?
                                 </button>
@@ -777,7 +783,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                         <div className="flex gap-4">
                           <div className="flex-1 space-y-1">
                             <div className="flex justify-between items-center h-4 mb-1">
-                              <Label className="text-xs text-slate-500 font-medium">
+                              <Label className="text-xs text-muted-foreground font-medium">
                                 New Part Name
                               </Label>
                               <button
@@ -787,7 +793,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                                   updateItem(index, 'customSparePartName', undefined);
                                   updateItem(index, 'hsCode', undefined);
                                 }}
-                                className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                                className="text-[10px] text-destructive hover:text-destructive font-medium transition-colors"
                               >
                                 Cancel
                               </button>
@@ -802,7 +808,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                             />
                           </div>
                           <div className="w-[120px] space-y-1">
-                            <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                            <Label className="text-xs text-muted-foreground font-medium h-4 mb-1 block">
                               HS Code *
                             </Label>
                             <Input
@@ -816,7 +822,9 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                       ) : (
                         <div className="space-y-1">
                           <div className="flex justify-between items-center h-4 mb-1">
-                            <Label className="text-xs text-slate-500 font-medium">Spare Part</Label>
+                            <Label className="text-xs text-muted-foreground font-medium">
+                              Spare Part
+                            </Label>
                             {item.brandId && (
                               <button
                                 type="button"
@@ -824,7 +832,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                                   updateItem(index, 'isRequestingNewPart', true);
                                   updateItem(index, 'sparePartId', undefined);
                                 }}
-                                className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                               >
                                 + Request New Spare Part?
                               </button>
@@ -856,7 +864,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                       )}
 
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                        <Label className="text-xs text-muted-foreground font-medium h-4 mb-1 block text-center">
                           Quantity
                         </Label>
                         <Input
@@ -876,7 +884,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent transition-all h-10 w-10 mb-[1px]"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 border border-transparent transition-all h-10 w-10 mb-[1px]"
                         onClick={() => removeItem(index)}
                       >
                         <Trash2 className="h-5 w-5" />
@@ -885,9 +893,9 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
 
                     {/* Metadata Row for Spare Parts */}
                     {item.itemType === ItemType.SPARE_PART && (
-                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-dashed border-slate-100">
+                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-dashed border-border">
                         <div className="space-y-1">
-                          <Label className="text-xs text-slate-500 font-medium">
+                          <Label className="text-xs text-muted-foreground font-medium">
                             Manufacturing Part # (MPN)
                           </Label>
                           <Input
@@ -898,7 +906,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-slate-500 font-medium font-medium">
+                          <Label className="text-xs text-muted-foreground font-medium font-medium">
                             Compatible Models
                           </Label>
                           <MultiSelect
@@ -937,7 +945,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                                 })),
                             ]}
                             placeholder="Comp. Models"
-                            className="h-9 text-xs bg-gray-50/30"
+                            className="h-9 text-xs bg-muted/30"
                             disabled={!item.brandId}
                           />
                         </div>
@@ -947,7 +955,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                 </div>
               ))}
               {items.length === 0 && (
-                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 text-sm">
+                <div className="text-center py-6 border-2 border-dashed border-border rounded-lg text-muted-foreground text-sm">
                   No items added yet. Click &quot;Add Item&quot; to begin.
                 </div>
               )}
@@ -955,7 +963,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
           </section>
 
           {/* Form Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
+          <div className="flex justify-end gap-3 pt-6 border-t border-border">
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>

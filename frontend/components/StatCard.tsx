@@ -10,12 +10,13 @@ import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/c
  * stats strip in the app looks the same, which an arbitrary style string would undo.
  * `negative` is for money leaving (fees, write-offs), `positive` for money landing.
  */
-export type StatTone = 'default' | 'positive' | 'negative';
+export type StatTone = 'default' | 'positive' | 'negative' | 'warning';
 
 const TONE_CLASS: Record<StatTone, string> = {
   default: 'text-primary',
-  positive: 'text-emerald-600',
-  negative: 'text-red-600',
+  positive: 'text-success',
+  negative: 'text-destructive',
+  warning: 'text-warning',
 };
 
 type StatCardProps = {
@@ -39,7 +40,7 @@ export default function StatCard({ title, value, subtitle, tone = 'default' }: S
   };
 
   return (
-    <Card className="rounded-2xl min-h-[70px] sm:min-h-[80px] h-full bg-card border-none shadow-sm overflow-hidden flex flex-col p-0">
+    <Card className="rounded-2xl min-h-[70px] sm:min-h-[80px] h-full bg-card border border-border shadow-[0_1px_3px_rgba(15,23,42,0.05)] overflow-hidden flex flex-col p-0">
       <CardContent className="flex-1 flex flex-col items-center justify-center gap-1 text-center p-1 sm:p-2 bg-card rounded-2xl w-full">
         <CardTitle className="font-medium text-muted-foreground text-[10px] sm:text-xs md:text-sm leading-tight uppercase text-center w-full">
           {title}

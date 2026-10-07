@@ -70,7 +70,7 @@ function periodLabel(start?: string, end?: string) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-600 mb-2 print:text-slate-800">
+    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground mb-2 print:text-foreground">
       {children}
     </p>
   );
@@ -78,7 +78,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5 print:text-slate-500">
+    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5 print:text-muted-foreground">
       {children}
     </p>
   );
@@ -87,13 +87,13 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 const STATUS_META: Record<string, { label: string; className: string }> = {
   PENDING_APPROVAL: {
     label: 'Pending Approval',
-    className: 'bg-amber-50 text-amber-700',
+    className: 'bg-warning/10 text-warning',
   },
   CUSTOMER_APPROVED: {
     label: 'Customer Approved',
-    className: 'bg-emerald-50 text-emerald-700',
+    className: 'bg-success/10 text-success',
   },
-  CUSTOMER_REJECTED: { label: 'Disputed', className: 'bg-red-50 text-red-700' },
+  CUSTOMER_REJECTED: { label: 'Disputed', className: 'bg-destructive/10 text-destructive' },
 };
 
 const RENT_PERIOD_LABELS: Record<string, string> = {
@@ -163,7 +163,7 @@ function BillHeader({
   return (
     <div>
       <div className="flex items-start justify-between mb-3">
-        <p className="text-xl font-black tracking-tight text-slate-800 uppercase leading-none">
+        <p className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
           {title}
         </p>
         {status && (
@@ -178,24 +178,24 @@ function BillHeader({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
         <div className="p-3">
           <FieldLabel>Bill To</FieldLabel>
-          <p className="text-sm font-black text-slate-800 leading-snug">
+          <p className="text-sm font-black text-foreground leading-snug">
             {invoice.customerName || 'Customer'}
           </p>
           {invoice.customerAddress && (
-            <p className="text-[11px] text-slate-600 leading-snug mt-1 whitespace-pre-line">
+            <p className="text-[11px] text-foreground leading-snug mt-1 whitespace-pre-line">
               {invoice.customerAddress}
             </p>
           )}
           <div className="mt-1.5 space-y-0.5">
             {invoice.customerEmail && (
-              <p className="text-[11px] text-slate-600 leading-snug">{invoice.customerEmail}</p>
+              <p className="text-[11px] text-foreground leading-snug">{invoice.customerEmail}</p>
             )}
             {invoice.customerPhone && (
-              <p className="text-[11px] text-slate-600 leading-snug">{invoice.customerPhone}</p>
+              <p className="text-[11px] text-foreground leading-snug">{invoice.customerPhone}</p>
             )}
           </div>
           {invoice.customerTrn && (
-            <p className="text-[10px] text-slate-500 mt-1.5">
+            <p className="text-[10px] text-muted-foreground mt-1.5">
               TRN: <span className="font-mono">{invoice.customerTrn}</span>
             </p>
           )}
@@ -204,10 +204,10 @@ function BillHeader({
         <div>
           {meta.map(([label, value]) => (
             <div key={label} className="flex items-baseline justify-between gap-3 px-3 py-[5px]">
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 print:text-slate-500 shrink-0">
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground print:text-muted-foreground shrink-0">
                 {label}
               </span>
-              <span className="text-[11px] font-bold text-slate-800 text-right">{value}</span>
+              <span className="text-[11px] font-bold text-foreground text-right">{value}</span>
             </div>
           ))}
         </div>
@@ -244,7 +244,7 @@ function ContractDetailsSection({ invoice }: { invoice: Invoice }) {
         {cells.map(([label, value]) => (
           <div key={label} className="p-2.5">
             <FieldLabel>{label}</FieldLabel>
-            <p className="text-xs font-black text-slate-800">{value}</p>
+            <p className="text-xs font-black text-foreground">{value}</p>
           </div>
         ))}
       </div>
@@ -285,11 +285,11 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
       <SectionHeading>Machines & Readings on This Bill</SectionHeading>
 
       {hasSwap && (
-        <div className="mb-2 bg-amber-50 px-3 py-2">
-          <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">
+        <div className="mb-2 bg-warning/10 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-wider text-warning">
             Machine replaced during this period — {fmtShortDate(replacedOn)}
           </p>
-          <p className="mt-1 text-[10px] text-amber-800 leading-relaxed">
+          <p className="mt-1 text-[10px] text-warning leading-relaxed">
             Both machines are billed here: usage up to the swap on{' '}
             <span className="font-bold font-mono">{outgoing?.allocation?.serialNumber}</span>, and
             from the swap onwards on{' '}
@@ -304,23 +304,23 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
       <div className="overflow-x-auto">
         <table className="w-full text-[10px]">
           <thead>
-            <tr className="bg-slate-50 print:bg-slate-100">
-              <th className="text-left p-1.5 font-black uppercase tracking-wider text-slate-500">
+            <tr className="bg-muted print:bg-muted">
+              <th className="text-left p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 Machine
               </th>
-              <th className="text-left p-1.5 font-black uppercase tracking-wider text-slate-500">
+              <th className="text-left p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 Role
               </th>
-              <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+              <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 B/W A4
               </th>
-              <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+              <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 B/W A3
               </th>
-              <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+              <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 Colour A4
               </th>
-              <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+              <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 Colour A3
               </th>
             </tr>
@@ -329,60 +329,60 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
             {items.map((it, idx) => (
               <React.Fragment key={it.allocationId || idx}>
                 <tr>
-                  <td rowSpan={2} className="p-1.5 align-top font-bold text-slate-700 font-mono">
+                  <td rowSpan={2} className="p-1.5 align-top font-bold text-foreground font-mono">
                     {it.allocation?.serialNumber || `Machine ${idx + 1}`}
                   </td>
-                  <td rowSpan={2} className="p-1.5 align-top text-slate-600">
+                  <td rowSpan={2} className="p-1.5 align-top text-foreground">
                     {roleOf(it)}
                     {it.allocation?.status === 'REPLACED' && it.allocation.endTimestamp && (
-                      <span className="block text-[9px] text-amber-700">
+                      <span className="block text-[9px] text-warning">
                         {fmtShortDate(it.allocation.endTimestamp)}
                       </span>
                     )}
                     {it.allocation?.replacementOfAllocationId && it.allocation.startTimestamp && (
-                      <span className="block text-[9px] text-emerald-700">
+                      <span className="block text-[9px] text-success">
                         {fmtShortDate(it.allocation.startTimestamp)}
                       </span>
                     )}
                   </td>
-                  <td className="p-1.5 text-right text-slate-500">
+                  <td className="p-1.5 text-right text-muted-foreground">
                     <span className="text-[8px] uppercase tracking-wider">Opening </span>
                     {fmtNum(it.startBwA4)}
                   </td>
-                  <td className="p-1.5 text-right text-slate-500">
+                  <td className="p-1.5 text-right text-muted-foreground">
                     <span className="text-[8px] uppercase tracking-wider">Opening </span>
                     {fmtNum(it.startBwA3)}
                   </td>
-                  <td className="p-1.5 text-right text-slate-500">
+                  <td className="p-1.5 text-right text-muted-foreground">
                     <span className="text-[8px] uppercase tracking-wider">Opening </span>
                     {fmtNum(it.startColorA4)}
                   </td>
-                  <td className="p-1.5 text-right text-slate-500">
+                  <td className="p-1.5 text-right text-muted-foreground">
                     <span className="text-[8px] uppercase tracking-wider">Opening </span>
                     {fmtNum(it.startColorA3)}
                   </td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 text-right font-bold text-slate-700">
-                    <span className="text-[8px] font-normal uppercase tracking-wider text-slate-400">
+                  <td className="p-1.5 text-right font-bold text-foreground">
+                    <span className="text-[8px] font-normal uppercase tracking-wider text-muted-foreground">
                       Closing{' '}
                     </span>
                     {fmtNum(it.endBwA4)}
                   </td>
-                  <td className="p-1.5 text-right font-bold text-slate-700">
-                    <span className="text-[8px] font-normal uppercase tracking-wider text-slate-400">
+                  <td className="p-1.5 text-right font-bold text-foreground">
+                    <span className="text-[8px] font-normal uppercase tracking-wider text-muted-foreground">
                       Closing{' '}
                     </span>
                     {fmtNum(it.endBwA3)}
                   </td>
-                  <td className="p-1.5 text-right font-bold text-slate-700">
-                    <span className="text-[8px] font-normal uppercase tracking-wider text-slate-400">
+                  <td className="p-1.5 text-right font-bold text-foreground">
+                    <span className="text-[8px] font-normal uppercase tracking-wider text-muted-foreground">
                       Closing{' '}
                     </span>
                     {fmtNum(it.endColorA4)}
                   </td>
-                  <td className="p-1.5 text-right font-bold text-slate-700">
-                    <span className="text-[8px] font-normal uppercase tracking-wider text-slate-400">
+                  <td className="p-1.5 text-right font-bold text-foreground">
+                    <span className="text-[8px] font-normal uppercase tracking-wider text-muted-foreground">
                       Closing{' '}
                     </span>
                     {fmtNum(it.endColorA3)}
@@ -438,55 +438,57 @@ function UsageGroupTable({ title, rows }: { title: string; rows: UsageRow[] }) {
     <div className="overflow-x-auto">
       <table className="w-full text-[10px]">
         <thead>
-          <tr className="bg-slate-50 print:bg-slate-100">
-            <th className="text-left p-1.5 font-black uppercase tracking-wider text-slate-700 w-[34%]">
+          <tr className="bg-muted print:bg-muted">
+            <th className="text-left p-1.5 font-black uppercase tracking-wider text-foreground w-[34%]">
               {title}
             </th>
-            <th className="text-left p-1.5 font-black uppercase tracking-wider text-slate-500">
+            <th className="text-left p-1.5 font-black uppercase tracking-wider text-muted-foreground">
               Date (A4)
             </th>
-            <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+            <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
               Counter (A4)
             </th>
-            <th className="text-left p-1.5 font-black uppercase tracking-wider text-slate-500">
+            <th className="text-left p-1.5 font-black uppercase tracking-wider text-muted-foreground">
               Date (A3)
             </th>
-            <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+            <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
               Counter (A3)
             </th>
-            <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500 w-[16%]">
+            <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground w-[16%]">
               Amount
             </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.label} className={r.strong ? 'bg-slate-50 print:bg-slate-100' : undefined}>
-              <td className={`p-1.5 ${r.strong ? 'font-black text-slate-800' : 'text-slate-600'}`}>
+            <tr key={r.label} className={r.strong ? 'bg-muted print:bg-muted' : undefined}>
+              <td
+                className={`p-1.5 ${r.strong ? 'font-black text-foreground' : 'text-foreground'}`}
+              >
                 {r.label}
               </td>
               {r.pooled !== undefined ? (
-                <td colSpan={4} className="p-1.5 text-right font-bold text-slate-700">
+                <td colSpan={4} className="p-1.5 text-right font-bold text-foreground">
                   {r.pooled}
                 </td>
               ) : (
                 <>
-                  <td className="p-1.5 text-slate-500">{r.a4Date ?? ''}</td>
+                  <td className="p-1.5 text-muted-foreground">{r.a4Date ?? ''}</td>
                   <td
-                    className={`p-1.5 text-right ${r.strong ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`}
+                    className={`p-1.5 text-right ${r.strong ? 'font-black text-foreground' : 'font-bold text-foreground'}`}
                   >
                     {r.a4 ?? ''}
                   </td>
-                  <td className="p-1.5 text-slate-500">{r.a3Date ?? ''}</td>
+                  <td className="p-1.5 text-muted-foreground">{r.a3Date ?? ''}</td>
                   <td
-                    className={`p-1.5 text-right ${r.strong ? 'font-black text-slate-800' : 'font-bold text-slate-700'}`}
+                    className={`p-1.5 text-right ${r.strong ? 'font-black text-foreground' : 'font-bold text-foreground'}`}
                   >
                     {r.a3 ?? ''}
                   </td>
                 </>
               )}
               <td
-                className={`p-1.5 text-right ${r.strong ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}
+                className={`p-1.5 text-right ${r.strong ? 'font-black text-foreground' : 'font-bold text-foreground'}`}
               >
                 {r.amount ?? ''}
               </td>
@@ -730,9 +732,9 @@ function UsageSection({
     <div>
       <div className="flex items-baseline justify-between mb-2">
         <SectionHeading>Meter Reading &amp; Usage</SectionHeading>
-        <p className="text-[9px] font-bold text-slate-500">
+        <p className="text-[9px] font-bold text-muted-foreground">
           Reading taken:{' '}
-          <span className="text-slate-700">{fmtShortDate(bill.readingTakenDate)}</span>
+          <span className="text-foreground">{fmtShortDate(bill.readingTakenDate)}</span>
         </p>
       </div>
 
@@ -742,18 +744,18 @@ function UsageSection({
             <UsageGroupTable title={g.title} rows={g.rows} />
           </div>
         ))}
-        <div className="flex items-center justify-between px-3 py-2 bg-slate-100">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">
+        <div className="flex items-center justify-between px-3 py-2 bg-muted">
+          <span className="text-[10px] font-black uppercase tracking-wider text-foreground">
             Total excess usage charged this period
           </span>
-          <span className="text-xs font-black text-slate-900">
+          <span className="text-xs font-black text-foreground">
             {fmtAmt(bill.exceededCharge, currency)}
           </span>
         </div>
       </div>
 
       {months !== 1 && (
-        <p className="text-[9px] text-slate-500 mt-1 leading-relaxed">
+        <p className="text-[9px] text-muted-foreground mt-1 leading-relaxed">
           The included volume is the plan&apos;s allowance for one whole billing period, so it is
           not multiplied by the number of months in the period.
         </p>
@@ -799,22 +801,22 @@ function PeriodComparisonSection({
       <div className="overflow-x-auto">
         <table className="w-full text-[10px]">
           <thead>
-            <tr className="bg-slate-50 print:bg-slate-100">
-              <th className="text-left p-1.5 font-black uppercase tracking-wider text-slate-500 w-[34%]">
+            <tr className="bg-muted print:bg-muted">
+              <th className="text-left p-1.5 font-black uppercase tracking-wider text-muted-foreground w-[34%]">
                 &nbsp;
               </th>
-              <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-500">
+              <th className="text-right p-1.5 font-black uppercase tracking-wider text-muted-foreground">
                 Previous
                 {previousBill.billNumber ? (
-                  <span className="block font-mono font-normal text-[8px] text-slate-400">
+                  <span className="block font-mono font-normal text-[8px] text-muted-foreground">
                     {previousBill.billNumber}
                   </span>
                 ) : null}
               </th>
-              <th className="text-right p-1.5 font-black uppercase tracking-wider text-slate-700">
+              <th className="text-right p-1.5 font-black uppercase tracking-wider text-foreground">
                 This Bill
                 {bill.billNumber ? (
-                  <span className="block font-mono font-normal text-[8px] text-slate-400">
+                  <span className="block font-mono font-normal text-[8px] text-muted-foreground">
                     {bill.billNumber}
                   </span>
                 ) : null}
@@ -824,9 +826,9 @@ function PeriodComparisonSection({
           <tbody>
             {rows.map(([label, before, now]) => (
               <tr key={label}>
-                <td className="p-1.5 text-slate-600">{label}</td>
-                <td className="p-1.5 text-right text-slate-500">{before}</td>
-                <td className="p-1.5 text-right font-bold text-slate-800">{now}</td>
+                <td className="p-1.5 text-foreground">{label}</td>
+                <td className="p-1.5 text-right text-muted-foreground">{before}</td>
+                <td className="p-1.5 text-right font-bold text-foreground">{now}</td>
               </tr>
             ))}
           </tbody>
@@ -841,10 +843,10 @@ function PeriodComparisonSection({
 const PAYMENT_STATUS_META: Record<string, { label: string; className: string }> = {
   PENDING: {
     label: 'Pending Accounts Approval',
-    className: 'bg-amber-50 text-amber-700',
+    className: 'bg-warning/10 text-warning',
   },
-  APPROVED: { label: 'Approved', className: 'bg-emerald-50 text-emerald-700' },
-  REJECTED: { label: 'Rejected', className: 'bg-red-50 text-red-700' },
+  APPROVED: { label: 'Approved', className: 'bg-success/10 text-success' },
+  REJECTED: { label: 'Rejected', className: 'bg-destructive/10 text-destructive' },
 };
 
 function AdvancePaymentSection({
@@ -864,7 +866,7 @@ function AdvancePaymentSection({
     return (
       <div>
         <SectionHeading>{sectionLabel}</SectionHeading>
-        <p className="text-xs text-slate-400 italic">{sectionLabel} details unavailable.</p>
+        <p className="text-xs text-muted-foreground italic">{sectionLabel} details unavailable.</p>
       </div>
     );
   }
@@ -884,12 +886,12 @@ function AdvancePaymentSection({
           {cells.map(([label, value]) => (
             <div key={label} className="p-2.5">
               <FieldLabel>{label}</FieldLabel>
-              <p className="text-xs font-black text-slate-800">{value}</p>
+              <p className="text-xs font-black text-foreground">{value}</p>
             </div>
           ))}
         </div>
-        <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 print:bg-slate-100">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-muted print:bg-muted">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
             Payment Approval Status
           </span>
           {paymentStatus && (
@@ -903,24 +905,24 @@ function AdvancePaymentSection({
       </div>
       {accessoryItems && accessoryItems.length > 0 && (
         <div>
-          <div className="px-3 py-1 bg-slate-50 print:bg-slate-100">
-            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+          <div className="px-3 py-1 bg-muted print:bg-muted">
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
               Includes Accessories (excl. tax — see Amount above for the tax-inclusive total)
             </span>
           </div>
           {accessoryItems.map((it, i) => (
             <div key={i} className="flex items-center justify-between px-3 py-1">
-              <span className="text-xs text-slate-600">
+              <span className="text-xs text-foreground">
                 {it.description} {(it.quantity ?? 1) > 1 ? `× ${it.quantity}` : ''}
               </span>
-              <span className="text-xs font-bold text-slate-700">
+              <span className="text-xs font-bold text-foreground">
                 {fmtAmt((it.quantity ?? 1) * Number(it.unitPrice ?? 0), currency)}
               </span>
             </div>
           ))}
         </div>
       )}
-      <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">{footerNote}</p>
+      <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">{footerNote}</p>
     </div>
   );
 }
@@ -969,15 +971,15 @@ function ChargesSection({
       <div>
         {rows.map(([label, amt]) => (
           <div key={label} className="flex items-center justify-between px-3 py-1.5 text-xs">
-            <span className="text-slate-500">{label}</span>
-            <span className="font-bold text-slate-700">{fmtAmt(amt, currency)}</span>
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-bold text-foreground">{fmtAmt(amt, currency)}</span>
           </div>
         ))}
-        <div className="flex items-center justify-between px-3 py-2 bg-slate-100">
-          <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+        <div className="flex items-center justify-between px-3 py-2 bg-muted">
+          <span className="text-xs font-black uppercase tracking-wider text-foreground">
             Grand Total
           </span>
-          <span className="text-base font-black text-slate-900">
+          <span className="text-base font-black text-foreground">
             {fmtAmt(bill.totalCharge, currency)}
           </span>
         </div>
@@ -995,37 +997,37 @@ function TotalsFooter({ total, currency }: { total: number; currency: string }) 
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
       <div className="p-3">
         <FieldLabel>Total in words</FieldLabel>
-        <p className="text-[11px] font-bold text-slate-800 leading-snug">
+        <p className="text-[11px] font-bold text-foreground leading-snug">
           {numberToWords(Number(total || 0), currency)}
         </p>
-        <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+        <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
           Please make cheque &amp; online transfer payable to:
         </p>
-        <p className="text-[11px] font-black text-slate-800 mt-0.5">{BANK.payTo}</p>
-        <p className="text-[10px] text-slate-600 leading-snug">
+        <p className="text-[11px] font-black text-foreground mt-0.5">{BANK.payTo}</p>
+        <p className="text-[10px] text-foreground leading-snug">
           {BANK.bank}, A/c no: {BANK.accountNo}
         </p>
-        <p className="text-[10px] text-slate-600 leading-snug font-mono">IBAN: {BANK.iban}</p>
-        <p className="text-[10px] text-slate-600 leading-snug font-mono">SWIFT: {BANK.swift}</p>
+        <p className="text-[10px] text-foreground leading-snug font-mono">IBAN: {BANK.iban}</p>
+        <p className="text-[10px] text-foreground leading-snug font-mono">SWIFT: {BANK.swift}</p>
       </div>
       <div className="p-3">
         <div className="flex items-center justify-between py-1 text-xs">
-          <span className="text-slate-500">Net Amount</span>
-          <span className="font-bold text-slate-700">{fmtAmt(total, currency)}</span>
+          <span className="text-muted-foreground">Net Amount</span>
+          <span className="font-bold text-foreground">{fmtAmt(total, currency)}</span>
         </div>
         <div className="flex items-center justify-between py-1 text-xs">
-          <span className="text-slate-500">Discount</span>
-          <span className="font-bold text-slate-700">{fmtAmt(0, currency)}</span>
+          <span className="text-muted-foreground">Discount</span>
+          <span className="font-bold text-foreground">{fmtAmt(0, currency)}</span>
         </div>
         <div className="flex items-center justify-between py-1 text-xs">
-          <span className="text-slate-500">Payment / Credit</span>
-          <span className="font-bold text-slate-700">—</span>
+          <span className="text-muted-foreground">Payment / Credit</span>
+          <span className="font-bold text-foreground">—</span>
         </div>
-        <div className="flex items-center justify-between py-1.5 mt-1 bg-slate-100 px-2">
-          <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+        <div className="flex items-center justify-between py-1.5 mt-1 bg-muted px-2">
+          <span className="text-xs font-black uppercase tracking-wider text-foreground">
             Net Amount
           </span>
-          <span className="text-sm font-black text-slate-900">{fmtAmt(total, currency)}</span>
+          <span className="text-sm font-black text-foreground">{fmtAmt(total, currency)}</span>
         </div>
       </div>
     </div>
@@ -1036,13 +1038,13 @@ function ApprovalSection({ bill }: { bill: Partial<Bill> }) {
   return (
     <div>
       <div className="p-2.5 space-y-1">
-        <p className="text-[10px] text-slate-500">
+        <p className="text-[10px] text-muted-foreground">
           Bill created by{' '}
-          <span className="font-bold text-slate-700">{bill.billCreatedByName || 'Employee'}</span>
+          <span className="font-bold text-foreground">{bill.billCreatedByName || 'Employee'}</span>
           {bill.createdAt ? ` on ${fmtDate(bill.createdAt)}` : ''}
         </p>
         {bill.billStatus === 'CUSTOMER_APPROVED' && (
-          <p className="text-[10px] text-emerald-700">
+          <p className="text-[10px] text-success">
             Approved by <span className="font-bold">{bill.customerApprovedByName}</span>
             {bill.customerApprovedAt ? ` on ${fmtDate(bill.customerApprovedAt)}` : ''}
             {bill.customerApprovalMethod === 'FINANCE_MANUAL'
@@ -1053,13 +1055,13 @@ function ApprovalSection({ bill }: { bill: Partial<Bill> }) {
           </p>
         )}
         {bill.billStatus === 'CUSTOMER_REJECTED' && (
-          <p className="text-[10px] text-red-700">
+          <p className="text-[10px] text-destructive">
             Disputed{bill.customerRejectedAt ? ` on ${fmtDate(bill.customerRejectedAt)}` : ''}
             {bill.customerRejectionReason ? ` — "${bill.customerRejectionReason}"` : ''}
           </p>
         )}
       </div>
-      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed text-center">
+      <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed text-center">
         If you notice any incorrect reading or have questions, please contact our finance team
         before approving this bill.
       </p>
@@ -1101,7 +1103,7 @@ export function BillDocumentBody({
   return (
     // Company stationery — the same letterhead artwork the quotations use.
     <Letterhead>
-      <div className="space-y-4 text-slate-800">
+      <div className="space-y-4 text-foreground">
         <BillHeader invoice={invoice} bill={bill} hasDeposit={showDepositSection} />
         <ContractDetailsSection invoice={invoice} />
 

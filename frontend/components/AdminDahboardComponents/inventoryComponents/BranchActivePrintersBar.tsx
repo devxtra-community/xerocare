@@ -55,7 +55,7 @@ export default function BranchActivePrintersBar() {
               horizontal={true}
               vertical={false}
               strokeDasharray="3 3"
-              stroke="#f3f4f6"
+              stroke="var(--muted)"
             />
             <XAxis type="number" hide />
             <YAxis
@@ -63,7 +63,7 @@ export default function BranchActivePrintersBar() {
               type="category"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#4b5563', fontSize: 12, fontWeight: 500 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12, fontWeight: 500 }}
               width={50}
             />
             <Tooltip
@@ -71,7 +71,7 @@ export default function BranchActivePrintersBar() {
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
               }}
             />
             <Bar dataKey="active" radius={[0, 4, 4, 0]}>

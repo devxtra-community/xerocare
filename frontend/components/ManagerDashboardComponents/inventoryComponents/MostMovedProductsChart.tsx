@@ -41,32 +41,36 @@ export default function MostMovedProductsChart() {
         <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="colorPrinter" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
-              <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--chart-blue)" stopOpacity={0.1} />
+              <stop offset="95%" stopColor="var(--chart-blue)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="colorToner" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.1} />
-              <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--chart-blue-soft)" stopOpacity={0.1} />
+              <stop offset="95%" stopColor="var(--chart-blue-soft)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="colorSpare" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.1} />
-              <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--chart-blue-light)" stopOpacity={0.1} />
+              <stop offset="95%" stopColor="var(--chart-blue-light)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--muted)" />
           <XAxis
             dataKey="name"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 10, fill: '#64748b' }}
+            tick={{ fontSize: 10, fill: 'var(--chart-slate-dark)' }}
             dy={10}
           />
-          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 10, fill: 'var(--chart-slate-dark)' }}
+          />
           <Tooltip
             contentStyle={{
               borderRadius: '8px',
               border: 'none',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+              boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
               fontSize: '11px',
             }}
           />
@@ -79,31 +83,31 @@ export default function MostMovedProductsChart() {
           <Area
             type="monotone"
             dataKey="Printer"
-            stroke="#2563eb"
+            stroke="var(--chart-blue)"
             fillOpacity={1}
             fill="url(#colorPrinter)"
             strokeWidth={2}
-            dot={{ r: 3, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
+            dot={{ r: 3, fill: 'var(--chart-blue)', strokeWidth: 2, stroke: 'var(--card)' }}
             activeDot={{ r: 5 }}
           />
           <Area
             type="monotone"
             dataKey="Toner"
-            stroke="#60a5fa"
+            stroke="var(--chart-blue-soft)"
             fillOpacity={1}
             fill="url(#colorToner)"
             strokeWidth={2}
-            dot={{ r: 3, fill: '#60a5fa', strokeWidth: 2, stroke: '#fff' }}
+            dot={{ r: 3, fill: 'var(--chart-blue-soft)', strokeWidth: 2, stroke: 'var(--card)' }}
             activeDot={{ r: 5 }}
           />
           <Area
             type="monotone"
             dataKey="Spare"
-            stroke="#93c5fd"
+            stroke="var(--chart-blue-light)"
             fillOpacity={1}
             fill="url(#colorSpare)"
             strokeWidth={2}
-            dot={{ r: 3, fill: '#93c5fd', strokeWidth: 2, stroke: '#fff' }}
+            dot={{ r: 3, fill: 'var(--chart-blue-light)', strokeWidth: 2, stroke: 'var(--card)' }}
             activeDot={{ r: 5 }}
           />
         </AreaChart>

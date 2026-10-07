@@ -80,43 +80,43 @@ export default function OrderUpdateDialog({
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Customer Name
               </label>
               <Input
                 name="customerName"
                 value={formData.customerName}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Customer Phone
               </label>
               <Input
                 name="customerPhone"
                 value={formData.customerPhone}
                 onChange={handleChange}
-                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Product
                 </label>
                 <Input
                   name="productName"
                   value={formData.productName}
                   onChange={handleChange}
-                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Quantity
                 </label>
                 <Input
@@ -124,32 +124,32 @@ export default function OrderUpdateDialog({
                   type="number"
                   value={formData.quantity}
                   onChange={handleChange}
-                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Total Amount
                 </label>
                 <Input
                   name="totalAmount"
                   value={formData.totalAmount}
                   onChange={handleChange}
-                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Delivery Type
                 </label>
                 <Select
                   value={formData.deliveryType}
                   onValueChange={(val) => handleSelectChange('deliveryType', val)}
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -163,54 +163,54 @@ export default function OrderUpdateDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Payment Status
                 </label>
                 <Select
                   value={formData.paymentStatus}
                   onValueChange={(val) => handleSelectChange('paymentStatus', val)}
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Paid" className="text-green-600 font-medium">
+                    <SelectItem value="Paid" className="text-success font-medium">
                       Paid
                     </SelectItem>
-                    <SelectItem value="Pending" className="text-red-600 font-medium">
+                    <SelectItem value="Pending" className="text-destructive font-medium">
                       Pending
                     </SelectItem>
-                    <SelectItem value="Partial" className="text-yellow-600 font-medium">
+                    <SelectItem value="Partial" className="text-warning font-medium">
                       Partial
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Order Status
                 </label>
                 <Select
                   value={formData.orderStatus}
                   onValueChange={(val) => handleSelectChange('orderStatus', val)}
                 >
-                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="New" className="text-blue-600 font-medium">
+                    <SelectItem value="New" className="text-primary font-medium">
                       New
                     </SelectItem>
-                    <SelectItem value="Processing" className="text-yellow-600 font-medium">
+                    <SelectItem value="Processing" className="text-warning font-medium">
                       Processing
                     </SelectItem>
-                    <SelectItem value="Shipped" className="text-blue-600 font-medium">
+                    <SelectItem value="Shipped" className="text-primary font-medium">
                       Shipped
                     </SelectItem>
-                    <SelectItem value="Delivered" className="text-green-600 font-medium">
+                    <SelectItem value="Delivered" className="text-success font-medium">
                       Delivered
                     </SelectItem>
-                    <SelectItem value="Cancelled" className="text-red-600 font-medium">
+                    <SelectItem value="Cancelled" className="text-destructive font-medium">
                       Cancelled
                     </SelectItem>
                   </SelectContent>
@@ -224,13 +224,13 @@ export default function OrderUpdateDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="font-bold text-gray-600 hover:text-foreground"
+              className="font-bold text-foreground hover:text-foreground"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="bg-primary text-white hover:bg-primary/90 font-bold px-8"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-8"
             >
               Save Changes
             </Button>

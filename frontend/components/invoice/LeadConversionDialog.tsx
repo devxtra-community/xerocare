@@ -125,7 +125,7 @@ export function LeadConversionDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-red-600 font-bold">Validation Error</DialogTitle>
+            <DialogTitle className="text-destructive font-bold">Validation Error</DialogTitle>
             <DialogDescription className="text-base text-foreground pt-4">
               Location is required before converting this lead to a customer.
               <br />
@@ -155,14 +155,14 @@ export function LeadConversionDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold px-4 py-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive mt-1.5 shrink-0" />
               <div className="flex-1 leading-normal">{errorMessage}</div>
             </div>
           )}
           <div className="grid gap-2">
             <Label htmlFor="name">
-              Name {isNameMissing && <span className="text-red-500">*</span>}
+              Name {isNameMissing && <span className="text-destructive">*</span>}
             </Label>
             <Input
               id="name"
@@ -175,7 +175,7 @@ export function LeadConversionDialog({
               // Let's hide if present to reduce friction?
               // Or show as read-only. Read-only is better context.
               readOnly={!!lead.name}
-              className={lead.name ? 'bg-slate-100' : ''}
+              className={lead.name ? 'bg-muted' : ''}
             />
           </div>
 
@@ -188,7 +188,7 @@ export function LeadConversionDialog({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="customer@example.com"
               readOnly={!!lead.email}
-              className={lead.email ? 'bg-slate-100' : ''}
+              className={lead.email ? 'bg-muted' : ''}
             />
           </div>
 
@@ -212,7 +212,7 @@ export function LeadConversionDialog({
               onChange={(e) => setPhone(e.target.value)}
               placeholder={dialCode ? `${dialCode} 50 123 4567` : 'Select a country first'}
               readOnly={!!lead.phone}
-              className={lead.phone ? 'bg-slate-100' : ''}
+              className={lead.phone ? 'bg-muted' : ''}
             />
           </div>
 
@@ -226,7 +226,7 @@ export function LeadConversionDialog({
             />
           </div>
           {isContactMissing && (
-            <p className="text-xs text-amber-600 font-medium">
+            <p className="text-xs text-warning font-medium">
               Please provide at least one contact method.
             </p>
           )}

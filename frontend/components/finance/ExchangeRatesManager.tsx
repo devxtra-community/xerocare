@@ -53,10 +53,10 @@ export default function ExchangeRatesManager() {
   const canSave = fromCurrency && toCurrency && fromCurrency !== toCurrency && parseFloat(rate) > 0;
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight flex items-center gap-2">
             <ArrowLeftRight className="h-6 w-6 text-primary" /> Exchange Rates
           </h3>
           <p className="text-muted-foreground text-sm">
@@ -78,13 +78,15 @@ export default function ExchangeRatesManager() {
       </div>
 
       <div id="exchange-rates-pdf" className="space-y-6">
-        <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-5 space-y-3">
+        <div className="rounded-2xl bg-card shadow-sm border border-border p-5 space-y-3">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Set / Update Rate
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase">From Currency</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                From Currency
+              </label>
               <SearchableSelect
                 options={currencyOptions()}
                 value={fromCurrency}
@@ -95,7 +97,9 @@ export default function ExchangeRatesManager() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase">To Currency</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                To Currency
+              </label>
               <SearchableSelect
                 options={currencyOptions()}
                 value={toCurrency || branchCurrency}
@@ -106,7 +110,7 @@ export default function ExchangeRatesManager() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">
                 Rate (1 {fromCurrency || '—'} = ? {toCurrency || branchCurrency})
               </label>
               <Input
@@ -129,7 +133,7 @@ export default function ExchangeRatesManager() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden">
+        <div className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
             <h3 className="font-bold text-primary text-sm">Current Rates</h3>
           </div>
@@ -138,7 +142,7 @@ export default function ExchangeRatesManager() {
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : isError ? (
-            <div className="p-8 text-center text-red-600 text-sm">
+            <div className="p-8 text-center text-destructive text-sm">
               Failed to load exchange rates.
             </div>
           ) : rates.length === 0 ? (
@@ -160,8 +164,8 @@ export default function ExchangeRatesManager() {
                 <tbody className="divide-y divide-border">
                   {rates.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/10">
-                      <td className="px-5 py-3 font-semibold text-slate-800">{r.fromCurrency}</td>
-                      <td className="px-5 py-3 font-semibold text-slate-800">{r.toCurrency}</td>
+                      <td className="px-5 py-3 font-semibold text-foreground">{r.fromCurrency}</td>
+                      <td className="px-5 py-3 font-semibold text-foreground">{r.toCurrency}</td>
                       <td className="px-5 py-3 tabular-nums">
                         1 {r.fromCurrency} = {formatCurrency(r.rate, r.toCurrency)}
                       </td>

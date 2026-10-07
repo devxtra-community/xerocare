@@ -19,15 +19,15 @@ export default function StatusBadge({ status, isOverdue }: Props) {
       className={cn(
         'px-2 py-1 text-sm rounded-md font-medium',
 
-        status === 'Active' && 'bg-emerald-100 text-emerald-800 border border-emerald-200',
-        status === 'Inactive' && 'bg-slate-100 text-slate-600 border border-border',
-        status === 'Paid' && 'bg-green-100 text-green-800',
-        status === 'Posted' && !isOverdue && 'bg-blue-100 text-blue-800',
-        status === 'Draft' && 'bg-gray-100 text-gray-800',
-        // status === 'Cancelled' && 'bg-red-100 text-red-700',
-        status === 'Posted' && isOverdue && 'bg-red-100 text-red-800',
-        status === 'Pending_Approval' && 'bg-yellow-100 text-yellow-800',
-        status === 'Approved' && 'bg-blue-100 text-blue-800',
+        status === 'Active' && 'bg-success/10 text-success border border-success/30',
+        status === 'Inactive' && 'bg-muted text-foreground border border-border',
+        status === 'Paid' && 'bg-success/10 text-success',
+        status === 'Posted' && !isOverdue && 'bg-primary/10 text-primary',
+        status === 'Draft' && 'bg-muted text-foreground',
+        // status === 'Cancelled' && 'bg-destructive/10 text-destructive',
+        status === 'Posted' && isOverdue && 'bg-destructive/10 text-destructive',
+        status === 'Pending_Approval' && 'bg-warning/10 text-warning',
+        status === 'Approved' && 'bg-primary/10 text-primary',
       )}
     >
       {isOverdue ? 'Overdue' : status.replace('_', ' ')}

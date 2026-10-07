@@ -100,12 +100,12 @@ export default function SalesSummaryTable({ selectedYear }: { selectedYear: numb
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by invoice, customer, or employee..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 border-blue-100 focus:border-blue-400 focus:ring-blue-50"
+            className="pl-9 h-10 border-primary/30 focus:border-primary/30 focus:ring-primary/30"
           />
         </div>
         <Select value={saleTypeFilter} onValueChange={setSaleTypeFilter}>
@@ -192,11 +192,11 @@ export default function SalesSummaryTable({ selectedYear }: { selectedYear: numb
                       variant={invoice.status === 'PAID' ? 'default' : 'secondary'}
                       className={`text-[10px] px-2 py-0.5 pointer-events-none ${
                         invoice.status === 'PAID'
-                          ? 'bg-green-100 text-green-700 hover:bg-green-100 border-green-200'
+                          ? 'bg-success/10 text-success hover:bg-success/10 border-success/30'
                           : invoice.status === 'PENDING'
-                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200'
+                            ? 'bg-warning/10 text-warning hover:bg-warning/10 border-warning/30'
                             : invoice.status === 'DRAFT'
-                              ? 'bg-gray-100 text-gray-700 hover:bg-gray-100 border-border'
+                              ? 'bg-muted text-foreground hover:bg-muted border-border'
                               : 'bg-primary/10 text-primary hover:bg-primary/15 border-primary/20'
                       }`}
                     >
@@ -212,7 +212,7 @@ export default function SalesSummaryTable({ selectedYear }: { selectedYear: numb
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
-                    <div className="bg-gray-100 p-3 rounded-full">
+                    <div className="bg-muted p-3 rounded-full">
                       <span className="text-2xl">🔍</span>
                     </div>
                     <p className="font-medium">No sales found</p>

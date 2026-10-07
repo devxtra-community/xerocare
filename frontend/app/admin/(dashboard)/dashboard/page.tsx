@@ -251,7 +251,7 @@ export default function Dashboard() {
       <div className="flex flex-col space-y-3 sm:space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+            <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
               Admin Dashboard
             </h3>
             <p className="text-sm text-muted-foreground font-medium">

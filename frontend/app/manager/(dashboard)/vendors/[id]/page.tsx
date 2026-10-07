@@ -94,7 +94,7 @@ export default function VendorProfilePage() {
 
   if (loading) {
     return (
-      <div className="bg-blue-100 min-h-screen flex items-center justify-center">
+      <div className="bg-card min-h-screen flex items-center justify-center">
         <div className="text-primary font-bold animate-pulse">Loading Vendor Details...</div>
       </div>
     );
@@ -102,7 +102,7 @@ export default function VendorProfilePage() {
 
   if (!vendor) {
     return (
-      <div className="bg-blue-100 min-h-screen flex items-center justify-center flex-col gap-4">
+      <div className="bg-card min-h-screen flex items-center justify-center flex-col gap-4">
         <div className="text-primary font-bold">Vendor not found</div>
         <Button onClick={() => router.back()}>Go Back</Button>
       </div>
@@ -113,7 +113,7 @@ export default function VendorProfilePage() {
   const bankAccounts = vendor.bankAccounts || [];
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* HEADER SECTION */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -121,7 +121,7 @@ export default function VendorProfilePage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 hover:bg-blue-200/50"
+              className="h-8 w-8 hover:bg-primary/10"
               onClick={() => router.back()}
             >
               <ArrowLeft className="h-5 w-5 text-primary" />
@@ -129,11 +129,11 @@ export default function VendorProfilePage() {
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-bold text-primary flex items-center gap-2 uppercase">
                 VENDOR DETAIL
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 uppercase font-bold">
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-success/10 text-success uppercase font-bold">
                   {vendor.status === 'ACTIVE' ? 'Active' : 'On Hold'}
                 </span>
               </h3>
-              <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">
+              <p className="text-xs text-primary font-medium uppercase tracking-wider">
                 {vendor.name}
               </p>
             </div>
@@ -142,13 +142,13 @@ export default function VendorProfilePage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-[11px] rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50 gap-1.5 font-semibold"
+              className="h-8 text-[11px] rounded-lg border-primary/30 text-primary hover:bg-primary/10 gap-1.5 font-semibold"
             >
               <Printer className="h-3.5 w-3.5" /> PRINT
             </Button>
             <Button
               size="sm"
-              className="h-8 text-[11px] rounded-lg bg-primary hover:bg-primary/90 text-white gap-1.5 font-semibold"
+              className="h-8 text-[11px] rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 font-semibold"
               onClick={() => setFormOpen(true)}
             >
               <Edit className="h-3.5 w-3.5" /> EDIT PROFILE
@@ -185,17 +185,17 @@ export default function VendorProfilePage() {
           {/* COLUMN 1: VENDOR INFO */}
           <div className="lg:col-span-1 flex flex-col gap-6">
             {/* General Info Card */}
-            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-primary/30 flex-1 flex flex-col">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-border pb-3 mb-4">
                 <User className="h-3.5 w-3.5 text-primary" /> Contact Profile
               </h3>
               <div className="space-y-4 flex-1">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <User className="h-4 w-4 text-blue-600" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <User className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                       Contact Person
                     </p>
                     <p className="text-xs font-semibold text-foreground">
@@ -204,33 +204,33 @@ export default function VendorProfilePage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <Phone className="h-4 w-4 text-blue-600" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Phone className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                       Phone
                     </p>
                     <p className="text-xs font-semibold text-foreground">{vendor.phone}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <Mail className="h-4 w-4 text-blue-600" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Mail className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                       Email
                     </p>
                     <p className="text-xs font-semibold text-foreground">{vendor.email}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <MapPin className="h-4 w-4 text-blue-600" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <MapPin className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                       Vendor Address
                     </p>
                     <p className="text-xs font-semibold text-foreground leading-relaxed">
@@ -240,23 +240,23 @@ export default function VendorProfilePage() {
                 </div>
                 {vendor.countryName && (
                   <div className="flex items-start gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <Globe className="h-4 w-4 text-blue-600" />
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Globe className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                         Country
                       </p>
                       <p className="text-xs font-semibold text-foreground">
                         {vendor.countryName}
                         {vendor.countryCode && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-mono">
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[10px] font-mono">
                             {vendor.countryCode}
                           </span>
                         )}
                       </p>
                       {currency && (
-                        <p className="text-[10px] text-blue-500 font-semibold mt-0.5">
+                        <p className="text-[10px] text-primary font-semibold mt-0.5">
                           Currency: {currency}
                         </p>
                       )}
@@ -267,12 +267,12 @@ export default function VendorProfilePage() {
             </div>
 
             {/* Business Details Card */}
-            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-primary/30 flex flex-col">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-border pb-3 mb-4">
                 <Building2 className="h-3.5 w-3.5 text-primary" /> Business & Tax
               </h3>
-              <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
-                <p className="text-[10px] text-blue-600 uppercase font-bold tracking-wider">
+              <div className="bg-primary/10 p-3 rounded-lg border border-primary/30">
+                <p className="text-[10px] text-primary uppercase font-bold tracking-wider">
                   GSTIN Number
                 </p>
                 <p className="text-sm font-bold text-primary">{vendor.gstin || 'N/A'}</p>
@@ -280,15 +280,15 @@ export default function VendorProfilePage() {
             </div>
 
             {/* Bank Accounts Card */}
-            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-primary/30 flex flex-col">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-border pb-3 mb-4">
                 <Landmark className="h-3.5 w-3.5 text-primary" /> Bank Accounts
-                <span className="ml-auto text-[10px] font-normal text-gray-400 normal-case">
+                <span className="ml-auto text-[10px] font-normal text-muted-foreground normal-case">
                   {bankAccounts.length} account{bankAccounts.length !== 1 ? 's' : ''}
                 </span>
               </h3>
               {bankAccounts.length === 0 ? (
-                <p className="text-xs text-gray-400 italic">
+                <p className="text-xs text-muted-foreground italic">
                   No bank accounts on file. Edit vendor to add.
                 </p>
               ) : (
@@ -298,21 +298,21 @@ export default function VendorProfilePage() {
                       type="button"
                       key={i}
                       onClick={() => setViewAccount(acc)}
-                      className={`w-full text-left p-3 rounded-xl border transition-colors hover:border-blue-300 ${acc.isPrimary ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 bg-gray-50/40'}`}
+                      className={`w-full text-left p-3 rounded-xl border transition-colors hover:border-primary/30 ${acc.isPrimary ? 'border-primary/30 bg-primary/10' : 'border-border bg-muted/40'}`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-foreground">{acc.bankName}</span>
                         {acc.isPrimary && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wide">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase tracking-wide">
                             Primary
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
-                      <p className="text-[11px] font-mono font-semibold text-gray-700 mt-0.5">
+                      <p className="text-[11px] text-muted-foreground">{acc.accountHolderName}</p>
+                      <p className="text-[11px] font-mono font-semibold text-foreground mt-0.5">
                         {acc.accountNumber}
                       </p>
-                      <p className="text-[10px] text-blue-500 font-semibold mt-1">
+                      <p className="text-[10px] text-primary font-semibold mt-1">
                         View full details →
                       </p>
                     </button>
@@ -324,8 +324,8 @@ export default function VendorProfilePage() {
 
           {/* COLUMN 2 & 3: TRANSACTION HISTORY */}
           <div className="lg:col-span-2">
-            <div className="bg-card rounded-xl shadow-sm border border-blue-100/30 h-full flex flex-col overflow-hidden text-primary uppercase">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 p-4 border-b border-gray-50 flex-none bg-card">
+            <div className="bg-card rounded-xl shadow-sm border border-primary/30 h-full flex flex-col overflow-hidden text-primary uppercase">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 p-4 border-b border-border flex-none bg-card">
                 <Clock className="h-3.5 w-3.5 text-primary" /> Request History
               </h3>
               <div className="flex-1 overflow-auto">
@@ -373,7 +373,7 @@ export default function VendorProfilePage() {
           {viewAccount && (
             <div className="space-y-3 text-sm">
               {viewAccount.isPrimary && (
-                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wide">
+                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase tracking-wide">
                   Primary Account
                 </span>
               )}
@@ -393,9 +393,9 @@ export default function VendorProfilePage() {
                 .map(([label, value]) => (
                   <div
                     key={label}
-                    className="flex justify-between gap-4 border-b border-gray-50 pb-2"
+                    className="flex justify-between gap-4 border-b border-border pb-2"
                   >
-                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                       {label}
                     </span>
                     <span className="text-xs font-semibold font-mono text-foreground text-right">

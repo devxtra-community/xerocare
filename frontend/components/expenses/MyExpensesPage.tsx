@@ -70,27 +70,27 @@ const CATEGORIES = [
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PENDING: {
     label: 'Draft',
-    color: 'bg-gray-100 text-gray-700 border-gray-200',
+    color: 'bg-muted text-foreground border-border',
     icon: <Clock className="h-3 w-3" />,
   },
   SUBMITTED: {
     label: 'Awaiting Approval',
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
+    color: 'bg-primary/10 text-primary border-primary/30',
     icon: <Send className="h-3 w-3" />,
   },
   APPROVED: {
     label: 'Approved',
-    color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    color: 'bg-success/10 text-success border-success/30',
     icon: <CheckCircle2 className="h-3 w-3" />,
   },
   REJECTED: {
     label: 'Rejected',
-    color: 'bg-red-100 text-red-700 border-red-200',
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
     icon: <XCircle className="h-3 w-3" />,
   },
   PAID: {
     label: 'Paid',
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
+    color: 'bg-lease/10 text-lease border-lease/30',
     icon: <Banknote className="h-3 w-3" />,
   },
 };
@@ -175,20 +175,20 @@ function ExpenseFormModal({
   const isSubmittable = form.description?.length >= 10 && Number(form.amount) > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="font-bold text-slate-800 text-lg">
+          <h2 className="font-bold text-foreground text-lg">
             {isEditing ? 'Edit Expense Request' : 'Add Expense Request'}
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {isEditing && expense?.status !== 'PENDING' && (
           <div className="px-6 pt-4">
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-700 text-sm">
+            <div className="flex items-center gap-2 bg-warning/10 border border-warning/30 rounded-lg p-3 text-warning text-sm">
               <AlertCircle className="h-4 w-4 shrink-0" />
               Once submitted, you cannot edit this expense
             </div>
@@ -251,7 +251,7 @@ function ExpenseFormModal({
               placeholder="Describe what this expense was for and why it was needed"
             />
             {form.description && form.description.length < 10 && (
-              <p className="text-xs text-red-500 mt-1">Min 10 characters required</p>
+              <p className="text-xs text-destructive mt-1">Min 10 characters required</p>
             )}
           </div>
 
@@ -342,36 +342,36 @@ function ViewExpenseModal({
   const cfg = STATUS_CONFIG[expense.status] ?? STATUS_CONFIG.PENDING;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div>
-            <h2 className="font-bold text-slate-800">Expense Request</h2>
+            <h2 className="font-bold text-foreground">Expense Request</h2>
             <p className="text-xs text-muted-foreground">{expense.requestNo}</p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="px-6 py-4 space-y-4 overflow-y-auto">
           {expense.status === 'REJECTED' && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 text-red-700 font-semibold mb-1">
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-destructive font-semibold mb-1">
                 <XCircle className="h-4 w-4" />
                 Rejected
                 {expense.reviewedByName && ` by ${expense.reviewedByName}`}
                 {expense.reviewedAt && ` on ${new Date(expense.reviewedAt).toLocaleDateString()}`}
               </div>
               {expense.rejectionReason && (
-                <p className="text-red-600 text-sm">Reason: {expense.rejectionReason}</p>
+                <p className="text-destructive text-sm">Reason: {expense.rejectionReason}</p>
               )}
             </div>
           )}
 
           {expense.status === 'APPROVED' && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+            <div className="bg-success/10 border border-success/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-success font-semibold">
                 <CheckCircle2 className="h-4 w-4" />
                 Approved
                 {expense.reviewedByName && ` by ${expense.reviewedByName}`}
@@ -381,8 +381,8 @@ function ViewExpenseModal({
           )}
 
           {expense.status === 'PAID' && (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 text-purple-700 font-semibold">
+            <div className="bg-lease/10 border border-lease/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-lease font-semibold">
                 <Banknote className="h-4 w-4" />
                 Paid on {expense.paidAt ? new Date(expense.paidAt).toLocaleDateString() : 'N/A'}
                 {expense.paymentReference && ` — Reference: ${expense.paymentReference}`}
@@ -412,7 +412,7 @@ function ViewExpenseModal({
             </div>
             <div>
               <span className="text-xs font-medium text-muted-foreground">Amount</span>
-              <p className="font-bold text-red-600">
+              <p className="font-bold text-destructive">
                 {formatCurrency(Number(expense.amount), expense.currency)}
               </p>
             </div>
@@ -424,12 +424,12 @@ function ViewExpenseModal({
             )}
             <div className="col-span-2">
               <span className="text-xs font-medium text-muted-foreground">Description</span>
-              <p className="text-slate-700">{expense.description}</p>
+              <p className="text-foreground">{expense.description}</p>
             </div>
             {expense.notes && (
               <div className="col-span-2">
                 <span className="text-xs font-medium text-muted-foreground">Notes</span>
-                <p className="text-slate-600 text-sm">{expense.notes}</p>
+                <p className="text-foreground text-sm">{expense.notes}</p>
               </div>
             )}
             {expense.receiptUrl && (
@@ -469,7 +469,7 @@ function ViewExpenseModal({
                 onClose();
                 onResubmit(expense);
               }}
-              className="bg-blue-600 text-white"
+              className="bg-primary text-primary-foreground"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
               Re-submit as New
@@ -495,14 +495,14 @@ function SubmitConfirmDialog({
   loading: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <Send className="h-5 w-5 text-blue-600" />
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Send className="h-5 w-5 text-primary" />
             </div>
-            <h3 className="font-bold text-slate-800">Submit this expense?</h3>
+            <h3 className="font-bold text-foreground">Submit this expense?</h3>
           </div>
           <p className="text-sm text-muted-foreground">
             Once submitted, you cannot edit it until the Finance Manager reviews it.
@@ -510,7 +510,7 @@ function SubmitConfirmDialog({
           <div className="bg-muted/40 rounded-xl p-3 space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Amount</span>
-              <span className="font-bold text-red-600">
+              <span className="font-bold text-destructive">
                 {formatCurrency(Number(expense.amount), expense.currency)}
               </span>
             </div>
@@ -635,11 +635,13 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
   }
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">My Expenses</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            My Expenses
+          </h3>
           <p className="text-muted-foreground">Submit and track your expense requests</p>
         </div>
         <Button
@@ -684,7 +686,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -726,7 +728,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <Table pagination={{ pageSize: 10 }}>
           <TableHeader className="bg-muted/40">
             <TableRow>
@@ -772,13 +774,13 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
                 return (
                   <TableRow
                     key={r.id}
-                    className="hover:bg-blue-50/50 transition-colors cursor-pointer"
+                    className="hover:bg-primary/10 transition-colors cursor-pointer"
                     onClick={() => setViewing(r)}
                   >
                     <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
                       {r.date?.slice(0, 10)}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                    <TableCell className="font-mono text-xs text-primary font-bold">
                       {r.requestNo || '—'}
                     </TableCell>
                     <TableCell className="text-xs font-medium">
@@ -787,7 +789,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
                     <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
                       {r.description}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-red-600">
+                    <TableCell className="text-right font-bold text-destructive">
                       {formatCurrency(Number(r.amount), r.currency)}
                     </TableCell>
                     <TableCell>
@@ -802,7 +804,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setViewing(r)}
-                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
                           title="View"
                         >
                           <Eye className="h-3.5 w-3.5" />
@@ -814,14 +816,14 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
                                 setEditing(r);
                                 setShowModal(true);
                               }}
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                              className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                               title="Edit"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => setConfirmSubmit(r)}
-                              className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                              className="p-1.5 rounded-md hover:bg-success/10 text-success"
                               title="Submit for approval"
                             >
                               <Send className="h-3.5 w-3.5" />
@@ -830,7 +832,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
                               onClick={() => {
                                 if (confirm('Delete this expense?')) deleteMut.mutate(r.id);
                               }}
-                              className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                              className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                               title="Delete"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -840,7 +842,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
                         {r.status === 'REJECTED' && (
                           <button
                             onClick={() => handleResubmit(r)}
-                            className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                            className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                             title="Re-submit as new"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />

@@ -55,7 +55,7 @@ export default function APDueTable() {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold">Upcoming Payables</CardTitle>
         <Link href="/finance/ap/invoices">
-          <Button variant="ghost" size="sm" className="text-sm text-blue-600 hover:text-blue-700">
+          <Button variant="ghost" size="sm" className="text-sm text-primary hover:text-primary">
             View All <ArrowRight className="ml-2 h-3 w-3" />
           </Button>
         </Link>
@@ -79,10 +79,10 @@ export default function APDueTable() {
               const overdue = isOverdue(inv.dueDate);
 
               return (
-                <TableRow key={inv.id} className="hover:bg-blue-50/50 transition-colors">
-                  <TableCell className="font-semibold text-slate-800">{vendor?.name}</TableCell>
+                <TableRow key={inv.id} className="hover:bg-primary/10 transition-colors">
+                  <TableCell className="font-semibold text-foreground">{vendor?.name}</TableCell>
 
-                  <TableCell className="text-muted-foreground hover:text-blue-600 cursor-pointer">
+                  <TableCell className="text-muted-foreground hover:text-primary cursor-pointer">
                     <Link
                       href={`/finance/ap/invoices/${inv.id}`}
                       className="underline-offset-2 hover:underline"
@@ -91,7 +91,7 @@ export default function APDueTable() {
                     </Link>
                   </TableCell>
 
-                  <TableCell className={overdue ? 'text-rose-600 font-bold' : 'text-slate-600'}>
+                  <TableCell className={overdue ? 'text-destructive font-bold' : 'text-foreground'}>
                     {formatDate(inv.dueDate)}
                   </TableCell>
 
@@ -102,7 +102,7 @@ export default function APDueTable() {
                   <TableCell>
                     <Badge
                       variant={overdue ? 'destructive' : 'secondary'}
-                      className={`text-xs font-semibold ${overdue ? 'bg-rose-100 text-rose-800' : 'bg-green-100 text-green-800'}`}
+                      className={`text-xs font-semibold ${overdue ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}`}
                     >
                       {overdue ? 'Overdue' : 'Pending'}
                     </Badge>

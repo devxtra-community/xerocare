@@ -41,11 +41,11 @@ export default function InvoiceViewPage() {
   const customer = arCustomers.find((c) => c.id === invoice.customerId);
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 bg-muted/50/30 min-h-screen">
+    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 bg-muted/50 min-h-screen">
       {/* Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-card/80 backdrop-blur sticky top-0 z-10 p-4 border rounded-xl shadow-sm">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
+          <h1 className="text-xl font-medium tracking-tight text-foreground">
             {invoice.invoiceNumber}
           </h1>
           <p className="text-xs text-muted-foreground">Issued: {invoice.issueDate}</p>
@@ -61,7 +61,7 @@ export default function InvoiceViewPage() {
           {invoice.status === 'Draft' && (
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-success hover:bg-success/90 text-success-foreground"
               onClick={() => router.push(`/finance/ar/invoices/${invoice.id}/post`)}
             >
               <FileCheck className="w-4 h-4 mr-2" /> Post to GL
@@ -69,7 +69,7 @@ export default function InvoiceViewPage() {
           )}
 
           {invoice.balanceDue > 0 && (
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <CreditCard className="w-4 h-4 mr-2" /> Record Payment
             </Button>
           )}
@@ -81,9 +81,9 @@ export default function InvoiceViewPage() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-card border shadow-sm rounded-2xl overflow-hidden">
             {/* Header Branding */}
-            <div className="p-8 border-b bg-muted/50/50 flex justify-between items-start">
+            <div className="p-8 border-b bg-muted/50 flex justify-between items-start">
               <div className="space-y-1">
-                <div className="text-2xl font-black tracking-tighter text-blue-600">
+                <div className="text-2xl font-black tracking-tighter text-primary">
                   Sales Invoice
                 </div>
                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
@@ -104,7 +104,7 @@ export default function InvoiceViewPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1">
                     <User className="w-3 h-3" /> Bill To
                   </label>
                   <div className="mt-2 space-y-1">
@@ -116,7 +116,7 @@ export default function InvoiceViewPage() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-xl border border-slate-100">
+              <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-xl border border-border">
                 <DetailItem label="Currency" value={invoice.currency} />
                 <DetailItem label="Terms" value="Net 30" />
                 <DetailItem label="Due Date" value={invoice.dueDate} />
@@ -125,9 +125,9 @@ export default function InvoiceViewPage() {
             </div>
 
             {/* Itemized Table */}
-            <div className="px-1 border-t border-slate-100">
+            <div className="px-1 border-t border-border">
               <Table>
-                <TableHeader className="bg-muted/50/50">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="pl-8 text-[11px] uppercase font-bold">
                       Item & Mode
@@ -144,7 +144,7 @@ export default function InvoiceViewPage() {
                   {invoice.lines.map((line) => {
                     const product = products.find((p) => p.id === line.productId);
                     return (
-                      <TableRow key={line.id} className="hover:bg-muted/50/30 border-slate-100">
+                      <TableRow key={line.id} className="hover:bg-muted/50 border-border">
                         <TableCell className="pl-8 py-4">
                           <div className="font-bold text-foreground">
                             {product?.name || line.description}
@@ -153,7 +153,7 @@ export default function InvoiceViewPage() {
                             {product?.code} • {product?.mode}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right text-sm text-slate-600">
+                        <TableCell className="text-right text-sm text-foreground">
                           {product?.mode === 'Sell' ? (
                             `${line.qty} Units @ ${line.rate}`
                           ) : (
@@ -176,7 +176,7 @@ export default function InvoiceViewPage() {
             </div>
 
             {/* Financial Footer */}
-            <div className="p-8 border-t border-slate-100 bg-muted/50/30 flex justify-end">
+            <div className="p-8 border-t border-border bg-muted/50 flex justify-end">
               <div className="w-full max-w-[240px] space-y-3">
                 <SummaryRow
                   label="Subtotal"
@@ -186,7 +186,7 @@ export default function InvoiceViewPage() {
                 <SummaryRow label="Tax (0%)" value={0} currency={invoice.currency} />
                 <div className="flex justify-between items-center pt-3 border-t-2 border-border">
                   <span className="text-sm font-black uppercase tracking-tighter">Total </span>
-                  <span className="text-xl font-black text-blue-600">
+                  <span className="text-xl font-black text-primary">
                     {invoice.currency} {invoice.totalAmount.toLocaleString()}
                   </span>
                 </div>
@@ -197,9 +197,9 @@ export default function InvoiceViewPage() {
 
         {/* Sidebar Info */}
         <div className="space-y-6">
-          <Card className="border-none shadow-sm ring-1 ring-slate-200">
+          <Card className="border-none shadow-sm ring-1 ring-ring">
             <CardContent className="p-6 space-y-4">
-              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b pb-2">
+              <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-widest border-b pb-2">
                 Timeline
               </h3>
               <DetailItem
@@ -209,14 +209,14 @@ export default function InvoiceViewPage() {
                 horizontal
               />
               <DetailItem
-                icon={<Calendar className="w-3.5 h-3.5 text-blue-500" />}
+                icon={<Calendar className="w-3.5 h-3.5 text-primary" />}
                 label="Due Date"
                 value={invoice.dueDate}
                 horizontal
               />
             </CardContent>
           </Card>
-          {/* <Card className="border-none shadow-sm ring-1 ring-slate-200">
+          {/* <Card className="border-none shadow-sm ring-1 ring-ring">
                         <CardContent className="p-6 space-y-4 text-center">
                             <p className="text-xs text-muted-foreground italic">Please quote {invoice.invoiceNumber} in all payment communications.</p>
                         </CardContent>
@@ -243,7 +243,7 @@ function DetailItem({
   if (horizontal)
     return (
       <div className="flex justify-between items-center">
-        <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
           {icon}
           {label}
         </span>
@@ -252,7 +252,7 @@ function DetailItem({
     );
   return (
     <div className="space-y-0.5">
-      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+      <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1">
         {icon}
         {label}
       </label>

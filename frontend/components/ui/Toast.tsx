@@ -22,27 +22,27 @@ export function Toast({ message, type, onClose }: ToastProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white font-medium text-sm transition-all duration-300 transform animate-slide-in-right',
+        'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-primary-foreground font-medium text-sm transition-all duration-300 transform animate-slide-in-right',
         type === 'success'
-          ? 'bg-green-600 border border-green-500'
-          : 'bg-red-600 border border-red-500',
+          ? 'bg-success border border-success'
+          : 'bg-destructive border border-destructive',
       )}
     >
       <div className="flex-shrink-0">
         {type === 'success' ? (
-          <span className="inline-flex items-center justify-center size-5 bg-white/20 rounded-full">
-            <Check className="size-3.5 text-white" />
+          <span className="inline-flex items-center justify-center size-5 bg-card rounded-full">
+            <Check className="size-3.5 text-primary-foreground" />
           </span>
         ) : (
-          <span className="inline-flex items-center justify-center size-5 bg-white/20 rounded-full">
-            <AlertCircle className="size-3.5 text-white" />
+          <span className="inline-flex items-center justify-center size-5 bg-card rounded-full">
+            <AlertCircle className="size-3.5 text-primary-foreground" />
           </span>
         )}
       </div>
       <div className="flex-grow">{message}</div>
       <button
         onClick={onClose}
-        className="flex-shrink-0 text-white/70 hover:text-white hover:bg-white/10 rounded-full p-0.5 transition-colors focus:outline-none"
+        className="flex-shrink-0 text-primary-foreground hover:text-primary-foreground hover:bg-card rounded-full p-0.5 transition-colors focus:outline-none"
       >
         <X className="size-4" />
       </button>

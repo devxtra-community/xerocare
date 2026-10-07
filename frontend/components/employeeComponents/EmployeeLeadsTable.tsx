@@ -117,31 +117,31 @@ export default function EmployeeLeadsTable() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'Hot':
-        return 'bg-red-100 text-red-600 hover:bg-red-200';
+        return 'bg-destructive/10 text-destructive hover:bg-destructive/10';
       case 'Warm':
-        return 'bg-orange-100 text-orange-600 hover:bg-orange-200';
+        return 'bg-warning/10 text-warning hover:bg-warning/10';
       case 'Cold':
-        return 'bg-blue-100 text-blue-600 hover:bg-blue-50/20';
+        return 'bg-primary/10 text-primary hover:bg-primary/10';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-muted text-foreground';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new':
-        return 'bg-purple-100 text-purple-600 hover:bg-purple-200';
+        return 'bg-lease/10 text-lease hover:bg-lease/10';
       case 'contacted':
-        return 'bg-blue-100 text-blue-600 hover:bg-blue-50/20';
+        return 'bg-primary/10 text-primary hover:bg-primary/10';
       case 'qualified':
       case 'Follow-up':
-        return 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200';
+        return 'bg-warning/10 text-warning hover:bg-warning/10';
       case 'converted':
-        return 'bg-green-100 text-green-600 hover:bg-green-200';
+        return 'bg-success/10 text-success hover:bg-success/10';
       case 'lost':
-        return 'bg-red-100 text-red-600 hover:bg-red-200';
+        return 'bg-destructive/10 text-destructive hover:bg-destructive/10';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -160,20 +160,20 @@ export default function EmployeeLeadsTable() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-primary">Leads Management</h2>
+        <h2 className="text-xl font-medium text-primary">Leads Management</h2>
         <Button onClick={handleAddClick} className="gap-2 bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4" /> Add Lead
         </Button>
       </div>
 
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Leads
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search leads..."
                 value={search}
@@ -183,11 +183,11 @@ export default function EmployeeLeadsTable() {
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Filter by Source
             </label>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Sources" />
               </SelectTrigger>
               <SelectContent>
@@ -199,7 +199,7 @@ export default function EmployeeLeadsTable() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Status Filter
             </label>
             <Button
@@ -243,7 +243,7 @@ export default function EmployeeLeadsTable() {
                 </TableRow>
               ) : (
                 paginatedLeads.map((lead, index) => (
-                  <TableRow key={lead._id} className={index % 2 ? 'bg-blue-50/20' : 'bg-card'}>
+                  <TableRow key={lead._id} className={index % 2 ? 'bg-primary/10' : 'bg-card'}>
                     <TableCell className="font-bold text-primary">
                       <div className="flex flex-col">
                         <span>{lead.name}</span>
@@ -255,7 +255,7 @@ export default function EmployeeLeadsTable() {
                         {lead.isCustomer && (
                           <Badge
                             variant="outline"
-                            className="w-fit text-[10px] mt-1 border-green-500 text-green-700 bg-green-50 flex gap-1 items-center"
+                            className="w-fit text-[10px] mt-1 border-success text-success bg-success/10 flex gap-1 items-center"
                           >
                             <CheckCircle size={10} /> CUSTOMER
                           </Badge>
@@ -289,7 +289,7 @@ export default function EmployeeLeadsTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           onClick={() => handleEditClick(lead)}
                           title="Edit Lead"
                         >
@@ -299,7 +299,7 @@ export default function EmployeeLeadsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           >
                             <Phone className="h-4 w-4" />
                           </Button>
@@ -308,7 +308,7 @@ export default function EmployeeLeadsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           >
                             <Mail className="h-4 w-4" />
                           </Button>
@@ -317,7 +317,7 @@ export default function EmployeeLeadsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleDeleteClick(lead._id)}
                             title="Delete Lead"
                           >

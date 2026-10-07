@@ -140,29 +140,29 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
             aria-label={`Filter by branch. Currently: ${label}`}
             className={cn(
               'group flex min-h-[44px] max-w-[280px] touch-manipulation items-center gap-2.5 rounded-xl border px-3.5 py-2 text-sm shadow-sm transition-all',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
               open
-                ? 'border-blue-400 bg-blue-50/60 ring-2 ring-blue-500/20'
-                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100',
+                ? 'border-primary/30 bg-primary/10 ring-2 ring-primary/20'
+                : 'border-border bg-card hover:border-border hover:bg-muted active:bg-muted',
             )}
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary/10">
               <Building2 className="h-4 w-4" />
             </span>
             <span className="flex min-w-0 flex-col items-start leading-tight">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Branch
               </span>
-              <span className="max-w-[180px] truncate font-semibold text-slate-800">{label}</span>
+              <span className="max-w-[180px] truncate font-semibold text-foreground">{label}</span>
             </span>
             {selected.length > 1 && (
-              <span className="ml-0.5 shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-bold text-white">
+              <span className="ml-0.5 shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
                 {selected.length}
               </span>
             )}
             <ChevronDown
               className={cn(
-                'h-4 w-4 shrink-0 text-slate-400 transition-transform',
+                'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
                 open && 'rotate-180',
               )}
             />
@@ -174,11 +174,11 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
         <PopoverContent
           align="end"
           sideOffset={6}
-          className="z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border-slate-200 p-0 shadow-2xl"
+          className="z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border-border p-0 shadow-2xl"
         >
           {/* Search */}
-          <div className="flex items-center gap-2.5 border-b border-slate-100 bg-slate-50/70 px-3.5 py-3">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <div className="flex items-center gap-2.5 border-b border-border bg-muted/70 px-3.5 py-3">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               ref={searchRef}
               value={query}
@@ -186,7 +186,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
               placeholder="Search branches..."
               aria-label="Search branches"
               autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:font-normal placeholder:text-slate-400"
+              className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground"
             />
             {query && (
               <button
@@ -196,7 +196,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
                   searchRef.current?.focus();
                 }}
                 aria-label="Clear search"
-                className="flex h-6 w-6 shrink-0 touch-manipulation items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                className="flex h-6 w-6 shrink-0 touch-manipulation items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -212,24 +212,24 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
               className={cn(
                 'flex min-h-[44px] w-full touch-manipulation items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
                 allDraftSelected
-                  ? 'bg-blue-50 font-semibold text-blue-700'
-                  : 'font-medium text-slate-600 hover:bg-slate-50 active:bg-slate-100',
+                  ? 'bg-primary/10 font-semibold text-primary'
+                  : 'font-medium text-foreground hover:bg-muted active:bg-muted',
               )}
             >
               <span>All Branches</span>
-              {allDraftSelected && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
+              {allDraftSelected && <Check className="h-4 w-4 shrink-0 text-primary" />}
             </button>
 
-            <div className="my-1.5 border-t border-slate-100" />
+            <div className="my-1.5 border-t border-border" />
 
             {isLoading ? (
               <div className="space-y-1.5 p-1.5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-11 animate-pulse rounded-xl bg-slate-100" />
+                  <div key={i} className="h-11 animate-pulse rounded-xl bg-muted" />
                 ))}
               </div>
             ) : filtered.length === 0 ? (
-              <p className="px-3 py-8 text-center text-sm text-slate-400">
+              <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                 {branches.length === 0 ? 'No branches available.' : `No match for “${query}”.`}
               </p>
             ) : (
@@ -245,15 +245,15 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
                     onClick={() => toggleDraft(b.id)}
                     className={cn(
                       'flex min-h-[44px] w-full touch-manipulation items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors',
-                      checked ? 'bg-blue-50/70' : 'hover:bg-slate-50 active:bg-slate-100',
+                      checked ? 'bg-primary/10' : 'hover:bg-muted active:bg-muted',
                     )}
                   >
                     <span
                       className={cn(
                         'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
                         checked
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-slate-300 bg-white',
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-card',
                       )}
                     >
                       {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
@@ -262,14 +262,14 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
                       <span
                         className={cn(
                           'truncate text-sm font-semibold',
-                          checked ? 'text-blue-800' : 'text-slate-700',
+                          checked ? 'text-primary' : 'text-foreground',
                         )}
                         title={b.name}
                       >
                         {b.name}
                       </span>
                       {subtitle && (
-                        <span className="truncate text-[11px] font-medium text-slate-400">
+                        <span className="truncate text-[11px] font-medium text-muted-foreground">
                           {subtitle}
                         </span>
                       )}
@@ -281,8 +281,8 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/70 px-3 py-2.5">
-            <span className="text-xs font-medium text-slate-500">
+          <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/70 px-3 py-2.5">
+            <span className="text-xs font-medium text-muted-foreground">
               {draft.length === 0 ? 'All branches' : `${draft.length} selected`}
             </span>
             <div className="flex items-center gap-1.5">
@@ -290,7 +290,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
                 type="button"
                 onClick={() => setDraft([])}
                 disabled={draft.length === 0}
-                className="min-h-[36px] touch-manipulation rounded-lg px-3 text-xs font-semibold text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent"
+                className="min-h-[36px] touch-manipulation rounded-lg px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
               >
                 Reset
               </button>
@@ -300,7 +300,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
                   commit(draft);
                   setOpen(false);
                 }}
-                className="min-h-[36px] touch-manipulation rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800"
+                className="min-h-[36px] touch-manipulation rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary"
               >
                 Apply
               </button>
@@ -316,7 +316,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
           type="button"
           onClick={() => commit(selected.filter((id) => id !== b.id))}
           aria-label={`Remove ${b.name} filter`}
-          className="flex min-h-[32px] max-w-[200px] touch-manipulation items-center gap-1.5 rounded-full bg-blue-100 pl-3 pr-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-200 active:bg-blue-300"
+          className="flex min-h-[32px] max-w-[200px] touch-manipulation items-center gap-1.5 rounded-full bg-primary/10 pl-3 pr-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 active:bg-primary/20"
         >
           <span className="truncate" title={b.name}>
             {b.name}
@@ -329,7 +329,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
         <button
           type="button"
           onClick={() => commit([])}
-          className="min-h-[32px] touch-manipulation rounded-full px-2.5 text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
+          className="min-h-[32px] touch-manipulation rounded-full px-2.5 text-xs font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
         >
           Clear all
         </button>
@@ -337,8 +337,8 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
 
       {/* ── Period picker ─────────────────────────────────────────────── */}
       {showPeriod && (
-        <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/20 hover:border-slate-300">
-          <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+        <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm shadow-sm focus-within:border-warning/30 focus-within:ring-2 focus-within:ring-warning/30 hover:border-border">
+          <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Select
             value={period}
             onValueChange={(v) => {
@@ -348,7 +348,7 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
           >
             <SelectTrigger
               aria-label="Reporting period"
-              className="h-auto gap-1 border-0 bg-transparent p-0 font-semibold text-slate-700 shadow-none focus-visible:ring-0"
+              className="h-auto gap-1 border-0 bg-transparent p-0 font-semibold text-foreground shadow-none focus-visible:ring-0"
             >
               <SelectValue />
             </SelectTrigger>
@@ -368,9 +368,9 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
         <button
           type="button"
           onClick={onExport}
-          className="ml-auto flex min-h-[44px] touch-manipulation items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100"
+          className="ml-auto flex min-h-[44px] touch-manipulation items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted active:bg-muted"
         >
-          <Download className="h-4 w-4 text-slate-400" /> Export All
+          <Download className="h-4 w-4 text-muted-foreground" /> Export All
         </button>
       )}
     </div>

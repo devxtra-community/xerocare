@@ -7,11 +7,11 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 const apAgingData = [
-  { bucket: 'Current', amount: 38000, color: 'bg-indigo-600', percentage: 63 },
-  { bucket: '1–30 Days', amount: 12000, color: 'bg-indigo-400', percentage: 20 },
-  { bucket: '31–60 Days', amount: 6400, color: 'bg-slate-400', percentage: 10 },
-  { bucket: '61–90 Days', amount: 2900, color: 'bg-slate-300', percentage: 5 },
-  { bucket: '90+ Days', amount: 1100, color: 'bg-rose-400', percentage: 2 },
+  { bucket: 'Current', amount: 38000, color: 'bg-primary', percentage: 63 },
+  { bucket: '1–30 Days', amount: 12000, color: 'bg-primary/20', percentage: 20 },
+  { bucket: '31–60 Days', amount: 6400, color: 'bg-muted', percentage: 10 },
+  { bucket: '61–90 Days', amount: 2900, color: 'bg-muted', percentage: 5 },
+  { bucket: '90+ Days', amount: 1100, color: 'bg-destructive/20', percentage: 2 },
 ];
 
 /**
@@ -28,10 +28,10 @@ export default function APDueAgingChart() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-card rounded-lg  border-border shadow-sm">
-              <Wallet className="w-4 h-4 text-indigo-600" />
+              <Wallet className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold text-slate-700">
+              <CardTitle className="text-sm font-semibold text-foreground">
                 Accounts Payable
               </CardTitle>
               <CardDescription className="text-xs">Scheduled outflows by age</CardDescription>
@@ -56,7 +56,7 @@ export default function APDueAgingChart() {
                     {item.bucket}
                   </span>
                   {item.bucket === '90+ Days' && (
-                    <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded font-bold">
+                    <span className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-bold">
                       CRITICAL
                     </span>
                   )}
@@ -65,12 +65,12 @@ export default function APDueAgingChart() {
                   <span className="text-sm font-bold text-foreground tabular-nums">
                     {formatCurrency(item.amount, currency)}
                   </span>
-                  <span className="text-xs text-slate-400 ml-2">({item.percentage}%)</span>
+                  <span className="text-xs text-muted-foreground ml-2">({item.percentage}%)</span>
                 </div>
               </div>
 
               {/* Modern Slim Progress Bar */}
-              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full ${item.color} transition-all duration-500 ease-in-out`}
                   style={{ width: `${item.percentage}%` }}
@@ -81,22 +81,20 @@ export default function APDueAgingChart() {
         </div>
 
         {/* 2026 Insights Footer */}
-        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-slate-400" />
+            <Clock className="w-4 h-4 text-muted-foreground" />
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-bold">
                 Avg. Pay Cycle
               </p>
-              <p className="text-sm font-bold text-slate-800">22 Days</p>
+              <p className="text-sm font-bold text-foreground">22 Days</p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-muted-foreground uppercase font-bold">Priority to Pay</p>
             <Link href="/finance/ap/invoices">
-              <p className="text-sm font-bold text-indigo-600 underline cursor-pointer">
-                3 Vendors
-              </p>
+              <p className="text-sm font-bold text-primary underline cursor-pointer">3 Vendors</p>
             </Link>
           </div>
         </div>

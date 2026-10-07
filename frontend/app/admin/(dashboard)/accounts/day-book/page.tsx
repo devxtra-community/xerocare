@@ -149,7 +149,7 @@ function DayBookContent() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Tabs defaultValue="cash" className="w-full space-y-4">
-        <TabsList className="bg-card border text-slate-600">
+        <TabsList className="bg-card border text-foreground">
           <TabsTrigger value="cash">Cash Journal</TabsTrigger>
           <TabsTrigger value="activity">Branch Activity</TabsTrigger>
         </TabsList>
@@ -201,7 +201,7 @@ function DayBookContent() {
               <Button
                 onClick={exportExcel}
                 disabled={days.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                className="bg-success hover:bg-success/90 text-success-foreground gap-2"
               >
                 <Download className="h-4 w-4" /> Export Excel
               </Button>
@@ -209,7 +209,7 @@ function DayBookContent() {
           </div>
 
           {!isSingleBranch && (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700">
+            <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-2.5 text-sm text-warning">
               Reversal actions are disabled when viewing multiple branches. Select a single branch
               to enable reversals.
             </div>
@@ -220,11 +220,11 @@ function DayBookContent() {
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : isError ? (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center space-y-3">
-              <p className="text-red-700 font-medium">Failed to load day book data.</p>
+            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center space-y-3">
+              <p className="text-destructive font-medium">Failed to load day book data.</p>
               <button
                 onClick={() => refetch()}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+                className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
               >
                 Retry
               </button>
@@ -255,7 +255,7 @@ function DayBookContent() {
               </div>
 
               {days.length === 0 ? (
-                <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-12 text-center">
+                <div className="rounded-2xl bg-card shadow-sm border border-border p-12 text-center">
                   <p className="text-muted-foreground">No transactions in this period.</p>
                 </div>
               ) : (
@@ -263,11 +263,11 @@ function DayBookContent() {
                   {days.map((day) => (
                     <div
                       key={day.date}
-                      className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden"
+                      className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden"
                     >
-                      <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+                      <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3 bg-muted/60">
                         <div>
-                          <h3 className="font-bold text-slate-800 text-base">
+                          <h3 className="font-bold text-foreground text-base">
                             {fmtDate(day.date)}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -275,14 +275,14 @@ function DayBookContent() {
                           </p>
                         </div>
                         <div className="flex items-center gap-6 text-sm">
-                          <span className="text-emerald-600 font-semibold">
+                          <span className="text-success font-semibold">
                             + {formatCurrency(day.totalReceipts, currency)}
                           </span>
-                          <span className="text-red-600 font-semibold">
+                          <span className="text-destructive font-semibold">
                             − {formatCurrency(day.totalPayments, currency)}
                           </span>
                           <span
-                            className={`font-bold ${day.net >= 0 ? 'text-slate-800' : 'text-red-600'}`}
+                            className={`font-bold ${day.net >= 0 ? 'text-foreground' : 'text-destructive'}`}
                           >
                             Net {formatCurrency(day.net, currency)}
                           </span>
@@ -305,41 +305,41 @@ function DayBookContent() {
                             {day.entries.map((e) => (
                               <tr
                                 key={e.id}
-                                className={`border-b border-border/60 hover:bg-slate-50/60 ${e.isReversed ? 'opacity-50' : ''}`}
+                                className={`border-b border-border/60 hover:bg-muted/60 ${e.isReversed ? 'opacity-50' : ''}`}
                               >
-                                <td className="px-6 py-2.5 font-medium text-slate-700">
+                                <td className="px-6 py-2.5 font-medium text-foreground">
                                   <span className="inline-flex items-center gap-1.5">
                                     {e.entryType === 'RECEIPT' ? (
-                                      <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600" />
+                                      <ArrowDownLeft className="h-3.5 w-3.5 text-success" />
                                     ) : (
-                                      <ArrowUpRight className="h-3.5 w-3.5 text-red-600" />
+                                      <ArrowUpRight className="h-3.5 w-3.5 text-destructive" />
                                     )}
                                     {e.referenceNo}
                                     {e.isReversed && (
-                                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                      <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase tracking-wide">
                                         Reversed
                                       </span>
                                     )}
                                     {e.category === 'REVERSAL' && (
-                                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                      <span className="text-[10px] font-bold text-warning bg-warning/10 px-1.5 py-0.5 rounded uppercase tracking-wide">
                                         Reversal
                                       </span>
                                     )}
                                   </span>
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-600">{e.category}</td>
-                                <td className="px-4 py-2.5 text-slate-600">
+                                <td className="px-4 py-2.5 text-foreground">{e.category}</td>
+                                <td className="px-4 py-2.5 text-foreground">
                                   {e.description ?? '—'}
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-600">
+                                <td className="px-4 py-2.5 text-foreground">
                                   {e.paymentMode ?? '—'}
                                 </td>
-                                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">
+                                <td className="px-4 py-2.5 text-right tabular-nums text-success">
                                   {e.entryType === 'RECEIPT'
                                     ? formatCurrency(Number(e.amount), currency)
                                     : ''}
                                 </td>
-                                <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
+                                <td className="px-4 py-2.5 text-right tabular-nums text-destructive">
                                   {e.entryType === 'PAYMENT'
                                     ? formatCurrency(Number(e.amount), currency)
                                     : ''}
@@ -360,7 +360,7 @@ function DayBookContent() {
                                           }
                                         }}
                                         disabled={reversingId === e.id}
-                                        className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 disabled:opacity-50"
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-warning hover:text-warning disabled:opacity-50"
                                         title="Reverse this manual entry"
                                       >
                                         <RotateCcw className="h-3 w-3" />
@@ -389,7 +389,7 @@ function DayBookContent() {
 
         <TabsContent value="activity" className="space-y-6">
           {!isSingleBranch ? (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700">
+            <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-2.5 text-sm text-warning">
               Select a single branch above to view its daily activity feed.
             </div>
           ) : (
@@ -403,10 +403,12 @@ function DayBookContent() {
 
 export default function AdminDayBookPage() {
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Day Book</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Day Book
+          </h3>
           <p className="text-muted-foreground">
             Daily cash receipts &amp; payments — across branches
           </p>

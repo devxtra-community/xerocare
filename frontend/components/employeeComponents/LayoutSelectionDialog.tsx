@@ -35,40 +35,40 @@ const CATEGORIES = [
     label: 'Product Layout',
     description: 'Direct sales of machines and devices',
     icon: ShoppingCart,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    hoverBorder: 'hover:border-blue-500',
+    color: 'text-primary',
+    bgColor: 'bg-primary/10',
+    borderColor: 'border-primary/30',
+    hoverBorder: 'hover:border-primary',
   },
   {
     id: 'sparepart',
     label: 'Sparepart Layout',
     description: 'Parts, consumables and accessories',
     icon: Wrench,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50',
-    borderColor: 'border-orange-200',
-    hoverBorder: 'hover:border-orange-500',
+    color: 'text-warning',
+    bgColor: 'bg-warning/10',
+    borderColor: 'border-warning/30',
+    hoverBorder: 'hover:border-warning',
   },
   {
     id: 'rental',
     label: 'Rental Layout',
     description: 'Short-term machine rentals',
     icon: Key,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
-    hoverBorder: 'hover:border-green-500',
+    color: 'text-success',
+    bgColor: 'bg-success/10',
+    borderColor: 'border-success/30',
+    hoverBorder: 'hover:border-success',
   },
   {
     id: 'lease',
     label: 'Lease Layout',
     description: 'Long-term leasing and FSM contracts',
     icon: FileSignature,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-200',
-    hoverBorder: 'hover:border-purple-500',
+    color: 'text-lease',
+    bgColor: 'bg-lease/10',
+    borderColor: 'border-lease/30',
+    hoverBorder: 'hover:border-lease',
   },
 ];
 
@@ -258,7 +258,7 @@ export function LayoutSelectionDialog({
                 <DialogTitle className="text-xl">
                   {step === 1 ? 'Select Layout Category' : 'Choose Layout Style'}
                 </DialogTitle>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   {step === 1
                     ? 'Choose the category of quotation layout you want to use.'
                     : 'Select a visual style for the generated document.'}
@@ -279,7 +279,7 @@ export function LayoutSelectionDialog({
                       className={`flex flex-col items-start p-5 rounded-2xl border-2 transition-all text-left ${
                         isSelected
                           ? `border-${category.color.split('-')[1]}-500 ${category.bgColor} ring-4 ring-${category.color.split('-')[1]}-500/10`
-                          : `border-slate-100 bg-white hover:border-slate-300 ${category.hoverBorder}`
+                          : `border-border bg-card hover:border-border ${category.hoverBorder}`
                       }`}
                     >
                       <div
@@ -287,8 +287,8 @@ export function LayoutSelectionDialog({
                       >
                         <category.icon className="h-6 w-6" />
                       </div>
-                      <div className="font-bold text-lg text-slate-900 mb-1">{category.label}</div>
-                      <div className="text-sm text-slate-500">{category.description}</div>
+                      <div className="font-bold text-lg text-foreground mb-1">{category.label}</div>
+                      <div className="text-sm text-muted-foreground">{category.description}</div>
                     </button>
                   );
                 })}
@@ -303,53 +303,53 @@ export function LayoutSelectionDialog({
                       onClick={() => handleSelectStyle(style.id)}
                       className={`group flex flex-col items-center text-center p-5 rounded-2xl border-2 transition-all relative overflow-hidden cursor-pointer ${
                         isSelected
-                          ? 'border-blue-600 bg-blue-50/50'
-                          : 'border-slate-100 bg-slate-50/50 hover:border-slate-300 hover:bg-white'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-muted/50 hover:border-border hover:bg-card'
                       }`}
                     >
                       {isSelected && (
-                        <div className="absolute top-3 right-3 text-blue-600">
-                          <CheckCircle2 className="h-5 w-5 fill-blue-100" />
+                        <div className="absolute top-3 right-3 text-primary">
+                          <CheckCircle2 className="h-5 w-5 fill-primary" />
                         </div>
                       )}
 
                       {/* Visual Preview Placeholder */}
                       <div className="relative w-24 h-32 rounded mb-3">
-                        <div className="w-full h-full bg-white rounded shadow-sm border border-slate-200 p-2 flex flex-col gap-1">
+                        <div className="w-full h-full bg-card rounded shadow-sm border border-border p-2 flex flex-col gap-1">
                           {style.id === 'standard' && (
                             <>
-                              <div className="w-full h-4 bg-teal-800 rounded-t-sm" />
-                              <div className="w-1/2 h-1 bg-slate-200 mt-2 rounded-full" />
-                              <div className="w-3/4 h-1 bg-slate-200 rounded-full" />
-                              <div className="w-full h-10 bg-slate-50 mt-auto border border-slate-100 rounded-sm" />
-                              <div className="w-full h-3 bg-gradient-to-r from-amber-400 to-teal-800 rounded-b-sm mt-auto" />
+                              <div className="w-full h-4 bg-info rounded-t-sm" />
+                              <div className="w-1/2 h-1 bg-muted mt-2 rounded-full" />
+                              <div className="w-3/4 h-1 bg-muted rounded-full" />
+                              <div className="w-full h-10 bg-muted mt-auto border border-border rounded-sm" />
+                              <div className="w-full h-3 bg-gradient-to-r from-warning to-info rounded-b-sm mt-auto" />
                             </>
                           )}
                           {style.id === 'normal' && (
                             <>
                               <div className="flex justify-between items-start pt-1">
-                                <div className="w-1/3 h-2 bg-slate-800 rounded-full" />
-                                <div className="w-4 h-4 bg-teal-800 rounded-full" />
+                                <div className="w-1/3 h-2 bg-foreground rounded-full" />
+                                <div className="w-4 h-4 bg-info rounded-full" />
                               </div>
-                              <div className="w-full h-12 bg-slate-50 mt-2" />
-                              <div className="w-1/3 h-1 bg-slate-200 ml-auto mt-2 rounded-full" />
-                              <div className="w-1/4 h-1 bg-slate-800 ml-auto mt-1 rounded-full" />
+                              <div className="w-full h-12 bg-muted mt-2" />
+                              <div className="w-1/3 h-1 bg-muted ml-auto mt-2 rounded-full" />
+                              <div className="w-1/4 h-1 bg-foreground ml-auto mt-1 rounded-full" />
                             </>
                           )}
                           {style.id === 'premium' && (
                             <>
-                              <div className="w-full h-full bg-slate-900 rounded-sm flex flex-col p-2">
-                                <div className="w-5 h-5 bg-amber-500 rounded-full mx-auto" />
-                                <div className="w-3/4 h-1 bg-slate-700 mt-2 mx-auto rounded-full" />
-                                <div className="w-full h-6 bg-slate-800 mt-auto border border-slate-700" />
+                              <div className="w-full h-full bg-foreground rounded-sm flex flex-col p-2">
+                                <div className="w-5 h-5 bg-warning rounded-full mx-auto" />
+                                <div className="w-3/4 h-1 bg-foreground mt-2 mx-auto rounded-full" />
+                                <div className="w-full h-6 bg-foreground mt-auto border border-border" />
                               </div>
                             </>
                           )}
                         </div>
                       </div>
 
-                      <div className="font-bold text-slate-900 mb-1 text-sm">{style.label}</div>
-                      <div className="text-[11px] text-slate-500 px-1 leading-relaxed min-h-[32px] flex items-center justify-center">
+                      <div className="font-bold text-foreground mb-1 text-sm">{style.label}</div>
+                      <div className="text-[11px] text-muted-foreground px-1 leading-relaxed min-h-[32px] flex items-center justify-center">
                         {style.description}
                       </div>
 
@@ -357,7 +357,7 @@ export function LayoutSelectionDialog({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="mt-3 w-full text-[10px] font-black uppercase tracking-wider h-8 border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-slate-900"
+                        className="mt-3 w-full text-[10px] font-black uppercase tracking-wider h-8 border-border text-foreground bg-card hover:bg-muted hover:text-foreground"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPreviewStyle(style.id);
@@ -378,22 +378,22 @@ export function LayoutSelectionDialog({
       <Dialog open={!!previewStyle} onOpenChange={(open) => !open && setPreviewStyle(null)}>
         <DialogContent
           showCloseButton={false}
-          className="sm:max-w-[900px] md:max-w-[950px] lg:max-w-[1000px] w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-900 border-slate-800 text-white rounded-2xl"
+          className="sm:max-w-[900px] md:max-w-[950px] lg:max-w-[1000px] w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-foreground border-border text-primary-foreground rounded-2xl"
         >
           {/* Custom Header Bar */}
-          <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700">
+          <div className="flex items-center justify-between px-6 py-4 bg-foreground border-b border-border">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+              <p className="text-[10px] font-black uppercase tracking-widest text-success">
                 Live Layout Preview
               </p>
-              <DialogTitle className="text-base font-black text-white capitalize">
+              <DialogTitle className="text-base font-black text-primary-foreground capitalize">
                 {previewStyle} Style — {activeType} Layout
               </DialogTitle>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                className="bg-success hover:bg-success/90 text-success-foreground font-bold text-xs"
                 onClick={() => {
                   if (previewStyle) {
                     handleSelectStyle(previewStyle);
@@ -406,7 +406,7 @@ export function LayoutSelectionDialog({
               <Button
                 variant="outline"
                 size="sm"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white text-xs"
+                className="border-border text-muted-foreground hover:bg-foreground hover:text-primary-foreground text-xs"
                 onClick={() => setPreviewStyle(null)}
               >
                 Close Preview
@@ -415,8 +415,8 @@ export function LayoutSelectionDialog({
           </div>
 
           {/* Preview Sheet Area */}
-          <div className="flex-1 overflow-auto w-full bg-slate-100 p-8 flex justify-center items-start">
-            <div className="shadow-2xl rounded-lg overflow-hidden bg-white min-w-[794px] max-w-[794px] w-[794px] my-4">
+          <div className="flex-1 overflow-auto w-full bg-muted p-8 flex justify-center items-start">
+            <div className="shadow-2xl rounded-lg overflow-hidden bg-card min-w-[794px] max-w-[794px] w-[794px] my-4">
               {renderPreviewContent()}
             </div>
           </div>

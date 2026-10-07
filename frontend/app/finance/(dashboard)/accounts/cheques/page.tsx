@@ -91,11 +91,14 @@ function AddChequeModal({
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Add Cheque</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+          <h2 className="text-lg font-semibold text-foreground">Add Cheque</h2>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xl font-bold"
+          >
             ×
           </button>
         </div>
@@ -112,9 +115,9 @@ function AddChequeModal({
         >
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600">Type *</label>
+              <label className="text-xs font-medium text-foreground">Type *</label>
               <Select value={form.type} onValueChange={(v) => set('type', v)}>
-                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                <SelectTrigger className="mt-1 w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -124,38 +127,38 @@ function AddChequeModal({
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">Cheque Number *</label>
+              <label className="text-xs font-medium text-foreground">Cheque Number *</label>
               <input
                 value={form.chequeNo}
                 onChange={(e) => set('chequeNo', e.target.value)}
                 placeholder="e.g. 001234"
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600">Party Name *</label>
+              <label className="text-xs font-medium text-foreground">Party Name *</label>
               <input
                 value={form.partyName}
                 onChange={(e) => set('partyName', e.target.value)}
                 placeholder="Customer or vendor name"
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">Name of the Bank</label>
+              <label className="text-xs font-medium text-foreground">Name of the Bank</label>
               <input
                 value={form.bankName}
                 onChange={(e) => set('bankName', e.target.value)}
                 placeholder="e.g. Emirates NBD"
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600">Amount *</label>
+              <label className="text-xs font-medium text-foreground">Amount *</label>
               <input
                 type="number"
                 min="0"
@@ -164,11 +167,11 @@ function AddChequeModal({
                 onChange={(e) => set('amount', e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0.00"
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">
+              <label className="text-xs font-medium text-foreground">
                 Cheque Date *{' '}
                 <span className="font-normal">(earliest date it can be deposited)</span>
               </label>
@@ -176,13 +179,13 @@ function AddChequeModal({
                 type="date"
                 value={form.chequeDate}
                 onChange={(e) => set('chequeDate', e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600">
+              <label className="text-xs font-medium text-foreground">
                 {isReceived ? 'Cheque Received Date' : 'Issue Date'}{' '}
                 <span className="font-normal">
                   {isReceived ? '(received from customer)' : '(handed to vendor)'}
@@ -192,16 +195,16 @@ function AddChequeModal({
                 type="date"
                 value={isReceived ? form.collectedDate : form.issueDate}
                 onChange={(e) => set(isReceived ? 'collectedDate' : 'issueDate', e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">Linked Account</label>
+              <label className="text-xs font-medium text-foreground">Linked Account</label>
               <Select
                 value={form.accountId || '__NONE__'}
                 onValueChange={(v) => set('accountId', v === '__NONE__' ? '' : v)}
               >
-                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                <SelectTrigger className="mt-1 w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -217,27 +220,27 @@ function AddChequeModal({
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600">Description</label>
+            <label className="text-xs font-medium text-foreground">Description</label>
             <textarea
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
               rows={2}
               placeholder="Optional notes..."
-              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>
           <div className="flex gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-gray-50"
+              className="flex-1 border rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mut.isPending}
-              className="flex-1 bg-blue-600 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 bg-primary text-primary-foreground rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               {mut.isPending ? 'Saving…' : 'Add Cheque'}
             </button>
@@ -262,31 +265,31 @@ function ActionButtons({
     {
       action: 'deposit',
       label: 'Deposit',
-      className: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
+      className: 'bg-primary/10 text-primary hover:bg-primary/10',
       show: cheque.type === 'RECEIVED' && cheque.status === 'PENDING',
     },
     {
       action: 'issue',
       label: 'Issue',
-      className: 'bg-purple-100 text-purple-700 hover:bg-purple-200',
+      className: 'bg-lease/10 text-lease hover:bg-lease/10',
       show: cheque.type === 'ISSUED' && cheque.status === 'PENDING',
     },
     {
       action: 'clear',
       label: 'Clear',
-      className: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
+      className: 'bg-success/10 text-success hover:bg-success/10',
       show: ['DEPOSITED', 'ISSUED'].includes(cheque.status),
     },
     {
       action: 'bounce',
       label: 'Bounce',
-      className: 'bg-red-100 text-red-700 hover:bg-red-200',
+      className: 'bg-destructive/10 text-destructive hover:bg-destructive/10',
       show: ['DEPOSITED', 'ISSUED'].includes(cheque.status),
     },
     {
       action: 'cancel',
       label: cheque.type === 'RECEIVED' ? 'Decline' : 'Cancel',
-      className: 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+      className: 'bg-muted text-foreground hover:bg-muted',
       show: cheque.status === 'PENDING',
     },
   ];
@@ -296,7 +299,7 @@ function ActionButtons({
       <button
         onClick={() => onView(cheque)}
         title="View details & payment proof"
-        className="text-xs font-medium px-2 py-1 rounded-md transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+        className="text-xs font-medium px-2 py-1 rounded-md transition-colors bg-muted text-foreground hover:bg-muted inline-flex items-center gap-1"
       >
         <Eye className="h-3.5 w-3.5" /> View
       </button>
@@ -338,36 +341,36 @@ function StatsRow({
       label: 'Total',
       count: total.count,
       amount: total.total,
-      color: 'text-gray-800',
-      bg: 'bg-gray-50 border-gray-200',
+      color: 'text-foreground',
+      bg: 'bg-muted border-border',
     },
     {
       label: type === 'RECEIVED' ? 'Pending' : 'Pending',
       count: pending.count,
       amount: pending.total,
-      color: 'text-yellow-700',
-      bg: 'bg-yellow-50 border-yellow-200',
+      color: 'text-warning',
+      bg: 'bg-warning/10 border-warning/30',
     },
     {
       label: type === 'RECEIVED' ? 'Deposited' : 'Issued',
       count: deposited.count,
       amount: deposited.total,
-      color: 'text-blue-700',
-      bg: 'bg-blue-50 border-blue-200',
+      color: 'text-primary',
+      bg: 'bg-primary/10 border-primary/30',
     },
     {
       label: 'Cleared',
       count: cleared.count,
       amount: cleared.total,
-      color: 'text-emerald-700',
-      bg: 'bg-emerald-50 border-emerald-200',
+      color: 'text-success',
+      bg: 'bg-success/10 border-success/30',
     },
     {
       label: 'Bounced',
       count: bounced.count,
       amount: bounced.total,
-      color: 'text-red-700',
-      bg: 'bg-red-50 border-red-200',
+      color: 'text-destructive',
+      bg: 'bg-destructive/10 border-destructive/30',
     },
   ];
 
@@ -375,7 +378,9 @@ function StatsRow({
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
       {cards.map((c) => (
         <div key={c.label} className={`rounded-xl border p-3 ${c.bg}`}>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{c.label}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {c.label}
+          </p>
           <p className={`text-xl font-bold mt-0.5 ${c.color}`}>{c.count}</p>
           <p className={`text-xs font-semibold mt-0.5 ${c.color}`}>
             {formatCurrency(c.amount, currency)}
@@ -406,14 +411,14 @@ function ChequeTable({
   const isOverdue = (c: Cheque) =>
     new Date(c.dueDate) < new Date() && ['PENDING', 'ISSUED'].includes(c.status);
 
-  if (loading) return <div className="p-10 text-center text-gray-400">Loading…</div>;
+  if (loading) return <div className="p-10 text-center text-muted-foreground">Loading…</div>;
   if (cheques.length === 0)
-    return <div className="p-10 text-center text-gray-400">{emptyLabel}</div>;
+    return <div className="p-10 text-center text-muted-foreground">{emptyLabel}</div>;
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+        <thead className="bg-muted text-xs uppercase text-muted-foreground border-b">
           <tr>
             {[
               'Cheque #',
@@ -435,28 +440,28 @@ function ChequeTable({
           {paging.pageRows.map((c) => (
             <tr
               key={c.id}
-              className={`transition-colors ${isOverdue(c) ? 'bg-red-50/40' : 'hover:bg-gray-50'}`}
+              className={`transition-colors ${isOverdue(c) ? 'bg-destructive/10' : 'hover:bg-muted'}`}
             >
-              <td className="px-4 py-3 font-mono text-gray-700 text-xs">{c.chequeNo}</td>
+              <td className="px-4 py-3 font-mono text-foreground text-xs">{c.chequeNo}</td>
               <td className="px-4 py-3">
-                <p className="font-medium text-gray-800 max-w-[140px] truncate">{c.partyName}</p>
-                <p className="text-xs text-gray-400">{c.bankName ?? '—'}</p>
+                <p className="font-medium text-foreground max-w-[140px] truncate">{c.partyName}</p>
+                <p className="text-xs text-muted-foreground">{c.bankName ?? '—'}</p>
               </td>
-              <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+              <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                 {formatCurrency(c.amount, currency)}
               </td>
               {/* Cheque Date — the deposit/presentment-eligible date, for both
                   directions. It used to show issueDate for ISSUED cheques, which is
                   a different concept and belongs in the next column. */}
               <td
-                className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+                className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-destructive font-bold' : 'text-muted-foreground'}`}
               >
                 {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
-                {isOverdue(c) && <span className="ml-1 text-red-500">⚠</span>}
+                {isOverdue(c) && <span className="ml-1 text-destructive">⚠</span>}
               </td>
               {/* Received from the customer / handed to the vendor. Replaces the old
                   Due Date column, which just repeated the Cheque Date. */}
-              <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+              <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                 {c.type === 'RECEIVED'
                   ? c.collectedDate
                     ? String(c.collectedDate).slice(0, 10)
@@ -465,12 +470,12 @@ function ChequeTable({
                     ? String(c.issueDate).slice(0, 10)
                     : '—'}
               </td>
-              <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px]">
+              <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px]">
                 <div className="flex flex-col gap-1 items-start">
                   <SaleTypeBadge saleType={c.saleType} />
                   {c.sourceLabel ? (
                     <span
-                      className="inline-block px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-medium text-slate-600 max-w-[150px] truncate"
+                      className="inline-block px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium text-foreground max-w-[150px] truncate"
                       title={c.sourceLabel}
                     >
                       {c.sourceLabel}
@@ -482,14 +487,14 @@ function ChequeTable({
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
+                  className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[c.status] ?? 'bg-muted text-foreground'}`}
                 >
                   {STATUS_ICON[c.status]}
                   {c.status}
                 </span>
                 {(c.status === 'BOUNCED' || c.status === 'CANCELLED') && c.reason && (
                   <span
-                    className="ml-1 inline-block cursor-help text-gray-400 hover:text-gray-600"
+                    className="ml-1 inline-block cursor-help text-muted-foreground hover:text-foreground"
                     title={c.reason}
                   >
                     ⓘ
@@ -617,22 +622,22 @@ export default function ChequesPage() {
   };
 
   return (
-    <div className="bg-blue-50/30 min-h-full p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground flex items-center gap-2">
             {activeTab === 'received' ? (
               <>
-                <ArrowDownCircle className="h-6 w-6 text-emerald-600" /> Cheques from Customers
+                <ArrowDownCircle className="h-6 w-6 text-success" /> Cheques from Customers
               </>
             ) : (
               <>
-                <ArrowUpCircle className="h-6 w-6 text-blue-600" /> Cheques to Vendors
+                <ArrowUpCircle className="h-6 w-6 text-primary" /> Cheques to Vendors
               </>
             )}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             {activeTab === 'received'
               ? 'Cheques received from customers — Cash at Bank moves only when bank clears payment'
               : 'Cheques issued to vendors — Cash at Bank moves only when bank clears payment'}
@@ -641,13 +646,13 @@ export default function ChequesPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowStatement(true)}
-            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </button>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 shadow-sm"
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-primary/90 shadow-sm"
           >
             <Plus className="h-4 w-4" /> Add Cheque
           </button>
@@ -655,7 +660,7 @@ export default function ChequesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-border">
         {(
           [
             {
@@ -678,8 +683,8 @@ export default function ChequesPage() {
             }}
             className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {icon}
@@ -697,19 +702,19 @@ export default function ChequesPage() {
         />
 
         {/* Filters */}
-        <div className="bg-white rounded-xl border p-4">
+        <div className="bg-card rounded-xl border p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search cheque #, party, bank, source…"
-                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="border-orange-200 text-sm">
+              <SelectTrigger className="border-warning/30 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -725,21 +730,21 @@ export default function ChequesPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               title="Due date from"
             />
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               title="Due date to"
             />
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
           <ChequeTable
             cheques={cheques}
             loading={isLoading}

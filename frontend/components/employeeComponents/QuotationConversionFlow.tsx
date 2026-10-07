@@ -413,14 +413,14 @@ export function QuotationConversionFlow({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl rounded-2xl p-0 overflow-hidden bg-white shadow-2xl border-0">
+      <DialogContent className="sm:max-w-2xl rounded-2xl p-0 overflow-hidden bg-card shadow-2xl border-0">
         <DialogTitle className="sr-only">Convert to {saleLabel}</DialogTitle>
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 text-white">
+        <div className="bg-gradient-to-r from-success to-success p-5 text-primary-foreground">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-              <ArrowRightLeft size={20} className="text-white" />
+            <div className="h-10 w-10 rounded-full bg-card flex items-center justify-center">
+              <ArrowRightLeft size={20} className="text-primary-foreground" />
             </div>
             <div>
               <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
@@ -437,14 +437,14 @@ export function QuotationConversionFlow({
               <React.Fragment key={s}>
                 <div
                   className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
-                    step >= i + 1 ? 'bg-white text-emerald-600' : 'bg-white/30 text-white'
+                    step >= i + 1 ? 'bg-card text-success' : 'bg-card text-primary-foreground'
                   }`}
                 >
                   {step > i + 1 ? <CheckCircle2 size={14} /> : i + 1}
                 </div>
                 {i < 2 && (
                   <div
-                    className={`h-0.5 flex-1 transition-all ${step > i + 1 ? 'bg-white' : 'bg-white/30'}`}
+                    className={`h-0.5 flex-1 transition-all ${step > i + 1 ? 'bg-card' : 'bg-card'}`}
                   />
                 )}
               </React.Fragment>
@@ -467,14 +467,16 @@ export function QuotationConversionFlow({
           {/* ── Step 1: Serial Numbers ─────────────────────────────────────── */}
           {step === 1 && (
             <div className="space-y-3">
-              <p className="text-xs font-black text-slate-600 uppercase tracking-wider">
+              <p className="text-xs font-black text-foreground uppercase tracking-wider">
                 Assign Serial / Product IDs
               </p>
               {allocatableItems.length === 0 ? (
-                <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  <PackageCheck size={28} className="mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-500">No physical items to allocate</p>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                <div className="text-center py-6 bg-muted rounded-xl border border-dashed border-border">
+                  <PackageCheck size={28} className="mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm font-bold text-muted-foreground">
+                    No physical items to allocate
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
                     This quotation has no products that need serial numbers.
                   </p>
                 </div>
@@ -482,12 +484,12 @@ export function QuotationConversionFlow({
                 serialUpdates.map((update, idx) => (
                   <div
                     key={`${update.itemId}-${idx}`}
-                    className="p-3 bg-slate-50 rounded-xl border border-slate-100"
+                    className="p-3 bg-muted rounded-xl border border-border"
                   >
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                       {update.description}
                       {update.isAccessory && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200 tracking-wider">
+                        <span className="px-1.5 py-0.5 rounded-full bg-lease/10 text-lease border border-lease/30 tracking-wider">
                           Accessory
                         </span>
                       )}
@@ -495,18 +497,18 @@ export function QuotationConversionFlow({
                     {update.isSparePart ? (
                       // Spare parts are pre-assigned from the quotation — show confirmation
                       isLoadingProducts ? (
-                        <div className="flex items-center gap-2 text-slate-400">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                           <Loader2 size={12} className="animate-spin" />
                           <span className="text-[10px] font-bold">Loading spare part...</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                          <PackageCheck size={16} className="text-emerald-500 shrink-0" />
+                        <div className="flex items-center gap-3 p-3 bg-success/10 border border-success/30 rounded-xl">
+                          <PackageCheck size={16} className="text-success shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-slate-800 truncate">
+                            <p className="text-xs font-bold text-foreground truncate">
                               {sparePartDetails[update.productId]?.part_name || update.description}
                             </p>
-                            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                            <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">
                               SKU: {sparePartDetails[update.productId]?.sku || update.productId}
                               {sparePartDetails[update.productId]?.lot?.lotNumber
                                 ? ` • Lot: ${sparePartDetails[update.productId].lot!.lotNumber}`
@@ -515,11 +517,11 @@ export function QuotationConversionFlow({
                                   : ''}
                             </p>
                           </div>
-                          <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                          <CheckCircle2 size={16} className="text-success shrink-0" />
                         </div>
                       )
                     ) : isLoadingProducts ? (
-                      <div className="flex items-center gap-2 text-slate-400">
+                      <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 size={12} className="animate-spin" />
                         <span className="text-[10px] font-bold">Loading available units...</span>
                       </div>
@@ -528,7 +530,7 @@ export function QuotationConversionFlow({
                         value={update.productId}
                         onValueChange={(val) => updateSerial(idx, val)}
                         placeholder="Search by Serial Number, Brand, or Product Name..."
-                        className="h-12 border-slate-200"
+                        className="h-12 border-border"
                         options={(update.modelId ? availableProducts[update.modelId] || [] : [])
                           .filter((p) =>
                             ['AVAILABLE', 'RETURNED', 'DAMAGED'].includes(p.product_status),
@@ -536,10 +538,10 @@ export function QuotationConversionFlow({
                           .map((p) => {
                             const statusColor =
                               p.product_status === 'DAMAGED'
-                                ? 'text-red-600'
+                                ? 'text-destructive'
                                 : p.product_status === 'RETURNED'
-                                  ? 'text-green-600'
-                                  : 'text-slate-400';
+                                  ? 'text-success'
+                                  : 'text-muted-foreground';
                             const statusLabel =
                               p.product_status && p.product_status !== 'AVAILABLE' ? (
                                 <span className={`${statusColor} font-black ml-2`}>
@@ -577,16 +579,16 @@ export function QuotationConversionFlow({
                   an Arrears contract has any, this card stays (as an accessories-only
                   collection) purely to carry the payment-mode/reference fields. */}
               {(!isArrearsBilling || accessoryTotal > 0) && (
-                <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80 space-y-3">
+                <div className="p-4 bg-muted/50 rounded-2xl border border-border/80 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    <h4 className="text-xs font-black text-success uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-success"></span>
                       {isArrearsBilling
                         ? 'Accessories Collection'
                         : `${isRentalContract ? 'First Month Advance Payment' : 'Advance Payment'} (Optional)`}
                     </h4>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide leading-relaxed">
                     {isArrearsBilling
                       ? 'This contract bills in arrears — no first month advance is collected. Only the accessories supplied with the machine are charged now.'
                       : isRentalContract
@@ -597,7 +599,7 @@ export function QuotationConversionFlow({
                     <div className="col-span-2">
                       {!isArrearsBilling && (
                         <>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Amount ({currency})
                           </Label>
                           <Input
@@ -605,12 +607,12 @@ export function QuotationConversionFlow({
                             value={advanceAmount}
                             onChange={(e) => setAdvanceAmount(e.target.value)}
                             placeholder="0.00"
-                            className="h-10 font-black text-emerald-600 text-sm border-slate-200 focus:border-emerald-300"
+                            className="h-10 font-black text-success text-sm border-border focus:border-success/30"
                           />
                         </>
                       )}
                       {accessoryTotal > 0 && (
-                        <p className="text-[10px] text-teal-600 font-bold mt-1">
+                        <p className="text-[10px] text-info font-bold mt-1">
                           {isArrearsBilling ? '' : '+ '}Accessories ({accessoryItems.length} item
                           {accessoryItems.length === 1 ? '' : 's'}): {currency}{' '}
                           {accessoryTotal.toFixed(2)}
@@ -618,7 +620,7 @@ export function QuotationConversionFlow({
                         </p>
                       )}
                       {advanceBase > 0 && advanceTaxAmount > 0 && (
-                        <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                        <p className="text-[10px] text-success font-bold mt-1">
                           + {quotation.taxName || 'VAT'} ({advanceTaxPercent}%){' '}
                           {advanceTaxAmount.toFixed(2)} = {currency} {advanceInclTax.toFixed(2)}{' '}
                           will be collected
@@ -628,7 +630,7 @@ export function QuotationConversionFlow({
                     {advanceBase > 0 && (
                       <>
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Payment Mode
                           </Label>
                           <Select
@@ -637,7 +639,7 @@ export function QuotationConversionFlow({
                               val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
                             ) => setPaymentMode(val)}
                           >
-                            <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                            <SelectTrigger className="h-10 border-border font-bold text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -657,7 +659,7 @@ export function QuotationConversionFlow({
                           </Select>
                         </div>
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             {paymentMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference #'}
                           </Label>
                           {paymentMode === 'CHEQUE' ? (
@@ -666,10 +668,10 @@ export function QuotationConversionFlow({
                               onChange={(e) => setChequeNumber(e.target.value)}
                               placeholder="e.g., CHQ-001234"
                               required
-                              className="h-10 border-slate-200 font-bold text-xs"
+                              className="h-10 border-border font-bold text-xs"
                             />
                           ) : (
-                            <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-400 italic">
+                            <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-[11px] text-muted-foreground italic">
                               Auto-generated — {autoReferencePreview(paymentMode)}
                             </div>
                           )}
@@ -679,13 +681,13 @@ export function QuotationConversionFlow({
                   </div>
                   {/* Cheque-specific fields */}
                   {advanceBase > 0 && paymentMode === 'CHEQUE' && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-700">
+                    <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-warning">
                         Cheque Details — PENDING until deposited in Accounts → Cheques
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Customer&apos;s Bank *
                           </Label>
                           <Input
@@ -693,11 +695,11 @@ export function QuotationConversionFlow({
                             onChange={(e) => setChequeBankName(e.target.value)}
                             placeholder="e.g., Emirates NBD"
                             required
-                            className="h-10 border-slate-200 font-bold text-xs"
+                            className="h-10 border-border font-bold text-xs"
                           />
                         </div>
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Cheque Received Date *
                           </Label>
                           <Input
@@ -705,11 +707,11 @@ export function QuotationConversionFlow({
                             value={chequeReceivedDate}
                             onChange={(e) => setChequeReceivedDate(e.target.value)}
                             required
-                            className="h-10 border-slate-200 font-bold text-xs"
+                            className="h-10 border-border font-bold text-xs"
                           />
                         </div>
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Cheque Date * (earliest deposit)
                           </Label>
                           <Input
@@ -717,7 +719,7 @@ export function QuotationConversionFlow({
                             value={chequeDate}
                             onChange={(e) => setChequeDate(e.target.value)}
                             required
-                            className="h-10 border-slate-200 font-bold text-xs"
+                            className="h-10 border-border font-bold text-xs"
                           />
                         </div>
                       </div>
@@ -728,26 +730,26 @@ export function QuotationConversionFlow({
 
               {/* ── Security Deposit Collection Card ──────────────────────────── */}
               {prefilledCaution > 0 && (
-                <div className="p-4 bg-blue-50/40 rounded-2xl border border-blue-100/80 space-y-3">
+                <div className="p-4 bg-primary/10 rounded-2xl border border-primary/30 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                    <h4 className="text-xs font-black text-primary uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-primary"></span>
                       Security Deposit Collection
                     </h4>
-                    <span className="text-[9px] font-black text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full uppercase">
+                    <span className="text-[9px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase">
                       From Quotation
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide leading-relaxed">
                     Security deposit required according to quotation. This amount is refundable.
                   </p>
 
                   <div>
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                       Collection Timing
                     </Label>
                     <Select value={depositTiming} onValueChange={handleDepositTimingChange}>
-                      <SelectTrigger className="h-10 border-slate-200 font-bold text-xs bg-white">
+                      <SelectTrigger className="h-10 border-border font-bold text-xs bg-card">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -762,8 +764,8 @@ export function QuotationConversionFlow({
                   </div>
 
                   {depositTiming === 'ON_INSTALLATION' && (
-                    <div className="p-3 bg-white/70 border border-dashed border-blue-200 rounded-xl">
-                      <p className="text-[11px] font-bold text-blue-600 leading-relaxed">
+                    <div className="p-3 bg-card border border-dashed border-primary/30 rounded-xl">
+                      <p className="text-[11px] font-bold text-primary leading-relaxed">
                         {currency} {prefilledCaution.toFixed(2)} will be collected by the Technician
                         at installation. Nothing is recorded now — the deposit stays outstanding
                         against this contract until it is collected.
@@ -774,7 +776,7 @@ export function QuotationConversionFlow({
                   {depositTiming === 'NOW' && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
-                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                           Amount Collected Now ({currency})
                         </Label>
                         <Input
@@ -782,9 +784,9 @@ export function QuotationConversionFlow({
                           min="0"
                           value={cautionAmount}
                           onChange={(e) => setCautionAmount(e.target.value)}
-                          className="h-10 font-black text-blue-600 text-sm border-slate-200"
+                          className="h-10 font-black text-primary text-sm border-border"
                         />
-                        <p className="text-[10px] text-blue-500 font-bold mt-1">
+                        <p className="text-[10px] text-primary font-bold mt-1">
                           Pre-filled from the quotation ({currency} {prefilledCaution.toFixed(2)}) —
                           adjust if a different amount was actually handed over.
                         </p>
@@ -792,7 +794,7 @@ export function QuotationConversionFlow({
                       {cautionAmount && Number(cautionAmount) > 0 && (
                         <>
                           <div>
-                            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                            <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                               Payment Mode
                             </Label>
                             <Select
@@ -801,7 +803,7 @@ export function QuotationConversionFlow({
                                 val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
                               ) => setCautionMode(val)}
                             >
-                              <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                              <SelectTrigger className="h-10 border-border font-bold text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -818,7 +820,7 @@ export function QuotationConversionFlow({
                             </Select>
                           </div>
                           <div>
-                            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                            <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                               {cautionMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference'}
                             </Label>
                             {cautionMode === 'CHEQUE' ? (
@@ -827,10 +829,10 @@ export function QuotationConversionFlow({
                                 onChange={(e) => setCautionChequeNumber(e.target.value)}
                                 placeholder="e.g., CHQ-005678"
                                 required
-                                className="h-10 border-slate-200 font-bold text-xs"
+                                className="h-10 border-border font-bold text-xs"
                               />
                             ) : (
-                              <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-400 italic">
+                              <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-[11px] text-muted-foreground italic">
                                 Auto-generated — {autoReferencePreview(cautionMode)}
                               </div>
                             )}
@@ -841,13 +843,13 @@ export function QuotationConversionFlow({
                   )}
                   {/* Cheque-specific fields for Security Deposit */}
                   {cautionAmount && Number(cautionAmount) > 0 && cautionMode === 'CHEQUE' && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-700">
+                    <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-warning">
                         Cheque Details — Security Deposit Cheque
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Customer&apos;s Bank *
                           </Label>
                           <Input
@@ -855,11 +857,11 @@ export function QuotationConversionFlow({
                             onChange={(e) => setCautionChequeBankName(e.target.value)}
                             placeholder="e.g., QNB"
                             required
-                            className="h-10 border-slate-200 font-bold text-xs"
+                            className="h-10 border-border font-bold text-xs"
                           />
                         </div>
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Cheque Received Date *
                           </Label>
                           <Input
@@ -867,11 +869,11 @@ export function QuotationConversionFlow({
                             value={cautionChequeReceivedDate}
                             onChange={(e) => setCautionChequeReceivedDate(e.target.value)}
                             required
-                            className="h-10 border-slate-200 font-bold text-xs"
+                            className="h-10 border-border font-bold text-xs"
                           />
                         </div>
                         <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                             Cheque Date * (earliest deposit)
                           </Label>
                           <Input
@@ -879,7 +881,7 @@ export function QuotationConversionFlow({
                             value={cautionChequeDate}
                             onChange={(e) => setCautionChequeDate(e.target.value)}
                             required
-                            className="h-10 border-slate-200 font-bold text-xs"
+                            className="h-10 border-border font-bold text-xs"
                           />
                         </div>
                       </div>
@@ -892,40 +894,40 @@ export function QuotationConversionFlow({
               {advanceBase > 0 ||
               (cautionAmount && Number(cautionAmount) > 0) ||
               prefilledCaution > 0 ? (
-                <div className="p-4 bg-slate-100/60 rounded-2xl border border-slate-200/80 space-y-2">
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                <div className="p-4 bg-muted/60 rounded-2xl border border-border/80 space-y-2">
+                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
                     Payment Summary
                   </h4>
                   {rentAdvancePortion > 0 && (
                     <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-slate-500">{advanceLabel}</span>
-                      <span className="text-slate-800">
+                      <span className="text-muted-foreground">{advanceLabel}</span>
+                      <span className="text-foreground">
                         {currency} {rentAdvancePortion.toFixed(2)}
                       </span>
                     </div>
                   )}
                   {accessoryTotal > 0 && (
                     <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-teal-600">Accessories ({accessoryItems.length})</span>
-                      <span className="text-slate-800">
+                      <span className="text-info">Accessories ({accessoryItems.length})</span>
+                      <span className="text-foreground">
                         {currency} {accessoryTotal.toFixed(2)}
                       </span>
                     </div>
                   )}
                   {advanceTaxAmount > 0 && (
                     <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-slate-500">
+                      <span className="text-muted-foreground">
                         {quotation.taxName || 'VAT'} ({advanceTaxPercent}%)
                       </span>
-                      <span className="text-slate-800">
+                      <span className="text-foreground">
                         {currency} {advanceTaxAmount.toFixed(2)}
                       </span>
                     </div>
                   )}
                   {cautionAmount && Number(cautionAmount) > 0 && (
                     <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-slate-500">Security Deposit</span>
-                      <span className="text-slate-800">
+                      <span className="text-muted-foreground">Security Deposit</span>
+                      <span className="text-foreground">
                         {currency} {Number(cautionAmount).toFixed(2)}
                       </span>
                     </div>
@@ -936,8 +938,8 @@ export function QuotationConversionFlow({
                       step. */}
                   {prefilledCaution > 0 && !(cautionAmount && Number(cautionAmount) > 0) && (
                     <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-amber-600">Security Deposit</span>
-                      <span className="text-amber-600">
+                      <span className="text-warning">Security Deposit</span>
+                      <span className="text-warning">
                         {currency} {prefilledCaution.toFixed(2)} —{' '}
                         {depositTiming === 'ON_INSTALLATION'
                           ? 'Technician collects at installation'
@@ -945,11 +947,11 @@ export function QuotationConversionFlow({
                       </span>
                     </div>
                   )}
-                  <div className="border-t border-slate-300 pt-2 mt-2 flex justify-between text-[12px] font-black">
-                    <span className="text-slate-700 uppercase tracking-wider">
+                  <div className="border-t border-border pt-2 mt-2 flex justify-between text-[12px] font-black">
+                    <span className="text-foreground uppercase tracking-wider">
                       Total Initial Collection
                     </span>
-                    <span className="text-emerald-700">
+                    <span className="text-success">
                       {currency} {(advanceInclTax + Number(cautionAmount || 0)).toFixed(2)}
                     </span>
                   </div>
@@ -957,15 +959,15 @@ export function QuotationConversionFlow({
               ) : null}
 
               {/* Remarks Section */}
-              <div className="p-3 bg-slate-50/20 rounded-xl border border-slate-100">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+              <div className="p-3 bg-muted/20 rounded-xl border border-border">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                   Remarks / Notes
                 </Label>
                 <Input
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Additional conversion remarks..."
-                  className="h-10 border-slate-200 font-bold text-xs"
+                  className="h-10 border-border font-bold text-xs"
                 />
               </div>
             </div>
@@ -974,89 +976,95 @@ export function QuotationConversionFlow({
           {/* ── Step 3: Confirmation ──────────────────────────────────────── */}
           {step === 3 && (
             <div className="space-y-4 py-4 text-center">
-              <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShieldCheck size={32} className="text-emerald-500" />
+              <div className="h-16 w-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ShieldCheck size={32} className="text-success" />
               </div>
-              <h3 className="text-lg font-black text-slate-800">Final Confirmation</h3>
-              <p className="text-xs font-bold text-slate-500 px-6 leading-relaxed">
+              <h3 className="text-lg font-black text-foreground">Final Confirmation</h3>
+              <p className="text-xs font-bold text-muted-foreground px-6 leading-relaxed">
                 You are about to convert this quotation into a live
-                <span className="text-emerald-600 uppercase mx-1">{saleLabel}</span>
+                <span className="text-success uppercase mx-1">{saleLabel}</span>
                 contract. Physical inventory will be allocated and the ledger account will be
                 initialized.
               </p>
 
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-left space-y-2">
+              <div className="bg-muted p-4 rounded-2xl border border-border text-left space-y-2">
                 <div className="flex justify-between text-[11px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest">Type</span>
-                  <span className="text-slate-700">{saleLabel}</span>
+                  <span className="text-muted-foreground uppercase tracking-widest">Type</span>
+                  <span className="text-foreground">{saleLabel}</span>
                 </div>
                 {rentAdvancePortion > 0 && (
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest">{advanceLabel}</span>
-                    <span className="text-emerald-600 font-black">
+                    <span className="text-muted-foreground uppercase tracking-widest">
+                      {advanceLabel}
+                    </span>
+                    <span className="text-success font-black">
                       {currency} {rentAdvancePortion.toFixed(2)}
                     </span>
                   </div>
                 )}
                 {accessoryTotal > 0 && (
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest">Accessories</span>
-                    <span className="text-teal-600 font-black">
+                    <span className="text-muted-foreground uppercase tracking-widest">
+                      Accessories
+                    </span>
+                    <span className="text-info font-black">
                       {currency} {accessoryTotal.toFixed(2)}
                     </span>
                   </div>
                 )}
                 {advanceTaxAmount > 0 && (
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest">
+                    <span className="text-muted-foreground uppercase tracking-widest">
                       {quotation.taxName || 'VAT'} ({advanceTaxPercent}%)
                     </span>
-                    <span className="text-emerald-600 font-black">
+                    <span className="text-success font-black">
                       {currency} {advanceTaxAmount.toFixed(2)}
                     </span>
                   </div>
                 )}
                 {cautionAmount && Number(cautionAmount) > 0 && (
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest">
+                    <span className="text-muted-foreground uppercase tracking-widest">
                       Security Deposit
                     </span>
-                    <span className="text-blue-600 font-black">
+                    <span className="text-primary font-black">
                       {currency} {Number(cautionAmount).toFixed(2)}
                     </span>
                   </div>
                 )}
                 {prefilledCaution > 0 && !(cautionAmount && Number(cautionAmount) > 0) && (
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest">
+                    <span className="text-muted-foreground uppercase tracking-widest">
                       Security Deposit
                     </span>
-                    <span className="text-amber-600 font-black">
+                    <span className="text-warning font-black">
                       {currency} {prefilledCaution.toFixed(2)} —{' '}
                       {depositTiming === 'ON_INSTALLATION' ? 'At installation' : 'Deferred'}
                     </span>
                   </div>
                 )}
                 {advanceBase > 0 && cautionAmount && Number(cautionAmount) > 0 && (
-                  <div className="flex justify-between text-[11px] font-black border-t border-slate-200 pt-2 mt-1">
-                    <span className="text-slate-600 uppercase tracking-widest">
+                  <div className="flex justify-between text-[11px] font-black border-t border-border pt-2 mt-1">
+                    <span className="text-foreground uppercase tracking-widest">
                       Total Initial Collection
                     </span>
-                    <span className="text-emerald-700">
+                    <span className="text-success">
                       {currency} {(advanceInclTax + Number(cautionAmount || 0)).toFixed(2)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between text-[11px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest">Allocated Units</span>
-                  <span className="text-slate-700">
+                  <span className="text-muted-foreground uppercase tracking-widest">
+                    Allocated Units
+                  </span>
+                  <span className="text-foreground">
                     {serialUpdates.filter((u) => u.productId).length} / {allocatableItems.length}
                   </span>
                 </div>
 
                 {serialUpdates.filter((u) => u.productId).length > 0 && (
-                  <div className="pt-3 mt-3 border-t border-slate-200/60 space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                  <div className="pt-3 mt-3 border-t border-border/60 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-1">
                       Assigned Inventory
                     </span>
                     {serialUpdates
@@ -1074,26 +1082,26 @@ export function QuotationConversionFlow({
                         return (
                           <div
                             key={idx}
-                            className="bg-white p-2.5 rounded-lg border border-slate-100 flex flex-col gap-1 shadow-sm"
+                            className="bg-card p-2.5 rounded-lg border border-border flex flex-col gap-1 shadow-sm"
                           >
                             <span
-                              className="text-xs font-bold text-slate-700 line-clamp-1"
+                              className="text-xs font-bold text-foreground line-clamp-1"
                               title={sparePart?.part_name || product?.name || update.description}
                             >
                               {sparePart?.part_name || product?.name || update.description}
                             </span>
                             <div className="flex items-center gap-2">
                               {update.isSparePart ? (
-                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                <span className="text-[10px] font-black text-success bg-success/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                   SKU: {sparePart?.sku || update.productId}
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                <span className="text-[10px] font-black text-success bg-success/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                   S/N: {product ? product.serial_no : 'Unknown'}
                                 </span>
                               )}
                               {(sparePart?.brand || product?.brand) && (
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase">
                                   {sparePart?.brand || product?.brand}
                                 </span>
                               )}
@@ -1109,12 +1117,12 @@ export function QuotationConversionFlow({
         </div>
 
         {/* Footer */}
-        <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-between gap-3">
+        <div className="p-5 bg-muted border-t border-border flex justify-between gap-3">
           <Button
             variant="ghost"
             onClick={step === 1 ? onClose : () => setStep((s) => (s - 1) as 1 | 2 | 3)}
             disabled={isSubmitting}
-            className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+            className="text-[10px] font-black uppercase tracking-widest text-muted-foreground"
           >
             {step === 1 ? 'Cancel' : 'Back'}
           </Button>
@@ -1124,7 +1132,7 @@ export function QuotationConversionFlow({
               isSubmitting ||
               (step === 1 && allocatableItems.length > 0 && serialUpdates.some((u) => !u.productId))
             }
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest px-8 rounded-xl shadow-lg shadow-emerald-100"
+            className="bg-success hover:bg-success/90 text-success-foreground font-black text-[10px] uppercase tracking-widest px-8 rounded-xl shadow-lg shadow-success/10"
           >
             {/* Keep a word next to the spinner: an icon-only button reads as "stuck", not
                 "working", and invites the second click this whole flow is guarding against. */}

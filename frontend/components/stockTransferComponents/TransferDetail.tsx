@@ -159,10 +159,14 @@ export default function TransferDetail({ transferId, role }: Props) {
   }, [transfer, isInter]);
 
   if (loading) {
-    return <div className="p-10 text-center text-sm text-slate-500">Loading transfer...</div>;
+    return (
+      <div className="p-10 text-center text-sm text-muted-foreground">Loading transfer...</div>
+    );
   }
   if (!transfer) {
-    return <div className="p-10 text-center text-sm text-slate-500">Transfer not found.</div>;
+    return (
+      <div className="p-10 text-center text-sm text-muted-foreground">Transfer not found.</div>
+    );
   }
 
   const status = transfer.status;
@@ -170,15 +174,15 @@ export default function TransferDetail({ transferId, role }: Props) {
   const reachedIdx = timeline.indexOf(status);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-5">
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold text-primary">{transfer.transfer_number}</h1>
-          <Badge className="border-0 bg-slate-200 text-slate-700">
+          <h1 className="text-xl font-medium text-primary">{transfer.transfer_number}</h1>
+          <Badge className="border-0 bg-muted text-foreground">
             {isInter ? 'Inter-Branch' : 'Intra-Branch'}
           </Badge>
           <Badge className={`border-0 ${STATUS_COLORS[status]}`}>{STATUS_LABELS[status]}</Badge>
@@ -191,42 +195,44 @@ export default function TransferDetail({ transferId, role }: Props) {
               <React.Fragment key={s}>
                 <div
                   className={`text-xs font-semibold px-3 py-1.5 rounded-full ${
-                    i <= reachedIdx ? 'bg-primary text-white' : 'bg-white text-slate-400'
+                    i <= reachedIdx
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-card text-muted-foreground'
                   }`}
                 >
                   {STATUS_LABELS[s as keyof typeof STATUS_LABELS]}
                 </div>
-                {i < timeline.length - 1 && <div className="flex-1 h-px bg-slate-300" />}
+                {i < timeline.length - 1 && <div className="flex-1 h-px bg-muted" />}
               </React.Fragment>
             ))}
           </div>
         )}
 
         {/* Route + meta */}
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-blue-100 space-y-3">
+        <div className="bg-card rounded-xl p-5 shadow-sm border border-primary/30 space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-foreground">
               {transfer.source_branch?.name ?? 'Source'}
               {transfer.source_warehouse ? ` / ${transfer.source_warehouse.warehouseName}` : ''}
             </span>
-            <ArrowRight className="h-4 w-4 text-slate-400" />
-            <span className="font-semibold text-slate-700">
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold text-foreground">
               {transfer.destination_branch?.name ?? 'Destination'}
               {transfer.destination_warehouse
                 ? ` / ${transfer.destination_warehouse.warehouseName}`
                 : ''}
             </span>
           </div>
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-foreground">
             <span className="font-medium">Reason:</span> {transfer.reason}
           </div>
           {transfer.notes && (
-            <div className="text-sm text-slate-600">
+            <div className="text-sm text-foreground">
               <span className="font-medium">Notes:</span> {transfer.notes}
             </div>
           )}
           {transfer.rejection_reason && (
-            <div className="text-sm text-red-600">
+            <div className="text-sm text-destructive">
               <span className="font-medium">Rejection:</span> {transfer.rejection_reason}
             </div>
           )}
@@ -239,14 +245,14 @@ export default function TransferDetail({ transferId, role }: Props) {
                 Receiving lot: {transfer.lot?.lotNumber ?? `TRF-${transfer.transfer_number}`} →
               </Link>
               {status === 'IN_TRANSIT' && (
-                <span className="text-slate-500 ml-2">
+                <span className="text-muted-foreground ml-2">
                   Confirm the lot as received to complete this transfer.
                 </span>
               )}
             </div>
           )}
           {isInter && transfer.lot?.exchangeRateSnapshot != null && (
-            <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+            <div className="text-xs text-muted-foreground bg-primary/10 rounded-lg px-3 py-2">
               Purchase prices converted to{' '}
               <span className="font-semibold">
                 {transfer.lot.currencyCode ?? 'destination currency'}
@@ -258,8 +264,8 @@ export default function TransferDetail({ transferId, role }: Props) {
         </div>
 
         {/* Items */}
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-blue-100">
-          <h2 className="font-semibold text-slate-700 mb-3">Items</h2>
+        <div className="bg-card rounded-xl p-5 shadow-sm border border-primary/30">
+          <h2 className="font-semibold text-foreground mb-3">Items</h2>
           <div className="space-y-2">
             {(transfer.items ?? []).map((item) => {
               const d = draft[item.id];
@@ -273,19 +279,19 @@ export default function TransferDetail({ transferId, role }: Props) {
                   key={item.id}
                   className={`p-3 rounded-lg border ${
                     item.item_status === 'REJECTED' || d?.rejected
-                      ? 'bg-red-50/50 border-red-100'
-                      : 'bg-slate-50 border-slate-100'
+                      ? 'bg-destructive/10 border-destructive/30'
+                      : 'bg-muted border-border'
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-slate-800 truncate">
+                      <div className="text-sm font-medium text-foreground truncate">
                         {itemLabel(item)}
                         <Badge
                           className={`ml-2 text-xs border-0 ${
                             item.item_type === 'PRODUCT'
-                              ? 'bg-violet-100 text-violet-700'
-                              : 'bg-blue-100 text-blue-700'
+                              ? 'bg-lease/10 text-lease'
+                              : 'bg-primary/10 text-primary'
                           }`}
                         >
                           {item.item_type === 'PRODUCT' ? 'Machine' : 'Spare Part'}
@@ -294,15 +300,15 @@ export default function TransferDetail({ transferId, role }: Props) {
                           <Badge
                             className={`ml-1 text-xs border-0 ${
                               item.item_status === 'APPROVED'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-red-100 text-red-700'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-destructive/10 text-destructive'
                             }`}
                           >
                             {item.item_status}
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
+                      <div className="text-xs text-muted-foreground mt-0.5">
                         Requested: {item.requested_qty}
                         {item.approved_qty != null && ` · Approved: ${item.approved_qty}`}
                         {item.dispatched_qty != null && ` · Dispatched: ${item.dispatched_qty}`}
@@ -315,7 +321,7 @@ export default function TransferDetail({ transferId, role }: Props) {
                       {!approvalMode &&
                         item.item_type === 'PRODUCT' &&
                         (item.assigned_product_ids?.length ?? 0) > 0 && (
-                          <div className="text-xs text-slate-500 mt-0.5">
+                          <div className="text-xs text-muted-foreground mt-0.5">
                             Assigned serial(s): {item.assigned_product_ids!.length}
                           </div>
                         )}
@@ -323,7 +329,7 @@ export default function TransferDetail({ transferId, role }: Props) {
 
                     {approvalMode && d && (
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs text-slate-500">Approve qty</Label>
+                        <Label className="text-xs text-muted-foreground">Approve qty</Label>
                         <Input
                           type="number"
                           min={0}
@@ -350,7 +356,9 @@ export default function TransferDetail({ transferId, role }: Props) {
                           variant="ghost"
                           size="sm"
                           className={
-                            d.rejected ? 'text-slate-500' : 'text-red-500 hover:text-red-600'
+                            d.rejected
+                              ? 'text-muted-foreground'
+                              : 'text-destructive hover:text-destructive'
                           }
                           onClick={() =>
                             setDraft((prev) => ({
@@ -440,7 +448,7 @@ export default function TransferDetail({ transferId, role }: Props) {
           {['DRAFT', 'SENT', 'APPROVED'].includes(status) && (
             <Button
               variant="outline"
-              className="text-red-500 hover:text-red-600"
+              className="text-destructive hover:text-destructive"
               onClick={() => run(() => cancelTransfer(transfer.id), 'Transfer cancelled')}
               disabled={acting}
             >
@@ -450,7 +458,7 @@ export default function TransferDetail({ transferId, role }: Props) {
         </div>
 
         {showReject && status === 'SENT' && isSourceSide && (
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-red-100 space-y-2">
+          <div className="bg-card rounded-xl p-4 shadow-sm border border-destructive/30 space-y-2">
             <Label className="text-sm font-medium">Rejection reason</Label>
             <Textarea
               value={rejectReason}
@@ -462,7 +470,7 @@ export default function TransferDetail({ transferId, role }: Props) {
             <div className="flex justify-end">
               <Button
                 variant="outline"
-                className="text-red-500"
+                className="text-destructive"
                 disabled={!rejectReason.trim() || acting}
                 onClick={() =>
                   run(() => rejectTransfer(transfer.id, rejectReason.trim()), 'Request rejected')

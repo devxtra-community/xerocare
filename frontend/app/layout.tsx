@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToasterProvider } from '@/components/ToasterProvider';
@@ -32,6 +33,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="xerocare-theme-init" strategy="beforeInteractive">
+          {`try { if (localStorage.getItem('xerocare-theme') === 'dark') document.documentElement.classList.add('dark'); } catch {}`}
+        </Script>
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning

@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Landmark, AlertCircle, CheckCircle, FileText } from 'lucide-react';
+import StatCard from '@/components/StatCard';
 import { OpeningBalanceEntry } from '@/lib/openingBalance';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -29,87 +28,38 @@ export default function OpeningBalanceSummaryCards({ entries }: SummaryCardsProp
   const totalActiveCount = entries.length - totalSettledCount;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <Card className="rounded-2xl border-none shadow-sm bg-card overflow-hidden">
-        <CardContent className="p-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase font-medium">
-              Total Migrated Value
-            </p>
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-              {getActiveCurrency()}{' '}
-              {totalOriginal.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1">From all live contracts & debts</p>
-          </div>
-          <div className="p-3 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500">
-            <Landmark className="h-6 w-6" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-none shadow-sm bg-card overflow-hidden">
-        <CardContent className="p-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase font-medium">
-              Remaining Outstanding
-            </p>
-            <h3 className="text-2xl font-bold text-amber-600 dark:text-amber-500 mt-1">
-              {getActiveCurrency()}{' '}
-              {totalRemaining.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1">To be collected post go-live</p>
-          </div>
-          <div className="p-3 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-500">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-none shadow-sm bg-card overflow-hidden">
-        <CardContent className="p-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase font-medium">
-              Total Paid / Settled
-            </p>
-            <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-500 mt-1">
-              {getActiveCurrency()}{' '}
-              {(totalPaid + totalCollectedSinceGoLive).toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              {getActiveCurrency()} {totalCollectedSinceGoLive.toLocaleString()} collected since
-              go-live
-            </p>
-          </div>
-          <div className="p-3 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500">
-            <CheckCircle className="h-6 w-6" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-none shadow-sm bg-card overflow-hidden">
-        <CardContent className="p-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase font-medium">Active Migrations</p>
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-              {totalActiveCount} Entries
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1">{totalSettledCount} fully settled</p>
-          </div>
-          <div className="p-3 rounded-full bg-slate-50 dark:bg-slate-900/20 text-slate-500">
-            <FileText className="h-6 w-6" />
-          </div>
-        </CardContent>
-      </Card>
+    <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 md:gap-4 lg:grid-cols-4">
+      <StatCard
+        title="Total Migrated Value"
+        value={`${getActiveCurrency()} ${totalOriginal.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`}
+        subtitle="From all live contracts & debts"
+      />
+      <StatCard
+        title="Remaining Outstanding"
+        value={`${getActiveCurrency()} ${totalRemaining.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`}
+        subtitle="To be collected post go-live"
+        tone="warning"
+      />
+      <StatCard
+        title="Total Paid / Settled"
+        value={`${getActiveCurrency()} ${(totalPaid + totalCollectedSinceGoLive).toLocaleString(
+          'en-US',
+          { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+        )}`}
+        subtitle={`${getActiveCurrency()} ${totalCollectedSinceGoLive.toLocaleString()} collected since go-live`}
+        tone="positive"
+      />
+      <StatCard
+        title="Active Migrations"
+        value={`${totalActiveCount} Entries`}
+        subtitle={`${totalSettledCount} fully settled`}
+      />
     </div>
   );
 }

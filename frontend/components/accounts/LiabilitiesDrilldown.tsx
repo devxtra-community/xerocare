@@ -77,7 +77,7 @@ const payableColumns: DrilldownColumn<PayableRow>[] = [
   { header: 'Vendor', render: (r) => <span className="text-sm font-medium">{r.vendorName}</span> },
   {
     header: 'Reference',
-    render: (r) => <span className="font-mono text-xs text-blue-600">{r.reference}</span>,
+    render: (r) => <span className="font-mono text-xs text-primary">{r.reference}</span>,
   },
   {
     header: 'Date',
@@ -104,7 +104,7 @@ const payableColumns: DrilldownColumn<PayableRow>[] = [
     header: 'Paid',
     align: 'right',
     render: (r) => (
-      <span className="tabular-nums text-xs text-emerald-600">
+      <span className="tabular-nums text-xs text-success">
         {formatCurrency(r.paid, r.currency)}
       </span>
     ),
@@ -113,7 +113,7 @@ const payableColumns: DrilldownColumn<PayableRow>[] = [
     header: 'Outstanding',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(r.outstanding, r.currency)}
       </span>
     ),
@@ -124,10 +124,10 @@ const payableColumns: DrilldownColumn<PayableRow>[] = [
       <span
         className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
           r.aging === 'Current'
-            ? 'bg-emerald-50 text-emerald-700'
+            ? 'bg-success/10 text-success'
             : r.aging === '90+ days'
-              ? 'bg-red-50 text-red-700'
-              : 'bg-amber-50 text-amber-700'
+              ? 'bg-destructive/10 text-destructive'
+              : 'bg-warning/10 text-warning'
         }`}
       >
         {r.aging}
@@ -216,7 +216,7 @@ const accruedColumns: DrilldownColumn<ExpenseEntry>[] = [
   {
     header: 'Approval Status',
     render: () => (
-      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-success/10 text-success">
         APPROVED
       </span>
     ),
@@ -225,7 +225,7 @@ const accruedColumns: DrilldownColumn<ExpenseEntry>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(r.netAmount), r.currency)}
       </span>
     ),
@@ -294,10 +294,10 @@ const vatColumns: DrilldownColumn<VatRow>[] = [
       <span
         className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
           r.rowType === 'OUTPUT_VAT'
-            ? 'bg-red-50 text-red-700'
+            ? 'bg-destructive/10 text-destructive'
             : r.rowType === 'INPUT_VAT_CREDIT'
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-blue-50 text-blue-700'
+              ? 'bg-success/10 text-success'
+              : 'bg-primary/10 text-primary'
         }`}
       >
         {r.rowType === 'OUTPUT_VAT'
@@ -310,7 +310,7 @@ const vatColumns: DrilldownColumn<VatRow>[] = [
   },
   {
     header: 'Reference',
-    render: (r) => <span className="font-mono text-xs text-blue-600">{r.reference}</span>,
+    render: (r) => <span className="font-mono text-xs text-primary">{r.reference}</span>,
   },
   {
     header: 'Date',
@@ -324,7 +324,7 @@ const vatColumns: DrilldownColumn<VatRow>[] = [
     align: 'right',
     render: (r) => (
       <span
-        className={`font-bold tabular-nums ${r.amount < 0 ? 'text-emerald-600' : 'text-slate-800'}`}
+        className={`font-bold tabular-nums ${r.amount < 0 ? 'text-success' : 'text-foreground'}`}
       >
         {r.amount < 0 ? '−' : '+'}
         {formatCurrency(Math.abs(r.amount), r.currency)}
@@ -437,7 +437,7 @@ export function SecurityDepositsModal({
       columns={[
         {
           header: 'Contract Ref',
-          render: (r) => <span className="font-mono text-xs text-blue-600">{r.invoiceNumber}</span>,
+          render: (r) => <span className="font-mono text-xs text-primary">{r.invoiceNumber}</span>,
         },
         { header: 'Customer', render: (r) => <span className="text-sm">{r.customerName}</span> },
         {
@@ -454,7 +454,7 @@ export function SecurityDepositsModal({
           header: 'Amount',
           align: 'right',
           render: (r) => (
-            <span className="font-bold tabular-nums text-slate-800">
+            <span className="font-bold tabular-nums text-foreground">
               {formatCurrency(r.amount, r.currencyCode)}
             </span>
           ),
@@ -495,7 +495,7 @@ export function DeferredRevenueModal({
       columns={[
         {
           header: 'Contract Ref',
-          render: (r) => <span className="font-mono text-xs text-blue-600">{r.invoiceNumber}</span>,
+          render: (r) => <span className="font-mono text-xs text-primary">{r.invoiceNumber}</span>,
         },
         { header: 'Customer', render: (r) => <span className="text-sm">{r.customerName}</span> },
         {
@@ -518,7 +518,7 @@ export function DeferredRevenueModal({
           header: 'Applied',
           align: 'right',
           render: (r) => (
-            <span className="tabular-nums text-xs text-emerald-600">
+            <span className="tabular-nums text-xs text-success">
               {formatCurrency(r.advanceAdjustedSoFar, r.currencyCode)}
             </span>
           ),
@@ -527,7 +527,7 @@ export function DeferredRevenueModal({
           header: 'Unearned',
           align: 'right',
           render: (r) => (
-            <span className="font-bold tabular-nums text-slate-800">
+            <span className="font-bold tabular-nums text-foreground">
               {formatCurrency(r.amount, r.currencyCode)}
             </span>
           ),
@@ -567,7 +567,7 @@ const salaryPayableColumns: DrilldownColumn<ManualPayable>[] = [
   {
     header: 'Status',
     render: (r) => (
-      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-warning/10 text-warning">
         {r.status}
       </span>
     ),
@@ -576,7 +576,7 @@ const salaryPayableColumns: DrilldownColumn<ManualPayable>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(r.outstanding), r.currency)}
       </span>
     ),

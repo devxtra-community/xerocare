@@ -51,11 +51,14 @@ import { useMutation } from '@tanstack/react-query';
 
 // ─── Purchase Request Stats ───────────────────────────────────────────────────
 const REQ_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  PENDING: { label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-200' },
-  SUBMITTED: { label: 'Awaiting Approval', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-700 border-red-200' },
-  PAID: { label: 'Paid', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  PENDING: { label: 'Draft', color: 'bg-muted text-foreground border-border' },
+  SUBMITTED: { label: 'Awaiting Approval', color: 'bg-primary/10 text-primary border-primary/30' },
+  APPROVED: { label: 'Approved', color: 'bg-success/10 text-success border-success/30' },
+  REJECTED: {
+    label: 'Rejected',
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
+  },
+  PAID: { label: 'Paid', color: 'bg-lease/10 text-lease border-lease/30' },
 };
 
 // ─── Quick Reject Modal ───────────────────────────────────────────────────────
@@ -78,10 +81,10 @@ function RejectModal({ expense, onClose }: { expense: ExpenseRequest; onClose: (
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Reject Payment Request</h2>
+          <h2 className="font-bold text-foreground">Reject Payment Request</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -89,7 +92,7 @@ function RejectModal({ expense, onClose }: { expense: ExpenseRequest; onClose: (
         <div className="px-6 py-4 space-y-3">
           <p className="text-sm text-muted-foreground">
             Purchase payment for{' '}
-            <span className="font-semibold text-slate-700">{expense.vendorName || 'Vendor'}</span>{' '}
+            <span className="font-semibold text-foreground">{expense.vendorName || 'Vendor'}</span>{' '}
             will be rejected.
           </p>
           <div>
@@ -102,7 +105,7 @@ function RejectModal({ expense, onClose }: { expense: ExpenseRequest; onClose: (
               placeholder="Explain why… (min 20 characters)"
             />
             {reason && reason.length < 20 && (
-              <p className="text-xs text-red-600 mt-1">Min 20 characters required</p>
+              <p className="text-xs text-destructive mt-1">Min 20 characters required</p>
             )}
           </div>
         </div>
@@ -113,7 +116,7 @@ function RejectModal({ expense, onClose }: { expense: ExpenseRequest; onClose: (
           <Button
             onClick={() => mut.mutate()}
             disabled={reason.length < 20 || mut.isPending}
-            className="bg-red-600 text-white hover:bg-red-700"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {mut.isPending ? 'Rejecting...' : 'Confirm Rejection'}
           </Button>
@@ -299,7 +302,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
       </div>
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
+      <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -381,9 +384,9 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
 
       {/* Purchase Requests Table */}
       {showRequests && (
-        <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-700">Purchase Payment Requests</h3>
+            <h3 className="text-sm font-bold text-foreground">Purchase Payment Requests</h3>
             <span className="text-xs text-muted-foreground">{filteredRequests.length} records</span>
           </div>
           {reqLoading ? (
@@ -429,13 +432,13 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                     const cfg = REQ_STATUS_CONFIG[r.status] ?? REQ_STATUS_CONFIG.PENDING;
                     const isChequeMode = (r.paymentMode ?? '').toLowerCase() === 'cheque';
                     return (
-                      <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                      <TableRow key={r.id} className="hover:bg-primary/10 transition-colors">
                         <TableCell className="pl-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
                           {r.submittedAt
                             ? new Date(r.submittedAt).toLocaleDateString()
                             : r.createdAt?.slice(0, 10)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-blue-600 font-bold whitespace-nowrap">
+                        <TableCell className="font-mono text-xs text-primary font-bold whitespace-nowrap">
                           {r.requestNo}
                         </TableCell>
                         <TableCell>
@@ -450,7 +453,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                                 not to the vendor named above — approving it must not be
                                 read as settling the vendor's invoice. */}
                             {r.purchaseCostType && (
-                              <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                              <span className="mt-1 inline-block rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">
                                 {r.purchaseCostType} cost — not vendor payment
                               </span>
                             )}
@@ -458,7 +461,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                                 already inside their invoice, so approving it must never
                                 be read as paying the vendor again. */}
                             {r.taxRecordId && (
-                              <span className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                              <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                                 {r.taxType === 'REVERSE_CHARGE_VAT'
                                   ? 'Reverse-charge VAT'
                                   : 'Input VAT'}{' '}
@@ -471,16 +474,16 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                               isChequeMode
-                                ? 'bg-purple-100 text-purple-700'
+                                ? 'bg-lease/10 text-lease'
                                 : (r.paymentMode ?? '').toLowerCase().includes('cash')
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-blue-100 text-blue-700'
+                                  ? 'bg-success/10 text-success'
+                                  : 'bg-primary/10 text-primary'
                             }`}
                           >
                             {r.paymentMode ?? 'Cash/Bank'}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-bold text-red-600 whitespace-nowrap">
+                        <TableCell className="text-right font-bold text-destructive whitespace-nowrap">
                           {formatCurrency(Number(r.amount), r.currency)}
                         </TableCell>
                         <TableCell>
@@ -494,7 +497,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setViewingReq(r)}
-                              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
                               title="View details"
                             >
                               <Eye className="h-3.5 w-3.5" />
@@ -503,14 +506,14 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                               <>
                                 <button
                                   onClick={() => setViewingReq(r)}
-                                  className="px-2 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+                                  className="px-2 py-1 rounded-md bg-success text-success-foreground text-[11px] font-semibold hover:bg-success/90"
                                 >
                                   <CheckCircle2 className="h-3 w-3 inline mr-0.5" />
                                   {isChequeMode ? 'Approve & Issue' : 'Approve'}
                                 </button>
                                 <button
                                   onClick={() => setRejectingReq(r)}
-                                  className="px-2 py-1 rounded-md bg-red-100 text-red-600 text-[11px] font-semibold hover:bg-red-200"
+                                  className="px-2 py-1 rounded-md bg-destructive/10 text-destructive text-[11px] font-semibold hover:bg-destructive/10"
                                 >
                                   <XCircle className="h-3 w-3 inline mr-0.5" />
                                   Reject
@@ -540,9 +543,9 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
 
       {/* Vendor Cheques (Issued) Table */}
       {showCheques && (
-        <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-700">Vendor Cheques (Issued)</h3>
+            <h3 className="text-sm font-bold text-foreground">Vendor Cheques (Issued)</h3>
             <span className="text-xs text-muted-foreground">{issuedCheques.length} records</span>
           </div>
           {chequeLoading ? (
@@ -584,32 +587,32 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                       return (
                         <tr
                           key={c.id}
-                          className={`transition-colors ${isOverdue ? 'bg-red-50/40' : 'hover:bg-muted/20'}`}
+                          className={`transition-colors ${isOverdue ? 'bg-destructive/10' : 'hover:bg-muted/20'}`}
                         >
-                          <td className="px-4 py-3 font-mono text-gray-700 text-xs">
+                          <td className="px-4 py-3 font-mono text-foreground text-xs">
                             {c.chequeNo}
                           </td>
                           <td className="px-4 py-3">
-                            <p className="font-medium text-gray-800 max-w-[140px] truncate">
+                            <p className="font-medium text-foreground max-w-[140px] truncate">
                               {c.partyName}
                             </p>
-                            <p className="text-xs text-gray-400">{c.bankName ?? '—'}</p>
+                            <p className="text-xs text-muted-foreground">{c.bankName ?? '—'}</p>
                           </td>
-                          <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                          <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                             {formatCurrency(c.amount, currency)}
                           </td>
                           <td
-                            className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+                            className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-destructive font-bold' : 'text-muted-foreground'}`}
                           >
                             {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
-                            {isOverdue && <span className="ml-1 text-red-500">⚠</span>}
+                            {isOverdue && <span className="ml-1 text-destructive">⚠</span>}
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                          <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                             {c.issueDate ? String(c.issueDate).slice(0, 10) : '—'}
                           </td>
                           <td className="px-4 py-3">
                             <span
-                              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
+                              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_STATUS_BADGE[c.status] ?? 'bg-muted text-foreground'}`}
                             >
                               {CHEQUE_STATUS_ICON[c.status]}
                               {c.status}
@@ -619,14 +622,14 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                             <div className="flex gap-1 flex-wrap items-center">
                               <button
                                 onClick={() => setViewCheque(c)}
-                                className="text-xs font-medium px-2 py-1 rounded-md transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+                                className="text-xs font-medium px-2 py-1 rounded-md transition-colors bg-muted text-foreground hover:bg-muted inline-flex items-center gap-1"
                               >
                                 <Eye className="h-3.5 w-3.5" /> View
                               </button>
                               {c.status === 'PENDING' && (
                                 <button
                                   onClick={() => setActionState({ cheque: c, action: 'issue' })}
-                                  className="text-xs font-medium px-2 py-1 rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200"
+                                  className="text-xs font-medium px-2 py-1 rounded-md bg-lease/10 text-lease hover:bg-lease/10"
                                 >
                                   Issue
                                 </button>
@@ -634,7 +637,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                               {['ISSUED'].includes(c.status) && (
                                 <button
                                   onClick={() => setActionState({ cheque: c, action: 'clear' })}
-                                  className="text-xs font-medium px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                  className="text-xs font-medium px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/10"
                                 >
                                   Clear
                                 </button>
@@ -642,7 +645,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                               {['ISSUED'].includes(c.status) && (
                                 <button
                                   onClick={() => setActionState({ cheque: c, action: 'bounce' })}
-                                  className="text-xs font-medium px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                                  className="text-xs font-medium px-2 py-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/10"
                                 >
                                   Bounce
                                 </button>
@@ -650,7 +653,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                               {c.status === 'PENDING' && (
                                 <button
                                   onClick={() => setActionState({ cheque: c, action: 'cancel' })}
-                                  className="text-xs font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                  className="text-xs font-medium px-2 py-1 rounded-md bg-muted text-foreground hover:bg-muted"
                                 >
                                   Cancel
                                 </button>
@@ -678,9 +681,9 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
       )}
 
       {/* Customer Refund Payables Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-700">Customer Refunds (Payable)</h3>
+          <h3 className="text-sm font-bold text-foreground">Customer Refunds (Payable)</h3>
           <span className="text-xs text-muted-foreground">{customerRefunds.length} records</span>
         </div>
         {refundLoading ? (
@@ -725,25 +728,25 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                 refundPaging.pageRows.map((r) => {
                   const statusColor =
                     r.status === 'PAID'
-                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                      ? 'bg-success/10 text-success border-success/30'
                       : r.status === 'PARTIAL'
-                        ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                        ? 'bg-warning/10 text-warning border-warning/30'
                         : r.status === 'OVERDUE'
-                          ? 'bg-red-100 text-red-700 border-red-200'
-                          : 'bg-blue-100 text-blue-700 border-blue-200';
+                          ? 'bg-destructive/10 text-destructive border-destructive/30'
+                          : 'bg-primary/10 text-primary border-primary/30';
                   return (
-                    <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                    <TableRow key={r.id} className="hover:bg-primary/10 transition-colors">
                       <TableCell className="pl-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
                         {r.issueDate?.slice(0, 10)}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-blue-600 font-bold whitespace-nowrap">
+                      <TableCell className="font-mono text-xs text-primary font-bold whitespace-nowrap">
                         {r.referenceNo}
                       </TableCell>
                       <TableCell className="text-sm font-medium">{r.payableTo}</TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate">
                         {r.description}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-red-600 whitespace-nowrap">
+                      <TableCell className="text-right font-bold text-destructive whitespace-nowrap">
                         {formatCurrency(Number(r.amount), currency)}
                       </TableCell>
                       <TableCell>
@@ -756,7 +759,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                       <TableCell className="pr-4">
                         <button
                           onClick={() => setViewRefund(r)}
-                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
                           title="View / Record Payment"
                         >
                           <Eye className="h-3.5 w-3.5" />

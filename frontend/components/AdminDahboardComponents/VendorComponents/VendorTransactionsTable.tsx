@@ -69,14 +69,14 @@ export default function VendorTransactionsTable({
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Transactions
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search items, branch or manager..."
                 value={searchQuery}
@@ -88,13 +88,13 @@ export default function VendorTransactionsTable({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Actions
             </label>
             <Button
               variant="outline"
               onClick={() => window.location.reload()}
-              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+              className="h-9 text-xs w-full justify-center gap-2 border-border hover:bg-muted"
             >
               Refresh Data
             </Button>
@@ -102,11 +102,11 @@ export default function VendorTransactionsTable({
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm overflow-hidden h-full flex flex-col p-4 border border-gray-100">
+      <div className="bg-card rounded-xl shadow-sm overflow-hidden h-full flex flex-col p-4 border border-border">
         <div className="overflow-x-auto flex-1 mb-4">
           <Table>
             <TableHeader>
-              <TableRow className="hover:bg-transparent bg-blue-50/30">
+              <TableRow className="hover:bg-transparent bg-primary/10">
                 <TableHead className="text-[10px] font-bold text-primary uppercase px-4 py-4">
                   Date
                 </TableHead>
@@ -134,14 +134,14 @@ export default function VendorTransactionsTable({
               {currentData.map((item, index) => (
                 <TableRow
                   key={item.id}
-                  className={`hover:bg-blue-50/20 transition-colors border-b border-gray-50 ${
-                    index % 2 ? 'bg-blue-50/10' : 'bg-card'
+                  className={`hover:bg-primary/10 transition-colors border-b border-border ${
+                    index % 2 ? 'bg-primary/10' : 'bg-card'
                   }`}
                 >
                   <TableCell className="px-4 py-4 text-xs font-medium text-foreground whitespace-nowrap">
                     {format(new Date(item.created_at), 'dd MMM yyyy')}
                   </TableCell>
-                  <TableCell className="px-4 py-4 text-xs text-gray-700 max-w-[200px] truncate font-medium">
+                  <TableCell className="px-4 py-4 text-xs text-foreground max-w-[200px] truncate font-medium">
                     {item.products}
                   </TableCell>
                   <TableCell className="px-4 py-4 text-xs font-bold text-primary">
@@ -150,24 +150,24 @@ export default function VendorTransactionsTable({
                       : '-'}
                   </TableCell>
                   <TableCell className="px-4 py-4 text-xs">
-                    <div className="flex items-center gap-1.5 text-blue-700 font-semibold bg-blue-50/50 px-2 py-1 rounded-md w-fit">
+                    <div className="flex items-center gap-1.5 text-primary font-semibold bg-primary/10 px-2 py-1 rounded-md w-fit">
                       <Building2 size={12} />
                       {item.branch?.name || 'Main Branch'}
                     </div>
                   </TableCell>
                   <TableCell className="px-4 py-4 text-xs">
                     <div className="flex flex-col">
-                      <span className="font-bold text-gray-900 flex items-center gap-1">
-                        <User size={12} className="text-blue-500" />
+                      <span className="font-bold text-foreground flex items-center gap-1">
+                        <User size={12} className="text-primary" />
                         {item.manager?.name || 'Manager'}
                       </span>
-                      <span className="text-[10px] text-gray-400 font-medium">
+                      <span className="text-[10px] text-muted-foreground font-medium">
                         {item.manager?.email || '-'}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell className="px-4 py-4 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-tight">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-success/10 text-success uppercase tracking-tight">
                       Sent
                     </span>
                   </TableCell>
@@ -175,7 +175,7 @@ export default function VendorTransactionsTable({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-blue-400 hover:text-primary hover:bg-blue-50"
+                      className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                     >
                       <FileText className="h-4 w-4" />
                     </Button>

@@ -37,7 +37,7 @@ export default function HRPayrollStats({
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="h-32 bg-card rounded-xl border border-gray-100 flex items-center justify-center"
+            className="h-32 bg-card rounded-xl border border-border flex items-center justify-center"
           >
             <Loader2 className="h-6 w-6 animate-spin text-primary/20" />
           </div>

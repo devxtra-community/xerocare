@@ -114,8 +114,8 @@ export default function EmployeeProfilePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 p-6 space-y-4">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-        <p className="text-sm font-medium text-slate-500">Loading employee details...</p>
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm font-medium text-muted-foreground">Loading employee details...</p>
       </div>
     );
   }
@@ -123,8 +123,11 @@ export default function EmployeeProfilePage() {
   if (!employee) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 p-6 space-y-4">
-        <p className="text-lg font-bold text-slate-800">Employee not found</p>
-        <Button onClick={() => router.back()} className="bg-blue-600 hover:bg-blue-700 text-white">
+        <p className="text-lg font-bold text-foreground">Employee not found</p>
+        <Button
+          onClick={() => router.back()}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
         </Button>
       </div>
@@ -185,7 +188,7 @@ export default function EmployeeProfilePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-medium shadow-sm">
+            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-medium shadow-sm">
               {fullName.charAt(0)}
             </div>
             <div>
@@ -194,8 +197,8 @@ export default function EmployeeProfilePage() {
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
                     employee.status === 'ACTIVE'
-                      ? 'bg-green-50 text-green-700 border-green-100'
-                      : 'bg-orange-50 text-orange-700 border-orange-100'
+                      ? 'bg-success/10 text-success border-success/30'
+                      : 'bg-warning/10 text-warning border-warning/30'
                   }`}
                 >
                   {statusLabel}
@@ -214,7 +217,7 @@ export default function EmployeeProfilePage() {
         {/* PERSONAL INFO */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-border">
               <User className="h-4 w-4 text-muted-foreground" /> Personal Information
             </h4>
             <div className="space-y-5">
@@ -230,7 +233,7 @@ export default function EmployeeProfilePage() {
           </div>
 
           <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-border">
               <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Documents
             </h4>
             <div className="space-y-3">
@@ -253,7 +256,7 @@ export default function EmployeeProfilePage() {
 
           {isSelfView && (
             <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-border">
                 <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Account
               </h4>
               <div className="grid grid-cols-2 gap-2">
@@ -279,7 +282,7 @@ export default function EmployeeProfilePage() {
         {/* WORK INFO */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-border">
               <Briefcase className="h-4 w-4 text-muted-foreground" /> Employment Details
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
@@ -308,7 +311,7 @@ export default function EmployeeProfilePage() {
           </div>
 
           <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-border">
               <Clock className="h-4 w-4 text-muted-foreground" /> Recent Activity
             </h4>
             {activityLoading ? (
@@ -324,15 +327,15 @@ export default function EmployeeProfilePage() {
                 {activity.map((a) => (
                   <div
                     key={a.id}
-                    className="flex items-center justify-between gap-4 py-3 border-b border-gray-50 last:border-0"
+                    className="flex items-center justify-between gap-4 py-3 border-b border-border last:border-0"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary">
                           {SALE_TYPE_LABELS[a.saleType] || a.saleType}
                         </span>
                         {a.returnCount > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-600">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-destructive/10 text-destructive">
                             <Undo2 className="h-3 w-3" />
                             {a.returnCount > 1 ? `${a.returnCount} Returns` : 'Returned'}
                           </span>
@@ -388,7 +391,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-4">
-      <div className="mt-0.5 text-gray-400 *:h-4 *:w-4">{icon}</div>
+      <div className="mt-0.5 text-muted-foreground *:h-4 *:w-4">{icon}</div>
       <div className="space-y-1">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         <p className={`text-sm font-medium ${isCritical ? 'text-primary' : 'text-foreground'}`}>
@@ -411,9 +414,9 @@ function DocumentRow({
   loading: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-muted/50 transition-colors">
+    <div className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 bg-gray-100 text-muted-foreground rounded flex items-center justify-center">
+        <div className="h-8 w-8 bg-muted text-muted-foreground rounded flex items-center justify-center">
           <FileText className="h-4 w-4" />
         </div>
         <div className="flex flex-col">

@@ -224,7 +224,7 @@ export default function LeadDialog({ open, onOpenChange, initialData, onSave }: 
             </Button>
             <Button
               type="submit"
-              className="bg-primary text-white flex items-center gap-2"
+              className="bg-primary text-primary-foreground flex items-center gap-2"
               disabled={loading}
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}

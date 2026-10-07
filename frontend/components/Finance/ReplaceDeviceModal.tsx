@@ -233,13 +233,15 @@ export default function ReplaceDeviceModal({
       <DialogContent className="sm:max-w-md p-6 bg-card rounded-xl">
         <DialogHeader className="mb-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
               <RefreshCw size={20} />
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold text-gray-800">Replace Device</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-foreground">
+                Replace Device
+              </DialogTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Replacing <span className="font-bold text-gray-700">{oldSerialNumber}</span>
+                Replacing <span className="font-bold text-foreground">{oldSerialNumber}</span>
               </p>
             </div>
           </div>
@@ -247,7 +249,7 @@ export default function ReplaceDeviceModal({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-gray-600 uppercase">New Serial Number</Label>
+            <Label className="text-xs font-bold text-foreground uppercase">New Serial Number</Label>
             <SearchableSelect
               options={productOptions}
               value={formData.newSerialNumber}
@@ -259,7 +261,7 @@ export default function ReplaceDeviceModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-gray-600 uppercase">Replacement Time</Label>
+            <Label className="text-xs font-bold text-foreground uppercase">Replacement Time</Label>
             <Input
               type="datetime-local"
               value={formData.replacementDate}
@@ -268,7 +270,7 @@ export default function ReplaceDeviceModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-gray-600 uppercase">
+            <Label className="text-xs font-bold text-foreground uppercase">
               Current Final Meter Reading (Old Device)
             </Label>
             <div className="grid grid-cols-2 gap-3">
@@ -300,7 +302,7 @@ export default function ReplaceDeviceModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-blue-600 uppercase">
+            <Label className="text-xs font-bold text-primary uppercase">
               New Device Initial Meter
             </Label>
             <div className="grid grid-cols-2 gap-3">
@@ -332,7 +334,7 @@ export default function ReplaceDeviceModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-gray-600 uppercase">Reason</Label>
+            <Label className="text-xs font-bold text-foreground uppercase">Reason</Label>
             <Textarea
               value={formData.replacementReason}
               onChange={(e) => setFormData({ ...formData, replacementReason: e.target.value })}
@@ -346,14 +348,14 @@ export default function ReplaceDeviceModal({
           <Button
             variant="ghost"
             onClick={onClose}
-            className="flex-1 rounded-xl text-gray-600 hover:bg-gray-100 font-bold h-10"
+            className="flex-1 rounded-xl text-foreground hover:bg-muted font-bold h-10"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={loading || fetchingProducts}
-            className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 shadow-lg shadow-blue-500/20 transition-all"
+            className="flex-1 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-10 shadow-lg shadow-primary/20 transition-all"
           >
             {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
             Replace Device

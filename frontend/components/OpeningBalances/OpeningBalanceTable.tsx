@@ -43,24 +43,24 @@ export default function OpeningBalanceTable({
   const getBalanceTypeClass = (type: string) => {
     switch (type) {
       case 'SALE_OUTSTANDING':
-        return 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400';
+        return 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary';
       case 'RENT_CONTRACT':
-        return 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400';
+        return 'bg-lease/10 text-lease dark:bg-lease/20 dark:text-lease';
       case 'LEASE_CONTRACT':
-        return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400';
+        return 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary';
       case 'SERVICE_DEBT':
-        return 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-400';
+        return 'bg-info/10 text-info dark:bg-info/20 dark:text-info';
       default:
-        return 'bg-slate-50 text-slate-700 dark:bg-slate-900/20 dark:text-slate-400';
+        return 'bg-muted text-foreground dark:bg-foreground/20 dark:text-muted-foreground';
     }
   };
 
   return (
-    <div className="w-full overflow-hidden bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+    <div className="w-full overflow-hidden bg-card dark:bg-foreground rounded-2xl shadow-sm border border-border dark:border-border">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-xs font-semibold uppercase text-slate-500 tracking-wider">
+            <tr className="border-b border-border dark:border-border bg-muted/50 dark:bg-foreground/50 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
               <th className="py-4 px-6">Entry Number</th>
               <th className="py-4 px-6">Customer</th>
               <th className="py-4 px-6">Branch</th>
@@ -71,7 +71,7 @@ export default function OpeningBalanceTable({
               <th className="py-4 px-6 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-300">
+          <tbody className="divide-y divide-border dark:divide-border text-sm text-foreground dark:text-muted-foreground">
             {entries.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-muted-foreground">
@@ -88,16 +88,16 @@ export default function OpeningBalanceTable({
                 return (
                   <tr
                     key={entry.id}
-                    className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
+                    className="hover:bg-muted/50 dark:hover:bg-foreground/20 transition-colors"
                   >
-                    <td className="py-4 px-6 font-medium text-slate-900 dark:text-slate-100">
+                    <td className="py-4 px-6 font-medium text-foreground dark:text-muted-foreground">
                       <div>{entry.entryNumber}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {new Date(entry.migratedAt).toLocaleDateString()}
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      <span className="font-semibold text-foreground dark:text-muted-foreground">
                         {customerNames[entry.customerId] || 'Loading customer...'}
                       </span>
                       <span className="block text-xs text-muted-foreground">
@@ -105,7 +105,7 @@ export default function OpeningBalanceTable({
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                      <span className="font-medium text-foreground dark:text-muted-foreground">
                         {entry.branchName || 'Unknown Branch'}
                       </span>
                     </td>
@@ -130,7 +130,7 @@ export default function OpeningBalanceTable({
                         })}
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-right font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="py-4 px-6 text-right font-semibold text-foreground dark:text-muted-foreground">
                       {getActiveCurrency()}{' '}
                       {Number(entry.remainingBalance).toLocaleString('en-US', {
                         minimumFractionDigits: 2,
@@ -140,8 +140,8 @@ export default function OpeningBalanceTable({
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                           entry.isFullySettled
-                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
-                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'
+                            ? 'bg-success/10 text-success dark:bg-success/30 dark:text-success'
+                            : 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning'
                         }`}
                       >
                         {entry.isFullySettled ? 'Fully Settled' : 'Outstanding'}
@@ -151,7 +151,7 @@ export default function OpeningBalanceTable({
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => onSelect(entry)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-foreground transition"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
@@ -159,7 +159,7 @@ export default function OpeningBalanceTable({
                         {['ADMIN', 'FINANCE'].includes(userRole) && !entry.isFullySettled && (
                           <button
                             onClick={() => onRecordPayment(entry)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-success hover:bg-success/10 dark:hover:bg-success/20 transition"
                             title="Record Payment"
                           >
                             <CreditCard className="h-4 w-4" />
@@ -170,8 +170,8 @@ export default function OpeningBalanceTable({
                           disabled={!canMutate}
                           className={`p-1.5 rounded-lg transition ${
                             canMutate
-                              ? 'text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                              : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                              ? 'text-muted-foreground hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20'
+                              : 'text-muted-foreground dark:text-foreground cursor-not-allowed'
                           }`}
                           title={canMutate ? 'Edit Entry' : 'Cannot edit entry (payments recorded)'}
                         >
@@ -182,8 +182,8 @@ export default function OpeningBalanceTable({
                           disabled={!canMutate}
                           className={`p-1.5 rounded-lg transition ${
                             canMutate
-                              ? 'text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                              : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                              ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
+                              : 'text-muted-foreground dark:text-foreground cursor-not-allowed'
                           }`}
                           title={
                             canMutate ? 'Delete Entry' : 'Cannot delete entry (payments recorded)'

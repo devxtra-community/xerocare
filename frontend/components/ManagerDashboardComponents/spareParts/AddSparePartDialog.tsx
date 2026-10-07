@@ -328,7 +328,7 @@ export default function AddSparePartDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2 col-span-2">
               <Label>
-                Lot Selection <span className="text-red-500">*</span>
+                Lot Selection <span className="text-destructive">*</span>
               </Label>
               <SearchableSelect
                 value={formData.lot_id}
@@ -382,7 +382,7 @@ export default function AddSparePartDialog({
             {formData.lot_id && (
               <div className="space-y-2 col-span-2">
                 <Label>
-                  Select Spare Part from Lot <span className="text-red-500">*</span>
+                  Select Spare Part from Lot <span className="text-destructive">*</span>
                 </Label>
                 <SearchableSelect
                   value={selectedLotItemId}
@@ -469,8 +469,8 @@ export default function AddSparePartDialog({
                         <span
                           className={
                             remaining >= 0 && requested > 0
-                              ? 'text-green-600 font-medium'
-                              : 'text-red-500 font-bold'
+                              ? 'text-success font-medium'
+                              : 'text-destructive font-bold'
                           }
                         >
                           {remaining >= 0 && requested > 0

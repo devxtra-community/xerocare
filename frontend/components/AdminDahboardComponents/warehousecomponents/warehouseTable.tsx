@@ -108,10 +108,10 @@ export default function WarehouseReport() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* WAREHOUSES */}
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Warehouses</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Warehouses</h3>
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
@@ -139,7 +139,7 @@ export default function WarehouseReport() {
 
         <div className="flex items-center justify-between pt-2">
           <div className="relative w-[260px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search warehouse"
               value={search}
@@ -149,7 +149,7 @@ export default function WarehouseReport() {
           </div>
 
           <Button
-            className="bg-primary text-white gap-2"
+            className="bg-primary text-primary-foreground gap-2"
             onClick={() => {
               setEditingWarehouse(null);
               setFormOpen(true);
@@ -189,7 +189,7 @@ export default function WarehouseReport() {
               {warehousePaging.pageRows.map((w, i) => (
                 <tr
                   key={w.id}
-                  className={`border-b border-gray-100 ${i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
+                  className={`border-b border-border ${i % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}`}
                 >
                   <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
                   <td className="px-4 py-3 text-sm text-primary font-medium">{w.warehouseCode}</td>
@@ -202,8 +202,8 @@ export default function WarehouseReport() {
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         w.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-destructive/10 text-destructive'
                       }`}
                     >
                       {w.status}
@@ -221,7 +221,7 @@ export default function WarehouseReport() {
                         Edit
                       </button>
                       <button
-                        className="text-red-600 hover:underline"
+                        className="text-destructive hover:underline"
                         onClick={() => setDeleteWarehouseData(w)}
                       >
                         Delete
@@ -281,13 +281,13 @@ function ConfirmDeleteModal({
     <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <div className="flex items-center gap-4 text-red-600 mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-sm">
+          <div className="flex items-center gap-4 text-destructive mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive shadow-sm">
               <Trash2 className="h-6 w-6" />
             </div>
             <DialogTitle className="text-xl font-bold text-primary">Delete Warehouse</DialogTitle>
           </div>
-          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+          <DialogDescription className="text-base text-foreground leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?
           </DialogDescription>
         </DialogHeader>
@@ -295,7 +295,7 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>

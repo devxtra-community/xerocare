@@ -24,12 +24,12 @@ import {
 } from '@/components/ui/select';
 
 export const CHEQUE_TABLE_STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  DEPOSITED: 'bg-blue-100 text-blue-700',
-  ISSUED: 'bg-purple-100 text-purple-700',
-  CLEARED: 'bg-emerald-100 text-emerald-700',
-  BOUNCED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
+  PENDING: 'bg-warning/10 text-warning',
+  DEPOSITED: 'bg-primary/10 text-primary',
+  ISSUED: 'bg-lease/10 text-lease',
+  CLEARED: 'bg-success/10 text-success',
+  BOUNCED: 'bg-destructive/10 text-destructive',
+  CANCELLED: 'bg-muted text-muted-foreground',
 };
 
 export const CHEQUE_STATUS_ICON: Record<string, React.ReactNode> = {
@@ -42,18 +42,18 @@ export const CHEQUE_STATUS_ICON: Record<string, React.ReactNode> = {
 };
 
 const SALE_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  SALE: { label: 'SALE', cls: 'bg-blue-100 text-blue-700' },
-  PRODUCT_SALE: { label: 'PRODUCT SALE', cls: 'bg-blue-100 text-blue-700' },
-  SPAREPART_SALE: { label: 'SPARE PART SALE', cls: 'bg-blue-100 text-blue-700' },
-  RENT: { label: 'RENT', cls: 'bg-orange-100 text-orange-700' },
-  LEASE: { label: 'LEASE', cls: 'bg-purple-100 text-purple-700' },
+  SALE: { label: 'SALE', cls: 'bg-primary/10 text-primary' },
+  PRODUCT_SALE: { label: 'PRODUCT SALE', cls: 'bg-primary/10 text-primary' },
+  SPAREPART_SALE: { label: 'SPARE PART SALE', cls: 'bg-primary/10 text-primary' },
+  RENT: { label: 'RENT', cls: 'bg-warning/10 text-warning' },
+  LEASE: { label: 'LEASE', cls: 'bg-lease/10 text-lease' },
 };
 
 export function SaleTypeBadge({ saleType }: { saleType?: string | null }) {
   if (!saleType) return null;
   const badge = SALE_TYPE_BADGE[saleType] ?? {
     label: saleType.replace(/_/g, ' '),
-    cls: 'bg-slate-100 text-slate-600',
+    cls: 'bg-muted text-foreground',
   };
   return (
     <span
@@ -78,7 +78,7 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
       value: cheque.chequeDate ? (
         <span>
           {String(cheque.chequeDate).slice(0, 10)}
-          <span className="ml-1 text-[10px] font-normal text-gray-400">
+          <span className="ml-1 text-[10px] font-normal text-muted-foreground">
             (earliest deposit date)
           </span>
         </span>
@@ -90,7 +90,7 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
       label: 'Status',
       value: (
         <span
-          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_TABLE_STATUS_BADGE[cheque.status] ?? 'bg-gray-100 text-gray-600'}`}
+          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_TABLE_STATUS_BADGE[cheque.status] ?? 'bg-muted text-foreground'}`}
         >
           {CHEQUE_STATUS_ICON[cheque.status]}
           {cheque.status}
@@ -129,7 +129,7 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
   if ((cheque.status === 'BOUNCED' || cheque.status === 'CANCELLED') && cheque.reason) {
     rows.push({
       label: cheque.status === 'BOUNCED' ? 'Bounce Reason' : 'Cancellation Reason',
-      value: <span className="text-red-600">{cheque.reason}</span>,
+      value: <span className="text-destructive">{cheque.reason}</span>,
     });
   }
 
@@ -141,14 +141,16 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
       <dl className="space-y-2.5">
         {rows.map((r) => (
           <div key={r.label} className="flex items-start justify-between gap-4 text-sm">
-            <dt className="text-gray-500 whitespace-nowrap">{r.label}</dt>
-            <dd className="font-medium text-gray-800 text-right break-words min-w-0">{r.value}</dd>
+            <dt className="text-muted-foreground whitespace-nowrap">{r.label}</dt>
+            <dd className="font-medium text-foreground text-right break-words min-w-0">
+              {r.value}
+            </dd>
           </div>
         ))}
       </dl>
 
       <div className="border-t pt-4">
-        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
           Payment Proof
         </p>
         {cheque.receiptUrl ? (
@@ -157,20 +159,20 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
               <img
                 src={cheque.receiptUrl}
                 alt="Payment proof"
-                className="w-full max-h-64 object-contain rounded-lg border bg-gray-50"
+                className="w-full max-h-64 object-contain rounded-lg border bg-muted"
               />
             )}
             <a
               href={cheque.receiptUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
             >
               <FileText className="h-4 w-4" /> View Payment Proof
             </a>
           </div>
         ) : (
-          <p className="text-sm text-gray-400">No payment proof uploaded.</p>
+          <p className="text-sm text-muted-foreground">No payment proof uploaded.</p>
         )}
       </div>
     </div>
@@ -197,16 +199,19 @@ export function ChequeDetailModal({
   const cheque = data ?? initialCheque;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Cheque Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+          <h2 className="text-lg font-semibold text-foreground">Cheque Details</h2>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xl font-bold"
+          >
             ×
           </button>
         </div>
         {isLoading ? (
-          <div className="p-10 text-center text-gray-400">Loading…</div>
+          <div className="p-10 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="p-6">
             <ChequeDetailBody cheque={cheque} currency={currency} />
@@ -268,17 +273,17 @@ export function ChequeActionModal({
   const cfg: Record<ActionType, { label: string; color: string; desc: string }> = {
     deposit: {
       label: 'Deposit to Bank',
-      color: 'bg-blue-600 hover:bg-blue-700',
+      color: 'bg-primary hover:bg-primary/90',
       desc: 'Mark cheque as deposited. Cash at Bank updates once you mark it Cleared — depositing alone does not move the balance.',
     },
     issue: {
       label: 'Issue to Vendor',
-      color: 'bg-purple-600 hover:bg-purple-700',
+      color: 'bg-lease hover:bg-lease/90',
       desc: 'Mark cheque as issued. Cash at Bank decreases only when you mark it Cleared.',
     },
     clear: {
       label: 'Mark Cleared',
-      color: 'bg-emerald-600 hover:bg-emerald-700',
+      color: 'bg-success hover:bg-success/90',
       desc:
         cheque.type === 'ISSUED'
           ? 'Bank confirms payment cleared. Cash at Bank decreases now.'
@@ -286,22 +291,25 @@ export function ChequeActionModal({
     },
     bounce: {
       label: 'Mark Returned',
-      color: 'bg-red-600 hover:bg-red-700',
+      color: 'bg-destructive hover:bg-destructive/90',
       desc: 'Cheque dishonored by the bank before clearing — no cash effect to reverse.',
     },
     cancel: {
       label: cheque.type === 'RECEIVED' ? 'Decline Cheque' : 'Cancel Cheque',
-      color: 'bg-gray-600 hover:bg-gray-700',
+      color: 'bg-muted hover:bg-foreground',
       desc: 'Cancel this pending cheque — only available before Deposit/Issue, so there is no cash effect to reverse.',
     },
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">{cfg[action].label}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+          <h2 className="text-lg font-semibold text-foreground">{cfg[action].label}</h2>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xl font-bold"
+          >
             ×
           </button>
         </div>
@@ -327,23 +335,23 @@ export function ChequeActionModal({
           }}
           className="p-6 space-y-4"
         >
-          <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-            <p className="text-gray-500">{cfg[action].desc}</p>
-            <p className="font-medium text-gray-800">
+          <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
+            <p className="text-muted-foreground">{cfg[action].desc}</p>
+            <p className="font-medium text-foreground">
               {cheque.partyName} — #{cheque.chequeNo} — {formatCurrency(cheque.amount, currency)}
             </p>
             {cheque.sourceLabel && (
-              <p className="text-xs text-gray-400">Source: {cheque.sourceLabel}</p>
+              <p className="text-xs text-muted-foreground">Source: {cheque.sourceLabel}</p>
             )}
           </div>
           {needsAccount && (
             <div>
-              <label className="text-xs font-medium text-gray-600">Bank Account *</label>
+              <label className="text-xs font-medium text-foreground">Bank Account *</label>
               <Select
                 value={accountId || '__NONE__'}
                 onValueChange={(v) => setAccountId(v === '__NONE__' ? '' : v)}
               >
-                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                <SelectTrigger className="mt-1 w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,7 +368,7 @@ export function ChequeActionModal({
           )}
           {needsDate && (
             <div>
-              <label className="text-xs font-medium text-gray-600">
+              <label className="text-xs font-medium text-foreground">
                 {action === 'clear'
                   ? 'Cleared / Cash Received Date'
                   : action === 'deposit'
@@ -378,10 +386,10 @@ export function ChequeActionModal({
                     : undefined
                 }
                 onChange={(e) => setDate(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
               {(action === 'deposit' || action === 'clear') && cheque.chequeDate && (
-                <p className="mt-1 text-[10px] text-gray-400">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   Cheque Date is {String(cheque.chequeDate).slice(0, 10)} — it cannot be{' '}
                   {action === 'clear' ? 'cleared' : 'deposited'} before then.
                 </p>
@@ -389,7 +397,7 @@ export function ChequeActionModal({
             </div>
           )}
           <div>
-            <label className="text-xs font-medium text-gray-600">
+            <label className="text-xs font-medium text-foreground">
               {requiresReason ? 'Reason *' : 'Notes'}
             </label>
             <textarea
@@ -398,21 +406,21 @@ export function ChequeActionModal({
               rows={2}
               required={requiresReason}
               placeholder={requiresReason ? 'Explain why…' : 'Optional notes…'}
-              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>
           <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-gray-50"
+              className="flex-1 border rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mut.isPending || (requiresReason && !notes.trim())}
-              className={`flex-1 text-white rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg[action].color}`}
+              className={`flex-1 text-primary-foreground rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg[action].color}`}
             >
               {mut.isPending ? 'Processing…' : cfg[action].label}
             </button>

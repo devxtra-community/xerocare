@@ -68,23 +68,23 @@ function PLRow({
   const currency = useBranchCurrency();
   const color =
     highlight === 'green'
-      ? 'text-emerald-700'
+      ? 'text-success'
       : highlight === 'red'
-        ? 'text-red-600'
+        ? 'text-destructive'
         : highlight === 'blue'
-          ? 'text-blue-700'
-          : 'text-slate-800';
+          ? 'text-primary'
+          : 'text-foreground';
   return (
     <div
       className={`flex items-center justify-between py-1.5 ${bold ? 'font-bold' : 'font-normal'}`}
     >
       <span
-        className={`text-sm ${bold ? 'text-slate-800' : 'text-slate-600'} ${indent > 0 ? 'pl-5' : ''}`}
+        className={`text-sm ${bold ? 'text-foreground' : 'text-foreground'} ${indent > 0 ? 'pl-5' : ''}`}
       >
         {label}
       </span>
       <span
-        className={`text-sm font-semibold tabular-nums ${bold ? color : value < 0 ? 'text-red-600' : 'text-slate-700'}`}
+        className={`text-sm font-semibold tabular-nums ${bold ? color : value < 0 ? 'text-destructive' : 'text-foreground'}`}
       >
         {value < 0
           ? `(${formatCurrency(Math.abs(value), currency)})`
@@ -95,7 +95,7 @@ function PLRow({
 }
 
 function Divider({ thick }: { thick?: boolean }) {
-  return <hr className={`my-1 ${thick ? 'border-2 border-slate-300' : 'border-slate-100'}`} />;
+  return <hr className={`my-1 ${thick ? 'border-2 border-border' : 'border-border'}`} />;
 }
 
 function SectionHeader({ label }: { label: string }) {
@@ -257,7 +257,7 @@ function IncomeStatementContent() {
           <Button
             onClick={() => setShowStatement(true)}
             disabled={!pl || dataWarnings.length > 0}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-success hover:bg-success/90 text-success-foreground gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </Button>
@@ -269,22 +269,22 @@ function IncomeStatementContent() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center">
-          <p className="text-red-700 font-medium">
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+          <p className="text-destructive font-medium">
             Failed to load profit &amp; loss data. Please refresh.
           </p>
         </div>
       ) : (
         <>
           {dataWarnings.length > 0 && (
-            <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
-              <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+            <div className="rounded-xl bg-warning/10 border border-warning/30 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-warning font-semibold text-sm">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Data incomplete — some figures may be understated.
               </div>
               <ul className="pl-6 list-disc space-y-0.5">
                 {dataWarnings.map((w, i) => (
-                  <li key={i} className="text-xs text-amber-700">
+                  <li key={i} className="text-xs text-warning">
                     {w}
                   </li>
                 ))}
@@ -310,7 +310,7 @@ function IncomeStatementContent() {
             />
           </div>
 
-          <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+          <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
             <div className="px-6 py-4 border-b border-border bg-muted/20">
               <h3 className="font-bold text-primary text-base">
                 Profit &amp; Loss Statement — {dateLabel}
@@ -362,7 +362,7 @@ function IncomeStatementContent() {
                 <p className="text-xs text-muted-foreground">
                   Net Margin:{' '}
                   <span
-                    className={`font-semibold ${margin >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                    className={`font-semibold ${margin >= 0 ? 'text-success' : 'text-destructive'}`}
                   >
                     {margin.toFixed(2)}%
                   </span>
@@ -372,9 +372,9 @@ function IncomeStatementContent() {
           </div>
 
           {(pl?.monthly?.length ?? 0) > 0 && (
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden">
+            <div className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden">
               <div className="px-6 py-4 border-b border-border">
-                <h3 className="font-semibold text-slate-800">Monthly Breakdown</h3>
+                <h3 className="font-semibold text-foreground">Monthly Breakdown</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -390,15 +390,15 @@ function IncomeStatementContent() {
                   <tbody className="divide-y divide-border">
                     {pl?.monthly.map((row) => (
                       <tr key={row.month} className="hover:bg-muted/10">
-                        <td className="px-5 py-3 font-medium text-slate-700">{row.month}</td>
-                        <td className="px-5 py-3 text-emerald-600">
+                        <td className="px-5 py-3 font-medium text-foreground">{row.month}</td>
+                        <td className="px-5 py-3 text-success">
                           {formatCurrency(row.revenue, currency)}
                         </td>
-                        <td className="px-5 py-3 text-red-600">
+                        <td className="px-5 py-3 text-destructive">
                           {formatCurrency(row.expenses, currency)}
                         </td>
                         <td
-                          className={`px-5 py-3 font-semibold ${row.net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
+                          className={`px-5 py-3 font-semibold ${row.net >= 0 ? 'text-success' : 'text-destructive'}`}
                         >
                           {row.net < 0
                             ? `(${formatCurrency(Math.abs(row.net), currency)})`
@@ -427,10 +427,12 @@ function IncomeStatementContent() {
 
 export default function AdminIncomeStatementPage() {
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Income Statement</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Income Statement
+          </h3>
           <p className="text-muted-foreground">Profit &amp; Loss — across branches</p>
         </div>
         <Suspense>

@@ -50,7 +50,7 @@ function Bal({ ab, negative }: { ab: AccountBalance; negative?: boolean }) {
   const val = negative ? -ab.balance : ab.balance;
   const isNeg = val < 0;
   return (
-    <span className={`font-bold tabular-nums ${isNeg ? 'text-red-600' : 'text-slate-800'}`}>
+    <span className={`font-bold tabular-nums ${isNeg ? 'text-destructive' : 'text-foreground'}`}>
       {formatCurrency(val, ab.currency)}
     </span>
   );
@@ -58,11 +58,11 @@ function Bal({ ab, negative }: { ab: AccountBalance; negative?: boolean }) {
 
 function Row({ ab, negative }: { ab: AccountBalance; negative?: boolean }) {
   return (
-    <div className="grid grid-cols-12 px-5 py-3 items-center hover:bg-blue-50/50 transition-colors text-sm">
+    <div className="grid grid-cols-12 px-5 py-3 items-center hover:bg-primary/10 transition-colors text-sm">
       <span className="col-span-1 font-mono text-xs text-muted-foreground font-medium">
         {ab.code}
       </span>
-      <span className="col-span-5 font-medium text-slate-800">{ab.name}</span>
+      <span className="col-span-5 font-medium text-foreground">{ab.name}</span>
       <span className="col-span-6 text-right">
         <Bal ab={ab} negative={negative} />
       </span>
@@ -72,10 +72,10 @@ function Row({ ab, negative }: { ab: AccountBalance; negative?: boolean }) {
 
 function SubTotal({ label, value, currency }: { label: string; value: number; currency: string }) {
   return (
-    <div className="grid grid-cols-12 px-5 py-2.5 border-t border-slate-200 bg-slate-50/60 text-sm">
-      <span className="col-span-6 font-semibold text-slate-700">{label}</span>
+    <div className="grid grid-cols-12 px-5 py-2.5 border-t border-border bg-muted/60 text-sm">
+      <span className="col-span-6 font-semibold text-foreground">{label}</span>
       <span
-        className={`col-span-6 text-right font-bold tabular-nums ${value < 0 ? 'text-red-600' : 'text-slate-800'}`}
+        className={`col-span-6 text-right font-bold tabular-nums ${value < 0 ? 'text-destructive' : 'text-foreground'}`}
       >
         {formatCurrency(value, currency)}
       </span>
@@ -105,7 +105,7 @@ function SectionHeader({
         ) : (
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         )}
-        <span className="font-bold text-sm text-slate-800">{title}</span>
+        <span className="font-bold text-sm text-foreground">{title}</span>
       </div>
     </button>
   );
@@ -115,14 +115,11 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-3">
       {[...Array(5)].map((_, i) => (
-        <div
-          key={i}
-          className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden"
-        >
-          <div className="h-12 bg-slate-100 animate-pulse" />
+        <div key={i} className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden">
+          <div className="h-12 bg-muted animate-pulse" />
           <div className="p-4 space-y-2">
             {[...Array(4)].map((_, j) => (
-              <div key={j} className="h-10 bg-gray-100 animate-pulse rounded" />
+              <div key={j} className="h-10 bg-muted animate-pulse rounded" />
             ))}
           </div>
         </div>
@@ -193,9 +190,11 @@ export default function ChartOfAccountsPage() {
 
   if (isLoading)
     return (
-      <div className="bg-blue-50/50 min-h-full p-6 space-y-6">
+      <div className="bg-primary/10 min-h-full p-6 space-y-6">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Chart of Accounts</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Chart of Accounts
+          </h3>
           <p className="text-muted-foreground">Master ledger of all account heads</p>
         </div>
         <LoadingSkeleton />
@@ -204,8 +203,8 @@ export default function ChartOfAccountsPage() {
 
   if (isError)
     return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex flex-col items-center justify-center gap-4">
-        <p className="text-red-500 font-medium">Failed to load Chart of Accounts</p>
+      <div className="bg-primary/10 min-h-full p-6 flex flex-col items-center justify-center gap-4">
+        <p className="text-destructive font-medium">Failed to load Chart of Accounts</p>
         <Button onClick={() => refetch()} variant="outline">
           Retry
         </Button>
@@ -221,11 +220,13 @@ export default function ChartOfAccountsPage() {
   const equityTree = buildEquityTree(equity);
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Chart of Accounts</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Chart of Accounts
+          </h3>
           <p className="text-muted-foreground text-sm">Live balances as of {data.asOfDate}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -259,12 +260,12 @@ export default function ChartOfAccountsPage() {
 
       <div id="chart-of-accounts-pdf" className="space-y-6">
         {/* Period Filter */}
-        <div className="bg-card rounded-2xl border border-slate-100 shadow-sm p-4">
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
             Period for Income &amp; Expenses
           </p>
           <div className="flex flex-wrap gap-3 items-end">
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               From
               <Input
                 type="date"
@@ -273,7 +274,7 @@ export default function ChartOfAccountsPage() {
                 className="w-44"
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
               To
               <Input
                 type="date"
@@ -293,8 +294,8 @@ export default function ChartOfAccountsPage() {
         <div
           className={`p-3 rounded-xl flex items-center gap-2 text-sm font-medium ${
             summary.accountingEquation.isBalanced
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
+              ? 'bg-success/10 text-success border border-success/30'
+              : 'bg-destructive/10 text-destructive border border-destructive/30'
           }`}
         >
           {summary.accountingEquation.isBalanced ? '✅' : '⚠️'}
@@ -308,12 +309,12 @@ export default function ChartOfAccountsPage() {
         </div>
 
         {/* ── ASSETS ── */}
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
           <SectionHeader
             title="Assets"
             open={openSections.has('assets')}
             onToggle={() => toggle('assets')}
-            accent="border-l-blue-500 bg-blue-50/60"
+            accent="border-l-blue-500 bg-primary/10"
           />
           {openSections.has('assets') && (
             <div className="divide-y divide-border">
@@ -376,12 +377,12 @@ export default function ChartOfAccountsPage() {
         </div>
 
         {/* ── LIABILITIES ── */}
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
           <SectionHeader
             title="Liabilities"
             open={openSections.has('liabilities')}
             onToggle={() => toggle('liabilities')}
-            accent="border-l-red-500 bg-red-50/60"
+            accent="border-l-red-500 bg-destructive/10"
           />
           {openSections.has('liabilities') && (
             <div className="divide-y divide-border">
@@ -425,12 +426,12 @@ export default function ChartOfAccountsPage() {
         </div>
 
         {/* ── EQUITY ── */}
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
           <SectionHeader
             title="Equity"
             open={openSections.has('equity')}
             onToggle={() => toggle('equity')}
-            accent="border-l-purple-500 bg-purple-50/60"
+            accent="border-l-purple-500 bg-lease/10"
           />
           {openSections.has('equity') && (
             <div className="divide-y divide-border">
@@ -455,12 +456,12 @@ export default function ChartOfAccountsPage() {
         </div>
 
         {/* ── INCOME ── */}
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
           <SectionHeader
             title="Income / Revenue"
             open={openSections.has('income')}
             onToggle={() => toggle('income')}
-            accent="border-l-emerald-500 bg-emerald-50/60"
+            accent="border-l-emerald-500 bg-success/10"
           />
           {openSections.has('income') && (
             <div className="divide-y divide-border">
@@ -531,12 +532,12 @@ export default function ChartOfAccountsPage() {
         </div>
 
         {/* ── EXPENSES ── */}
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border">
           <SectionHeader
             title="Expenses"
             open={openSections.has('expenses')}
             onToggle={() => toggle('expenses')}
-            accent="border-l-orange-500 bg-orange-50/60"
+            accent="border-l-orange-500 bg-warning/10"
           />
           {openSections.has('expenses') && (
             <div className="divide-y divide-border">
@@ -564,37 +565,37 @@ export default function ChartOfAccountsPage() {
         </div>
 
         {/* ── P&L Summary ── */}
-        <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-5 space-y-2">
-          <p className="text-sm font-bold text-slate-700 uppercase tracking-widest">
+        <div className="rounded-2xl bg-card shadow-sm border border-border p-5 space-y-2">
+          <p className="text-sm font-bold text-foreground uppercase tracking-widest">
             P&amp;L Summary ({data.periodFrom} → {data.periodTo})
           </p>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex justify-between px-3 py-2 bg-slate-50 rounded-lg">
+            <div className="flex justify-between px-3 py-2 bg-muted rounded-lg">
               <span className="text-muted-foreground">Total Income</span>
               <span className="font-bold tabular-nums">
                 {formatCurrency(income.totalIncome, currency)}
               </span>
             </div>
-            <div className="flex justify-between px-3 py-2 bg-slate-50 rounded-lg">
+            <div className="flex justify-between px-3 py-2 bg-muted rounded-lg">
               <span className="text-muted-foreground">Total Expenses</span>
               <span className="font-bold tabular-nums">
                 {formatCurrency(expenses.totalExpenses, currency)}
               </span>
             </div>
-            <div className="flex justify-between px-3 py-2 bg-blue-50 rounded-lg">
-              <span className="text-slate-700 font-medium">Gross Profit</span>
+            <div className="flex justify-between px-3 py-2 bg-primary/10 rounded-lg">
+              <span className="text-foreground font-medium">Gross Profit</span>
               <span
-                className={`font-bold tabular-nums ${summary.grossProfit < 0 ? 'text-red-600' : 'text-blue-700'}`}
+                className={`font-bold tabular-nums ${summary.grossProfit < 0 ? 'text-destructive' : 'text-primary'}`}
               >
                 {formatCurrency(summary.grossProfit, currency)}
               </span>
             </div>
             <div
-              className={`flex justify-between px-3 py-2 rounded-lg ${summary.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}
+              className={`flex justify-between px-3 py-2 rounded-lg ${summary.netProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}
             >
-              <span className="text-slate-700 font-medium">Net Profit</span>
+              <span className="text-foreground font-medium">Net Profit</span>
               <span
-                className={`font-bold tabular-nums ${summary.netProfit < 0 ? 'text-red-600' : 'text-emerald-700'}`}
+                className={`font-bold tabular-nums ${summary.netProfit < 0 ? 'text-destructive' : 'text-success'}`}
               >
                 {formatCurrency(summary.netProfit, currency)}
               </span>

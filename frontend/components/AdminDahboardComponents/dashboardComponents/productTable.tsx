@@ -193,24 +193,24 @@ export default function ProductsTable({ branchId }: { branchId?: string } = {}) 
           <tbody>
             {currentData.length > 0 ? (
               currentData.map((item, index) => (
-                <tr key={item.id} className={index % 2 === 1 ? 'bg-sky-100/60' : ''}>
+                <tr key={item.id} className={index % 2 === 1 ? 'bg-info/10' : ''}>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                     {item.name}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {branchId
                       ? (branchNameFromId ?? 'N/A')
                       : selectedBranch === 'all'
                         ? getProductBranches(item).join(', ') || 'N/A'
                         : selectedBranch}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {getBranchQuantity(item, selectedBranch)}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {item.sale_price}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
                   </td>
                 </tr>

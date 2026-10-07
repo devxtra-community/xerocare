@@ -37,7 +37,7 @@ export default function APInvoiceViewPage() {
   const balanceDue = (invoice.totalAmount ?? 0) - (invoice.paidAmount ?? 0);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6 bg-muted/50/50 min-h-screen">
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6 bg-muted/50 min-h-screen">
       {/* 1. Sticky Action Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 rounded-xl border shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -45,7 +45,7 @@ export default function APInvoiceViewPage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">{invoice.invoiceNumber}</h1>
+            <h1 className="text-xl font-medium tracking-tight">{invoice.invoiceNumber}</h1>
             <p className="text-xs text-muted-foreground uppercase font-semibold">Vendor Invoice</p>
           </div>
         </div>
@@ -60,7 +60,7 @@ export default function APInvoiceViewPage() {
           {invoice.status === 'Draft' && (
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-success hover:bg-success/90 text-success-foreground"
               onClick={() => router.push(`/finance/ap/invoices/${invoice.id}/post`)}
             >
               <FileCheck className="w-4 h-4 mr-2" /> Post to GL
@@ -69,7 +69,7 @@ export default function APInvoiceViewPage() {
           {invoice.status !== 'Paid' && (
             <Button
               size="sm"
-              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <CreditCard className="w-4 h-4 mr-2" /> Pay Now
             </Button>
@@ -84,7 +84,7 @@ export default function APInvoiceViewPage() {
             {/* Vendor & Header Branding */}
             <div className="p-8 border-b flex justify-between items-start">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                <div className="flex items-center gap-2 text-primary mb-2">
                   <User className="w-5 h-5" />
                   <span className="font-bold text-lg uppercase tracking-wide">Vendor Info</span>
                 </div>
@@ -102,7 +102,7 @@ export default function APInvoiceViewPage() {
                       <Clock className="w-3.5 h-3.5" /> Due in 3 days
                     </span>
                   ) : (
-                    <span className="text-green-600 flex items-center gap-1 justify-end">
+                    <span className="text-success flex items-center gap-1 justify-end">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Fully Paid
                     </span>
                   )}
@@ -113,7 +113,7 @@ export default function APInvoiceViewPage() {
             {/* Line Items Table */}
             <div className="p-0">
               <Table>
-                <TableHeader className="bg-muted/50/50">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="pl-8 py-4">Service Description</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
@@ -123,7 +123,7 @@ export default function APInvoiceViewPage() {
                 </TableHeader>
                 <TableBody>
                   {invoice.lines.map((line) => (
-                    <TableRow key={line.id} className="hover:bg-muted/50/30">
+                    <TableRow key={line.id} className="hover:bg-muted/50">
                       <TableCell className="pl-8 py-4 font-medium">{line.description}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {line.quantity || 1}
@@ -141,13 +141,13 @@ export default function APInvoiceViewPage() {
             </div>
 
             {/* Totals Summary Footer */}
-            <div className="p-8 border-t bg-muted/50/30 flex justify-end">
+            <div className="p-8 border-t bg-muted/50 flex justify-end">
               <div className="w-full max-w-[280px] space-y-3">
                 <SummaryRow label="Subtotal" value={invoice.totalAmount} />
                 <SummaryRow label="Tax (0%)" value={0} />
                 <div className="flex justify-between items-center pt-3 border-t">
                   <span className="text-base font-bold">Grand Total</span>
-                  <span className="text-xl font-black text-blue-700">
+                  <span className="text-xl font-black text-primary">
                     {invoice.currency} {invoice.totalAmount.toLocaleString()}
                   </span>
                 </div>
@@ -169,13 +169,13 @@ export default function APInvoiceViewPage() {
           {(invoice.approvedBy || invoice.approvedOn) && (
             <SidebarCard
               title="Audit & Approval"
-              icon={<CheckCircle2 className="w-4 h-4 text-green-600" />}
+              icon={<CheckCircle2 className="w-4 h-4 text-success" />}
             >
               <DetailItem label="Approved By" value={invoice.approvedBy ?? '-'} />
               <DetailItem label="Approved At" value={invoice.approvedOn ?? '-'} />
-              <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-100 flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-green-800">
+              <div className="mt-4 p-3 bg-success/10 rounded-lg border border-success/30 flex gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                <p className="text-xs text-success">
                   This document has passed 3-way matching internal controls.
                 </p>
               </div>
@@ -211,7 +211,7 @@ function SidebarCard({
     <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b bg-muted/50 flex items-center gap-2">
         {icon}
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-600">{title}</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">{title}</h2>
       </div>
       <div className="p-4 space-y-4">{children}</div>
     </div>

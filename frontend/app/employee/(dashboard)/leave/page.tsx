@@ -15,10 +15,12 @@ export default function EmployeeLeavePage() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6">
+    <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-primary">My Leave Applications</h1>
+          <h1 className="text-xl sm:text-2xl font-medium tracking-tight text-primary">
+            My Leave Applications
+          </h1>
           <p className="text-muted-foreground mt-1">View and manage your leave applications</p>
         </div>
         <Button onClick={() => setIsDialogOpen(true)} className="gap-2 font-bold">

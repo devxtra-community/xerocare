@@ -23,7 +23,7 @@ interface ChartDataItem {
 }
 
 const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+  <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
     <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">{title}</h4>
     <div className="flex-1 w-full min-h-0">{children}</div>
   </div>
@@ -118,9 +118,9 @@ export default function EmployeeOrdersGraphs({
         {[1, 2].map((i) => (
           <div
             key={i}
-            className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full items-center justify-center"
+            className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full items-center justify-center"
           >
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ))}
       </div>
@@ -138,27 +138,27 @@ export default function EmployeeOrdersGraphs({
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="#e2e8f0"
+                stroke="var(--chart-grid)"
                 strokeOpacity={0.5}
               />
               <XAxis
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+                tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
                 dy={10}
                 interval={0}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+                tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               />
               <Tooltip
                 content={<ChartTooltipContent />}
-                cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
+                cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
               />
-              <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={10} />
+              <Bar dataKey="count" fill="var(--chart-blue)" radius={[4, 4, 0, 0]} barSize={10} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -169,37 +169,37 @@ export default function EmployeeOrdersGraphs({
             <AreaChart data={dailyData} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
               <defs>
                 <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-blue-mid)" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="var(--chart-blue-mid)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="#e2e8f0"
+                stroke="var(--chart-grid)"
                 strokeOpacity={0.5}
               />
               <XAxis
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+                tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
                 dy={10}
                 interval={Math.floor(dailyData.length / 10)}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+                tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               />
               <Tooltip
                 content={<ChartTooltipContent />}
-                cursor={{ stroke: '#3b82f6', strokeWidth: 1 }}
+                cursor={{ stroke: 'var(--chart-blue-mid)', strokeWidth: 1 }}
               />
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke="#3b82f6"
+                stroke="var(--chart-blue-mid)"
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorCount)"

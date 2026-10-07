@@ -58,7 +58,7 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* HEADER SECTION */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -66,7 +66,7 @@ export default function ProductDetailPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 hover:bg-blue-200/50"
+              className="h-8 w-8 hover:bg-primary/10"
               onClick={() => router.back()}
             >
               <ArrowLeft className="h-5 w-5 text-primary" />
@@ -77,14 +77,14 @@ export default function ProductDetailPage() {
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${
                     product.status === 'In Stock'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-destructive/10 text-destructive'
                   }`}
                 >
                   {product.status}
                 </span>
               </h3>
-              <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">
+              <p className="text-xs text-primary font-medium uppercase tracking-wider">
                 SKU: {product.sku} • {product.name}
               </p>
             </div>
@@ -93,13 +93,13 @@ export default function ProductDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-[11px] rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50 gap-1.5 font-semibold"
+              className="h-8 text-[11px] rounded-lg border-primary/30 text-primary hover:bg-primary/10 gap-1.5 font-semibold"
             >
               <Printer className="h-3.5 w-3.5" /> PRINT LABEL
             </Button>
             <Button
               size="sm"
-              className="h-8 text-[11px] rounded-lg bg-primary hover:bg-primary/90 text-white gap-1.5 font-semibold"
+              className="h-8 text-[11px] rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 font-semibold"
             >
               <Edit className="h-3.5 w-3.5" /> EDIT PRODUCT
             </Button>
@@ -134,7 +134,7 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* COLUMN 1: PRODUCT IMAGE & QUICK SPECS */}
           <div className="lg:col-span-1 flex flex-col gap-6">
-            <div className="bg-card rounded-xl shadow-sm overflow-hidden border border-blue-100/30">
+            <div className="bg-card rounded-xl shadow-sm overflow-hidden border border-primary/30">
               <div className="aspect-square relative flex items-center justify-center bg-muted/50">
                 <Image
                   src={resolveImageUrl(product.imageUrl)}
@@ -145,14 +145,14 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-primary/30">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-border pb-3 mb-4">
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Warranty & MFD
               </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <Calendar className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground font-medium">
                       Warranty Until
                     </span>
@@ -161,7 +161,7 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-blue-600" />
+                    <Package className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground font-medium">MFD</span>
                   </div>
                   <span className="text-xs font-bold text-primary">{product.mfd}</span>
@@ -172,15 +172,15 @@ export default function ProductDetailPage() {
 
           {/* COLUMN 2 & 3: DETAILED INFO */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            <div className="bg-card rounded-xl shadow-sm p-6 border border-blue-100/30 flex-1">
-              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-6">
+            <div className="bg-card rounded-xl shadow-sm p-6 border border-primary/30 flex-1">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-border pb-3 mb-6">
                 <Info className="h-3.5 w-3.5 text-primary" /> General Information
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                 <div className="space-y-6">
                   <div className="space-y-1">
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1.5">
                       <Tag className="h-3 w-3" /> Brand & Model
                     </p>
                     <p className="text-sm font-bold text-primary">
@@ -188,13 +188,13 @@ export default function ProductDetailPage() {
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1.5">
                       <Layers className="h-3 w-3" /> Category
                     </p>
                     <p className="text-sm font-bold text-primary">{product.category}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1.5">
                       <ShieldCheck className="h-3 w-3" /> Serial Number
                     </p>
                     <p className="text-sm font-mono font-bold text-primary">{product.serialNo}</p>
@@ -203,13 +203,13 @@ export default function ProductDetailPage() {
 
                 <div className="space-y-6">
                   <div className="space-y-1">
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1.5">
                       <Truck className="h-3 w-3" /> Primary Vendor
                     </p>
                     <p className="text-sm font-bold text-primary">{product.vendor}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1.5">
                       <BarChart3 className="h-3 w-3" /> Stock Location
                     </p>
                     <p className="text-sm font-bold text-primary">{product.location}</p>

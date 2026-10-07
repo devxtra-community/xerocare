@@ -611,59 +611,63 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   // ── SUCCESS SCREEN ────────────────────────────────────────────────────────
   if (successInvoice) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-y-auto border border-slate-200 p-6 space-y-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 animate-fadeIn">
+        <div className="bg-card text-card-foreground rounded-lg shadow-xl w-full max-w-2xl overflow-y-auto border border-border p-6 space-y-6">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-50 text-green-600 mb-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 text-success mb-2">
               <CheckCircle2 size={40} className="animate-bounce" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Sale Completed Successfully!</h2>
-            <p className="text-sm text-slate-500">Invoice has been generated and recorded.</p>
+            <h2 className="text-xl sm:text-2xl font-medium text-foreground">
+              Sale Completed Successfully!
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Invoice has been generated and recorded.
+            </p>
           </div>
 
-          <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="bg-muted rounded-xl p-5 border border-border space-y-3">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Invoice Summary
             </h3>
-            <div className="grid grid-cols-2 gap-4 text-sm text-slate-700">
+            <div className="grid grid-cols-2 gap-4 text-sm text-foreground">
               <div>
-                <span className="font-semibold text-slate-500">Invoice Number:</span>
-                <p className="font-bold text-slate-900">{successInvoice.invoiceNumber || 'N/A'}</p>
+                <span className="font-semibold text-muted-foreground">Invoice Number:</span>
+                <p className="font-bold text-foreground">{successInvoice.invoiceNumber || 'N/A'}</p>
               </div>
               <div>
-                <span className="font-semibold text-slate-500">Grand Total:</span>
-                <p className="font-bold text-green-600">
+                <span className="font-semibold text-muted-foreground">Grand Total:</span>
+                <p className="font-bold text-success">
                   {formatCurrency(successInvoice.totalAmount || grandTotal, currency)}
                 </p>
               </div>
               <div>
-                <span className="font-semibold text-slate-500">Customer:</span>
-                <p className="font-bold text-slate-900">
+                <span className="font-semibold text-muted-foreground">Customer:</span>
+                <p className="font-bold text-foreground">
                   {customers.find((c) => c.id === customerId)?.name || 'Walk-in'}
                 </p>
               </div>
               <div>
-                <span className="font-semibold text-slate-500">Payment Status:</span>
-                <p className="font-bold text-blue-600">{successInvoice.status || 'PAID'}</p>
+                <span className="font-semibold text-muted-foreground">Payment Status:</span>
+                <p className="font-bold text-primary">{successInvoice.status || 'PAID'}</p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h3 className="text-sm font-bold text-slate-800">Share & Download</h3>
+          <div className="space-y-4 pt-4 border-t border-border">
+            <h3 className="text-sm font-bold text-foreground">Share & Download</h3>
 
             <Button
               onClick={handleDownloadPDF}
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-md"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 shadow-md"
             >
               <Download size={18} />
               Download PDF Invoice
             </Button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 border border-slate-100 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-between">
+              <div className="space-y-2 border border-border rounded-xl p-4 bg-muted/50 flex flex-col justify-between">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                  <label className="block text-xs font-bold text-foreground mb-1">
                     Email Recipient
                   </label>
                   <input
@@ -671,13 +675,13 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                     value={notifyEmail}
                     onChange={(e) => setNotifyEmail(e.target.value)}
                     placeholder="customer@email.com"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    className="w-full border border-border rounded-lg px-3 py-2 text-xs bg-card focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <Button
                   onClick={handleSendEmail}
                   disabled={notifyingEmail}
-                  className="w-full mt-3 bg-slate-800 hover:bg-slate-900 text-white rounded-lg h-9 text-xs flex items-center justify-center gap-2"
+                  className="w-full mt-3 bg-foreground hover:bg-foreground text-primary-foreground rounded-lg h-9 text-xs flex items-center justify-center gap-2"
                 >
                   {notifyingEmail ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -688,9 +692,9 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 </Button>
               </div>
 
-              <div className="space-y-2 border border-slate-100 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-between">
+              <div className="space-y-2 border border-border rounded-xl p-4 bg-muted/50 flex flex-col justify-between">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                  <label className="block text-xs font-bold text-foreground mb-1">
                     WhatsApp Number
                   </label>
                   <input
@@ -698,13 +702,13 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                     value={notifyPhone}
                     onChange={(e) => setNotifyPhone(e.target.value)}
                     placeholder="+974xxxxxxxx"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    className="w-full border border-border rounded-lg px-3 py-2 text-xs bg-card focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <Button
                   onClick={handleSendWhatsapp}
                   disabled={notifyingWhatsapp}
-                  className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white rounded-lg h-9 text-xs flex items-center justify-center gap-2"
+                  className="w-full mt-3 bg-success hover:bg-success/90 text-success-foreground rounded-lg h-9 text-xs flex items-center justify-center gap-2"
                 >
                   {notifyingWhatsapp ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -722,7 +726,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               onClick={() => {
                 onSuccess();
               }}
-              className="bg-black hover:bg-slate-800 text-white px-6 rounded-lg h-10"
+              className="bg-foreground hover:bg-foreground text-primary-foreground px-6 rounded-lg h-10"
             >
               Done
             </Button>
@@ -734,22 +738,28 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
 
   // ── FORM SCREEN ──────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-slate-200">
-        <div className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 animate-fadeIn">
+      <div className="bg-card text-card-foreground rounded-lg shadow-xl w-full max-w-6xl max-h-[calc(100dvh-2rem)] overflow-y-auto border border-border">
+        <div className="sticky top-0 z-10 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">New Direct Sale</h2>
-            <p className="text-sm text-slate-500">Create a final invoice bypassing quotation</p>
+            <h2 className="text-xl font-medium text-foreground">New Direct Sale</h2>
+            <p className="text-sm text-muted-foreground">
+              Create a final invoice bypassing quotation
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 transition-colors rounded-lg">
-            <X size={20} className="text-slate-500" />
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <X size={20} />
           </button>
         </div>
 
         <div className="p-6 space-y-8">
           {/* Customer Selection */}
-          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">
+          <div className="bg-muted p-5 rounded-xl border border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
               Customer Details
             </h3>
             <div className="flex gap-2">
@@ -765,14 +775,14 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                     setTransactionType(selected?.customerType === 'B2B' ? 'B2B' : 'B2C');
                   }}
                   placeholder="Search and select customer..."
-                  className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                  className="rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setAddCustomerOpen(true)}
-                className="rounded-lg border-slate-300 gap-1.5 shrink-0"
+                className="rounded-lg border-border gap-1.5 shrink-0"
               >
                 <Plus size={16} />
                 New Customer
@@ -781,15 +791,15 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           </div>
 
           {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price/base_price */}
-          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">
+          <div className="bg-muted p-5 rounded-xl border border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
               Transaction Type
             </h3>
             <Select
               value={transactionType}
               onValueChange={(v) => setTransactionType(v as 'B2B' | 'B2C')}
             >
-              <SelectTrigger className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600">
+              <SelectTrigger className="rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -801,14 +811,14 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
 
           {/* Item Selection & Barcode Scanner */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-2">
-              <ShieldCheck size={16} className="text-blue-500" />
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+              <ShieldCheck size={16} className="text-primary" />
               Items (Products & Spare Parts)
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
                   Search Catalog
                 </label>
                 <ProductSelect
@@ -816,33 +826,33 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                   mode="BOTH"
                   selectedQuantities={selectedQuantities}
                   placeholder="Search by name, model or serial — add as many as you need"
-                  className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 w-full"
+                  className="rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
                   Barcode / Serial Scanner
                 </label>
                 <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
                   <div className="relative flex-1">
                     <Barcode
                       size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     />
                     <input
                       type="text"
                       value={barcodeInput}
                       onChange={(e) => setBarcodeInput(e.target.value)}
                       placeholder="Scan/Type barcode (XC-P-{serial} or XC-S-{sku})"
-                      className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                      className="w-full border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                       disabled={barcodeLoading}
                     />
                   </div>
                   <Button
                     type="submit"
                     disabled={barcodeLoading || !barcodeInput.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-[38px] text-xs font-bold px-4"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-[38px] text-xs font-bold px-4"
                   >
                     {barcodeLoading ? 'Scanning...' : 'Scan'}
                   </Button>
@@ -851,9 +861,9 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
             </div>
 
             {items.length > 0 && (
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="border border-border rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                  <thead className="bg-muted border-b border-border text-foreground">
                     <tr>
                       <th className="px-4 py-3 font-semibold">Name</th>
                       <th className="px-4 py-3 font-semibold w-24">Type</th>
@@ -866,25 +876,25 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                       <th className="px-4 py-3 w-12"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
+                  <tbody className="divide-y divide-border">
                     {items.map((item, idx) => {
                       const itemSubtotal = (item.unitPrice - item.discount) * item.quantity;
                       const itemTax = itemSubtotal * ((item.taxRate || 0) / 100);
                       const itemTotal = itemSubtotal + itemTax;
 
                       return (
-                        <tr key={item.key} className="bg-white hover:bg-slate-50">
+                        <tr key={item.key} className="bg-card hover:bg-muted">
                           <td className="px-4 py-3">
-                            <p className="font-medium text-slate-800 line-clamp-2">
+                            <p className="font-medium text-foreground line-clamp-2">
                               {item.description}
                             </p>
                             {/* Warehouse stocks display for spare parts */}
                             {item.itemType === 'SPARE_PART' &&
                               item.sparePartId &&
                               sparePartStocks[item.sparePartId] && (
-                                <div className="mt-1.5 text-[10px] text-slate-500 bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
-                                  <div className="font-bold flex items-center gap-1 text-slate-700">
-                                    <Warehouse size={12} className="text-blue-500" /> Stock by
+                                <div className="mt-1.5 text-[10px] text-muted-foreground bg-muted border border-border p-2 rounded-lg space-y-1">
+                                  <div className="font-bold flex items-center gap-1 text-foreground">
+                                    <Warehouse size={12} className="text-primary" /> Stock by
                                     Warehouse (Total: {sparePartStocks[item.sparePartId].totalStock}
                                     ):
                                   </div>
@@ -892,8 +902,8 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                                     {sparePartStocks[item.sparePartId].warehouseStock?.map(
                                       (w, wIdx) => (
                                         <div key={wIdx}>
-                                          <span className="text-slate-500">{w.name}:</span>{' '}
-                                          <span className="text-slate-800 font-bold">
+                                          <span className="text-muted-foreground">{w.name}:</span>{' '}
+                                          <span className="text-foreground font-bold">
                                             {w.quantity}
                                           </span>
                                         </div>
@@ -905,7 +915,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                           </td>
                           <td className="px-4 py-3 text-xs font-semibold">
                             <span
-                              className={`px-2 py-1 rounded-md whitespace-nowrap ${item.itemType === 'PRODUCT' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}`}
+                              className={`px-2 py-1 rounded-md whitespace-nowrap ${item.itemType === 'PRODUCT' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-info/10 text-info border border-info/30'}`}
                             >
                               {item.itemType === 'PRODUCT' ? 'Product' : 'Spare Part'}
                             </span>
@@ -913,7 +923,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                           <td className="px-4 py-3">
                             {item.itemType === 'PRODUCT' ? (
                               <select
-                                className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
+                                className="w-full border border-border rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-card"
                                 value={item.serialNumber || ''}
                                 onChange={(e) => {
                                   const selectedSerial = e.target.value;
@@ -961,7 +971,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                                   ))}
                               </select>
                             ) : (
-                              <span className="text-slate-700 font-medium px-2 bg-slate-100 border border-slate-200 rounded-md text-xs py-1 select-all font-mono">
+                              <span className="text-foreground font-medium px-2 bg-muted border border-border rounded-md text-xs py-1 select-all font-mono">
                                 {item.sku || '-'}
                               </span>
                             )}
@@ -971,7 +981,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                               <input
                                 type="number"
                                 disabled
-                                className="w-full border border-slate-200 rounded-lg bg-slate-50 text-slate-400 text-sm px-2 py-1 cursor-not-allowed text-center"
+                                className="w-full border border-border rounded-lg bg-muted text-muted-foreground text-sm px-2 py-1 cursor-not-allowed text-center"
                                 value={item.quantity}
                                 onWheel={(e) => e.currentTarget.blur()}
                               />
@@ -979,7 +989,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                               <input
                                 type="number"
                                 min="1"
-                                className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-center"
+                                className="w-full border border-border rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-center"
                                 value={item.quantity}
                                 onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
                                 onWheel={(e) => e.currentTarget.blur()}
@@ -989,7 +999,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                           <td className="px-4 py-3">
                             <input
                               type="number"
-                              className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                              className="w-full border border-border rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                               value={item.unitPrice}
                               onChange={(e) => updateItem(idx, 'unitPrice', Number(e.target.value))}
                               onWheel={(e) => e.currentTarget.blur()}
@@ -998,7 +1008,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                           <td className="px-4 py-3">
                             <input
                               type="number"
-                              className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                              className="w-full border border-border rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                               value={item.discount}
                               onChange={(e) => handleDiscountChange(idx, Number(e.target.value))}
                               onWheel={(e) => e.currentTarget.blur()}
@@ -1009,18 +1019,18 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                             <input
                               type="number"
                               disabled
-                              className="w-full border border-slate-200 rounded-lg bg-slate-50 text-slate-400 text-sm px-2 py-1 cursor-not-allowed text-center"
+                              className="w-full border border-border rounded-lg bg-muted text-muted-foreground text-sm px-2 py-1 cursor-not-allowed text-center"
                               value={item.taxRate || 0}
                               onWheel={(e) => e.currentTarget.blur()}
                             />
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-700">
+                          <td className="px-4 py-3 font-semibold text-foreground">
                             {formatCurrency(itemTotal, currency)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => removeItem(idx)}
-                              className="text-red-500 hover:text-red-700 p-1"
+                              className="text-destructive hover:text-destructive p-1"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -1035,20 +1045,20 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           </div>
 
           {/* Payment Section */}
-          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-2">
-              <CreditCard size={16} className="text-green-600" />
+          <div className="bg-muted p-5 rounded-xl border border-border space-y-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+              <CreditCard size={16} className="text-success" />
               Immediate Payment (Optional)
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Amount Paid ({currency})
                 </label>
                 <input
                   type="number"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   value={paymentAmount || ''}
                   onChange={(e) => setPaymentAmount(Number(e.target.value))}
                   onWheel={(e) => e.currentTarget.blur()}
@@ -1056,11 +1066,11 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Payment Mode
                 </label>
                 <select
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-card"
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value)}
                 >
@@ -1071,19 +1081,19 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   {paymentMode === 'CHEQUE' ? 'Cheque Number' : 'Reference Number'}
                 </label>
                 {paymentMode === 'CHEQUE' ? (
                   <input
                     type="text"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
                     placeholder="e.g., CHQ-001234"
                   />
                 ) : (
-                  <div className="w-full h-9 flex items-center border border-dashed border-slate-300 rounded-lg px-3 text-sm text-slate-400 italic bg-slate-50">
+                  <div className="w-full h-9 flex items-center border border-dashed border-border rounded-lg px-3 text-sm text-muted-foreground italic bg-muted">
                     Auto-generated on save — {autoReferencePreview(paymentMode)}
                   </div>
                 )}
@@ -1108,39 +1118,39 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               />
             )}
 
-            <div className="flex flex-col gap-2 pt-4 border-t border-slate-200">
-              <div className="flex justify-between items-center text-sm text-slate-600">
+            <div className="flex flex-col gap-2 pt-4 border-t border-border">
+              <div className="flex justify-between items-center text-sm text-foreground">
                 <span>Total (Without Tax):</span>
                 <span className="font-medium">{formatCurrency(subtotal, currency)}</span>
               </div>
-              <div className="flex justify-between items-center text-sm text-slate-600">
+              <div className="flex justify-between items-center text-sm text-foreground">
                 <span>Tax Amount:</span>
                 <span className="font-medium">{formatCurrency(taxTotal, currency)}</span>
               </div>
-              <div className="flex justify-between items-center text-base font-bold text-slate-800">
+              <div className="flex justify-between items-center text-base font-bold text-foreground">
                 <span>Grand Total (With Tax):</span>
                 <span>{formatCurrency(grandTotal, currency)}</span>
               </div>
               {paymentMode === 'ONLINE_PAYMENT' && cardQuote && paymentAmount > 0 && (
                 <>
-                  <div className="flex justify-between items-center text-sm text-slate-500 pt-1 border-t border-dashed border-slate-200">
+                  <div className="flex justify-between items-center text-sm text-muted-foreground pt-1 border-t border-dashed border-border">
                     <span>Card Processing Fee ({cardQuote.ratePercentApplied}%):</span>
-                    <span className="font-medium text-red-600">
+                    <span className="font-medium text-destructive">
                       − {formatCurrency(cardQuote.commissionAmount, currency)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm text-slate-600">
+                  <div className="flex justify-between items-center text-sm text-foreground">
                     <span>Merchant Net Settlement:</span>
-                    <span className="font-semibold text-emerald-700">
+                    <span className="font-semibold text-success">
                       {formatCurrency(cardQuote.netSettlementAmount, currency)}
                     </span>
                   </div>
                 </>
               )}
-              <div className="flex justify-between items-center text-sm text-slate-500 pt-1 border-t border-dashed border-slate-200">
+              <div className="flex justify-between items-center text-sm text-muted-foreground pt-1 border-t border-dashed border-border">
                 <span>Pending Balance:</span>
                 <span
-                  className={`font-bold ${grandTotal - paymentAmount <= 0 ? 'text-green-600' : 'text-orange-600'}`}
+                  className={`font-bold ${grandTotal - paymentAmount <= 0 ? 'text-success' : 'text-warning'}`}
                 >
                   {formatCurrency(Math.max(0, grandTotal - paymentAmount), currency)}
                 </span>
@@ -1150,17 +1160,17 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
 
           {/* Warranty Section — shown when at least one PRODUCT item */}
           {items.some((it) => it.itemType === 'PRODUCT') && (
-            <div className="bg-amber-50/20 p-5 rounded-xl border border-amber-100 space-y-4">
-              <h3 className="text-sm font-semibold text-amber-600 uppercase tracking-wide flex items-center gap-2">
+            <div className="bg-warning/10 p-5 rounded-xl border border-warning/30 space-y-4">
+              <h3 className="text-sm font-semibold text-warning uppercase tracking-wide flex items-center gap-2">
                 Warranty Configuration
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-xs font-semibold text-foreground mb-1">
                     Warranty Type
                   </label>
                   <select
-                    className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-400"
+                    className="w-full border border-warning/30 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:border-warning/30"
                     value={warrantyType}
                     onChange={(e) =>
                       setWarrantyType(e.target.value as 'none' | 'duration' | 'copies' | 'both')
@@ -1176,12 +1186,12 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 {(warrantyType === 'duration' || warrantyType === 'both') && (
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      <label className="block text-xs font-semibold text-foreground mb-1">
                         Duration Value
                       </label>
                       <input
                         type="number"
-                        className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                        className="w-full border border-warning/30 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warning/30"
                         placeholder="e.g. 12"
                         value={warrantyDurationValue}
                         onChange={(e) => setWarrantyDurationValue(e.target.value)}
@@ -1189,11 +1199,11 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      <label className="block text-xs font-semibold text-foreground mb-1">
                         Unit
                       </label>
                       <select
-                        className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-400"
+                        className="w-full border border-warning/30 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:border-warning/30"
                         value={warrantyDurationUnit}
                         onChange={(e) =>
                           setWarrantyDurationUnit(e.target.value as 'months' | 'years')
@@ -1208,12 +1218,12 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
 
                 {(warrantyType === 'copies' || warrantyType === 'both') && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    <label className="block text-xs font-semibold text-foreground mb-1">
                       Warranty Copy Limit (Total)
                     </label>
                     <input
                       type="number"
-                      className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                      className="w-full border border-warning/30 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warning/30"
                       placeholder="e.g. 100000"
                       value={warrantyCopyLimit}
                       onChange={(e) => setWarrantyCopyLimit(e.target.value)}
@@ -1226,11 +1236,11 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
+            <label className="block text-xs font-semibold text-foreground mb-1">
               Notes / Remarks
             </label>
             <textarea
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -1238,14 +1248,14 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t p-4 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-card border-t p-4 flex justify-end gap-3">
           <Button variant="outline" onClick={onClose} disabled={loading} className="rounded-lg">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={loading || items.length === 0}
-            className="bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold"
+            className="bg-success hover:bg-success/90 text-success-foreground rounded-lg font-bold"
           >
             {loading ? 'Processing...' : 'Complete Direct Sale'}
           </Button>

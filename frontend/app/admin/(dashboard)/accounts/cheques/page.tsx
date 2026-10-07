@@ -94,37 +94,40 @@ function ChequeActionModal({
   const cfg: Record<ActionType, { label: string; color: string; desc: string }> = {
     deposit: {
       label: 'Deposit to Bank',
-      color: 'bg-blue-600 hover:bg-blue-700',
+      color: 'bg-primary hover:bg-primary/90',
       desc: 'Record cheque deposited. Cash at Bank increases only at CLEARED.',
     },
     issue: {
       label: 'Issue to Vendor',
-      color: 'bg-purple-600 hover:bg-purple-700',
+      color: 'bg-lease hover:bg-lease/90',
       desc: 'Record cheque issued. Cash at Bank decreases only at CLEARED.',
     },
     clear: {
       label: 'Mark Cleared',
-      color: 'bg-emerald-600 hover:bg-emerald-700',
+      color: 'bg-success hover:bg-success/90',
       desc: 'Bank confirms funds cleared — moves Cash at Bank balance now.',
     },
     bounce: {
       label: 'Mark Bounced',
-      color: 'bg-red-600 hover:bg-red-700',
+      color: 'bg-destructive hover:bg-destructive/90',
       desc: 'Cheque bounced. No balance reversal needed.',
     },
     cancel: {
       label: 'Cancel Cheque',
-      color: 'bg-gray-600 hover:bg-gray-700',
+      color: 'bg-muted hover:bg-foreground',
       desc: 'Cancel this pending cheque.',
     },
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-semibold">{cfg[action].label}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xl font-bold"
+          >
             ×
           </button>
         </div>
@@ -149,23 +152,23 @@ function ChequeActionModal({
           }}
           className="p-6 space-y-4"
         >
-          <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-            <p className="text-gray-500">{cfg[action].desc}</p>
+          <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
+            <p className="text-muted-foreground">{cfg[action].desc}</p>
             <p className="font-medium">
               {cheque.partyName} — #{cheque.chequeNo} — {formatCurrency(cheque.amount, currency)}
             </p>
             {cheque.sourceLabel && (
-              <p className="text-xs text-gray-400">Source: {cheque.sourceLabel}</p>
+              <p className="text-xs text-muted-foreground">Source: {cheque.sourceLabel}</p>
             )}
           </div>
           {needsAccount && (
             <div>
-              <label className="text-xs font-medium text-gray-600">Bank Account *</label>
+              <label className="text-xs font-medium text-foreground">Bank Account *</label>
               <Select
                 value={accountId || '__NONE__'}
                 onValueChange={(v) => setAccountId(v === '__NONE__' ? '' : v)}
               >
-                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                <SelectTrigger className="mt-1 w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -182,7 +185,7 @@ function ChequeActionModal({
           )}
           {needsDate && (
             <div>
-              <label className="text-xs font-medium text-gray-600">
+              <label className="text-xs font-medium text-foreground">
                 {action === 'clear'
                   ? 'Cleared / Cash Received Date'
                   : action === 'deposit'
@@ -201,7 +204,7 @@ function ChequeActionModal({
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
               />
               {(action === 'deposit' || action === 'clear') && cheque.chequeDate && (
-                <p className="mt-1 text-[10px] text-gray-400">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   Cheque Date is {String(cheque.chequeDate).slice(0, 10)} — it cannot be{' '}
                   {action === 'clear' ? 'cleared' : 'deposited'} before then.
                 </p>
@@ -209,7 +212,7 @@ function ChequeActionModal({
             </div>
           )}
           <div>
-            <label className="text-xs font-medium text-gray-600">
+            <label className="text-xs font-medium text-foreground">
               {requiresReason ? 'Reason *' : 'Notes'}
             </label>
             <textarea
@@ -225,14 +228,14 @@ function ChequeActionModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-gray-50"
+              className="flex-1 border rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mut.isPending || (requiresReason && !notes.trim())}
-              className={`flex-1 text-white rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg[action].color}`}
+              className={`flex-1 text-primary-foreground rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg[action].color}`}
             >
               {mut.isPending ? 'Processing…' : cfg[action].label}
             </button>
@@ -256,31 +259,31 @@ function ActionButtons({
     {
       action: 'deposit',
       label: 'Deposit',
-      className: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
+      className: 'bg-primary/10 text-primary hover:bg-primary/10',
       show: cheque.type === 'RECEIVED' && cheque.status === 'PENDING',
     },
     {
       action: 'issue',
       label: 'Issue',
-      className: 'bg-purple-100 text-purple-700 hover:bg-purple-200',
+      className: 'bg-lease/10 text-lease hover:bg-lease/10',
       show: cheque.type === 'ISSUED' && cheque.status === 'PENDING',
     },
     {
       action: 'clear',
       label: 'Clear',
-      className: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
+      className: 'bg-success/10 text-success hover:bg-success/10',
       show: ['DEPOSITED', 'ISSUED'].includes(cheque.status),
     },
     {
       action: 'bounce',
       label: 'Bounce',
-      className: 'bg-red-100 text-red-700 hover:bg-red-200',
+      className: 'bg-destructive/10 text-destructive hover:bg-destructive/10',
       show: ['DEPOSITED', 'ISSUED'].includes(cheque.status),
     },
     {
       action: 'cancel',
       label: 'Cancel',
-      className: 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+      className: 'bg-muted text-foreground hover:bg-muted',
       show: cheque.status === 'PENDING',
     },
   ];
@@ -290,7 +293,7 @@ function ActionButtons({
       <button
         onClick={() => onView(cheque)}
         title="View details & payment proof"
-        className="text-xs font-medium px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+        className="text-xs font-medium px-2 py-1 rounded-md bg-muted text-foreground hover:bg-muted inline-flex items-center gap-1"
       >
         <Eye className="h-3.5 w-3.5" /> View
       </button>
@@ -325,29 +328,36 @@ function StatsRow({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
       {[
-        { label: 'Total', ...total, color: 'text-gray-800', bg: 'bg-gray-50 border-gray-200' },
+        { label: 'Total', ...total, color: 'text-foreground', bg: 'bg-muted border-border' },
         {
           label: 'Pending',
           ...pending,
-          color: 'text-yellow-700',
-          bg: 'bg-yellow-50 border-yellow-200',
+          color: 'text-warning',
+          bg: 'bg-warning/10 border-warning/30',
         },
         {
           label: 'In Bank',
           ...deposited,
-          color: 'text-blue-700',
-          bg: 'bg-blue-50 border-blue-200',
+          color: 'text-primary',
+          bg: 'bg-primary/10 border-primary/30',
         },
         {
           label: 'Cleared',
           ...cleared,
-          color: 'text-emerald-700',
-          bg: 'bg-emerald-50 border-emerald-200',
+          color: 'text-success',
+          bg: 'bg-success/10 border-success/30',
         },
-        { label: 'Bounced', ...bounced, color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
+        {
+          label: 'Bounced',
+          ...bounced,
+          color: 'text-destructive',
+          bg: 'bg-destructive/10 border-destructive/30',
+        },
       ].map((c) => (
         <div key={c.label} className={`rounded-xl border p-3 ${c.bg}`}>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{c.label}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {c.label}
+          </p>
           <p className={`text-xl font-bold mt-0.5 ${c.color}`}>{c.count}</p>
           <p className={`text-xs font-semibold ${c.color}`}>{formatCurrency(c.total, currency)}</p>
         </div>
@@ -471,34 +481,34 @@ function AdminChequesContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground flex items-center gap-2">
             {activeTab === 'received' ? (
               <>
-                <ArrowDownCircle className="h-6 w-6 text-emerald-600" /> Cheques from Customers
+                <ArrowDownCircle className="h-6 w-6 text-success" /> Cheques from Customers
               </>
             ) : (
               <>
-                <ArrowUpCircle className="h-6 w-6 text-blue-600" /> Cheques to Vendors
+                <ArrowUpCircle className="h-6 w-6 text-primary" /> Cheques to Vendors
               </>
             )}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             All branches — Cash at Bank moves only at CLEARED step
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowStatement(true)}
-            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </button>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 shadow-sm"
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-primary/90 shadow-sm"
           >
             <Plus className="h-4 w-4" /> Add Cheque
           </button>
@@ -507,7 +517,7 @@ function AdminChequesContent() {
 
       <BranchFilterBar />
 
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-border">
         {(
           [
             {
@@ -530,8 +540,8 @@ function AdminChequesContent() {
             }}
             className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {icon}
@@ -542,19 +552,19 @@ function AdminChequesContent() {
 
       <StatsRow summary={tabSummary} currency={currency} />
 
-      <div className="bg-white rounded-xl border p-4">
+      <div className="bg-card rounded-xl border p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search cheque #, party, source…"
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="border-orange-200 text-sm">
+            <SelectTrigger className="border-warning/30 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -583,15 +593,15 @@ function AdminChequesContent() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         {isLoading ? (
-          <div className="p-10 text-center text-gray-400">Loading…</div>
+          <div className="p-10 text-center text-muted-foreground">Loading…</div>
         ) : cheques.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">No cheques found</div>
+          <div className="p-10 text-center text-muted-foreground">No cheques found</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground border-b">
                 <tr>
                   {[
                     'Cheque #',
@@ -611,24 +621,24 @@ function AdminChequesContent() {
               </thead>
               <tbody className="divide-y">
                 {chequePaging.pageRows.map((c) => (
-                  <tr key={c.id} className={isOverdue(c) ? 'bg-red-50/40' : 'hover:bg-gray-50'}>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-700">{c.chequeNo}</td>
+                  <tr key={c.id} className={isOverdue(c) ? 'bg-destructive/10' : 'hover:bg-muted'}>
+                    <td className="px-4 py-3 font-mono text-xs text-foreground">{c.chequeNo}</td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800 max-w-[140px] truncate">
+                      <p className="font-medium text-foreground max-w-[140px] truncate">
                         {c.partyName}
                       </p>
-                      <p className="text-xs text-gray-400">{c.bankName ?? '—'}</p>
+                      <p className="text-xs text-muted-foreground">{c.bankName ?? '—'}</p>
                     </td>
                     <td className="px-4 py-3 font-semibold whitespace-nowrap">
                       {formatCurrency(c.amount, currency)}
                     </td>
                     <td
-                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-destructive font-bold' : 'text-muted-foreground'}`}
                     >
                       {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
                       {isOverdue(c) && ' ⚠'}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {c.type === 'RECEIVED'
                         ? c.collectedDate
                           ? String(c.collectedDate).slice(0, 10)
@@ -637,10 +647,10 @@ function AdminChequesContent() {
                           ? String(c.issueDate).slice(0, 10)
                           : '—'}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px]">
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px]">
                       {c.sourceLabel ? (
                         <span
-                          className="inline-block px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-medium text-slate-600 max-w-[150px] truncate"
+                          className="inline-block px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium text-foreground max-w-[150px] truncate"
                           title={c.sourceLabel}
                         >
                           {c.sourceLabel}
@@ -651,14 +661,14 @@ function AdminChequesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
+                        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[c.status] ?? 'bg-muted text-foreground'}`}
                       >
                         {STATUS_ICON[c.status]}
                         {c.status}
                       </span>
                       {(c.status === 'BOUNCED' || c.status === 'CANCELLED') && c.reason && (
                         <span
-                          className="ml-1 inline-block cursor-help text-gray-400 hover:text-gray-600"
+                          className="ml-1 inline-block cursor-help text-muted-foreground hover:text-foreground"
                           title={c.reason}
                         >
                           ⓘ
@@ -690,24 +700,24 @@ function AdminChequesContent() {
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-lg font-semibold">Add Cheque</h2>
               <button
                 onClick={() => setShowAdd(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+                className="text-muted-foreground hover:text-foreground text-xl font-bold"
               >
                 ×
               </button>
             </div>
-            <div className="p-6 text-sm text-gray-500">
+            <div className="p-6 text-sm text-muted-foreground">
               Cheques auto-populate from payments. Use this form for manually tracking cheques not
               linked to a bill.
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={() => setShowAdd(false)}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-muted"
                 >
                   Close
                 </button>
@@ -747,7 +757,7 @@ function AdminChequesContent() {
 
 export default function AdminChequesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <AdminChequesContent />
     </Suspense>
   );

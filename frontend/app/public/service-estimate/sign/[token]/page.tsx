@@ -97,33 +97,33 @@ export default function RemoteServiceEstimateApprovalPage() {
     `${currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-50 p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-success to-muted p-4 sm:p-8">
       <div className="w-full max-w-2xl mx-auto">
         <div className="text-center mb-6">
-          <div className="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <FileText size={24} className="text-white" />
+          <div className="h-12 w-12 bg-success rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <FileText size={24} className="text-primary-foreground" />
           </div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
             Service Quotation Approval
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+        <div className="bg-card rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
           {state === 'loading' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 size={28} className="animate-spin text-emerald-500" />
-              <p className="text-sm font-bold text-slate-500">Loading your quotation...</p>
+              <Loader2 size={28} className="animate-spin text-success" />
+              <p className="text-sm font-bold text-muted-foreground">Loading your quotation...</p>
             </div>
           )}
 
           {state === 'error' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle size={24} className="text-red-500" />
+              <div className="h-12 w-12 bg-destructive/10 rounded-full flex items-center justify-center">
+                <AlertTriangle size={24} className="text-destructive" />
               </div>
-              <p className="text-sm font-black text-slate-800">Unable to Load Quotation</p>
-              <p className="text-xs text-slate-500">{errorMsg}</p>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-sm font-black text-foreground">Unable to Load Quotation</p>
+              <p className="text-xs text-muted-foreground">{errorMsg}</p>
+              <p className="text-xs text-muted-foreground mt-2">
                 This link may have expired or already been used. Please contact Xerocare for a new
                 link.
               </p>
@@ -132,16 +132,16 @@ export default function RemoteServiceEstimateApprovalPage() {
 
           {state === 'approved' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-14 w-14 bg-emerald-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 size={28} className="text-emerald-500" />
+              <div className="h-14 w-14 bg-success/10 rounded-full flex items-center justify-center">
+                <CheckCircle2 size={28} className="text-success" />
               </div>
-              <p className="text-lg font-black text-slate-800">Quotation Approved!</p>
+              <p className="text-lg font-black text-foreground">Quotation Approved!</p>
               {doneAt && (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Approved on {new Date(doneAt).toLocaleString()}
                 </p>
               )}
-              <p className="text-xs text-slate-400 mt-3 max-w-sm leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 max-w-sm leading-relaxed">
                 Thank you. Our service team will proceed with the repair. You may close this tab.
               </p>
             </div>
@@ -149,16 +149,16 @@ export default function RemoteServiceEstimateApprovalPage() {
 
           {state === 'rejected' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-14 w-14 bg-amber-100 rounded-full flex items-center justify-center">
-                <ThumbsDown size={28} className="text-amber-500" />
+              <div className="h-14 w-14 bg-warning/10 rounded-full flex items-center justify-center">
+                <ThumbsDown size={28} className="text-warning" />
               </div>
-              <p className="text-lg font-black text-slate-800">Quotation Declined</p>
+              <p className="text-lg font-black text-foreground">Quotation Declined</p>
               {doneAt && (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Submitted on {new Date(doneAt).toLocaleString()}
                 </p>
               )}
-              <p className="text-xs text-slate-400 mt-3 max-w-sm leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 max-w-sm leading-relaxed">
                 Our team will get in touch to discuss next steps. You may close this tab.
               </p>
             </div>
@@ -166,31 +166,31 @@ export default function RemoteServiceEstimateApprovalPage() {
 
           {(state === 'ready' || state === 'rejecting') && data && (
             <>
-              <div className="border border-slate-200 rounded-2xl p-4 sm:p-6 space-y-4">
+              <div className="border border-border rounded-2xl p-4 sm:p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       Quotation
                     </p>
-                    <p className="text-sm font-black text-slate-800">{data.ticket.ticketNumber}</p>
+                    <p className="text-sm font-black text-foreground">{data.ticket.ticketNumber}</p>
                   </div>
                   {data.branch?.name && (
-                    <p className="text-xs font-bold text-slate-500 text-right">
+                    <p className="text-xs font-bold text-muted-foreground text-right">
                       {data.branch.name}
                     </p>
                   )}
                 </div>
 
-                <div className="text-xs text-slate-600 leading-relaxed">
-                  <span className="font-bold text-slate-700">Machine:</span>{' '}
+                <div className="text-xs text-foreground leading-relaxed">
+                  <span className="font-bold text-foreground">Machine:</span>{' '}
                   {data.ticket.productBrand} {data.ticket.productModel}
                   <br />
-                  <span className="font-bold text-slate-700">Serial No:</span>{' '}
+                  <span className="font-bold text-foreground">Serial No:</span>{' '}
                   {data.ticket.serialNumber}
                   {data.customerName && (
                     <>
                       <br />
-                      <span className="font-bold text-slate-700">Customer:</span>{' '}
+                      <span className="font-bold text-foreground">Customer:</span>{' '}
                       {data.customerName}
                     </>
                   )}
@@ -200,7 +200,7 @@ export default function RemoteServiceEstimateApprovalPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-left text-slate-400 border-b border-slate-100">
+                        <tr className="text-left text-muted-foreground border-b border-border">
                           <th className="py-1.5 font-bold">Item</th>
                           <th className="py-1.5 font-bold text-center">Qty</th>
                           <th className="py-1.5 font-bold text-right">Unit</th>
@@ -209,13 +209,13 @@ export default function RemoteServiceEstimateApprovalPage() {
                       </thead>
                       <tbody>
                         {data.estimate.items.map((it, i) => (
-                          <tr key={i} className="border-b border-slate-50">
-                            <td className="py-1.5 text-slate-700">{it.partName}</td>
-                            <td className="py-1.5 text-center text-slate-600">{it.quantity}</td>
-                            <td className="py-1.5 text-right text-slate-600">
+                          <tr key={i} className="border-b border-border">
+                            <td className="py-1.5 text-foreground">{it.partName}</td>
+                            <td className="py-1.5 text-center text-foreground">{it.quantity}</td>
+                            <td className="py-1.5 text-right text-foreground">
                               {it.isFree ? 'Free' : money(it.unitPrice)}
                             </td>
-                            <td className="py-1.5 text-right text-slate-700">
+                            <td className="py-1.5 text-right text-foreground">
                               {it.isFree
                                 ? 'Free'
                                 : money(it.totalPrice ?? Number(it.unitPrice || 0) * it.quantity)}
@@ -249,7 +249,7 @@ export default function RemoteServiceEstimateApprovalPage() {
                   {Number(data.estimate.discountAmount) > 0 && (
                     <Row label="Discount" value={`- ${money(data.estimate.discountAmount)}`} />
                   )}
-                  <div className="flex justify-between pt-2 mt-1 border-t border-slate-200 text-sm font-black text-slate-800">
+                  <div className="flex justify-between pt-2 mt-1 border-t border-border text-sm font-black text-foreground">
                     <span>
                       {data.ticket.visitChargeMethod === 'SEPARATE' &&
                       Number(data.ticket.visitChargeAmount) > 0 &&
@@ -263,7 +263,7 @@ export default function RemoteServiceEstimateApprovalPage() {
                 </div>
 
                 {data.validUntil && (
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-muted-foreground">
                     Valid until {new Date(data.validUntil).toLocaleDateString()}
                   </p>
                 )}
@@ -272,14 +272,14 @@ export default function RemoteServiceEstimateApprovalPage() {
                   href={serviceEstimateSigningPdfUrl(token)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-success hover:underline"
                 >
                   <Download size={14} /> Download quotation PDF
                 </a>
               </div>
 
               {data.expired && (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-center text-xs text-amber-700 font-bold">
+                <div className="p-3 bg-warning/10 rounded-xl border border-warning/30 text-center text-xs text-warning font-bold">
                   This quotation has expired. Please contact Xerocare for an updated quotation.
                 </div>
               )}
@@ -287,14 +287,14 @@ export default function RemoteServiceEstimateApprovalPage() {
               {state === 'ready' && !data.expired && (
                 <>
                   <div>
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                       Your Full Name *
                     </Label>
                     <Input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Enter your full name"
-                      className="h-10 font-bold border-slate-200"
+                      className="h-10 font-bold border-border"
                     />
                   </div>
 
@@ -306,7 +306,7 @@ export default function RemoteServiceEstimateApprovalPage() {
                       disabled={!customerName.trim() || isSaving}
                       className={cn(
                         buttonVariants(),
-                        'flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-100 disabled:opacity-40',
+                        'flex-1 h-12 bg-success hover:bg-success/90 text-success-foreground font-black text-sm rounded-xl shadow-lg shadow-success/10 disabled:opacity-40',
                       )}
                     >
                       <CheckCircle2 size={18} className="mr-2" />
@@ -316,7 +316,7 @@ export default function RemoteServiceEstimateApprovalPage() {
                       variant="outline"
                       onClick={() => setState('rejecting')}
                       disabled={isSaving}
-                      className="flex-1 h-12 border-red-200 text-red-600 hover:bg-red-50 font-black text-sm rounded-xl"
+                      className="flex-1 h-12 border-destructive/30 text-destructive hover:bg-destructive/10 font-black text-sm rounded-xl"
                     >
                       <ThumbsDown size={18} className="mr-2" />
                       Decline
@@ -328,14 +328,14 @@ export default function RemoteServiceEstimateApprovalPage() {
               {state === 'rejecting' && (
                 <>
                   <div>
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                       Why are you declining? *
                     </Label>
                     <Textarea
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       placeholder="e.g. The cost is higher than expected"
-                      className="min-h-24 text-sm border-slate-200"
+                      className="min-h-24 text-sm border-border"
                     />
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -354,7 +354,7 @@ export default function RemoteServiceEstimateApprovalPage() {
                       disabled={!rejectReason.trim() || isSaving}
                       className={cn(
                         buttonVariants(),
-                        'flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl disabled:opacity-40',
+                        'flex-1 h-12 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-black text-sm rounded-xl disabled:opacity-40',
                       )}
                     >
                       Submit
@@ -366,7 +366,7 @@ export default function RemoteServiceEstimateApprovalPage() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-slate-400 mt-4">
+        <p className="text-center text-[10px] text-muted-foreground mt-4">
           Secured by Xerocare • This link is for one-time use only
         </p>
       </div>
@@ -376,7 +376,7 @@ export default function RemoteServiceEstimateApprovalPage() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-slate-600">
+    <div className="flex justify-between text-foreground">
       <span>{label}</span>
       <span>{value}</span>
     </div>

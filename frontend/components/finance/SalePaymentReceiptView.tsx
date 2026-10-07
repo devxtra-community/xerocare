@@ -52,9 +52,9 @@ const NETWORK_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
-  APPROVED: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  REJECTED: 'bg-red-50 text-red-700 border border-red-200',
+  PENDING: 'bg-warning/10 text-warning border border-warning/30',
+  APPROVED: 'bg-success/10 text-success border border-success/30',
+  REJECTED: 'bg-destructive/10 text-destructive border border-destructive/30',
 };
 
 type ReceiptType = 'SALE' | 'RENT' | 'LEASE' | 'OTHER';
@@ -75,7 +75,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Initial advance collected at contract conversion',
         type: 'SALE',
         badge: 'SALE',
-        badgeClass: 'bg-indigo-100 text-indigo-700',
+        badgeClass: 'bg-primary/10 text-primary',
       };
     case 'RENT_ADVANCE':
       return {
@@ -83,7 +83,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Initial first month advance payment for rental contract',
         type: 'RENT',
         badge: 'RENT · ADVANCE',
-        badgeClass: 'bg-blue-100 text-blue-700',
+        badgeClass: 'bg-primary/10 text-primary',
       };
     case 'RENT_PERIODIC':
       return {
@@ -91,7 +91,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Periodic rental payment collection',
         type: 'RENT',
         badge: 'RENT · MONTHLY',
-        badgeClass: 'bg-blue-100 text-blue-700',
+        badgeClass: 'bg-primary/10 text-primary',
       };
     case 'RENT_SECURITY_DEPOSIT':
       return {
@@ -99,7 +99,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Refundable security deposit — not a rent payment',
         type: 'RENT',
         badge: 'RENT · SECURITY DEPOSIT',
-        badgeClass: 'bg-teal-100 text-teal-700',
+        badgeClass: 'bg-info/10 text-info',
       };
     case 'LEASE_ADVANCE':
       return {
@@ -107,7 +107,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Initial first month advance payment for lease contract',
         type: 'LEASE',
         badge: 'LEASE · ADVANCE',
-        badgeClass: 'bg-violet-100 text-violet-700',
+        badgeClass: 'bg-lease/10 text-lease',
       };
     case 'LEASE_PERIODIC':
       return {
@@ -115,7 +115,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Periodic lease / EMI installment',
         type: 'LEASE',
         badge: 'LEASE · INSTALLMENT',
-        badgeClass: 'bg-violet-100 text-violet-700',
+        badgeClass: 'bg-lease/10 text-lease',
       };
     case 'LEASE_SECURITY_DEPOSIT':
       return {
@@ -123,7 +123,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Refundable security deposit — not a lease payment',
         type: 'LEASE',
         badge: 'LEASE · SECURITY DEPOSIT',
-        badgeClass: 'bg-teal-100 text-teal-700',
+        badgeClass: 'bg-info/10 text-info',
       };
     default:
       return {
@@ -131,7 +131,7 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         subtitle: 'Contract payment',
         type: 'OTHER',
         badge: 'PAYMENT',
-        badgeClass: 'bg-slate-100 text-slate-700',
+        badgeClass: 'bg-muted text-foreground',
       };
   }
 }
@@ -147,23 +147,23 @@ function SaleSection({
 }) {
   const total = invoice?.totalAmount;
   return (
-    <div className="p-3 bg-indigo-50 rounded-xl space-y-2">
-      <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500">
+    <div className="p-3 bg-primary/10 rounded-xl space-y-2">
+      <p className="text-[9px] font-black uppercase tracking-widest text-primary">
         Sale Contract Details
       </p>
       <div className="grid grid-cols-2 gap-2 text-xs">
         {total != null && (
           <>
-            <span className="text-slate-500 font-bold">Total Contract Value</span>
-            <span className="text-right font-black text-slate-800">{fmtAmt(total, currency)}</span>
+            <span className="text-muted-foreground font-bold">Total Contract Value</span>
+            <span className="text-right font-black text-foreground">{fmtAmt(total, currency)}</span>
           </>
         )}
-        <span className="text-slate-500 font-bold">This Payment</span>
-        <span className="text-right font-black text-indigo-700">
+        <span className="text-muted-foreground font-bold">This Payment</span>
+        <span className="text-right font-black text-primary">
           {fmtAmt(Number(payment.amount), currency)}
         </span>
-        <span className="text-slate-500 font-bold">Payment Type</span>
-        <span className="text-right font-bold text-slate-700">Advance at Conversion</span>
+        <span className="text-muted-foreground font-bold">Payment Type</span>
+        <span className="text-right font-bold text-foreground">Advance at Conversion</span>
       </div>
     </div>
   );
@@ -195,15 +195,15 @@ function RentSection({
     : (invoice?.items?.find((i) => (i.unitPrice ?? 0) > 0)?.unitPrice ?? null);
 
   return (
-    <div className={`p-3 rounded-xl space-y-2 ${isDeposit ? 'bg-teal-50' : 'bg-blue-50'}`}>
+    <div className={`p-3 rounded-xl space-y-2 ${isDeposit ? 'bg-info/10' : 'bg-primary/10'}`}>
       <p
-        className={`text-[9px] font-black uppercase tracking-widest ${isDeposit ? 'text-teal-600' : 'text-blue-500'}`}
+        className={`text-[9px] font-black uppercase tracking-widest ${isDeposit ? 'text-info' : 'text-primary'}`}
       >
         Rental Details
       </p>
       <div className="grid grid-cols-2 gap-2 text-xs">
-        <span className="text-slate-500 font-bold">Payment Type</span>
-        <span className="text-right font-bold text-slate-700">
+        <span className="text-muted-foreground font-bold">Payment Type</span>
+        <span className="text-right font-bold text-foreground">
           {isDeposit
             ? 'Security Deposit (Refundable)'
             : isAdvance
@@ -211,27 +211,27 @@ function RentSection({
               : `Monthly Rental — ${billingMonth}`}
         </span>
         {isDeposit && (
-          <p className="col-span-2 text-[9px] text-teal-700 leading-relaxed">
+          <p className="col-span-2 text-[9px] text-info leading-relaxed">
             This is a refundable guarantee, held separately from rent — it is returned per the terms
             of your contract, not applied toward rent charges.
           </p>
         )}
         {!isAdvance && !isDeposit && (
           <>
-            <span className="text-slate-500 font-bold">Billing Period</span>
-            <span className="text-right font-bold text-slate-700">{billingMonth}</span>
+            <span className="text-muted-foreground font-bold">Billing Period</span>
+            <span className="text-right font-bold text-foreground">{billingMonth}</span>
           </>
         )}
         {monthlyRate != null && !isDeposit && (
           <>
-            <span className="text-slate-500 font-bold">Monthly Rate</span>
-            <span className="text-right font-black text-slate-800">
+            <span className="text-muted-foreground font-bold">Monthly Rate</span>
+            <span className="text-right font-black text-foreground">
               {fmtAmt(monthlyRate, currency)}
             </span>
           </>
         )}
-        <span className="text-slate-500 font-bold">Amount Collected</span>
-        <span className={`text-right font-black ${isDeposit ? 'text-teal-700' : 'text-blue-700'}`}>
+        <span className="text-muted-foreground font-bold">Amount Collected</span>
+        <span className={`text-right font-black ${isDeposit ? 'text-info' : 'text-primary'}`}>
           {fmtAmt(Number(payment.amount), currency)}
         </span>
       </div>
@@ -259,19 +259,19 @@ function LeaseSection({
   });
 
   return (
-    <div className={`p-3 rounded-xl space-y-2 ${isDeposit ? 'bg-teal-50' : 'bg-violet-50'}`}>
+    <div className={`p-3 rounded-xl space-y-2 ${isDeposit ? 'bg-info/10' : 'bg-lease/10'}`}>
       <p
-        className={`text-[9px] font-black uppercase tracking-widest ${isDeposit ? 'text-teal-600' : 'text-violet-500'}`}
+        className={`text-[9px] font-black uppercase tracking-widest ${isDeposit ? 'text-info' : 'text-lease'}`}
       >
         Lease Details
       </p>
       <div className="grid grid-cols-2 gap-2 text-xs">
-        <span className="text-slate-500 font-bold">Lease Type</span>
-        <span className="text-right font-bold text-slate-700">
+        <span className="text-muted-foreground font-bold">Lease Type</span>
+        <span className="text-right font-bold text-foreground">
           {leaseType === 'EMI' ? 'EMI Lease' : 'Full Service Maintenance'}
         </span>
-        <span className="text-slate-500 font-bold">Payment Type</span>
-        <span className="text-right font-bold text-slate-700">
+        <span className="text-muted-foreground font-bold">Payment Type</span>
+        <span className="text-right font-bold text-foreground">
           {isDeposit
             ? 'Security Deposit (Refundable)'
             : isAdvance
@@ -281,15 +281,13 @@ function LeaseSection({
                 : `Service Period — ${billingMonth}`}
         </span>
         {isDeposit && (
-          <p className="col-span-2 text-[9px] text-teal-700 leading-relaxed">
+          <p className="col-span-2 text-[9px] text-info leading-relaxed">
             This is a refundable guarantee, held separately from lease payments — it is returned per
             the terms of your contract, not applied toward lease charges.
           </p>
         )}
-        <span className="text-slate-500 font-bold">Amount</span>
-        <span
-          className={`text-right font-black ${isDeposit ? 'text-teal-700' : 'text-violet-700'}`}
-        >
+        <span className="text-muted-foreground font-bold">Amount</span>
+        <span className={`text-right font-black ${isDeposit ? 'text-info' : 'text-lease'}`}>
           {fmtAmt(Number(payment.amount), currency)}
         </span>
       </div>
@@ -306,27 +304,27 @@ export function SalePaymentReceiptView({
   const meta = getContextMeta(payment.paymentContext);
 
   return (
-    <div ref={printRef} className="bg-white rounded-2xl overflow-hidden">
+    <div ref={printRef} className="bg-card rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="bg-white p-5 border-b border-slate-100">
+      <div className="bg-card p-5 border-b border-border">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">
               Payment Receipt
             </p>
-            <p className="text-xl font-black text-slate-800">{payment.requestNo}</p>
-            <p className="text-xs font-bold mt-0.5 text-slate-500">{meta.title}</p>
+            <p className="text-xl font-black text-foreground">{payment.requestNo}</p>
+            <p className="text-xs font-bold mt-0.5 text-muted-foreground">{meta.title}</p>
           </div>
           <div className="text-right">
             <span
               className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
                 STATUS_BADGE_CLASS[payment.status] ??
-                'bg-slate-100 text-slate-600 border border-slate-200'
+                'bg-muted text-foreground border border-border'
               }`}
             >
               {payment.status}
             </span>
-            <p className="text-[10px] text-slate-400 font-bold mt-1">
+            <p className="text-[10px] text-muted-foreground font-bold mt-1">
               {fmtDate(payment.paymentDate)}
             </p>
           </div>
@@ -336,27 +334,27 @@ export function SalePaymentReceiptView({
       <div className="p-5 space-y-4">
         {/* Parties */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
+          <div className="p-3 bg-muted rounded-xl">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
               <Building2 size={9} /> Branch
             </p>
-            <p className="text-xs font-black text-slate-700">Xerocare</p>
+            <p className="text-xs font-black text-foreground">Xerocare</p>
           </div>
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
+          <div className="p-3 bg-muted rounded-xl">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
               <User size={9} /> Received From
             </p>
-            <p className="text-xs font-black text-slate-700">{payment.customerName}</p>
+            <p className="text-xs font-black text-foreground">{payment.customerName}</p>
           </div>
         </div>
 
         {/* Contract reference */}
-        <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl">
+        <div className="flex items-center justify-between p-2.5 bg-muted rounded-xl">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Contract / Invoice
             </p>
-            <p className="text-sm font-black text-slate-800 mt-0.5">{payment.invoiceNumber}</p>
+            <p className="text-sm font-black text-foreground mt-0.5">{payment.invoiceNumber}</p>
           </div>
           <span
             className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${meta.badgeClass}`}
@@ -387,40 +385,40 @@ export function SalePaymentReceiptView({
         )}
 
         {/* Payment method */}
-        <div className="p-3 border border-slate-200 rounded-xl space-y-2">
-          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
+        <div className="p-3 border border-border rounded-xl space-y-2">
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">
             <CreditCard size={9} /> Payment Details
           </p>
           <div className="grid grid-cols-2 gap-1.5 text-xs">
-            <span className="text-slate-500 font-bold">Mode</span>
-            <span className="text-right font-black text-slate-800">
+            <span className="text-muted-foreground font-bold">Mode</span>
+            <span className="text-right font-black text-foreground">
               {modeLabel(payment.paymentMode)}
             </span>
-            <span className="text-slate-500 font-bold">Amount</span>
-            <span className="text-right font-black text-slate-900 text-sm">
+            <span className="text-muted-foreground font-bold">Amount</span>
+            <span className="text-right font-black text-foreground text-sm">
               {fmtAmt(Number(payment.amount), currency)}
             </span>
-            <span className="text-slate-500 font-bold">Date</span>
-            <span className="text-right font-bold text-slate-700">
+            <span className="text-muted-foreground font-bold">Date</span>
+            <span className="text-right font-bold text-foreground">
               {fmtDate(payment.paymentDate)}
             </span>
             {payment.referenceNumber && (
               <>
-                <span className="text-slate-500 font-bold">Reference</span>
-                <span className="text-right font-bold text-slate-700">
+                <span className="text-muted-foreground font-bold">Reference</span>
+                <span className="text-right font-bold text-foreground">
                   {payment.referenceNumber}
                 </span>
               </>
             )}
           </div>
           {payment.paymentMode === 'ONLINE_PAYMENT' && payment.cardLast4 && (
-            <div className="mt-2 p-2 bg-indigo-50 rounded-lg space-y-1">
-              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600">
+            <div className="mt-2 p-2 bg-primary/10 rounded-lg space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-primary">
                 Card Details
               </p>
               <div className="grid grid-cols-2 gap-1 text-xs">
-                <span className="text-slate-500 font-bold">Card</span>
-                <span className="text-right font-bold text-slate-700">
+                <span className="text-muted-foreground font-bold">Card</span>
+                <span className="text-right font-bold text-foreground">
                   {payment.issuerBank ? `${payment.issuerBank} ` : ''}
                   {payment.cardNetwork
                     ? (NETWORK_LABELS[payment.cardNetwork] ?? payment.cardNetwork)
@@ -429,22 +427,22 @@ export function SalePaymentReceiptView({
                 </span>
                 {/* Masked, always. The full number is not stored, so it cannot be shown
                     here even by mistake. */}
-                <span className="text-slate-500 font-bold">Card Number</span>
-                <span className="text-right font-bold text-slate-700 font-mono">
+                <span className="text-muted-foreground font-bold">Card Number</span>
+                <span className="text-right font-bold text-foreground font-mono">
                   •••• •••• •••• {payment.cardLast4}
                 </span>
                 {payment.cardHolderName && (
                   <>
-                    <span className="text-slate-500 font-bold">Card Holder</span>
-                    <span className="text-right font-bold text-slate-700 uppercase">
+                    <span className="text-muted-foreground font-bold">Card Holder</span>
+                    <span className="text-right font-bold text-foreground uppercase">
                       {payment.cardHolderName}
                     </span>
                   </>
                 )}
                 {payment.transactionReference && (
                   <>
-                    <span className="text-slate-500 font-bold">Approval Ref</span>
-                    <span className="text-right font-bold text-slate-700">
+                    <span className="text-muted-foreground font-bold">Approval Ref</span>
+                    <span className="text-right font-bold text-foreground">
                       {payment.transactionReference}
                     </span>
                   </>
@@ -456,26 +454,26 @@ export function SalePaymentReceiptView({
                   customer paid the gross above and is not charged this — the acquirer
                   withholds it from what it settles to us. */}
               {payment.commissionAmount != null && (
-                <div className="mt-2 border-t border-dashed border-indigo-200 pt-2">
+                <div className="mt-2 border-t border-dashed border-primary/30 pt-2">
                   <div className="grid grid-cols-2 gap-1 text-xs">
-                    <span className="text-slate-500 font-bold">Amount Charged</span>
-                    <span className="text-right font-bold text-slate-700">
+                    <span className="text-muted-foreground font-bold">Amount Charged</span>
+                    <span className="text-right font-bold text-foreground">
                       {fmtAmt(Number(payment.amount), currency)}
                     </span>
-                    <span className="text-slate-500 font-bold">
+                    <span className="text-muted-foreground font-bold">
                       Bank Commission
                       {payment.commissionRateApplied != null &&
                         ` (${Number(payment.commissionRateApplied)}%)`}
                     </span>
-                    <span className="text-right font-bold text-red-600">
+                    <span className="text-right font-bold text-destructive">
                       − {fmtAmt(Number(payment.commissionAmount), currency)}
                     </span>
-                    <span className="text-slate-600 font-black">Net Settlement</span>
-                    <span className="text-right font-black text-emerald-700">
+                    <span className="text-foreground font-black">Net Settlement</span>
+                    <span className="text-right font-black text-success">
                       {fmtAmt(Number(payment.netSettlementAmount ?? payment.amount), currency)}
                     </span>
                   </div>
-                  <p className="mt-1 text-[9px] font-bold text-slate-400">
+                  <p className="mt-1 text-[9px] font-bold text-muted-foreground">
                     Commission is deducted by the bank from the merchant&apos;s settlement. The
                     customer is credited the full amount charged.
                   </p>
@@ -485,39 +483,39 @@ export function SalePaymentReceiptView({
           )}
 
           {payment.paymentMode === 'CHEQUE' && (payment.chequeNumber || payment.chequeBankName) && (
-            <div className="mt-2 p-2 bg-amber-50 rounded-lg space-y-1">
-              <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">
+            <div className="mt-2 p-2 bg-warning/10 rounded-lg space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-warning">
                 Cheque Details
               </p>
               <div className="grid grid-cols-2 gap-1 text-xs">
                 {payment.chequeNumber && (
                   <>
-                    <span className="text-slate-500 font-bold">Cheque No.</span>
-                    <span className="text-right font-bold text-slate-700">
+                    <span className="text-muted-foreground font-bold">Cheque No.</span>
+                    <span className="text-right font-bold text-foreground">
                       {payment.chequeNumber}
                     </span>
                   </>
                 )}
                 {payment.chequeBankName && (
                   <>
-                    <span className="text-slate-500 font-bold">Bank</span>
-                    <span className="text-right font-bold text-slate-700">
+                    <span className="text-muted-foreground font-bold">Bank</span>
+                    <span className="text-right font-bold text-foreground">
                       {payment.chequeBankName}
                     </span>
                   </>
                 )}
                 {payment.paymentDate && (
                   <>
-                    <span className="text-slate-500 font-bold">Cheque Received Date</span>
-                    <span className="text-right font-bold text-slate-700">
+                    <span className="text-muted-foreground font-bold">Cheque Received Date</span>
+                    <span className="text-right font-bold text-foreground">
                       {fmtDate(payment.paymentDate)}
                     </span>
                   </>
                 )}
                 {payment.chequeDate && (
                   <>
-                    <span className="text-slate-500 font-bold">Cheque Date</span>
-                    <span className="text-right font-bold text-slate-700">
+                    <span className="text-muted-foreground font-bold">Cheque Date</span>
+                    <span className="text-right font-bold text-foreground">
                       {fmtDate(payment.chequeDate)}
                     </span>
                   </>
@@ -526,7 +524,7 @@ export function SalePaymentReceiptView({
             </div>
           )}
           {payment.remarks && (
-            <p className="text-xs text-slate-500 font-bold italic border-t border-slate-100 pt-2 mt-1">
+            <p className="text-xs text-muted-foreground font-bold italic border-t border-border pt-2 mt-1">
               Note: {payment.remarks}
             </p>
           )}
@@ -534,12 +532,12 @@ export function SalePaymentReceiptView({
 
         {/* Approval status */}
         {payment.status === 'APPROVED' && (
-          <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+          <div className="flex items-center gap-2 p-2.5 bg-success/10 border border-success/30 rounded-xl">
+            <CheckCircle2 size={16} className="text-success shrink-0" />
             <div>
-              <p className="text-xs font-black text-emerald-700">Approved & Posted to Ledger</p>
+              <p className="text-xs font-black text-success">Approved & Posted to Ledger</p>
               {payment.reviewedByName && (
-                <p className="text-[10px] text-emerald-600 font-bold">
+                <p className="text-[10px] text-success font-bold">
                   By {payment.reviewedByName}
                   {payment.reviewedAt ? ` · ${fmtDate(payment.reviewedAt)}` : ''}
                 </p>
@@ -549,17 +547,19 @@ export function SalePaymentReceiptView({
         )}
 
         {payment.status === 'REJECTED' && (
-          <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl">
-            <p className="text-xs font-black text-red-600">Payment Rejected</p>
+          <div className="p-2.5 bg-destructive/10 border border-destructive/30 rounded-xl">
+            <p className="text-xs font-black text-destructive">Payment Rejected</p>
             {payment.rejectionReason && (
-              <p className="text-[10px] text-red-500 font-bold mt-0.5">{payment.rejectionReason}</p>
+              <p className="text-[10px] text-destructive font-bold mt-0.5">
+                {payment.rejectionReason}
+              </p>
             )}
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-bold">
             <Calendar size={10} />
             <span>Recorded {fmtDate(payment.createdAt)}</span>
             {payment.recordedByEmployeeName && <span>· {payment.recordedByEmployeeName}</span>}

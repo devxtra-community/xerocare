@@ -67,7 +67,7 @@ const equityColumns: DrilldownColumn<EquityEntry>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(r.amount), r.currency)}
       </span>
     ),
@@ -121,17 +121,17 @@ export function RetainedEarningsModal({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="font-bold text-slate-800">Retained Earnings — Monthly Breakdown</h2>
+            <h2 className="font-bold text-foreground">Retained Earnings — Monthly Breakdown</h2>
             <p className="text-xs text-muted-foreground">
               Cumulative net income by month (Revenue − Expenses each month, running total). See the
               Profit &amp; Loss page for the full transaction-level detail behind each month.
             </p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -162,7 +162,7 @@ export function RetainedEarningsModal({ onClose }: { onClose: () => void }) {
                       {formatCurrency(row.expenses, data?.currency ?? 'AED')}
                     </td>
                     <td
-                      className={`px-3 py-2 text-right tabular-nums font-semibold ${row.netIncome < 0 ? 'text-red-600' : 'text-emerald-600'}`}
+                      className={`px-3 py-2 text-right tabular-nums font-semibold ${row.netIncome < 0 ? 'text-destructive' : 'text-success'}`}
                     >
                       {formatCurrency(row.netIncome, data?.currency ?? 'AED')}
                     </td>

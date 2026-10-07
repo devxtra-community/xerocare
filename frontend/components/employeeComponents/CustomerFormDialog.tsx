@@ -289,14 +289,14 @@ export default function CustomerFormDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader className="p-8 pb-4">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
                 <User size={24} />
               </div>
               <div className="space-y-1">
                 <DialogTitle className="text-xl font-bold text-primary tracking-tight">
                   {customer ? 'Update Customer' : 'Add New Customer'}
                 </DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
                   {customer
                     ? `Editing profile ID: ${customer.id}`
                     : 'Create a new customer profile'}
@@ -307,7 +307,7 @@ export default function CustomerFormDialog({
 
           <div className="p-8 pt-4 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+              <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                 Full Name
               </Label>
               <div className="relative">
@@ -316,16 +316,16 @@ export default function CustomerFormDialog({
                   value={formData.name || ''}
                   onChange={handleChange}
                   placeholder="Ex. John Doe"
-                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30 pl-11"
                   required
                 />
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                   Email Address
                 </Label>
                 <div className="relative">
@@ -335,13 +335,13 @@ export default function CustomerFormDialog({
                     value={formData.email || ''}
                     onChange={handleChange}
                     placeholder="john@example.com"
-                    className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                    className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30 pl-11"
                   />
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                   Country
                 </Label>
                 <SearchableSelect
@@ -350,7 +350,7 @@ export default function CustomerFormDialog({
                   onValueChange={handleCountryChange}
                   placeholder="Select country"
                   emptyText="No country found."
-                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                 />
               </div>
             </div>
@@ -359,7 +359,7 @@ export default function CustomerFormDialog({
               {formData.country && (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                       {regionLabel}
                     </Label>
                     {states.length > 0 ? (
@@ -370,7 +370,7 @@ export default function CustomerFormDialog({
                           handleSelectChange('city', '');
                         }}
                       >
-                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                           <SelectValue placeholder={`Select ${regionLabel}`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
@@ -390,12 +390,12 @@ export default function CustomerFormDialog({
                           handleSelectChange('city', '');
                         }}
                         placeholder={`Enter ${regionLabel}`}
-                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                       />
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                       City
                     </Label>
                     {uniqueCities.length > 0 ? (
@@ -403,7 +403,7 @@ export default function CustomerFormDialog({
                         value={formData.city ?? ''}
                         onValueChange={(val) => handleSelectChange('city', val)}
                       >
-                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                           <SelectValue placeholder="Select city" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
@@ -427,7 +427,7 @@ export default function CustomerFormDialog({
                             ? `Select a ${regionLabel.toLowerCase()} first, or type a city`
                             : 'Enter city'
                         }
-                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                       />
                     )}
                   </div>
@@ -440,17 +440,17 @@ export default function CustomerFormDialog({
                 before a number can be typed.
               */}
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                   Phone Number
                 </Label>
-                <div className="flex items-center h-12 rounded-xl bg-muted/50 border border-transparent focus-within:ring-2 focus-within:ring-blue-400 focus-within:bg-card focus-within:border-transparent transition-all overflow-hidden relative shadow-sm">
-                  <div className="flex items-center gap-1.5 px-3 h-full bg-blue-50 border-r border-blue-100 shrink-0 min-w-[64px] justify-center">
+                <div className="flex items-center h-12 rounded-xl bg-muted/50 border border-transparent focus-within:ring-2 focus-within:ring-primary/30 focus-within:bg-card focus-within:border-transparent transition-all overflow-hidden relative shadow-sm">
+                  <div className="flex items-center gap-1.5 px-3 h-full bg-primary/10 border-r border-primary/30 shrink-0 min-w-[64px] justify-center">
                     {formData.country && (
                       <span className="text-base leading-none select-none">
                         {isoToFlag(formData.country)}
                       </span>
                     )}
-                    <span className="text-xs font-mono font-bold text-blue-600 whitespace-nowrap select-none">
+                    <span className="text-xs font-mono font-bold text-primary whitespace-nowrap select-none">
                       {dialCode || '+--'}
                     </span>
                   </div>
@@ -466,7 +466,7 @@ export default function CustomerFormDialog({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+              <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                 Full Address
               </Label>
               <div className="relative">
@@ -475,16 +475,16 @@ export default function CustomerFormDialog({
                   value={formData.address || ''}
                   onChange={handleChange}
                   placeholder="Ex. 123 Building, Doha, Qatar"
-                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30 pl-11"
                 />
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
 
             {/* Row 1: Customer Type + Account Status */}
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2 min-w-0">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                   Customer Type
                 </Label>
                 <Select
@@ -493,7 +493,7 @@ export default function CustomerFormDialog({
                     setFormData((prev) => ({ ...prev, customerType: val as CustomerType }))
                   }
                 >
-                  <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 overflow-hidden">
+                  <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30 overflow-hidden">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-none shadow-xl">
@@ -503,7 +503,7 @@ export default function CustomerFormDialog({
                 </Select>
               </div>
               <div className="space-y-2 min-w-0">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                   Account Status
                 </Label>
                 <Select
@@ -512,17 +512,17 @@ export default function CustomerFormDialog({
                     handleSelectChange('status', val as 'ACTIVE' | 'INACTIVE')
                   }
                 >
-                  <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 pl-11 relative text-left overflow-hidden">
+                  <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30 pl-11 relative text-left overflow-hidden">
                     <div
-                      className={`absolute left-4 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full ${formData.status === 'ACTIVE' ? 'bg-green-500' : 'bg-red-500'}`}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full ${formData.status === 'ACTIVE' ? 'bg-success' : 'bg-destructive'}`}
                     />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-none shadow-xl">
-                    <SelectItem value="ACTIVE" className="font-bold text-green-600">
+                    <SelectItem value="ACTIVE" className="font-bold text-success">
                       ACTIVE
                     </SelectItem>
-                    <SelectItem value="INACTIVE" className="font-bold text-red-600">
+                    <SelectItem value="INACTIVE" className="font-bold text-destructive">
                       INACTIVE
                     </SelectItem>
                   </SelectContent>
@@ -539,7 +539,7 @@ export default function CustomerFormDialog({
               <>
                 {/* Row 2: VAT Status — full width to accommodate long labels */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                     {taxName} Status
                   </Label>
                   <Select
@@ -554,7 +554,7 @@ export default function CustomerFormDialog({
                       }));
                     }}
                   >
-                    <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-none shadow-xl">
@@ -569,7 +569,7 @@ export default function CustomerFormDialog({
 
                 {formData.vatStatus === 'REGISTERED' && (
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                       {taxName} Number
                     </Label>
                     <Input
@@ -577,15 +577,15 @@ export default function CustomerFormDialog({
                       value={formData.vatNumber ?? ''}
                       onChange={handleChange}
                       placeholder={`Tax registration / ${taxName} No.`}
-                      className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                      className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
                     />
                   </div>
                 )}
 
                 {formData.vatStatus === 'EXEMPT' && (
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      Exemption Reason <span className="text-red-500">*</span>
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
+                      Exemption Reason <span className="text-destructive">*</span>
                     </Label>
                     <Select
                       value={formData.exemptionReason ?? ''}
@@ -593,7 +593,7 @@ export default function CustomerFormDialog({
                         handleSelectChange('exemptionReason', val as CustomerExemptionReason)
                       }
                     >
-                      <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                      <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                         <SelectValue placeholder="Select the reason for VAT exemption" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-xl">
@@ -617,7 +617,7 @@ export default function CustomerFormDialog({
             {/* Bank Accounts Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
                   Bank Accounts ({bankAccounts.length})
                 </Label>
                 {!addingBank && (
@@ -625,7 +625,7 @@ export default function CustomerFormDialog({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px] gap-1 border-blue-200 text-blue-700"
+                    className="h-7 text-[11px] gap-1 border-primary/30 text-primary"
                     onClick={() => {
                       setAddingBank(true);
                       setBankDraft({
@@ -645,28 +645,30 @@ export default function CustomerFormDialog({
                   {bankAccounts.map((acc, idx) => (
                     <div
                       key={idx}
-                      className={`flex items-start gap-3 p-3 rounded-xl border ${acc.isPrimary ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 bg-card'}`}
+                      className={`flex items-start gap-3 p-3 rounded-xl border ${acc.isPrimary ? 'border-primary/30 bg-primary/10' : 'border-border bg-card'}`}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-foreground">{acc.bankName}</span>
                           {acc.isPrimary && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase">
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">
                               Primary
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
+                        <p className="text-[11px] text-muted-foreground">{acc.accountHolderName}</p>
                         <div className="flex items-center gap-2">
-                          <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                          <p className="text-[11px] font-mono text-foreground">
+                            {acc.accountNumber}
+                          </p>
                           {acc.accountType && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-lease/10 text-lease">
                               {acc.accountType}
                             </span>
                           )}
                         </div>
                         {(acc.swiftCode || acc.iban || acc.address) && (
-                          <p className="text-[10px] text-gray-400 mt-0.5">
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
                             {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
                             {acc.iban && ` • ${getBankCodeLabel(acc.bankCountry)}: ${acc.iban}`}
                             {acc.address && ` • ${acc.address}`}
@@ -679,7 +681,7 @@ export default function CustomerFormDialog({
                             type="button"
                             title="Set as primary"
                             onClick={() => setPrimary(idx)}
-                            className="p-1 rounded-lg hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
+                            className="p-1 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
                           >
                             <Star className="h-3.5 w-3.5" />
                           </button>
@@ -687,7 +689,7 @@ export default function CustomerFormDialog({
                         <button
                           type="button"
                           onClick={() => removeBankAccount(idx)}
-                          className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                          className="p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                         >
                           <Trash className="h-3.5 w-3.5" />
                         </button>
@@ -698,12 +700,12 @@ export default function CustomerFormDialog({
               )}
 
               {addingBank && (
-                <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/30 space-y-3">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                <div className="border border-primary/30 rounded-xl p-4 bg-primary/10 space-y-3">
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider">
                     New Bank Account
                   </p>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Bank Country *
                     </label>
                     <SearchableSelect
@@ -736,7 +738,7 @@ export default function CustomerFormDialog({
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Account Beneficiary *
                       </label>
                       <Input
@@ -749,7 +751,7 @@ export default function CustomerFormDialog({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Account Number *
                       </label>
                       <Input
@@ -762,7 +764,7 @@ export default function CustomerFormDialog({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Account Type
                       </label>
                       <Select
@@ -785,7 +787,7 @@ export default function CustomerFormDialog({
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         SWIFT / BIC
                       </label>
                       <Input
@@ -796,7 +798,7 @@ export default function CustomerFormDialog({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Bank Address
                       </label>
                       <Input
@@ -807,7 +809,7 @@ export default function CustomerFormDialog({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Currency
                       </label>
                       <SearchableSelect
@@ -829,7 +831,7 @@ export default function CustomerFormDialog({
                           }
                           className="rounded"
                         />
-                        <span className="text-xs font-semibold text-gray-600">
+                        <span className="text-xs font-semibold text-foreground">
                           Set as primary account
                         </span>
                       </label>
@@ -859,11 +861,11 @@ export default function CustomerFormDialog({
             </div>
           </div>
 
-          <div className="p-8 bg-muted/50 flex items-center justify-between border-t border-gray-100">
+          <div className="p-8 bg-muted/50 flex items-center justify-between border-t border-border">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
             >
               Discard
             </button>
@@ -873,7 +875,7 @@ export default function CustomerFormDialog({
               loadingText="Saving..."
               className={cn(
                 buttonVariants(),
-                'h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg transition-all flex items-center gap-2',
+                'h-12 px-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-lg transition-all flex items-center gap-2',
               )}
               disabled={loading}
             >

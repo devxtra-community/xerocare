@@ -57,7 +57,7 @@ const expenseColumns: DrilldownColumn<ExpenseEntry>[] = [
   {
     header: 'Status',
     render: (r) => (
-      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-muted text-foreground">
         {r.status}
       </span>
     ),
@@ -65,7 +65,7 @@ const expenseColumns: DrilldownColumn<ExpenseEntry>[] = [
   {
     header: 'Source',
     render: () => (
-      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-muted text-foreground border border-border">
         Manual
       </span>
     ),
@@ -74,7 +74,7 @@ const expenseColumns: DrilldownColumn<ExpenseEntry>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(r.netAmount), r.currency)}
       </span>
     ),
@@ -194,7 +194,7 @@ const depreciationColumns: DrilldownColumn<AssetDepreciationRegister>[] = [
     header: 'NBV',
     align: 'right',
     render: (a) => (
-      <span className="font-bold tabular-nums text-slate-800">{formatCurrency(a.nbv, 'AED')}</span>
+      <span className="font-bold tabular-nums text-foreground">{formatCurrency(a.nbv, 'AED')}</span>
     ),
   },
 ];
@@ -272,7 +272,7 @@ const vendorPurchaseColumns: DrilldownColumn<PurchaseOrder>[] = [
   {
     header: 'PO / Lot Ref',
     render: (p) => (
-      <span className="font-mono text-xs text-blue-600">{(p.lotId ?? p.id).slice(0, 8)}</span>
+      <span className="font-mono text-xs text-primary">{(p.lotId ?? p.id).slice(0, 8)}</span>
     ),
   },
   {
@@ -335,7 +335,7 @@ const vendorPurchaseColumns: DrilldownColumn<PurchaseOrder>[] = [
     header: 'Amount',
     align: 'right',
     render: (p) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(
           Number(p.purchaseAmount ?? 0) + Number(p.documentationFee ?? 0),
           p.currencyCode ?? 'AED',

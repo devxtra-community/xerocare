@@ -34,9 +34,9 @@ import {
 } from 'lucide-react';
 
 const STATUS_CONFIG: Record<SwapRequestStatus, { label: string; color: string }> = {
-  PENDING: { label: 'Pending Review', color: 'bg-amber-100 text-amber-700' },
-  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700' },
-  REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-600' },
+  PENDING: { label: 'Pending Review', color: 'bg-warning/10 text-warning' },
+  APPROVED: { label: 'Approved', color: 'bg-success/10 text-success' },
+  REJECTED: { label: 'Rejected', color: 'bg-destructive/10 text-destructive' },
 };
 
 export default function MachineSwapsPage() {
@@ -119,10 +119,10 @@ export default function MachineSwapsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Machine Swap Requests
           </h1>
-          <p className="text-xs text-slate-400 font-bold mt-0.5">
+          <p className="text-xs text-muted-foreground font-bold mt-0.5">
             Review and approve serial number swaps requested by technicians
           </p>
         </div>
@@ -130,7 +130,7 @@ export default function MachineSwapsPage() {
           variant="ghost"
           size="sm"
           onClick={load}
-          className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-9"
+          className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-9"
         >
           <RefreshCw size={12} className="mr-1" />
           Refresh
@@ -140,13 +140,18 @@ export default function MachineSwapsPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Pending Review', count: pending, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Approved', count: approved, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Rejected', count: rejected, color: 'text-red-500', bg: 'bg-red-50' },
+          { label: 'Pending Review', count: pending, color: 'text-warning', bg: 'bg-warning/10' },
+          { label: 'Approved', count: approved, color: 'text-success', bg: 'bg-success/10' },
+          {
+            label: 'Rejected',
+            count: rejected,
+            color: 'text-destructive',
+            bg: 'bg-destructive/10',
+          },
         ].map((s) => (
           <div key={s.label} className={`${s.bg} rounded-2xl p-4 flex flex-col items-center gap-1`}>
             <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               {s.label}
             </p>
           </div>
@@ -156,16 +161,19 @@ export default function MachineSwapsPage() {
       {/* Filters */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by invoice, customer, serial, or model..."
-            className="pl-9 h-9 border-slate-200 text-sm font-bold"
+            className="pl-9 h-9 border-border text-sm font-bold"
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <Filter size={12} className="text-slate-400" />
+          <Filter size={12} className="text-muted-foreground" />
           {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
             <Button
               key={s}
@@ -174,8 +182,8 @@ export default function MachineSwapsPage() {
               onClick={() => setStatusFilter(s)}
               className={`h-8 text-[10px] font-black uppercase tracking-wider px-3 ${
                 statusFilter === s
-                  ? 'bg-slate-800 text-white'
-                  : 'border-slate-200 text-slate-500 hover:text-slate-700'
+                  ? 'bg-foreground text-primary-foreground'
+                  : 'border-border text-muted-foreground hover:text-foreground'
               }`}
             >
               {s}
@@ -188,20 +196,20 @@ export default function MachineSwapsPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-slate-400" />
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
-              <RefreshCw size={32} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-sm font-bold text-slate-500">No swap requests</p>
-              <p className="text-xs text-slate-400 mt-1">
+              <RefreshCw size={32} className="mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm font-bold text-muted-foreground">No swap requests</p>
+              <p className="text-xs text-muted-foreground mt-1">
                 Requests appear here when technicians report a defective machine.
               </p>
             </div>
           ) : (
             <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
-                <TableRow className="bg-slate-50/70">
+                <TableRow className="bg-muted/70">
                   {[
                     'Invoice',
                     'Customer',
@@ -214,7 +222,7 @@ export default function MachineSwapsPage() {
                   ].map((h) => (
                     <TableHead
                       key={h}
-                      className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+                      className="text-[10px] font-black uppercase tracking-widest text-muted-foreground"
                     >
                       {h}
                     </TableHead>
@@ -226,47 +234,49 @@ export default function MachineSwapsPage() {
                   const isActing = actionLoading === swap.id;
                   const cfg = STATUS_CONFIG[swap.status];
                   return (
-                    <TableRow key={swap.id} className="hover:bg-slate-50/50">
-                      <TableCell className="font-black text-slate-800 text-sm">
+                    <TableRow key={swap.id} className="hover:bg-muted/50">
+                      <TableCell className="font-black text-foreground text-sm">
                         {swap.invoiceNumber}
-                        <p className="text-[9px] text-slate-400 font-bold">{swap.contractType}</p>
+                        <p className="text-[9px] text-muted-foreground font-bold">
+                          {swap.contractType}
+                        </p>
                       </TableCell>
-                      <TableCell className="font-bold text-slate-600 text-sm">
+                      <TableCell className="font-bold text-foreground text-sm">
                         {swap.customerName ?? '—'}
                       </TableCell>
-                      <TableCell className="font-bold text-slate-600 text-sm">
+                      <TableCell className="font-bold text-foreground text-sm">
                         {swap.modelName ?? '—'}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[11px] font-black text-slate-600 bg-slate-100 rounded px-1.5 py-0.5">
+                          <span className="font-mono text-[11px] font-black text-foreground bg-muted rounded px-1.5 py-0.5">
                             {swap.currentSerialNumber}
                           </span>
-                          <ArrowRight size={11} className="text-slate-400 flex-shrink-0" />
-                          <span className="font-mono text-[11px] font-black text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5">
+                          <ArrowRight size={11} className="text-muted-foreground flex-shrink-0" />
+                          <span className="font-mono text-[11px] font-black text-success bg-success/10 rounded px-1.5 py-0.5">
                             {swap.requestedSerialNumber}
                           </span>
                         </div>
                         {swap.status === 'APPROVED' && swap.swapExecutedAt && (
-                          <p className="text-[9px] text-emerald-600 font-bold mt-0.5">
+                          <p className="text-[9px] text-success font-bold mt-0.5">
                             Executed {new Date(swap.swapExecutedAt).toLocaleDateString('en-GB')}
                           </p>
                         )}
                         {swap.status === 'REJECTED' && swap.rejectionReason && (
                           <p
-                            className="text-[9px] text-red-500 font-bold mt-0.5 max-w-[160px] truncate"
+                            className="text-[9px] text-destructive font-bold mt-0.5 max-w-[160px] truncate"
                             title={swap.rejectionReason}
                           >
                             ✕ {swap.rejectionReason}
                           </p>
                         )}
                       </TableCell>
-                      <TableCell className="text-[11px] text-slate-500 font-semibold max-w-[140px]">
+                      <TableCell className="text-[11px] text-muted-foreground font-semibold max-w-[140px]">
                         <span className="line-clamp-2">{swap.reason || '—'}</span>
                       </TableCell>
-                      <TableCell className="font-bold text-slate-600 text-sm">
+                      <TableCell className="font-bold text-foreground text-sm">
                         {swap.requestedByName}
-                        <p className="text-[9px] text-slate-400">
+                        <p className="text-[9px] text-muted-foreground">
                           {new Date(swap.createdAt).toLocaleString('en-GB', {
                             day: '2-digit',
                             month: 'short',
@@ -282,7 +292,7 @@ export default function MachineSwapsPage() {
                           {cfg.label}
                         </span>
                         {swap.status !== 'PENDING' && swap.reviewedByName && (
-                          <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                          <p className="text-[9px] text-muted-foreground font-bold mt-0.5">
                             by {swap.reviewedByName}
                           </p>
                         )}
@@ -294,7 +304,7 @@ export default function MachineSwapsPage() {
                               size="sm"
                               onClick={() => handleApprove(swap)}
                               disabled={isActing}
-                              className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
+                              className="h-7 bg-success hover:bg-success/90 text-success-foreground font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
                             >
                               {isActing ? (
                                 <Loader2 size={12} className="animate-spin" />
@@ -313,18 +323,18 @@ export default function MachineSwapsPage() {
                                 setRejectReason('');
                               }}
                               disabled={isActing}
-                              className="h-7 border-red-200 text-red-600 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
+                              className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10 font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
                             >
                               <XCircle size={10} className="mr-1" />
                               Reject
                             </Button>
                           </div>
                         ) : (
-                          <span className="flex items-center justify-end gap-1 text-slate-400">
+                          <span className="flex items-center justify-end gap-1 text-muted-foreground">
                             {swap.status === 'APPROVED' ? (
-                              <CheckCircle2 size={14} className="text-emerald-500" />
+                              <CheckCircle2 size={14} className="text-success" />
                             ) : (
-                              <XCircle size={14} className="text-red-400" />
+                              <XCircle size={14} className="text-destructive" />
                             )}
                             <span className="text-[10px] font-black">
                               {swap.status === 'APPROVED' ? 'Done' : 'Rejected'}
@@ -345,9 +355,9 @@ export default function MachineSwapsPage() {
       <Dialog open={!!rejectTarget} onOpenChange={(v) => !v && setRejectTarget(null)}>
         <DialogContent className="sm:max-w-sm rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
           <DialogTitle className="sr-only">Reject Swap Request</DialogTitle>
-          <div className="bg-gradient-to-r from-red-600 to-red-500 p-5 text-white">
+          <div className="bg-gradient-to-r from-destructive to-destructive p-5 text-primary-foreground">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-full bg-card flex items-center justify-center">
                 <XCircle size={18} />
               </div>
               <div>
@@ -363,14 +373,14 @@ export default function MachineSwapsPage() {
           </div>
           <div className="p-5 space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Reason for Rejection (optional)
               </Label>
               <Input
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="e.g. Replacement unit not available, policy reasons…"
-                className="h-9 text-xs font-bold border-slate-200"
+                className="h-9 text-xs font-bold border-border"
               />
             </div>
             <div className="flex gap-2 pt-1">
@@ -382,7 +392,7 @@ export default function MachineSwapsPage() {
                 Cancel
               </Button>
               <Button
-                className="flex-1 h-9 text-xs font-black bg-red-600 hover:bg-red-700"
+                className="flex-1 h-9 text-xs font-black bg-destructive hover:bg-destructive/90"
                 onClick={handleRejectSubmit}
                 disabled={rejecting}
               >

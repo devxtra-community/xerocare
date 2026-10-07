@@ -27,7 +27,7 @@ export function TaxPeriodFilter({
   return (
     <>
       <Select value={period} onValueChange={(v) => onPeriodChange(v as TaxPeriod)}>
-        <SelectTrigger className="w-40 h-10 bg-white shadow-sm">
+        <SelectTrigger className="w-40 h-10 bg-card shadow-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -44,14 +44,14 @@ export function TaxPeriodFilter({
             type="date"
             value={customFrom}
             onChange={(e) => onCustomChange({ customFrom: e.target.value })}
-            className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm h-10"
+            className="rounded-lg border px-3 py-2 text-sm bg-card shadow-sm h-10"
           />
           <span className="text-muted-foreground text-sm">to</span>
           <input
             type="date"
             value={customTo}
             onChange={(e) => onCustomChange({ customTo: e.target.value })}
-            className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm h-10"
+            className="rounded-lg border px-3 py-2 text-sm bg-card shadow-sm h-10"
           />
         </>
       )}

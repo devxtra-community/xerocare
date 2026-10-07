@@ -44,25 +44,25 @@ export default function HRLeaveGraph() {
   }, []);
 
   return (
-    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
       <div className="flex-1 w-full min-h-0 pt-4">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="day"
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               axisLine={false}
               tickLine={false}
               dy={10}
             />
             <YAxis
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               axisLine={false}
               tickLine={false}
             />
@@ -79,7 +79,7 @@ export default function HRLeaveGraph() {
               dataKey="leaves"
               stroke="var(--primary)"
               strokeWidth={3}
-              dot={{ r: 4, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
+              dot={{ r: 4, fill: 'var(--primary)', strokeWidth: 2, stroke: 'var(--card)' }}
               activeDot={{ r: 6, fill: 'var(--primary)', strokeWidth: 0 }}
             />
           </LineChart>

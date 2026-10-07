@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { getHRStats } from '@/lib/employee';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { ERP_CHART_SERIES } from '@/lib/chartTheme';
 
 import { getActiveCurrency } from '@/lib/currency';
-const COLORS = ['#003F7D', '#0284C7', '#0891b2', '#7dd3fc', '#94a3b8', '#CBD5E1'];
 
 export default function SalaryDistributionChart({
   selectedYear,
@@ -43,13 +44,13 @@ export default function SalaryDistributionChart({
 
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
-  if (!isClient) return <div className="h-[320px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[320px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm border border-primary/30 flex flex-col p-4">
       <div className="pb-2">
-        <h4 className="text-sm font-semibold text-gray-800">Salary Payroll Distribution</h4>
-        <p className="text-[10px] text-gray-500">
+        <h4 className="text-sm font-semibold text-foreground">Salary Payroll Distribution</h4>
+        <p className="text-[10px] text-muted-foreground">
           Total: {getActiveCurrency()} {(total / 1000).toFixed(1)}k
         </p>
       </div>
@@ -67,27 +68,29 @@ export default function SalaryDistributionChart({
               strokeWidth={2}
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={ERP_CHART_SERIES[index % ERP_CHART_SERIES.length]}
+                />
               ))}
             </Pie>
             <Tooltip
-              content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const item = payload[0];
-                  const percentage =
-                    total > 0 ? (((item.value as number) / total) * 100).toFixed(1) : 0;
-                  return (
-                    <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-50">
-                      <p className="text-xs font-bold text-gray-700">{item.name}</p>
-                      <p className="text-xs text-primary font-medium">
-                        {getActiveCurrency()} {((item.value as number) / 1000).toFixed(1)}k (
-                        {percentage}%)
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
-              }}
+              content={
+                <ChartTooltipContent
+                  valueFormatter={(value) =>
+                    `${getActiveCurrency()} ${(Number(value) / 1000).toFixed(1)}k`
+                  }
+                  footer={(payload) => {
+                    const amount = Number(payload[0]?.value) || 0;
+                    const percentage = total > 0 ? ((amount / total) * 100).toFixed(1) : '0.0';
+                    return (
+                      <span className="text-[11px] text-muted-foreground">
+                        {percentage}% of payroll
+                      </span>
+                    );
+                  }}
+                />
+              }
             />
             <Legend
               verticalAlign="bottom"
@@ -97,7 +100,7 @@ export default function SalaryDistributionChart({
               wrapperStyle={{
                 fontSize: '10px',
                 fontWeight: 500,
-                color: '#64748b',
+                color: 'var(--chart-slate-dark)',
                 paddingTop: '10px',
               }}
             />

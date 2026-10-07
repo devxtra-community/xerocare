@@ -13,9 +13,9 @@ import { formatCurrency } from '@/lib/format';
 
 export function CostBasisBadge({ basis }: { basis: CostBasis }) {
   const styles: Record<CostBasis, string> = {
-    ACTUAL: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    APPROXIMATE: 'bg-amber-50 text-amber-700 border-amber-200',
-    UNAVAILABLE: 'bg-slate-100 text-slate-500 border-slate-200',
+    ACTUAL: 'bg-success/10 text-success border-success/30',
+    APPROXIMATE: 'bg-warning/10 text-warning border-warning/30',
+    UNAVAILABLE: 'bg-muted text-muted-foreground border-border',
   };
   const labels: Record<CostBasis, string> = {
     ACTUAL: 'Actual',
@@ -80,7 +80,7 @@ function buildProductColumns(currency: string): DrilldownColumn<ProductSaleRow>[
     },
     {
       header: 'Invoice #',
-      render: (r) => <span className="font-mono text-xs text-blue-600">{r.invoiceNumber}</span>,
+      render: (r) => <span className="font-mono text-xs text-primary">{r.invoiceNumber}</span>,
     },
     { header: 'Customer', render: (r) => <span className="text-sm">{r.customerName}</span> },
     {
@@ -116,7 +116,7 @@ function buildProductColumns(currency: string): DrilldownColumn<ProductSaleRow>[
       align: 'right',
       render: (r) => (
         <span
-          className={`font-bold tabular-nums ${r.profit < 0 ? 'text-red-600' : 'text-emerald-700'}`}
+          className={`font-bold tabular-nums ${r.profit < 0 ? 'text-destructive' : 'text-success'}`}
         >
           {formatCurrency(r.profit, currency)}
         </span>
@@ -197,7 +197,7 @@ function buildContractColumns(currency: string): DrilldownColumn<ContractPnlRow>
   return [
     {
       header: 'Invoice / Contract #',
-      render: (r) => <span className="font-mono text-xs text-blue-600">{r.invoiceNumber}</span>,
+      render: (r) => <span className="font-mono text-xs text-primary">{r.invoiceNumber}</span>,
     },
     {
       header: 'Customer',
@@ -239,7 +239,7 @@ function buildContractColumns(currency: string): DrilldownColumn<ContractPnlRow>
       align: 'right',
       render: (r) => (
         <span
-          className={`font-bold tabular-nums ${r.profit < 0 ? 'text-red-600' : 'text-emerald-700'}`}
+          className={`font-bold tabular-nums ${r.profit < 0 ? 'text-destructive' : 'text-success'}`}
         >
           {formatCurrency(r.profit, currency)}
         </span>

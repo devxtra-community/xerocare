@@ -148,7 +148,7 @@ export function BankBranchSelector({
     <div className={className}>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-[10px] font-bold text-gray-400 uppercase">
+          <Label className="text-[10px] font-bold text-muted-foreground uppercase">
             {bankLabel} {required && '*'}
           </Label>
           {bankCountryCode && data?.available ? (
@@ -177,7 +177,9 @@ export function BankBranchSelector({
 
         {onBranchChange && (
           <div className="space-y-1">
-            <Label className="text-[10px] font-bold text-gray-400 uppercase">{branchLabel}</Label>
+            <Label className="text-[10px] font-bold text-muted-foreground uppercase">
+              {branchLabel}
+            </Label>
             <div className="flex items-center gap-1">
               <Input
                 placeholder="Branch name"
@@ -185,7 +187,7 @@ export function BankBranchSelector({
                 onChange={(e) => onBranchChange(e.target.value)}
                 className="h-9 text-sm"
               />
-              {ifscVerified && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />}
+              {ifscVerified && <CheckCircle2 className="h-4 w-4 text-success shrink-0" />}
             </div>
           </div>
         )}
@@ -194,9 +196,9 @@ export function BankBranchSelector({
       {onCodeChange && (
         <div className="mt-2 space-y-1">
           {isIndia ? (
-            <div className="flex items-end gap-2 rounded-lg border border-blue-100 bg-blue-50/40 p-2">
+            <div className="flex items-end gap-2 rounded-lg border border-primary/30 bg-primary/10 p-2">
               <div className="flex-1 space-y-1">
-                <Label className="text-[10px] font-bold text-blue-600 uppercase">
+                <Label className="text-[10px] font-bold text-primary uppercase">
                   IFSC Code (optional — auto-fills Branch, City, State)
                 </Label>
                 <Input
@@ -222,7 +224,7 @@ export function BankBranchSelector({
             </div>
           ) : (
             <>
-              <Label className="text-[10px] font-bold text-gray-400 uppercase">
+              <Label className="text-[10px] font-bold text-muted-foreground uppercase">
                 {getBankCodeLabel(bankCountryCode)}
               </Label>
               <Input
@@ -232,7 +234,7 @@ export function BankBranchSelector({
                 className="h-9 text-sm font-mono"
               />
               {!codeValidation.valid && (
-                <p className="text-[10px] text-red-500">{codeValidation.message}</p>
+                <p className="text-[10px] text-destructive">{codeValidation.message}</p>
               )}
             </>
           )}

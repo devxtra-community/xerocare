@@ -61,8 +61,8 @@ export default function ManagerLotTable() {
   }, [loadLots]);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
-      <h3 className="text-xl sm:text-2xl font-bold text-primary">Lot Management</h3>
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+      <h3 className="text-xl sm:text-2xl font-medium text-foreground">Lot Management</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
         <StatCard title="Total Lots" value={stats.totalLots.toString()} subtitle="All orders" />
@@ -75,7 +75,7 @@ export default function ManagerLotTable() {
 
       <div className="flex items-center justify-between">
         <div className="relative w-[260px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by Lot # or Vendor"
             value={search}
@@ -87,7 +87,7 @@ export default function ManagerLotTable() {
         <select
           value={originFilter}
           onChange={(e) => setOriginFilter(e.target.value as 'ALL' | PurchaseOrigin)}
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm ml-3"
+          className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground shadow-sm ml-3"
           aria-label="Filter by purchase origin"
         >
           <option value="ALL">All Origins</option>
@@ -96,7 +96,7 @@ export default function ManagerLotTable() {
         </select>
 
         <Button
-          className="bg-primary text-white gap-2 ml-auto"
+          className="bg-primary text-primary-foreground gap-2 ml-auto"
           onClick={() => setAddDialogOpen(true)}
         >
           <Plus size={16} /> Add Lot
@@ -153,15 +153,15 @@ export default function ManagerLotTable() {
               className: 'font-semibold text-[11px] text-primary uppercase',
               cell: (lot: Lot) => {
                 const statusStyles: Record<string, string> = {
-                  RECEIVED: 'bg-green-100 text-green-700',
-                  COMPLETED: 'bg-green-100 text-green-700',
-                  RECEIVING: 'bg-blue-100 text-blue-700',
-                  PENDING: 'bg-amber-100 text-amber-700',
-                  CANCELLED: 'bg-red-100 text-red-700',
+                  RECEIVED: 'bg-success/10 text-success',
+                  COMPLETED: 'bg-success/10 text-success',
+                  RECEIVING: 'bg-primary/10 text-primary',
+                  PENDING: 'bg-warning/10 text-warning',
+                  CANCELLED: 'bg-destructive/10 text-destructive',
                 };
                 return (
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[lot.status] ?? 'bg-slate-100 text-slate-600'}`}
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[lot.status] ?? 'bg-muted text-foreground'}`}
                   >
                     {lot.status}
                   </span>

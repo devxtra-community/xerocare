@@ -24,18 +24,18 @@ interface AdHocMachine {
 }
 
 const GROUP_META: Record<string, { label: string; badgeClass: string }> = {
-  SALE: { label: 'Purchased', badgeClass: 'bg-blue-50 text-blue-700 border-blue-100' },
+  SALE: { label: 'Purchased', badgeClass: 'bg-primary/10 text-primary border-primary/30' },
   RENT: {
     label: 'Rented from us',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    badgeClass: 'bg-success/10 text-success border-success/30',
   },
-  LEASE: { label: 'Leased from us', badgeClass: 'bg-purple-50 text-purple-700 border-purple-100' },
-  AMC: { label: 'AMC Contract', badgeClass: 'bg-amber-50 text-amber-700 border-amber-100' },
-  SMA: { label: 'SMA Contract', badgeClass: 'bg-amber-50 text-amber-700 border-amber-100' },
-  FSMA: { label: 'FSMA Contract', badgeClass: 'bg-amber-50 text-amber-700 border-amber-100' },
+  LEASE: { label: 'Leased from us', badgeClass: 'bg-lease/10 text-lease border-lease/30' },
+  AMC: { label: 'AMC Contract', badgeClass: 'bg-warning/10 text-warning border-warning/30' },
+  SMA: { label: 'SMA Contract', badgeClass: 'bg-warning/10 text-warning border-warning/30' },
+  FSMA: { label: 'FSMA Contract', badgeClass: 'bg-warning/10 text-warning border-warning/30' },
   EXTERNAL: {
     label: 'Under our service (external machine)',
-    badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+    badgeClass: 'bg-muted text-foreground border-border',
   },
 };
 
@@ -152,7 +152,7 @@ export default function CustomerProductsPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-slate-400 text-sm py-6">
+      <div className="flex items-center gap-2 text-muted-foreground text-sm py-6">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading products & services…
       </div>
     );
@@ -160,7 +160,7 @@ export default function CustomerProductsPanel({
 
   if (groups.length === 0 && adHocMachines.length === 0) {
     return (
-      <p className="text-sm text-slate-400 py-6">
+      <p className="text-sm text-muted-foreground py-6">
         No products, rentals, leases, contracts, or service history for this customer yet.
       </p>
     );
@@ -177,13 +177,13 @@ export default function CustomerProductsPanel({
       {groups.map(({ key, machines }) => {
         const meta = GROUP_META[key] || {
           label: key,
-          badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+          badgeClass: 'bg-muted text-foreground border-border',
         };
         return (
           <div key={key}>
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-2">
               {meta.label}
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {machines.length}
               </span>
             </h4>
@@ -197,13 +197,13 @@ export default function CustomerProductsPanel({
                     onClick={() => setExpandedSerial(isExpanded ? null : m.serialNumber || null)}
                     className={`rounded-xl border p-3 space-y-1 cursor-pointer transition-colors ${
                       isExpanded
-                        ? 'border-indigo-300 bg-indigo-50/30'
-                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'
+                        ? 'border-primary/30 bg-primary/10'
+                        : 'border-border hover:border-primary/30 hover:bg-muted'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                        <Package className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                        <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         {m.modelName}
                       </p>
                       <div className="flex items-center gap-2 shrink-0">
@@ -211,19 +211,19 @@ export default function CustomerProductsPanel({
                           <button
                             onClick={(e) => goToProduct(e, m.id)}
                             title="Open product page"
-                            className="text-slate-300 hover:text-indigo-500"
+                            className="text-muted-foreground hover:text-primary"
                           >
                             <ExternalLink className="h-3 w-3" />
                           </button>
                         )}
                         {isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-muted-foreground">
                       {m.brandName ? `${m.brandName} • ` : ''}SN: {m.serialNumber}
                     </p>
                     <span
@@ -232,21 +232,21 @@ export default function CustomerProductsPanel({
                       {m.contractType || key}
                     </span>
                     {m.effectiveTo && (
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-muted-foreground">
                         {key === 'SALE' ? 'Warranty until' : 'Ends'}{' '}
                         {new Date(m.effectiveTo).toLocaleDateString()}
                       </p>
                     )}
                     {m.remainingTime && (
-                      <p className="text-[10px] text-slate-400">{m.remainingTime}</p>
+                      <p className="text-[10px] text-muted-foreground">{m.remainingTime}</p>
                     )}
                   </div>
                 );
               })}
             </div>
             {machines.some((m) => m.serialNumber && m.serialNumber === expandedSerial) && (
-              <div className="mt-3 rounded-xl border border-indigo-100 bg-white p-4">
-                <h5 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide mb-2">
+              <div className="mt-3 rounded-xl border border-primary/30 bg-card p-4">
+                <h5 className="text-[10px] font-bold text-primary uppercase tracking-wide mb-2">
                   Service & Spend — {expandedSerial}
                 </h5>
                 <MachineServiceAnalyticsPanel serialNumber={expandedSerial} />
@@ -258,9 +258,9 @@ export default function CustomerProductsPanel({
 
       {adHocMachines.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-2">
             One-off service (unregistered / external machine)
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
               {adHocMachines.length}
             </span>
           </h4>
@@ -270,28 +270,28 @@ export default function CustomerProductsPanel({
               return (
                 <div
                   key={m.serialNumber}
-                  className="rounded-xl border border-slate-100 overflow-hidden"
+                  className="rounded-xl border border-border overflow-hidden"
                 >
                   <button
                     onClick={() => setExpandedSerial(isExpanded ? null : m.serialNumber)}
-                    className="w-full flex items-center justify-between gap-2 p-3 bg-slate-50/30 hover:bg-slate-50 text-left"
+                    className="w-full flex items-center justify-between gap-2 p-3 bg-muted/30 hover:bg-muted text-left"
                   >
                     <div>
-                      <p className="text-sm font-semibold text-slate-700">{m.label}</p>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-sm font-semibold text-foreground">{m.label}</p>
+                      <p className="text-[11px] text-muted-foreground">
                         SN: {m.serialNumber} • {m.ticketCount} ticket{m.ticketCount > 1 ? 's' : ''}
                         {m.lastTicketDate &&
                           ` • last ${new Date(m.lastTicketDate).toLocaleDateString()}`}
                       </p>
                     </div>
                     {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}
                   </button>
                   {isExpanded && (
-                    <div className="p-3 border-t border-slate-100">
+                    <div className="p-3 border-t border-border">
                       <MachineServiceAnalyticsPanel serialNumber={m.serialNumber} />
                     </div>
                   )}

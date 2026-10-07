@@ -68,19 +68,19 @@ function CFRow({
   const currency = useBranchCurrency();
   const color =
     highlight === 'positive'
-      ? 'text-emerald-600'
+      ? 'text-success'
       : highlight === 'negative'
-        ? 'text-red-600'
-        : 'text-slate-800';
+        ? 'text-destructive'
+        : 'text-foreground';
   return (
     <div className={`flex items-center justify-between py-2 ${indent ? 'pl-5' : ''}`}>
       <span
-        className={`text-sm ${indent ? 'text-muted-foreground' : bold ? 'font-bold text-slate-800' : 'text-slate-700'}`}
+        className={`text-sm ${indent ? 'text-muted-foreground' : bold ? 'font-bold text-foreground' : 'text-foreground'}`}
       >
         {label}
       </span>
       <span
-        className={`text-sm font-semibold tabular-nums ${bold ? color : value < 0 ? 'text-red-600' : 'text-slate-700'}`}
+        className={`text-sm font-semibold tabular-nums ${bold ? color : value < 0 ? 'text-destructive' : 'text-foreground'}`}
       >
         {value < 0
           ? `(${formatCurrency(Math.abs(value), currency)})`
@@ -92,9 +92,9 @@ function CFRow({
 
 function SectionLabel({ label, color }: { label: string; color: string }) {
   const colors: Record<string, string> = {
-    emerald: 'text-emerald-700',
-    blue: 'text-blue-700',
-    purple: 'text-purple-700',
+    emerald: 'text-success',
+    blue: 'text-primary',
+    purple: 'text-lease',
   };
   return (
     <p
@@ -270,10 +270,12 @@ export default function CashFlowPage() {
   };
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Cash Flow Statement</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Cash Flow Statement
+          </h3>
           <p className="text-muted-foreground">
             Direct method — {from} to {to}
           </p>
@@ -318,7 +320,7 @@ export default function CashFlowPage() {
           </Button>
           <Button
             onClick={() => setShowStatement(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            className="bg-success hover:bg-success/90 text-success-foreground gap-2"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </Button>
@@ -330,11 +332,11 @@ export default function CashFlowPage() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center space-y-3">
-          <p className="text-red-700 font-medium">Failed to load cash flow data.</p>
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center space-y-3">
+          <p className="text-destructive font-medium">Failed to load cash flow data.</p>
           <button
             onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
           >
             Retry
           </button>
@@ -359,7 +361,7 @@ export default function CashFlowPage() {
             />
           </div>
 
-          <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+          <div className="rounded-2xl bg-card shadow-sm border border-border">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="font-bold text-primary text-base">
                 Cash Flow Statement — {from} to {to}
@@ -379,7 +381,7 @@ export default function CashFlowPage() {
                 bold
                 highlight={netOperating >= 0 ? 'positive' : 'negative'}
               />
-              <hr className="my-2 border-2 border-slate-300" />
+              <hr className="my-2 border-2 border-border" />
 
               <SectionLabel label="INVESTING ACTIVITIES" color="blue" />
               <CFRow label="Cash receipts from investing" value={invReceipts} indent />
@@ -391,7 +393,7 @@ export default function CashFlowPage() {
                 bold
                 highlight={netInvesting >= 0 ? 'positive' : 'negative'}
               />
-              <hr className="my-2 border-2 border-slate-300" />
+              <hr className="my-2 border-2 border-border" />
 
               <SectionLabel label="FINANCING ACTIVITIES" color="purple" />
               <CFRow label="Cash receipts from financing" value={finReceipts} indent />
@@ -403,7 +405,7 @@ export default function CashFlowPage() {
                 bold
                 highlight={netFinancing >= 0 ? 'positive' : 'negative'}
               />
-              <hr className="my-2 border-2 border-slate-300" />
+              <hr className="my-2 border-2 border-border" />
 
               <CFRow
                 label="NET CHANGE IN CASH"

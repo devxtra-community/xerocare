@@ -78,14 +78,14 @@ export default function HRNewEmployeesGraph() {
   if (isLoading) {
     return (
       <div className="bg-card rounded-2xl shadow-sm border-0 p-6 h-[300px]">
-        <div className="h-4 w-32 bg-gray-100 animate-pulse rounded mb-8" />
+        <div className="h-4 w-32 bg-muted animate-pulse rounded mb-8" />
         <div className="flex-1 min-h-0 bg-muted/50 animate-pulse rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
       <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
         New Employees per Month
       </h4>
@@ -95,18 +95,18 @@ export default function HRNewEmployeesGraph() {
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="month"
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               axisLine={false}
               tickLine={false}
               dy={10}
             />
             <YAxis
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               axisLine={false}
               tickLine={false}
             />
@@ -116,7 +116,7 @@ export default function HRNewEmployeesGraph() {
               dataKey="count"
               stroke="var(--primary)"
               strokeWidth={3}
-              dot={{ r: 4, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }}
+              dot={{ r: 4, fill: 'var(--primary)', strokeWidth: 2, stroke: 'var(--card)' }}
               activeDot={{ r: 6, fill: 'var(--primary)', strokeWidth: 0 }}
             />
           </LineChart>

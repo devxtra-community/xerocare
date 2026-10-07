@@ -13,13 +13,12 @@ import {
 } from 'recharts';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { ERP_CHART_COLORS, ERP_CHART_SERIES } from '@/lib/chartTheme';
 
 interface BranchData {
   branch: string;
   count: number;
 }
-
-const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
 /**
  * Bar chart visualizing employee distribution across branches.
@@ -62,45 +61,49 @@ export default function HRBranchEmployeesGraph() {
   if (isLoading) {
     return (
       <div className="bg-card rounded-2xl shadow-sm border-0 p-6 h-[300px]">
-        <div className="h-4 w-32 bg-gray-100 animate-pulse rounded mb-8" />
+        <div className="h-4 w-32 bg-muted animate-pulse rounded mb-8" />
         <div className="flex-1 min-h-0 bg-muted/50 animate-pulse rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
       <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
         Branch wise Employees
       </h4>
       <div className="flex-1 w-full min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="#e2e8f0"
-              strokeOpacity={0.5}
-            />
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          >
+            <CartesianGrid horizontal={false} stroke={ERP_CHART_COLORS.grid} />
             <XAxis
-              dataKey="branch"
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              type="number"
+              tick={{ fill: ERP_CHART_COLORS.axis, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
-              dy={10}
             />
             <YAxis
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              type="category"
+              dataKey="branch"
+              width={100}
+              tick={{ fill: ERP_CHART_COLORS.axis, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
             />
             <Tooltip
               content={<ChartTooltipContent valueFormatter={(val) => `${val} staff`} />}
-              cursor={{ fill: '#f1f5f9' }}
+              cursor={{ fill: ERP_CHART_COLORS.track, fillOpacity: 0.35 }}
             />
-            <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={30}>
+            <Bar dataKey="count" name="Employees" radius={[0, 5, 5, 0]} barSize={16}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={ERP_CHART_SERIES[index % ERP_CHART_SERIES.length]}
+                />
               ))}
             </Bar>
           </BarChart>

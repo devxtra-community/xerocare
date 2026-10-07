@@ -227,12 +227,12 @@ export default function AddExpenseModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92dvh] flex-col overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="shrink-0 border-b bg-slate-900 px-6 py-5 text-white">
+        <DialogHeader className="shrink-0 border-b bg-foreground px-6 py-5 text-primary-foreground">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Wallet size={18} className="text-emerald-400" />
+            <Wallet size={18} className="text-success" />
             Add Expense
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-400">
+          <DialogDescription className="text-xs text-muted-foreground">
             Recorded directly by Accounts — no employee request or approval step.
           </DialogDescription>
         </DialogHeader>
@@ -240,7 +240,7 @@ export default function AddExpenseModal({
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Expense Date *
               </Label>
               <Input
@@ -251,7 +251,7 @@ export default function AddExpenseModal({
               />
             </div>
             <div>
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Reference / Bill No.
               </Label>
               <Input
@@ -266,7 +266,7 @@ export default function AddExpenseModal({
           {/* Lines */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Expenses
               </Label>
               <Button
@@ -282,16 +282,16 @@ export default function AddExpenseModal({
             {lines.map((l, idx) => {
               const cat = categories.find((c) => c.key === l.category);
               return (
-                <div key={l.uid} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                <div key={l.uid} className="rounded-xl border border-border bg-muted/60 p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                       Line {idx + 1}
                     </span>
                     {lines.length > 1 && (
                       <button
                         type="button"
                         onClick={() => setLines((ls) => ls.filter((x) => x.uid !== l.uid))}
-                        className="text-slate-400 transition hover:text-red-600"
+                        className="text-muted-foreground transition hover:text-destructive"
                         aria-label={`Remove line ${idx + 1}`}
                       >
                         <Trash2 size={14} />
@@ -301,12 +301,14 @@ export default function AddExpenseModal({
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <Label className="text-[10px] font-bold text-slate-500">Expense Type *</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground">
+                        Expense Type *
+                      </Label>
                       <Select
                         value={l.category}
                         onValueChange={(v) => patch(l.uid, { category: v })}
                       >
-                        <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+                        <SelectTrigger className="mt-1 h-9 bg-card text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -319,11 +321,15 @@ export default function AddExpenseModal({
                         </SelectContent>
                       </Select>
                       {cat && (
-                        <p className="mt-1 text-[10px] text-slate-400">Posts to {cat.account}</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          Posts to {cat.account}
+                        </p>
                       )}
                     </div>
                     <div>
-                      <Label className="text-[10px] font-bold text-slate-500">Sub-category</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground">
+                        Sub-category
+                      </Label>
                       <Input
                         className="mt-1 h-9"
                         placeholder="Optional — e.g. Electricity"
@@ -332,7 +338,9 @@ export default function AddExpenseModal({
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label className="text-[10px] font-bold text-slate-500">Description *</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground">
+                        Description *
+                      </Label>
                       <Input
                         className="mt-1 h-9"
                         placeholder="What was this for?"
@@ -341,9 +349,9 @@ export default function AddExpenseModal({
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label className="text-[10px] font-bold text-slate-500">
+                      <Label className="text-[10px] font-bold text-muted-foreground">
                         Amount *
-                        <span className="ml-1 font-normal text-slate-400">
+                        <span className="ml-1 font-normal text-muted-foreground">
                           (total for this line, including any tax)
                         </span>
                       </Label>
@@ -363,10 +371,10 @@ export default function AddExpenseModal({
           </div>
 
           {/* Totals — the two figures differ on purpose and the split matters. */}
-          <div className="flex justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-black text-slate-800">
+          <div className="flex justify-between rounded-xl border border-border bg-card p-3 text-sm font-black text-foreground">
             <span>
               Total
-              <span className="ml-1 text-[11px] font-medium text-slate-400">
+              <span className="ml-1 text-[11px] font-medium text-muted-foreground">
                 ({lines.length} {lines.length === 1 ? 'line' : 'lines'})
               </span>
             </span>
@@ -374,7 +382,7 @@ export default function AddExpenseModal({
           </div>
 
           {/* Payment */}
-          <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+          <div className="space-y-3 rounded-xl border border-border p-3">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -382,8 +390,8 @@ export default function AddExpenseModal({
                 onChange={(e) => setPayNow(e.target.checked)}
                 className="h-4 w-4"
               />
-              <span className="text-sm font-bold text-slate-700">Pay now</span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-sm font-bold text-foreground">Pay now</span>
+              <span className="text-[11px] text-muted-foreground">
                 — deducts from the account and posts to the day book. Leave off to record it as
                 unpaid.
               </span>
@@ -392,9 +400,11 @@ export default function AddExpenseModal({
             {payNow && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <Label className="text-[10px] font-bold text-slate-500">Payment Mode</Label>
+                  <Label className="text-[10px] font-bold text-muted-foreground">
+                    Payment Mode
+                  </Label>
                   <Select value={paymentMode} onValueChange={setPaymentMode}>
-                    <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+                    <SelectTrigger className="mt-1 h-9 bg-card text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -408,9 +418,11 @@ export default function AddExpenseModal({
                 </div>
                 {paymentMode !== 'Cheque' && (
                   <div>
-                    <Label className="text-[10px] font-bold text-slate-500">Paid From *</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground">
+                      Paid From *
+                    </Label>
                     <Select value={paidFrom} onValueChange={setPaidFrom}>
-                      <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+                      <SelectTrigger className="mt-1 h-9 bg-card text-sm">
                         <SelectValue placeholder="No matching account" />
                       </SelectTrigger>
                       <SelectContent>
@@ -427,7 +439,7 @@ export default function AddExpenseModal({
                   </div>
                 )}
                 {balanceError && (
-                  <p className="text-[11px] font-semibold text-red-600 sm:col-span-2">
+                  <p className="text-[11px] font-semibold text-destructive sm:col-span-2">
                     {balanceError}
                   </p>
                 )}
@@ -436,7 +448,7 @@ export default function AddExpenseModal({
           </div>
 
           {/* Prepayment */}
-          <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+          <div className="space-y-3 rounded-xl border border-border p-3">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -444,8 +456,8 @@ export default function AddExpenseModal({
                 onChange={(e) => setIsPrepayment(e.target.checked)}
                 className="h-4 w-4"
               />
-              <span className="text-sm font-bold text-slate-700">This is a prepayment</span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-sm font-bold text-foreground">This is a prepayment</span>
+              <span className="text-[11px] text-muted-foreground">
                 — e.g. a year of rent or insurance paid upfront
               </span>
             </label>
@@ -453,7 +465,9 @@ export default function AddExpenseModal({
               <>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <Label className="text-[10px] font-bold text-slate-500">Covers From *</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground">
+                      Covers From *
+                    </Label>
                     <Input
                       type="date"
                       className="mt-1 h-9"
@@ -462,7 +476,9 @@ export default function AddExpenseModal({
                     />
                   </div>
                   <div>
-                    <Label className="text-[10px] font-bold text-slate-500">Covers To *</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground">
+                      Covers To *
+                    </Label>
                     <Input
                       type="date"
                       className="mt-1 h-9"
@@ -471,7 +487,7 @@ export default function AddExpenseModal({
                     />
                   </div>
                 </div>
-                <p className="text-[10px] leading-snug text-slate-400">
+                <p className="text-[10px] leading-snug text-muted-foreground">
                   Held as a Prepaid Expense asset (1005) until the period it covers has run, rather
                   than charged to this month in full.
                 </p>
@@ -480,7 +496,7 @@ export default function AddExpenseModal({
           </div>
 
           <div>
-            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Notes
             </Label>
             <Input
@@ -492,7 +508,7 @@ export default function AddExpenseModal({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-white px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-card px-6 py-4">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

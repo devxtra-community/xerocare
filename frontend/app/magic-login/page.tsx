@@ -83,13 +83,13 @@ function MagicLoginContent() {
           <p className="text-muted-foreground animate-pulse">Verifying your link...</p>
         )}
         {status === 'success' && (
-          <div className="text-green-600 text-center">
+          <div className="text-success text-center">
             <p className="font-medium">Verified!</p>
             <p className="text-sm">Redirecting you to dashboard...</p>
           </div>
         )}
         {status === 'error' && (
-          <div className="text-red-500 text-center space-y-4">
+          <div className="text-destructive text-center space-y-4">
             <p>Login failed: {errorMessage}</p>
             <Button onClick={() => router.push('/login')}>Back to Login</Button>
           </div>

@@ -76,14 +76,14 @@ export default function TopProductsChart() {
                     payload?.[0]?.payload?.productName || ''
                   }
                   footer={(payload: { payload?: (typeof data)[0] }[]) => (
-                    <div className="space-y-0.5 border-t border-blue-50 mt-1 pt-1">
-                      <p className="text-[10px] text-gray-500 font-medium uppercase tracking-tighter">
+                    <div className="space-y-0.5 border-t border-primary/30 mt-1 pt-1">
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
                         Vendor:{' '}
-                        <span className="text-gray-700">{payload?.[0]?.payload?.vendor}</span>
+                        <span className="text-foreground">{payload?.[0]?.payload?.vendor}</span>
                       </p>
-                      <p className="text-[10px] text-gray-500 font-medium uppercase tracking-tighter">
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
                         Warehouse:{' '}
-                        <span className="text-gray-700">{payload?.[0]?.payload?.warehouse}</span>
+                        <span className="text-foreground">{payload?.[0]?.payload?.warehouse}</span>
                       </p>
                     </div>
                   )}

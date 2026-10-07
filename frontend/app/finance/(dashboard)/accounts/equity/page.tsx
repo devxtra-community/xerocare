@@ -72,15 +72,15 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_BADGE: Record<string, string> = {
-  SHARE_CAPITAL: 'bg-blue-100 text-blue-700',
-  RETAINED_EARNINGS: 'bg-emerald-100 text-emerald-700',
-  RESERVES: 'bg-purple-100 text-purple-700',
-  OWNER_CONTRIBUTION: 'bg-amber-100 text-amber-700',
-  DIVIDEND: 'bg-red-100 text-red-700',
-  WITHDRAWAL: 'bg-rose-100 text-rose-700',
-  PROFIT_TRANSFER: 'bg-cyan-100 text-cyan-700',
-  LOSS_TRANSFER: 'bg-orange-100 text-orange-700',
-  OTHER: 'bg-gray-100 text-gray-700',
+  SHARE_CAPITAL: 'bg-primary/10 text-primary',
+  RETAINED_EARNINGS: 'bg-success/10 text-success',
+  RESERVES: 'bg-lease/10 text-lease',
+  OWNER_CONTRIBUTION: 'bg-warning/10 text-warning',
+  DIVIDEND: 'bg-destructive/10 text-destructive',
+  WITHDRAWAL: 'bg-destructive/10 text-destructive',
+  PROFIT_TRANSFER: 'bg-info/10 text-info',
+  LOSS_TRANSFER: 'bg-warning/10 text-warning',
+  OTHER: 'bg-muted text-foreground',
 };
 
 // ─── Equity Entry Modal ───────────────────────────────────────────────────────
@@ -242,34 +242,34 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
-          <h3 className="font-semibold text-gray-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-card z-10">
+          <h3 className="font-semibold text-foreground">
             {entry ? 'Edit Equity Entry' : 'New Equity Entry'}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             ✕
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 {isDividend ? 'Declaration Date' : 'Date'}
               </label>
               <input
                 type="date"
                 value={form.date}
                 onChange={(e) => set('date', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Type</label>
               <Select value={form.type} onValueChange={(v) => set('type', v)}>
-                <SelectTrigger className="w-full border-orange-200 text-sm">
+                <SelectTrigger className="w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -286,25 +286,27 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
           {/* Dividend — Payment Date, separate from the Declaration Date above */}
           {isDividend && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Payment Date{' '}
-                <span className="text-gray-400 font-normal">(leave blank if not yet paid)</span>
+                <span className="text-muted-foreground font-normal">
+                  (leave blank if not yet paid)
+                </span>
               </label>
               <input
                 type="date"
                 value={form.paymentDate}
                 onChange={(e) => set('paymentDate', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+            <label className="block text-xs font-medium text-foreground mb-1">Description</label>
             <input
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
           </div>
@@ -323,7 +325,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
           {isShareCapital && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Number of Shares
                 </label>
                 <input
@@ -333,11 +335,11 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                   value={form.numberOfShares}
                   onChange={(e) => set('numberOfShares', e.target.value)}
                   onWheel={(e) => e.currentTarget.blur()}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Price per Share
                 </label>
                 <input
@@ -347,7 +349,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                   value={form.pricePerShare}
                   onChange={(e) => set('pricePerShare', e.target.value)}
                   onWheel={(e) => e.currentTarget.blur()}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -357,18 +359,20 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
           {isReserves && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Reserve Type</label>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Reserve Type
+                </label>
                 <input
                   value={form.reserveType}
                   onChange={(e) => set('reserveType', e.target.value)}
                   placeholder="e.g. General Reserve"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Source</label>
+                <label className="block text-xs font-medium text-foreground mb-1">Source</label>
                 <Select value={form.reserveSource} onValueChange={(v) => set('reserveSource', v)}>
-                  <SelectTrigger className="w-full border-orange-200 text-sm">
+                  <SelectTrigger className="w-full border-warning/30 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,7 +386,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Amount</label>
               <input
                 type="number"
                 min="0"
@@ -390,12 +394,12 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                 value={form.amount}
                 onChange={(e) => set('amount', e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Currency</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Currency</label>
               <div className="w-full border rounded-lg px-3 py-2 text-sm bg-muted font-medium">
                 {form.currency}
               </div>
@@ -405,9 +409,9 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
           {/* Payment Mode — Share Capital / Owner Contribution / Dividend / Withdrawal */}
           {showPaymentMode && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Payment Mode</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Payment Mode</label>
               <Select value={form.paymentMode} onValueChange={(v) => set('paymentMode', v)}>
-                <SelectTrigger className="w-full border-orange-200 text-sm">
+                <SelectTrigger className="w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -425,37 +429,37 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               No cash movement happens now; a PENDING cheque is created instead, and Cash
               at Bank only moves once it's cleared in Accounts → Cheques. */}
           {isCheque && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="col-span-full text-xs font-medium text-amber-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+              <p className="col-span-full text-xs font-medium text-warning">
                 This creates a PENDING {isDividend || isWithdrawal ? 'Issued' : 'Received'} cheque
                 record. Cash at Bank only moves once it&apos;s cleared in Accounts → Cheques.
               </p>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Cheque Number
                 </label>
                 <input
                   value={form.chequeNumber}
                   onChange={(e) => set('chequeNumber', e.target.value)}
                   placeholder="e.g. CHQ-001234"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Bank Name</label>
+                <label className="block text-xs font-medium text-foreground mb-1">Bank Name</label>
                 <input
                   value={form.chequeBankName}
                   onChange={(e) => set('chequeBankName', e.target.value)}
                   placeholder="e.g. Emirates NBD"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Cheque Date{' '}
-                  <span className="text-gray-400 font-normal">
+                  <span className="text-muted-foreground font-normal">
                     (earliest date it can be deposited)
                   </span>
                 </label>
@@ -463,7 +467,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                   type="date"
                   value={form.chequeDate}
                   onChange={(e) => set('chequeDate', e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -471,32 +475,34 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
           )}
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Reference No.</label>
+            <label className="block text-xs font-medium text-foreground mb-1">Reference No.</label>
             <input
               value={form.referenceNo}
               onChange={(e) => set('referenceNo', e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           {/* Share Capital — optional document reference (e.g. share certificate link) */}
           {isShareCapital && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Document Reference{' '}
-                <span className="text-gray-400 font-normal">(e.g. certificate link, optional)</span>
+                <span className="text-muted-foreground font-normal">
+                  (e.g. certificate link, optional)
+                </span>
               </label>
               <input
                 value={form.documentUrl}
                 onChange={(e) => set('documentUrl', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           )}
 
           {!isCheque && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Linked Cash/Bank Account (auto-creates cashbook entry)
               </label>
               <Select
@@ -507,7 +513,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                   if (val) setConfirmNonCash(false);
                 }}
               >
-                <SelectTrigger className="w-full border-orange-200 text-sm">
+                <SelectTrigger className="w-full border-warning/30 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -523,10 +529,10 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                 </SelectContent>
               </Select>
               {balanceError && (
-                <p className="mt-1 text-xs font-medium text-red-600">{balanceError}</p>
+                <p className="mt-1 text-xs font-medium text-destructive">{balanceError}</p>
               )}
               {!form.linkedCashAccountId && (
-                <label className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <label className="mt-2 flex items-start gap-2 text-xs text-warning bg-warning/10 border border-warning/30 rounded-lg px-3 py-2">
                   <input
                     type="checkbox"
                     checked={confirmNonCash}
@@ -543,28 +549,28 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
             </div>
           )}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-medium text-foreground mb-1">
               {isWithdrawal ? 'Reason' : 'Notes'}
             </label>
             <textarea
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
               rows={2}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>
           <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              className="flex-1 border rounded-lg px-4 py-2 text-sm font-medium hover:bg-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || !!balanceError}
-              className="flex-1 bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save Entry'}
             </button>
@@ -797,27 +803,27 @@ export default function EquityPage() {
   };
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <PieIcon className="h-6 w-6 text-blue-600" /> Equity Management
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground flex items-center gap-2">
+            <PieIcon className="h-6 w-6 text-primary" /> Equity Management
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Track owner&apos;s equity, capital movements and financial position
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowStatement(true)}
-            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </button>
           <button
             onClick={() => setModal('add')}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" /> New Equity Entry
           </button>
@@ -826,30 +832,30 @@ export default function EquityPage() {
 
       {/* Equity Position Banner */}
       {summary && (
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-5 text-white">
+        <div className="bg-gradient-to-r from-primary to-primary rounded-xl p-5 text-primary-foreground">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <p className="text-blue-200 text-sm mb-1">Net Equity Position</p>
+              <p className="text-primary text-sm mb-1">Net Equity Position</p>
               <p className="text-3xl font-bold">{formatCurrency(summary.netEquity, currency)}</p>
-              <p className="text-blue-200 text-sm mt-1">
+              <p className="text-primary text-sm mt-1">
                 Total Assets: {formatCurrency(summary.totalAssets, currency)}
               </p>
             </div>
             <div className="grid grid-cols-3 gap-6 text-center">
               <div>
-                <p className="text-blue-200 text-xs">Share Capital</p>
+                <p className="text-primary text-xs">Share Capital</p>
                 <p className="text-xl font-semibold">
                   {formatCurrency(summary.shareCapital, currency)}
                 </p>
               </div>
               <div>
-                <p className="text-blue-200 text-xs">Retained Earnings</p>
+                <p className="text-primary text-xs">Retained Earnings</p>
                 <p className="text-xl font-semibold">
                   {formatCurrency(summary.retainedEarnings, currency)}
                 </p>
               </div>
               <div>
-                <p className="text-blue-200 text-xs">Reserves</p>
+                <p className="text-primary text-xs">Reserves</p>
                 <p className="text-xl font-semibold">
                   {formatCurrency(summary.reserves, currency)}
                 </p>
@@ -860,12 +866,12 @@ export default function EquityPage() {
       )}
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 bg-white rounded-lg p-1 shadow-sm border w-fit">
+      <div className="flex gap-1 bg-card rounded-lg p-1 shadow-sm border w-fit">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t.id ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
           >
             <t.icon className="h-4 w-4" /> {t.label}
           </button>
@@ -909,35 +915,37 @@ export default function EquityPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Equity Composition</h3>
+            <div className="bg-card rounded-xl shadow-sm border p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Equity Composition</h3>
               <DonutChart data={compositionData} currency={currency} />
             </div>
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Equity Growth Over Time</h3>
+            <div className="bg-card rounded-xl shadow-sm border p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">
+                Equity Growth Over Time
+              </h3>
               <SimpleLineChart
                 data={summary?.growthLine ?? []}
                 xKey="month"
-                lines={[{ key: 'equity', color: '#3b82f6', label: 'Net Equity' }]}
+                lines={[{ key: 'equity', color: 'var(--chart-blue-mid)', label: 'Net Equity' }]}
                 currency={currency}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">
+            <div className="bg-card rounded-xl shadow-sm border p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">
                 Assets / Liabilities / Equity
               </h3>
               <SimpleBarChart
                 data={assetLiabEquity}
                 xKey="label"
-                bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
+                bars={[{ key: 'value', color: 'var(--chart-blue-mid)', label: 'Amount' }]}
                 currency={currency}
               />
             </div>
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">
+            <div className="bg-card rounded-xl shadow-sm border p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">
                 Capital Movements (Waterfall)
               </h3>
               <WaterfallChart
@@ -954,7 +962,7 @@ export default function EquityPage() {
                     name: e.type,
                     value: Number(e.amount),
                     start: 0,
-                    fill: sign > 0 ? '#10b981' : '#ef4444',
+                    fill: sign > 0 ? 'var(--chart-profit)' : 'var(--destructive)',
                   };
                 })}
                 currency={currency}
@@ -966,22 +974,22 @@ export default function EquityPage() {
 
       {/* ── Entries Tab ── */}
       {tab === 'entries' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b">
-            <h3 className="font-semibold text-gray-800">Equity Entries ({entries.length})</h3>
+            <h3 className="font-semibold text-foreground">Equity Entries ({entries.length})</h3>
             <button
               onClick={() => setModal('add')}
-              className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700"
+              className="flex items-center gap-1 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:bg-primary/90"
             >
               <Plus className="h-3.5 w-3.5" /> Add Entry
             </button>
           </div>
           {loadingEntries ? (
-            <div className="p-8 text-center text-gray-400">Loading…</div>
+            <div className="p-8 text-center text-muted-foreground">Loading…</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <thead className="bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
                     {[
                       'Entry No',
@@ -1001,18 +1009,20 @@ export default function EquityPage() {
                 <tbody className="divide-y">
                   {entries.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-400">
+                      <td colSpan={7} className="text-center py-8 text-muted-foreground">
                         No equity entries yet
                       </td>
                     </tr>
                   ) : (
                     entries.map((e) => (
-                      <tr key={e.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.entryNo}</td>
+                      <tr key={e.id} className="hover:bg-muted">
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {e.entryNo}
+                        </td>
                         <td className="px-4 py-3">{e.date?.slice(0, 10)}</td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[e.type] ?? 'bg-gray-100 text-gray-700'}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[e.type] ?? 'bg-muted text-foreground'}`}
                           >
                             {e.type.replace(/_/g, ' ')}
                           </span>
@@ -1020,15 +1030,15 @@ export default function EquityPage() {
                         <td className="px-4 py-3 max-w-[200px] truncate" title={e.description}>
                           {e.description}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-gray-800">
+                        <td className="px-4 py-3 font-semibold text-foreground">
                           {formatCurrency(e.amount, currency)}
                         </td>
-                        <td className="px-4 py-3 text-gray-500">{e.currency}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{e.currency}</td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button
                               onClick={() => setModal(e)}
-                              className="text-blue-500 hover:text-blue-700"
+                              className="text-primary hover:text-primary"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
@@ -1036,7 +1046,7 @@ export default function EquityPage() {
                               onClick={() => {
                                 if (confirm('Delete this entry?')) deleteMut.mutate(e.id);
                               }}
-                              className="text-red-400 hover:text-red-600"
+                              className="text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -1056,9 +1066,9 @@ export default function EquityPage() {
       {tab === 'statement' && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">Year:</label>
+            <label className="text-sm font-medium text-foreground">Year:</label>
             <Select value={stmtYear} onValueChange={setStmtYear}>
-              <SelectTrigger className="border-orange-200 text-sm w-28">
+              <SelectTrigger className="border-warning/30 text-sm w-28">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1075,15 +1085,15 @@ export default function EquityPage() {
           </div>
 
           {statement && (
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="p-4 border-b bg-gray-50">
-                <h3 className="font-semibold text-gray-800">
+            <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
+              <div className="p-4 border-b bg-muted">
+                <h3 className="font-semibold text-foreground">
                   Statement of Changes in Equity — {statement.year}
                 </h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500">
+                  <thead className="bg-muted text-xs text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 text-left">Description</th>
                       <th className="px-4 py-3 text-right">Share Capital</th>
@@ -1093,8 +1103,8 @@ export default function EquityPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    <tr className="bg-blue-50 font-medium">
-                      <td className="px-4 py-3 text-blue-800">
+                    <tr className="bg-primary/10 font-medium">
+                      <td className="px-4 py-3 text-primary">
                         Opening Balance ({Number(statement.year) - 1})
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -1111,23 +1121,25 @@ export default function EquityPage() {
                       </td>
                     </tr>
                     {statement.movements.map((m, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
+                      <tr key={i} className="hover:bg-muted">
                         <td className="px-4 py-3">
-                          <span className="text-gray-500 text-xs mr-2">{m.date?.slice(0, 10)}</span>
+                          <span className="text-muted-foreground text-xs mr-2">
+                            {m.date?.slice(0, 10)}
+                          </span>
                           {m.description}
                           <span
-                            className={`ml-2 px-1.5 py-0.5 rounded text-xs ${TYPE_BADGE[m.type] ?? 'bg-gray-100 text-gray-700'}`}
+                            className={`ml-2 px-1.5 py-0.5 rounded text-xs ${TYPE_BADGE[m.type] ?? 'bg-muted text-foreground'}`}
                           >
                             {m.type.replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-700">
+                        <td className="px-4 py-3 text-right text-foreground">
                           {m.shareCapital ? formatCurrency(m.shareCapital, currency) : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-700">
+                        <td className="px-4 py-3 text-right text-foreground">
                           {m.retainedEarnings ? formatCurrency(m.retainedEarnings, currency) : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-700">
+                        <td className="px-4 py-3 text-right text-foreground">
                           {m.reserves ? formatCurrency(m.reserves, currency) : '—'}
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
@@ -1137,15 +1149,13 @@ export default function EquityPage() {
                     ))}
                     {statement.movements.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="text-center py-4 text-gray-400 text-xs">
+                        <td colSpan={5} className="text-center py-4 text-muted-foreground text-xs">
                           No movements in {statement.year}
                         </td>
                       </tr>
                     )}
-                    <tr className="bg-emerald-50 font-semibold">
-                      <td className="px-4 py-3 text-emerald-800">
-                        Closing Balance ({statement.year})
-                      </td>
+                    <tr className="bg-success/10 font-semibold">
+                      <td className="px-4 py-3 text-success">Closing Balance ({statement.year})</td>
                       <td className="px-4 py-3 text-right">
                         {formatCurrency(statement.closing.shareCapital, currency)}
                       </td>
@@ -1174,16 +1184,16 @@ export default function EquityPage() {
             <>
               {/* Balance check banner */}
               <div
-                className={`flex items-center gap-3 p-4 rounded-xl border ${balanceSheet.balanced ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}
+                className={`flex items-center gap-3 p-4 rounded-xl border ${balanceSheet.balanced ? 'bg-success/10 border-success/30 text-success' : 'bg-warning/10 border-warning/30 text-warning'}`}
               >
                 {balanceSheet.balanced ? (
                   <>
-                    <CheckCircle className="h-5 w-5 text-emerald-500" />{' '}
+                    <CheckCircle className="h-5 w-5 text-success" />{' '}
                     <span className="font-semibold">Balance Sheet is Balanced ✓</span>
                   </>
                 ) : (
                   <>
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />{' '}
+                    <AlertTriangle className="h-5 w-5 text-warning" />{' '}
                     <span className="font-semibold">
                       Balance Sheet Difference: {formatCurrency(balanceSheet.difference, currency)}
                     </span>
@@ -1193,33 +1203,33 @@ export default function EquityPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Assets */}
-                <div className="bg-white rounded-xl shadow-sm border p-5">
-                  <h3 className="font-semibold text-blue-700 mb-4 flex items-center gap-2">
+                <div className="bg-card rounded-xl shadow-sm border p-5">
+                  <h3 className="font-semibold text-primary mb-4 flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
                     Assets
                   </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Cash & Bank</span>
+                      <span className="text-foreground">Cash & Bank</span>
                       <span className="font-medium">
                         {formatCurrency(balanceSheet.assets.cash, currency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Fixed Assets (NBV)</span>
+                      <span className="text-foreground">Fixed Assets (NBV)</span>
                       <span className="font-medium">
                         {formatCurrency(balanceSheet.assets.fixedAssetsNet, currency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Accounts Receivable</span>
+                      <span className="text-foreground">Accounts Receivable</span>
                       <span className="font-medium">
                         {formatCurrency(balanceSheet.assets.accountsReceivable, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold">
                       <span>Total Assets</span>
-                      <span className="text-blue-700">
+                      <span className="text-primary">
                         {formatCurrency(balanceSheet.assets.total, currency)}
                       </span>
                     </div>
@@ -1227,27 +1237,27 @@ export default function EquityPage() {
                 </div>
 
                 {/* Liabilities */}
-                <div className="bg-white rounded-xl shadow-sm border p-5">
-                  <h3 className="font-semibold text-red-700 mb-4 flex items-center gap-2">
+                <div className="bg-card rounded-xl shadow-sm border p-5">
+                  <h3 className="font-semibold text-destructive mb-4 flex items-center gap-2">
                     <Scale className="h-4 w-4" />
                     Liabilities
                   </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Accounts Payable</span>
+                      <span className="text-foreground">Accounts Payable</span>
                       <span className="font-medium">
                         {formatCurrency(balanceSheet.liabilities.accountsPayable, currency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Accrued Expenses</span>
+                      <span className="text-foreground">Accrued Expenses</span>
                       <span className="font-medium">
                         {formatCurrency(balanceSheet.liabilities.accruedExpenses, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold">
                       <span>Total Liabilities</span>
-                      <span className="text-red-700">
+                      <span className="text-destructive">
                         {formatCurrency(balanceSheet.liabilities.total, currency)}
                       </span>
                     </div>
@@ -1255,25 +1265,25 @@ export default function EquityPage() {
                 </div>
 
                 {/* Equity */}
-                <div className="bg-white rounded-xl shadow-sm border p-5">
-                  <h3 className="font-semibold text-emerald-700 mb-4 flex items-center gap-2">
+                <div className="bg-card rounded-xl shadow-sm border p-5">
+                  <h3 className="font-semibold text-success mb-4 flex items-center gap-2">
                     <PieIcon className="h-4 w-4" />
                     Equity
                   </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Net Equity</span>
+                      <span className="text-foreground">Net Equity</span>
                       <span className="font-medium">
                         {formatCurrency(balanceSheet.equity.total, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold">
                       <span>Total Equity</span>
-                      <span className="text-emerald-700">
+                      <span className="text-success">
                         {formatCurrency(balanceSheet.equity.total, currency)}
                       </span>
                     </div>
-                    <div className="border-t pt-3 flex justify-between font-semibold text-gray-800">
+                    <div className="border-t pt-3 flex justify-between font-semibold text-foreground">
                       <span>Liabilities + Equity</span>
                       <span>
                         {formatCurrency(balanceSheet.totalLiabilitiesAndEquity, currency)}
@@ -1284,8 +1294,8 @@ export default function EquityPage() {
               </div>
 
               {/* Side-by-side visual */}
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+              <div className="bg-card rounded-xl shadow-sm border p-5">
+                <h3 className="text-sm font-semibold text-foreground mb-4">
                   Assets vs Liabilities + Equity
                 </h3>
                 <SimpleBarChart
@@ -1305,19 +1315,19 @@ export default function EquityPage() {
                   ]}
                   xKey="group"
                   bars={[
-                    { key: 'Cash', color: '#3b82f6' },
-                    { key: 'Fixed Assets', color: '#10b981' },
-                    { key: 'Receivables', color: '#8b5cf6' },
-                    { key: 'Payables', color: '#ef4444' },
-                    { key: 'Accrued Exp', color: '#f97316' },
-                    { key: 'Equity', color: '#06b6d4' },
+                    { key: 'Cash', color: 'var(--chart-blue-mid)' },
+                    { key: 'Fixed Assets', color: 'var(--chart-profit)' },
+                    { key: 'Receivables', color: 'var(--lease)' },
+                    { key: 'Payables', color: 'var(--destructive)' },
+                    { key: 'Accrued Exp', color: 'var(--rent)' },
+                    { key: 'Equity', color: 'var(--info)' },
                   ]}
                   currency={currency}
                 />
               </div>
             </>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm border p-8 text-center text-gray-400">
+            <div className="bg-card rounded-xl shadow-sm border p-8 text-center text-muted-foreground">
               Loading balance sheet…
             </div>
           )}

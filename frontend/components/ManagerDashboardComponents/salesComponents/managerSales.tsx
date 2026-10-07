@@ -93,11 +93,11 @@ export default function ManagerSalesPage() {
   }, [selectedYear]);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       {/* SALES */}
       <div className="space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl sm:text-2xl font-bold text-primary">Sales</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground">Sales</h3>
           <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
         </div>
 

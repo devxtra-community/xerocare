@@ -169,7 +169,7 @@ export default function EditSparePartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-card text-black">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Edit Spare Part</DialogTitle>
         </DialogHeader>
@@ -361,7 +361,11 @@ export default function EditSparePartDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading} className="bg-primary text-white">
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="bg-primary text-primary-foreground"
+          >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogFooter>

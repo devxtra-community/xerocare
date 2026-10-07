@@ -63,9 +63,13 @@ export default function EmployeesPage() {
   };
 
   const distributionData = [
-    { name: 'Branch Manager', value: displayStats.branchManager, color: '#003F7D' },
-    { name: 'Sales, Rent & Lease', value: displayStats.salesRentLeaseStaff, color: '#0891b2' },
-    { name: 'Finance', value: displayStats.finance, color: '#94a3b8' },
+    {
+      name: 'Branch Manager',
+      value: displayStats.branchManager,
+      color: 'var(--primary-blue-dark)',
+    },
+    { name: 'Sales, Rent & Lease', value: displayStats.salesRentLeaseStaff, color: 'var(--info)' },
+    { name: 'Finance', value: displayStats.finance, color: 'var(--chart-slate)' },
     {
       name: 'Other',
       value: Math.max(
@@ -75,22 +79,22 @@ export default function EmployeesPage() {
               (displayStats.branchManager + displayStats.salesRentLeaseStaff + displayStats.finance)
           : 0,
       ),
-      color: '#CBD5E1',
+      color: 'var(--border)',
     },
   ].filter((item) => item.value > 0 || item.name === 'Other');
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
       {/* HEADER SECTION */}
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-primary">Employee Management</h2>
+          <h2 className="text-xl sm:text-2xl font-medium text-foreground">Employee Management</h2>
           <p className="text-sm text-muted-foreground font-medium">
             Monitor attendance, department distribution, and visa statuses
           </p>
         </div>
         <Button
-          className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-white"
+          className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
           onClick={() => setIsAddOpen(true)}
         >
           <Plus className="h-4 w-4 mr-2" />

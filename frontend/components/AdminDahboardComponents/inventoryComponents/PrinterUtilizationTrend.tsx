@@ -56,22 +56,26 @@ export default function PrinterUtilizationTrend() {
                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f3f4f6" />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--muted)" />
             <XAxis
               dataKey="month"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#6b7280', fontSize: 12 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
               dy={10}
             />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+            />
             <Tooltip
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
               }}
-              cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }}
+              cursor={{ stroke: 'var(--chart-grid)', strokeWidth: 1 }}
             />
             <Area
               type="monotone"

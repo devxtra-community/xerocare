@@ -87,11 +87,11 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
               </TableRow>
             ) : (
               paginatedLeads.map((lead, index) => (
-                <TableRow key={lead._id} className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}>
+                <TableRow key={lead._id} className={index % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}>
                   <TableCell>
                     <div className="flex flex-col space-y-1">
                       <span className="font-bold text-primary flex items-center gap-2">
-                        <User size={14} className="text-blue-500" />
+                        <User size={14} className="text-primary" />
                         {lead.name || 'No Name'}
                       </span>
                       {lead.email && (
@@ -109,7 +109,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-blue-100 text-blue-600">
+                    <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary">
                       {lead.source || 'Direct'}
                     </span>
                   </TableCell>
@@ -118,10 +118,10 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                       className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                                             ${
                                               lead.status === 'converted'
-                                                ? 'bg-green-100 text-green-600'
+                                                ? 'bg-success/10 text-success'
                                                 : lead.status === 'lost'
-                                                  ? 'bg-red-100 text-red-600'
-                                                  : 'bg-blue-100 text-blue-600'
+                                                  ? 'bg-destructive/10 text-destructive'
+                                                  : 'bg-primary/10 text-primary'
                                             }`}
                     >
                       {lead.status}
@@ -140,7 +140,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-blue-50"
+                        className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/10"
                         onClick={() => onEdit(lead)}
                       >
                         <Edit className="h-4 w-4" />
@@ -148,7 +148,7 @@ export function LeadTable({ leads, onRefresh, onEdit }: LeadTableProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                         disabled={isDeleting === lead._id}
                         onClick={() => handleDeleteClick(lead._id)}
                       >

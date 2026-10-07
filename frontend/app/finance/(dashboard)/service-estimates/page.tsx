@@ -247,7 +247,7 @@ export default function FinanceServiceEstimatesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-primary">Service Estimates Review</h2>
+          <h2 className="text-xl font-medium text-primary">Service Estimates Review</h2>
           <p className="text-sm text-muted-foreground">
             Approve or reject service quotations from technicians
           </p>
@@ -257,7 +257,7 @@ export default function FinanceServiceEstimatesPage() {
       {internalQueueError && (
         <p
           role="alert"
-          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning"
         >
           {internalQueueError} The Billing quotation queue remains available below.
         </p>
@@ -266,9 +266,9 @@ export default function FinanceServiceEstimatesPage() {
       <PendingServiceEstimateQueue data={internalEstimates} onRefresh={() => fetchEstimates()} />
 
       {/* Search and Filters */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
         <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by number, customer, ticket, technician..."
             value={search}
@@ -279,30 +279,30 @@ export default function FinanceServiceEstimatesPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border p-4">
         <div className="overflow-x-auto">
           <Table pagination={{ pageSize: 10 }} className="w-full">
-            <TableHeader className="bg-slate-50/50 border-b border-slate-100">
+            <TableHeader className="bg-muted/50 border-b border-border">
               <TableRow>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                   BILLING QUOTATION
                 </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                   TICKET ID
                 </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                   CUSTOMER
                 </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                   TECHNICIAN
                 </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                   TOTAL AMOUNT
                 </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                   DATE
                 </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase text-center">
+                <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase text-center">
                   ACTIONS
                 </TableHead>
               </TableRow>
@@ -317,17 +317,17 @@ export default function FinanceServiceEstimatesPage() {
                 </TableRow>
               ) : (
                 filtered.map((e) => (
-                  <TableRow key={e.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="font-semibold text-blue-600 text-xs font-mono">
+                  <TableRow key={e.id} className="hover:bg-muted/50 transition-colors">
+                    <TableCell className="font-semibold text-primary text-xs font-mono">
                       {e.invoiceNumber}
                     </TableCell>
-                    <TableCell className="text-slate-600 text-xs font-mono">
+                    <TableCell className="text-foreground text-xs font-mono">
                       {e.serviceTicketId ? e.serviceTicketId.substring(0, 8) + '...' : '—'}
                     </TableCell>
-                    <TableCell className="font-bold text-slate-700 text-xs">
+                    <TableCell className="font-bold text-foreground text-xs">
                       {e.customerName || 'Walk-in'}
                     </TableCell>
-                    <TableCell className="text-slate-600 text-xs">
+                    <TableCell className="text-foreground text-xs">
                       {e.employeeName || '—'}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground text-xs">
@@ -341,7 +341,7 @@ export default function FinanceServiceEstimatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50 rounded-lg"
+                          className="h-8 w-8 p-0 text-primary hover:bg-primary/10 rounded-lg"
                           title="View Details"
                           onClick={() => setDetailTarget(e)}
                         >
@@ -350,7 +350,7 @@ export default function FinanceServiceEstimatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 rounded-lg"
+                          className="h-8 w-8 p-0 text-success hover:bg-success/10 rounded-lg"
                           title="Approve"
                           onClick={() => handleApprove(e)}
                           disabled={actionLoading}
@@ -360,7 +360,7 @@ export default function FinanceServiceEstimatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 rounded-lg"
+                          className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 rounded-lg"
                           title="Reject"
                           onClick={() => openReject(e)}
                           disabled={actionLoading}
@@ -379,11 +379,11 @@ export default function FinanceServiceEstimatesPage() {
 
       {/* Approved estimates — ready to send to the customer */}
       {approvedEstimates.length > 0 && (
-        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-emerald-100">
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-success/30">
           <div className="px-4 pt-4 pb-2 flex items-center gap-2">
-            <Send className="h-4 w-4 text-emerald-600" />
+            <Send className="h-4 w-4 text-success" />
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Approved — Ready to Send</h3>
+              <h3 className="text-sm font-bold text-foreground">Approved — Ready to Send</h3>
               <p className="text-xs text-muted-foreground">
                 Finance-approved estimates waiting to be shared with the customer.
               </p>
@@ -391,32 +391,32 @@ export default function FinanceServiceEstimatesPage() {
           </div>
           <div className="overflow-x-auto p-2">
             <Table pagination={{ pageSize: 10 }} className="w-full">
-              <TableHeader className="bg-emerald-50/40 border-b border-emerald-100">
+              <TableHeader className="bg-success/10 border-b border-success/30">
                 <TableRow>
-                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                  <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                     ESTIMATE NUMBER
                   </TableHead>
-                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                  <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                     CUSTOMER
                   </TableHead>
-                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                  <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                     TOTAL AMOUNT
                   </TableHead>
-                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                  <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase">
                     APPROVED
                   </TableHead>
-                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase text-center">
+                  <TableHead className="text-muted-foreground font-bold text-[10px] tracking-wider uppercase text-center">
                     ACTIONS
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {approvedEstimates.map((inv) => (
-                  <TableRow key={inv.id} className="hover:bg-emerald-50/30 transition-colors">
-                    <TableCell className="font-semibold text-blue-600 text-xs font-mono">
+                  <TableRow key={inv.id} className="hover:bg-success/10 transition-colors">
+                    <TableCell className="font-semibold text-primary text-xs font-mono">
                       {inv.invoiceNumber}
                     </TableCell>
-                    <TableCell className="font-bold text-slate-700 text-xs">
+                    <TableCell className="font-bold text-foreground text-xs">
                       {inv.customerName || 'Walk-in'}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground text-xs">
@@ -432,7 +432,7 @@ export default function FinanceServiceEstimatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50 rounded-lg"
+                          className="h-8 w-8 p-0 text-primary hover:bg-primary/10 rounded-lg"
                           title="View Details"
                           onClick={() => setDetailTarget(inv)}
                         >
@@ -440,7 +440,7 @@ export default function FinanceServiceEstimatesPage() {
                         </Button>
                         <Button
                           size="sm"
-                          className="h-8 px-3 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
+                          className="h-8 px-3 gap-1.5 bg-success hover:bg-success/90 text-success-foreground rounded-lg text-xs font-bold"
                           onClick={() => openShare(inv)}
                         >
                           <Send className="h-3.5 w-3.5" /> Send to Customer
@@ -477,22 +477,22 @@ export default function FinanceServiceEstimatesPage() {
         <Dialog open onOpenChange={(v) => !v && setDetailTarget(null)}>
           <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden rounded-2xl max-h-[92vh] flex flex-col">
             {/* Header band */}
-            <DialogHeader className="shrink-0 bg-blue-50/60 border-b border-slate-100 px-6 py-5 space-y-2">
+            <DialogHeader className="shrink-0 bg-primary/10 border-b border-border px-6 py-5 space-y-2">
               <div className="flex items-start justify-between gap-3 pr-8">
                 <div>
-                  <DialogTitle className="text-slate-900 text-lg font-bold tracking-tight">
+                  <DialogTitle className="text-foreground text-lg font-bold tracking-tight">
                     Service Estimate Review
                   </DialogTitle>
-                  <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  <DialogDescription className="text-muted-foreground text-xs mt-0.5">
                     Items, charges and technician context for this estimate.
                   </DialogDescription>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
+                  <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-lg">
                     {detailTarget.invoiceNumber}
                   </span>
                   {(detailTarget.revisionCount || 0) > 0 && (
-                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-warning bg-warning/10 border border-warning/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
                       Revision {detailTarget.revisionCount}
                     </span>
                   )}
@@ -523,13 +523,13 @@ export default function FinanceServiceEstimatesPage() {
                 ].map((f) => (
                   <div
                     key={f.label}
-                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
+                    className="bg-card border border-border rounded-lg px-2.5 py-1.5"
                   >
-                    <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                       {f.label}
                     </span>
                     <span
-                      className={`block text-[11px] font-semibold text-slate-700 truncate ${
+                      className={`block text-[11px] font-semibold text-foreground truncate ${
                         f.mono ? 'font-mono' : ''
                       }`}
                       title={f.value}
@@ -542,11 +542,11 @@ export default function FinanceServiceEstimatesPage() {
             </DialogHeader>
 
             {/* Scrollable body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 bg-slate-50/60">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 bg-muted/60">
               {/* Ticket Details Section */}
               {detailTarget.serviceTicketId && (
-                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm space-y-3">
+                  <h4 className="text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <ClipboardList className="text-primary h-3.5 w-3.5" /> Service Ticket Context
                   </h4>
 
@@ -558,20 +558,20 @@ export default function FinanceServiceEstimatesPage() {
                   ) : ticketDetails ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                       <div className="md:col-span-3">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                           Complaint Registered
                         </span>
-                        <p className="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed font-medium">
+                        <p className="text-foreground bg-muted p-2.5 rounded-lg border border-border leading-relaxed font-medium">
                           {ticketDetails.issueDescription || 'No complaint details provided.'}
                         </p>
                       </div>
 
                       {ticketDetails.problemFound && (
                         <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                             Problem Found
                           </span>
-                          <span className="font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 block">
+                          <span className="font-semibold text-foreground bg-muted px-2.5 py-1.5 rounded-lg border border-border block">
                             {ticketDetails.problemFound}
                           </span>
                         </div>
@@ -579,10 +579,10 @@ export default function FinanceServiceEstimatesPage() {
 
                       {ticketDetails.rootCause && (
                         <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                             Root Cause
                           </span>
-                          <span className="font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 block">
+                          <span className="font-semibold text-foreground bg-muted px-2.5 py-1.5 rounded-lg border border-border block">
                             {ticketDetails.rootCause}
                           </span>
                         </div>
@@ -590,10 +590,10 @@ export default function FinanceServiceEstimatesPage() {
 
                       {ticketDetails.meterReadingAtService !== undefined && (
                         <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                             Meter Reading
                           </span>
-                          <span className="font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 block font-mono">
+                          <span className="font-semibold text-foreground bg-muted px-2.5 py-1.5 rounded-lg border border-border block font-mono">
                             {Number(ticketDetails.meterReadingAtService).toLocaleString()}
                           </span>
                         </div>
@@ -601,10 +601,10 @@ export default function FinanceServiceEstimatesPage() {
 
                       {ticketDetails.diagnosisNotes && (
                         <div className="md:col-span-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                             Technician Diagnosis Notes
                           </span>
-                          <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap font-medium">
+                          <p className="text-foreground bg-muted p-2.5 rounded-lg border border-border whitespace-pre-wrap font-medium">
                             {ticketDetails.diagnosisNotes}
                           </p>
                         </div>
@@ -612,10 +612,10 @@ export default function FinanceServiceEstimatesPage() {
                       {(ticketDetails.technicianNoteToFinance ||
                         detailTarget.technicianNoteToFinance) && (
                         <div className="md:col-span-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-warning block mb-1">
                             📝 Note to Finance
                           </span>
-                          <p className="text-amber-900 bg-amber-50 p-2.5 rounded-lg border border-amber-200/70 font-medium whitespace-pre-wrap">
+                          <p className="text-warning bg-warning/10 p-2.5 rounded-lg border border-warning/30 font-medium whitespace-pre-wrap">
                             {ticketDetails.technicianNoteToFinance ||
                               detailTarget.technicianNoteToFinance}
                           </p>
@@ -623,32 +623,32 @@ export default function FinanceServiceEstimatesPage() {
                       )}
                     </div>
                   ) : (
-                    <div className="text-xs text-red-500">Failed to load ticket details.</div>
+                    <div className="text-xs text-destructive">Failed to load ticket details.</div>
                   )}
                 </div>
               )}
 
               {/* Items */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
                 <div className="px-4 pt-3.5 pb-2">
-                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  <h4 className="text-[11px] font-bold text-foreground uppercase tracking-wider">
                     Estimate Items
                   </h4>
                 </div>
                 <div className="overflow-x-auto">
                   <Table className="w-full text-xs">
-                    <TableHeader className="bg-slate-50">
+                    <TableHeader className="bg-muted">
                       <TableRow>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                           Item / Description
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-center">
                           Qty
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">
                           Unit Price
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">
                           Total
                         </TableHead>
                       </TableRow>
@@ -661,24 +661,24 @@ export default function FinanceServiceEstimatesPage() {
                           const listPrice = listPriceFor(item);
                           const coveredValue = isFoc ? listPrice * (item.quantity || 0) : 0;
                           return (
-                            <TableRow key={idx} className="hover:bg-slate-50/60">
-                              <TableCell className="font-medium text-slate-800 max-w-[320px]">
+                            <TableRow key={idx} className="hover:bg-muted/60">
+                              <TableCell className="font-medium text-foreground max-w-[320px]">
                                 <span className="block truncate" title={item.description}>
                                   {item.description}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-center font-semibold text-slate-600">
+                              <TableCell className="text-center font-semibold text-foreground">
                                 {item.quantity || 0}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-slate-600">
+                              <TableCell className="text-right font-mono text-foreground">
                                 {isFoc ? (
                                   <span className="inline-flex items-center justify-end gap-1.5">
                                     {listPrice > 0 && (
-                                      <span className="text-slate-500">
+                                      <span className="text-muted-foreground">
                                         {formatCurrency(listPrice, currency)}
                                       </span>
                                     )}
-                                    <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                                    <Badge className="bg-success/10 text-success border border-success/30 text-[9px] font-bold">
                                       {listPrice > 0 ? 'Covered' : 'FOC'}
                                     </Badge>
                                   </span>
@@ -686,10 +686,10 @@ export default function FinanceServiceEstimatesPage() {
                                   formatCurrency(item.unitPrice || 0, currency)
                                 )}
                               </TableCell>
-                              <TableCell className="text-right font-mono font-semibold text-slate-800">
+                              <TableCell className="text-right font-mono font-semibold text-foreground">
                                 {formatCurrency(lineTotal, currency)}
                                 {coveredValue > 0 && (
-                                  <span className="block text-[10px] font-normal text-slate-400">
+                                  <span className="block text-[10px] font-normal text-muted-foreground">
                                     value {formatCurrency(coveredValue, currency)}
                                   </span>
                                 )}
@@ -735,16 +735,16 @@ export default function FinanceServiceEstimatesPage() {
                     Number(ticketDetails?.discountAmount) ||
                     0;
                   return (
-                    <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+                    <div className="border-t border-border bg-muted/70 px-5 py-4">
                       <div className="ml-auto w-full sm:w-72 space-y-1.5 text-xs">
-                        <div className="flex justify-between text-slate-500 font-medium">
+                        <div className="flex justify-between text-muted-foreground font-medium">
                           <span>Items Subtotal</span>
                           <span className="font-mono">
                             {formatCurrency(itemsSubtotal, currency)}
                           </span>
                         </div>
                         {coveredValueTotal > 0 && (
-                          <div className="flex justify-between text-emerald-700 font-medium">
+                          <div className="flex justify-between text-success font-medium">
                             <span>Covered value (not charged)</span>
                             <span className="font-mono">
                               {formatCurrency(coveredValueTotal, currency)}
@@ -752,14 +752,14 @@ export default function FinanceServiceEstimatesPage() {
                           </div>
                         )}
                         {visitCharge > 0 && (
-                          <div className="flex justify-between text-slate-500 font-medium">
+                          <div className="flex justify-between text-muted-foreground font-medium">
                             <span className="flex items-center gap-1.5">
                               Visit Charge
                               <span
                                 className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
                                   visitAdded
-                                    ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    ? 'bg-primary/10 text-primary border border-primary/30'
+                                    : 'bg-warning/10 text-warning border border-warning/30'
                                 }`}
                               >
                                 {visitAdded ? 'In Estimate' : 'Cash On-Site'}
@@ -773,15 +773,15 @@ export default function FinanceServiceEstimatesPage() {
                           </div>
                         )}
                         {discount > 0 && (
-                          <div className="flex justify-between text-rose-600 font-semibold">
+                          <div className="flex justify-between text-destructive font-semibold">
                             <span>Discount</span>
                             <span className="font-mono">
                               − {formatCurrency(discount, currency)}
                             </span>
                           </div>
                         )}
-                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-slate-200">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-border">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">
                             Grand Total
                           </span>
                           <span className="text-lg font-extrabold text-primary font-mono">
@@ -789,13 +789,13 @@ export default function FinanceServiceEstimatesPage() {
                           </span>
                         </div>
                         {coveredValueTotal > 0 && (
-                          <p className="text-[10px] text-emerald-700 font-medium leading-snug pt-1">
+                          <p className="text-[10px] text-success font-medium leading-snug pt-1">
                             Covered parts are not charged to the customer. Their value is kept for
                             this machine&apos;s spend history.
                           </p>
                         )}
                         {visitCharge > 0 && !visitAdded && (
-                          <p className="text-[10px] text-amber-700 font-medium leading-snug pt-1">
+                          <p className="text-[10px] text-warning font-medium leading-snug pt-1">
                             Visit charge is collected separately in cash on-site and is not part of
                             this total.
                           </p>
@@ -808,7 +808,7 @@ export default function FinanceServiceEstimatesPage() {
             </div>
 
             {/* Sticky footer */}
-            <DialogFooter className="shrink-0 gap-2 border-t border-slate-100 bg-white px-6 py-4">
+            <DialogFooter className="shrink-0 gap-2 border-t border-border bg-card px-6 py-4">
               <Button
                 variant="outline"
                 className="rounded-xl"
@@ -819,7 +819,7 @@ export default function FinanceServiceEstimatesPage() {
               {detailTarget.status === 'WAITING_FINANCE_APPROVAL' ? (
                 <>
                   <Button
-                    className="bg-green-600 hover:bg-green-700 text-white gap-1.5 rounded-xl"
+                    className="bg-success hover:bg-success/90 text-success-foreground gap-1.5 rounded-xl"
                     onClick={() => {
                       handleApprove(detailTarget);
                       setDetailTarget(null);
@@ -842,7 +842,7 @@ export default function FinanceServiceEstimatesPage() {
                 </>
               ) : (
                 <Button
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 rounded-xl"
+                  className="bg-success hover:bg-success/90 text-success-foreground gap-1.5 rounded-xl"
                   onClick={() => {
                     setDetailTarget(null);
                     openShare(detailTarget);

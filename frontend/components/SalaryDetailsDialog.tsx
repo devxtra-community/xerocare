@@ -79,7 +79,7 @@ export function SalaryDetailsDialog({ open, onOpenChange, payrollId }: SalaryDet
           <div className="space-y-6 pt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted/30 p-4 rounded-xl space-y-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Amount Paid
                 </span>
                 <div className="text-lg font-bold text-primary">
@@ -87,39 +87,39 @@ export function SalaryDetailsDialog({ open, onOpenChange, payrollId }: SalaryDet
                 </div>
               </div>
               <div className="bg-muted/30 p-4 rounded-xl space-y-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Status
                 </span>
                 <div className="flex items-center gap-1.5 pt-1">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-sm font-bold text-green-700">{details.status}</span>
+                  <span className="h-2 w-2 rounded-full bg-success" />
+                  <span className="text-sm font-bold text-success">{details.status}</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 border-b border-gray-100 italic">
+              <div className="flex items-center justify-between p-3 border-b border-border italic">
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">Paid Date</span>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-foreground">Paid Date</span>
                 </div>
                 <span className="text-sm font-medium">
                   {details.paid_date ? new Date(details.paid_date).toLocaleDateString() : 'N/A'}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-3 border-b border-gray-100">
+              <div className="flex items-center justify-between p-3 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">Month/Year</span>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-foreground">Month/Year</span>
                 </div>
                 <span className="text-sm font-medium">Current Month</span>
               </div>
 
-              <div className="flex items-center justify-between p-3 border-b border-gray-100">
+              <div className="flex items-center justify-between p-3 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">Leave Count</span>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-foreground">Leave Count</span>
                 </div>
                 <span className="text-sm font-medium">{details.leave_days} Days</span>
               </div>
@@ -139,7 +139,7 @@ export function SalaryDetailsDialog({ open, onOpenChange, payrollId }: SalaryDet
             </div>
           </div>
         ) : (
-          <div className="py-10 text-center text-sm text-gray-500 italic">
+          <div className="py-10 text-center text-sm text-muted-foreground italic">
             Could not find details for this payroll record.
           </div>
         )}

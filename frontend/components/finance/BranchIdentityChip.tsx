@@ -18,12 +18,12 @@ export default function BranchIdentityChip({
   const { getBranchName, isLoading } = useBranchNameMap();
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-      <span className="text-sm text-blue-600">Branch:</span>
-      <span className="text-sm font-medium text-blue-800">
+    <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg">
+      <span className="text-sm text-primary">Branch:</span>
+      <span className="text-sm font-medium text-primary">
         {!branchId ? 'Your Branch' : isLoading ? 'Loading…' : getBranchName(branchId)}
       </span>
-      {role && <span className="text-xs text-blue-500 ml-auto">{role}</span>}
+      {role && <span className="text-xs text-primary ml-auto">{role}</span>}
     </div>
   );
 }

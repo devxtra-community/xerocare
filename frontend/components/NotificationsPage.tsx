@@ -410,7 +410,7 @@ export default function NotificationsPage({ role }: { role: string }) {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="bg-blue-50 min-h-screen p-4 sm:p-6">
+    <div className="bg-primary/10 min-h-screen p-4 sm:p-6">
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -418,17 +418,19 @@ export default function NotificationsPage({ role }: { role: string }) {
             <h1 className="text-lg font-bold text-primary uppercase tracking-wide">
               Notifications
             </h1>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
             </p>
           </div>
           <div className="flex items-center gap-2">
             {/* Filter tabs */}
-            <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 text-xs">
+            <div className="flex bg-card rounded-lg border border-border p-0.5 text-xs">
               <button
                 onClick={() => setFilter('ALL')}
                 className={`px-3 py-1.5 rounded-md font-semibold transition-colors ${
-                  filter === 'ALL' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700'
+                  filter === 'ALL'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 All
@@ -437,8 +439,8 @@ export default function NotificationsPage({ role }: { role: string }) {
                 onClick={() => setFilter('UNREAD')}
                 className={`px-3 py-1.5 rounded-md font-semibold transition-colors ${
                   filter === 'UNREAD'
-                    ? 'bg-primary text-white'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Unread {unreadCount > 0 && `(${unreadCount})`}
@@ -464,7 +466,7 @@ export default function NotificationsPage({ role }: { role: string }) {
             Loading notifications...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
             <Bell className="h-12 w-12 opacity-20" />
             <p className="text-sm font-medium">
               {filter === 'UNREAD' ? 'No unread notifications' : 'No notifications yet'}
@@ -486,8 +488,8 @@ export default function NotificationsPage({ role }: { role: string }) {
                 }}
                 className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
                   notif.is_read
-                    ? 'bg-white border-gray-100 hover:border-gray-200'
-                    : 'bg-white border-primary/20 shadow-sm hover:shadow-md'
+                    ? 'bg-card border-border hover:border-border'
+                    : 'bg-card border-primary/20 shadow-sm hover:shadow-md'
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -503,16 +505,16 @@ export default function NotificationsPage({ role }: { role: string }) {
                     <div className="flex items-start justify-between gap-2">
                       <span
                         className={`text-sm font-semibold leading-tight ${
-                          notif.is_read ? 'text-gray-700' : 'text-primary'
+                          notif.is_read ? 'text-foreground' : 'text-primary'
                         }`}
                       >
                         {notif.title}
                       </span>
-                      <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0 mt-0.5">
                         {formatNotificationTime(notif.createdAt)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
                       {notif.message}
                     </p>
                   </div>
@@ -552,32 +554,32 @@ export default function NotificationsPage({ role }: { role: string }) {
                 maxWidth="lg"
               >
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="text-base leading-none">{getIcon(selected.type)}</span>
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
                       {humanizeType(selected.type)}
                     </span>
                     <span>{formatFullTime(selected.createdAt)}</span>
                     {!selected.is_read && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">
+                      <span className="rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning">
                         Unread
                       </span>
                     )}
                   </div>
 
                   {/* Full description — never clamped here. */}
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                     {selected.message}
                   </p>
 
                   {related && (
-                    <div className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                       <span>Related to</span>
-                      <span className="font-semibold text-gray-700">{related}</span>
+                      <span className="font-semibold text-foreground">{related}</span>
                     </div>
                   )}
 
-                  <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-gray-100 bg-white px-1 pt-3">
+                  <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-border bg-card px-1 pt-3">
                     <Button
                       size="sm"
                       variant="outline"

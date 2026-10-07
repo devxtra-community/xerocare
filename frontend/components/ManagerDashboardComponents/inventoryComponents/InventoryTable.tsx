@@ -108,12 +108,12 @@ export default function InventoryTable({
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 bg-card p-4 rounded-xl border border-gray-100 shadow-sm">
+      <div className="flex flex-col md:flex-row gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by model or product name..."
-            className="pl-10 h-10 border-blue-100 focus:border-blue-400 focus:ring-blue-50"
+            className="pl-10 h-10 border-primary/30 focus:border-primary/30 focus:ring-primary/30"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -131,7 +131,7 @@ export default function InventoryTable({
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-10 border-blue-100">
+              <SelectTrigger className="h-10 border-primary/30">
                 <SelectValue placeholder="Brand" />
               </SelectTrigger>
               <SelectContent>
@@ -153,7 +153,7 @@ export default function InventoryTable({
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-10 border-blue-100">
+              <SelectTrigger className="h-10 border-primary/30">
                 <SelectValue placeholder="Vendor" />
               </SelectTrigger>
               <SelectContent>
@@ -172,7 +172,7 @@ export default function InventoryTable({
               variant="ghost"
               size="sm"
               onClick={resetFilters}
-              className="h-10 px-3 text-slate-500 hover:text-red-500 transition-colors"
+              className="h-10 px-3 text-muted-foreground hover:text-destructive transition-colors"
             >
               <X className="h-4 w-4 mr-2" />
               Clear
@@ -181,11 +181,11 @@ export default function InventoryTable({
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
           <Table className="min-w-[900px]">
             <TableHeader>
-              <TableRow className="bg-muted/50/50 hover:bg-transparent">
+              <TableRow className="bg-muted/50 hover:bg-transparent">
                 {mode !== 'warehouse' && (
                   <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
                     Warehouse
@@ -231,7 +231,7 @@ export default function InventoryTable({
                 currentData.map((item, idx) => (
                   <TableRow
                     key={idx}
-                    className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'}`}
+                    className={`transition-colors h-11 ${idx % 2 === 0 ? 'bg-card' : 'bg-primary/10'}`}
                   >
                     {mode !== 'warehouse' && (
                       <TableCell className="px-3 py-1.5 font-medium text-foreground text-[12px]">
@@ -241,10 +241,10 @@ export default function InventoryTable({
                     <TableCell className="px-3 py-1.5 font-medium text-primary text-[12px]">
                       {item.model_name}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    <TableCell className="px-3 py-1.5 text-foreground text-[11px]">
                       {item.product_name || 'N/A'}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    <TableCell className="px-3 py-1.5 text-foreground text-[11px]">
                       {item.brand}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-bold text-primary text-[12px]">
@@ -254,17 +254,17 @@ export default function InventoryTable({
                       {item.total_qty}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center">
-                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      <span className="bg-success/10 text-success px-2 py-0.5 rounded-full text-[10px] font-bold">
                         {item.available_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center">
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold">
                         {item.rented_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center">
-                      <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      <span className="bg-lease/10 text-lease px-2 py-0.5 rounded-full text-[10px] font-bold">
                         {item.lease_qty}
                       </span>
                     </TableCell>
@@ -272,7 +272,7 @@ export default function InventoryTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/5"
                         onClick={() => {
                           if (item.product_id) {
                             router.push(`/manager/products/${item.product_id}`);
@@ -288,11 +288,13 @@ export default function InventoryTable({
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="bg-gray-100 p-3 rounded-full">
+                      <div className="bg-muted p-3 rounded-full">
                         <span className="text-2xl">📦</span>
                       </div>
                       <p className="font-medium">No stock found</p>
-                      <p className="text-xs text-gray-400">Inventory items will appear here.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Inventory items will appear here.
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>

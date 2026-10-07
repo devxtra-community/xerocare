@@ -24,10 +24,14 @@ export default function MostSoldProductChart() {
             layout="vertical"
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f9ff" />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              horizontal={false}
+              stroke="color-mix(in srgb, var(--info) 10%, transparent)"
+            />
             <XAxis
               type="number"
-              tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 500 }}
+              tick={{ fontSize: 11, fill: 'var(--chart-indigo)', fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
             />
@@ -35,8 +39,8 @@ export default function MostSoldProductChart() {
               type="category"
               dataKey="product"
               width={80}
-              tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 500 }}
-              axisLine={{ stroke: '#e0f2fe' }}
+              tick={{ fontSize: 11, fill: 'var(--chart-indigo)', fontWeight: 500 }}
+              axisLine={{ stroke: 'color-mix(in srgb, var(--info) 10%, transparent)' }}
               tickLine={false}
               tickMargin={8}
             />
@@ -45,12 +49,12 @@ export default function MostSoldProductChart() {
                 fontSize: 12,
                 borderRadius: '12px',
                 border: 'none',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--foreground) 10%, transparent)',
               }}
-              labelStyle={{ color: '#1e3a8a', fontWeight: 'bold' }}
-              cursor={{ fill: '#f8fafc' }}
+              labelStyle={{ color: 'var(--chart-indigo)', fontWeight: 'bold' }}
+              cursor={{ fill: 'var(--muted)' }}
             />
-            <Bar dataKey="qty" fill="#0D47A1" radius={[0, 4, 4, 0]} barSize={20} />
+            <Bar dataKey="qty" fill="var(--primary-blue-dark)" radius={[0, 4, 4, 0]} barSize={20} />
           </BarChart>
         </ResponsiveContainer>
       </div>
