@@ -196,13 +196,13 @@ export default function AddPayrollDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Filter by Department
             </label>
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="h-10 rounded-lg bg-card border-blue-400/60 focus:ring-blue-100 shadow-sm transition-all">
+              <SelectTrigger className="h-10 rounded-lg bg-card border-primary/30 focus:ring-primary/30 shadow-sm transition-all">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-blue-400" />
+                  <Filter className="h-4 w-4 text-primary" />
                   <SelectValue placeholder="All Departments" />
                 </div>
               </SelectTrigger>
@@ -218,7 +218,7 @@ export default function AddPayrollDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Select User
             </label>
             <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
@@ -241,7 +241,7 @@ export default function AddPayrollDialog({
           </div>
 
           {incentiveBanner && (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5 text-sm text-emerald-800 dark:text-emerald-300">
+            <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 dark:bg-success/20 px-3 py-2.5 text-sm text-success dark:text-success">
               <Sparkles className="h-4 w-4 shrink-0" />
               <span>
                 Incentive for {incentiveBanner.month}:{' '}
@@ -255,7 +255,7 @@ export default function AddPayrollDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Branch
               </label>
               <Input
@@ -266,7 +266,7 @@ export default function AddPayrollDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Role
               </label>
               <Input
@@ -279,7 +279,7 @@ export default function AddPayrollDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Department
             </label>
             <Input
@@ -291,7 +291,7 @@ export default function AddPayrollDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Salary Amount ({getActiveCurrency()})
             </label>
             <Input
@@ -307,7 +307,7 @@ export default function AddPayrollDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Status
               </label>
               <Select value={formData.status} onValueChange={handleStatusChange}>
@@ -321,7 +321,7 @@ export default function AddPayrollDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Paid Date
               </label>
               <Input
@@ -340,7 +340,7 @@ export default function AddPayrollDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+              className="font-bold text-foreground hover:bg-muted rounded-xl"
             >
               Cancel
             </Button>

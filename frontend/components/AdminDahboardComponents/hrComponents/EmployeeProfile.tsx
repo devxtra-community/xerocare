@@ -166,7 +166,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
   if (!emp) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-transparent gap-4">
-        <AlertCircle className="h-12 w-12 text-red-500" />
+        <AlertCircle className="h-12 w-12 text-destructive" />
         <h2 className="text-xl font-semibold text-foreground">Employee Not Found</h2>
         <Button onClick={() => router.back()}>Go Back</Button>
       </div>
@@ -187,7 +187,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
   }
 
   return (
-    <div className="min-h-screen bg-muted/50/50 p-6 space-y-8">
+    <div className="min-h-screen bg-muted/50 p-6 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -200,7 +200,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex flex-col">
-            <h2 className="text-xl font-bold text-foreground">Employee Portfolio</h2>
+            <h2 className="text-xl font-medium text-foreground">Employee Portfolio</h2>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>ID: {emp.display_id || '---'}</span>
             </div>
@@ -211,8 +211,8 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
             variant="outline"
             className={`px-2.5 py-0.5 rounded-md font-medium text-xs ${
               emp.status === 'ACTIVE'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-rose-50 text-rose-700 border-rose-200'
+                ? 'bg-success/10 text-success border-success/30'
+                : 'bg-destructive/10 text-destructive border-destructive/30'
             }`}
           >
             {emp.status}
@@ -230,7 +230,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
         {/* Left Column - Profile Summary */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-card rounded-xl border border-border shadow-sm p-6 flex flex-col items-center">
-            <div className="h-28 w-28 rounded-full bg-gray-100 border-4 border-white shadow-sm flex items-center justify-center mb-4 overflow-hidden relative">
+            <div className="h-28 w-28 rounded-full bg-muted border-4 border-border shadow-sm flex items-center justify-center mb-4 overflow-hidden relative">
               {emp.profile_image_url ? (
                 <Image src={emp.profile_image_url} alt="" fill className="object-cover" />
               ) : (
@@ -239,13 +239,13 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                 </span>
               )}
             </div>
-            <h3 className="text-xl font-bold text-primary text-center">
+            <h3 className="text-xl font-medium text-primary text-center">
               {emp.first_name} {emp.last_name}
             </h3>
             <p className="text-sm font-medium text-muted-foreground mb-6 text-center">{emp.role}</p>
 
             <div className="w-full grid grid-cols-2 gap-3 mb-6">
-              <div className="bg-muted/50 p-3 rounded-lg border border-gray-100 flex flex-col items-center text-center">
+              <div className="bg-muted/50 p-3 rounded-lg border border-border flex flex-col items-center text-center">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Leaves (This Year)
                 </span>
@@ -253,7 +253,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                   {leaveCount === null ? '—' : String(leaveCount).padStart(2, '0')}
                 </span>
               </div>
-              <div className="bg-muted/50 p-3 rounded-lg border border-gray-100 flex flex-col items-center text-center">
+              <div className="bg-muted/50 p-3 rounded-lg border border-border flex flex-col items-center text-center">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Late (This Year)
                 </span>
@@ -274,13 +274,13 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
               </Button>
             )}
 
-            <div className="w-full space-y-4 pt-4 border-t border-gray-100">
+            <div className="w-full space-y-4 pt-4 border-t border-border">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-muted/50 text-muted-foreground flex items-center justify-center">
                   <Mail className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col overflow-hidden">
-                  <span className="text-xs text-gray-400 font-medium uppercase">Email</span>
+                  <span className="text-xs text-muted-foreground font-medium uppercase">Email</span>
                   <span className="text-sm font-medium text-primary truncate" title={emp.email}>
                     {emp.email}
                   </span>
@@ -291,7 +291,9 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                   <Briefcase className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs text-gray-400 font-medium uppercase">Department</span>
+                  <span className="text-xs text-muted-foreground font-medium uppercase">
+                    Department
+                  </span>
                   <span className="text-sm font-medium text-primary">{deptDisplay}</span>
                 </div>
               </div>
@@ -303,7 +305,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
               <ShieldAlert className="h-4 w-4 text-muted-foreground" />
               Security Access
             </h4>
-            <div className="p-4 bg-muted/50 rounded-lg border border-gray-100 border-dashed">
+            <div className="p-4 bg-muted/50 rounded-lg border border-border border-dashed">
               <p className="text-xs text-muted-foreground leading-relaxed mb-4">
                 Employee has standard access to the {emp.role?.toLowerCase()} dashboard and internal
                 logistics tools.
@@ -355,7 +357,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                     return (
                       <li
                         key={doc.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-muted/40 px-3 py-2"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
@@ -366,12 +368,12 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                               </span>
                             )}
                             {status === 'expired' && (
-                              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                              <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold text-destructive">
                                 EXPIRED
                               </span>
                             )}
                             {status === 'soon' && (
-                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold text-warning">
                                 EXPIRES SOON
                               </span>
                             )}
@@ -386,7 +388,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                             href={doc.viewUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 text-blue-600 hover:text-blue-700"
+                            className="shrink-0 text-primary hover:text-primary"
                             title="Open document"
                           >
                             <Download className="h-4 w-4" />
@@ -404,7 +406,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
         {/* Right Column - Work Details */}
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <h4 className="text-lg font-bold text-foreground">Contractual Overview</h4>
               <Badge variant="secondary" className="font-medium">
                 Full-Time Basis
@@ -507,11 +509,13 @@ function DetailRow({
 }) {
   return (
     <div className="flex gap-4">
-      <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/50 flex items-center justify-center text-gray-400 *:h-5 *:w-5">
+      <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/50 flex items-center justify-center text-muted-foreground *:h-5 *:w-5">
         {icon}
       </div>
       <div>
-        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
+          {label}
+        </p>
         <p className="text-base font-semibold text-primary">{value}</p>
       </div>
     </div>

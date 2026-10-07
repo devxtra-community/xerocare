@@ -1514,13 +1514,13 @@ export default function UsageRecordingModal({
                       : "Monthly Rent (Next Month's Advance)";
 
                 return (
-                  <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
-                    <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
+                  <div className="p-4 rounded-xl bg-primary/10 border border-primary/30 space-y-2">
+                    <h3 className="text-sm font-bold text-primary flex items-center gap-2">
                       <Coins size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
                     </h3>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-slate-600">{label}</span>
-                      <span className="text-sm font-bold text-slate-800">
+                      <span className="text-xs font-semibold text-foreground">{label}</span>
+                      <span className="text-sm font-bold text-foreground">
                         {isLastMonth && !isArrearsBilling
                           ? `${formatCurrency(0, currency)} (Adjusted from Advance)`
                           : formatCurrency(amount, currency)}
@@ -1532,17 +1532,17 @@ export default function UsageRecordingModal({
 
             {/* Last Month Alert */}
             {isLastMonth && !contract?.rentType?.includes('CPC') && (
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2 animate-in fade-in slide-in-from-top-2">
+              <div className="p-4 rounded-xl bg-warning/10 border border-warning/30 text-warning space-y-2 animate-in fade-in slide-in-from-top-2">
                 <h3 className="text-sm font-bold flex items-center gap-2">
-                  <span className="text-amber-500 text-lg">⚠️</span> Last Month of Contract
+                  <span className="text-warning text-lg">⚠️</span> Last Month of Contract
                 </h3>
-                <p className="text-sm text-amber-800">
+                <p className="text-sm text-warning">
                   The contract ends in this billing period, so{' '}
                   <strong>no next-month advance is charged</strong> — only this period&apos;s usage.
                   This month&apos;s rent is settled against the <strong>First Month Advance</strong>{' '}
                   held since signing, and submitting this reading completes the contract.
                 </p>
-                <div className="flex flex-col gap-1 mt-2 text-sm bg-white/50 p-3 rounded-lg border border-amber-100">
+                <div className="flex flex-col gap-1 mt-2 text-sm bg-card p-3 rounded-lg border border-warning/30">
                   <div className="flex justify-between">
                     <span>Contract Advance Held:</span>
                     <span className="font-bold">
@@ -1555,8 +1555,8 @@ export default function UsageRecordingModal({
                       {formatCurrency(Number(contract?.monthlyRent || 0), currency)}
                     </span>
                   </div>
-                  <div className="border-t border-amber-200/50 my-1"></div>
-                  <div className="flex justify-between font-bold text-amber-950">
+                  <div className="border-t border-warning/30 my-1"></div>
+                  <div className="flex justify-between font-bold text-warning">
                     <span>Net Payable Rent:</span>
                     <span>
                       {formatCurrency(
@@ -1569,7 +1569,7 @@ export default function UsageRecordingModal({
                     </span>
                   </div>
                   {Number(contract?.advanceAmount || 0) > Number(contract?.monthlyRent || 0) && (
-                    <p className="text-xs text-green-700 mt-1">
+                    <p className="text-xs text-success mt-1">
                       * Remaining advance of{' '}
                       {formatCurrency(
                         Number(contract?.advanceAmount || 0) - Number(contract?.monthlyRent || 0),
@@ -1586,20 +1586,20 @@ export default function UsageRecordingModal({
             {!isSimplifiedLease && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {showBwReading && (
-                  <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
-                    <h3 className="text-sm font-bold text-slate-700 border-b pb-2 mb-2 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-slate-900" />
+                  <div className="space-y-4 p-4 rounded-xl bg-muted border border-border">
+                    <h3 className="text-sm font-bold text-foreground border-b pb-2 mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-foreground" />
                       Black & White Readings
                     </h3>
                     {/* BW Inputs */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-3">
-                      <div className="flex justify-between items-center text-xs text-slate-500 pb-2 border-b border-slate-100">
+                    <div className="bg-card p-3 rounded-lg border border-border space-y-3">
+                      <div className="flex justify-between items-center text-xs text-muted-foreground pb-2 border-b border-border">
                         {contract?.rentType?.includes('CPC') ? (
                           <span className="invisible">Free Limit: 0</span>
                         ) : (
                           <span>
                             {ruleItems.combo ? 'Combined Total Limit' : 'Free Limit'}:{' '}
-                            <span className="font-bold text-slate-700">
+                            <span className="font-bold text-foreground">
                               {Number(
                                 ruleItems.combo?.combinedIncludedLimit ||
                                   ruleItems.bw?.bwIncludedLimit ||
@@ -1611,7 +1611,7 @@ export default function UsageRecordingModal({
                         )}
                         <span>
                           Excess Rate:{' '}
-                          <span className="font-bold text-slate-700">
+                          <span className="font-bold text-foreground">
                             {(() => {
                               const isCpc = contract?.rentType?.includes('CPC');
                               if (isCpc) {
@@ -1621,7 +1621,7 @@ export default function UsageRecordingModal({
                                 if (slabs.length > 0) {
                                   return (
                                     <div className="flex flex-col items-end">
-                                      <span className="text-[10px] uppercase text-slate-400">
+                                      <span className="text-[10px] uppercase text-muted-foreground">
                                         Slabs
                                       </span>
                                       {slabs.map((s: SlabRange, i: number) => (
@@ -1644,10 +1644,10 @@ export default function UsageRecordingModal({
                         <div className="flex justify-between items-end">
                           <Label className="text-xs font-semibold">A4 Current Reading</Label>
                           <div className="text-right">
-                            <span className="text-[10px] text-orange-600 block">
+                            <span className="text-[10px] text-warning block">
                               {effectivePrevCounts.label}: {effectivePrevCounts.bwA4}
                             </span>
-                            <span className="text-[10px] text-green-600 font-bold block">
+                            <span className="text-[10px] text-success font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
@@ -1680,14 +1680,14 @@ export default function UsageRecordingModal({
                           readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.bwA4
-                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              ? 'border-destructive focus-visible:ring-destructive bg-destructive/10'
                               : hasMultipleUniqueMachines
-                                ? 'bg-slate-100 cursor-not-allowed opacity-70'
+                                ? 'bg-muted cursor-not-allowed opacity-70'
                                 : ''
                           }
                         />
                         {getErrors.bwA4 && (
-                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                          <p className="text-[10px] text-destructive font-bold animate-pulse">
                             {getErrors.bwA4}
                           </p>
                         )}
@@ -1697,10 +1697,10 @@ export default function UsageRecordingModal({
                         <div className="flex justify-between items-end">
                           <Label className="text-xs font-semibold">A3 Current Reading</Label>
                           <div className="text-right">
-                            <span className="text-[10px] text-orange-600 block">
+                            <span className="text-[10px] text-warning block">
                               {effectivePrevCounts.label}: {effectivePrevCounts.bwA3}
                             </span>
-                            <span className="text-[10px] text-green-600 font-bold block">
+                            <span className="text-[10px] text-success font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
@@ -1733,14 +1733,14 @@ export default function UsageRecordingModal({
                           readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.bwA3
-                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              ? 'border-destructive focus-visible:ring-destructive bg-destructive/10'
                               : hasMultipleUniqueMachines
-                                ? 'bg-slate-100 cursor-not-allowed opacity-70'
+                                ? 'bg-muted cursor-not-allowed opacity-70'
                                 : ''
                           }
                         />
                         {getErrors.bwA3 && (
-                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                          <p className="text-[10px] text-destructive font-bold animate-pulse">
                             {getErrors.bwA3}
                           </p>
                         )}
@@ -1750,20 +1750,20 @@ export default function UsageRecordingModal({
                 )}
 
                 {showColorReading && (
-                  <div className="space-y-4 p-4 rounded-xl bg-rose-50/30 border border-rose-100">
-                    <h3 className="text-sm font-bold text-rose-700 border-b border-rose-100 pb-2 mb-2 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <div className="space-y-4 p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+                    <h3 className="text-sm font-bold text-destructive border-b border-destructive/30 pb-2 mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-destructive" />
                       Color Readings
                     </h3>
                     {/* Color Inputs */}
-                    <div className="bg-white p-3 rounded-lg border border-rose-100 space-y-3">
-                      <div className="flex justify-between items-center text-xs text-rose-600/80 pb-2 border-b border-rose-50">
+                    <div className="bg-card p-3 rounded-lg border border-destructive/30 space-y-3">
+                      <div className="flex justify-between items-center text-xs text-destructive/80 pb-2 border-b border-destructive/30">
                         {contract?.rentType?.includes('CPC') ? (
                           <span className="invisible">Free Limit: 0</span>
                         ) : (
                           <span>
                             {ruleItems.combo ? 'Combined Total Limit' : 'Free Limit'}:{' '}
-                            <span className="font-bold text-rose-700">
+                            <span className="font-bold text-destructive">
                               {Number(
                                 ruleItems.combo?.combinedIncludedLimit ||
                                   ruleItems.color?.colorIncludedLimit ||
@@ -1775,7 +1775,7 @@ export default function UsageRecordingModal({
                         )}
                         <span>
                           Excess Rate:{' '}
-                          <span className="font-bold text-rose-700">
+                          <span className="font-bold text-destructive">
                             {(() => {
                               const isCpc = contract?.rentType?.includes('CPC');
                               if (isCpc) {
@@ -1786,7 +1786,7 @@ export default function UsageRecordingModal({
                                 if (slabs.length > 0) {
                                   return (
                                     <div className="flex flex-col items-end">
-                                      <span className="text-[10px] uppercase text-rose-400">
+                                      <span className="text-[10px] uppercase text-destructive">
                                         Slabs
                                       </span>
                                       {slabs.map((s: SlabRange, i: number) => (
@@ -1809,10 +1809,10 @@ export default function UsageRecordingModal({
                         <div className="flex justify-between items-end">
                           <Label className="text-xs font-semibold">A4 Current Reading</Label>
                           <div className="text-right">
-                            <span className="text-[10px] text-orange-600 block">
+                            <span className="text-[10px] text-warning block">
                               {effectivePrevCounts.label}: {effectivePrevCounts.clrA4}
                             </span>
-                            <span className="text-[10px] text-green-600 font-bold block">
+                            <span className="text-[10px] text-success font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
@@ -1845,14 +1845,14 @@ export default function UsageRecordingModal({
                           readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.clrA4
-                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              ? 'border-destructive focus-visible:ring-destructive bg-destructive/10'
                               : hasMultipleUniqueMachines
-                                ? 'bg-slate-100 cursor-not-allowed opacity-70'
+                                ? 'bg-muted cursor-not-allowed opacity-70'
                                 : ''
                           }
                         />
                         {getErrors.clrA4 && (
-                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                          <p className="text-[10px] text-destructive font-bold animate-pulse">
                             {getErrors.clrA4}
                           </p>
                         )}
@@ -1862,10 +1862,10 @@ export default function UsageRecordingModal({
                         <div className="flex justify-between items-end">
                           <Label className="text-xs font-semibold">A3 Current Reading</Label>
                           <div className="text-right">
-                            <span className="text-[10px] text-orange-600 block">
+                            <span className="text-[10px] text-warning block">
                               {effectivePrevCounts.label}: {effectivePrevCounts.clrA3}
                             </span>
-                            <span className="text-[10px] text-green-600 font-bold block">
+                            <span className="text-[10px] text-success font-bold block">
                               Usage:{' '}
                               {Math.max(
                                 0,
@@ -1898,14 +1898,14 @@ export default function UsageRecordingModal({
                           readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.clrA3
-                              ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
+                              ? 'border-destructive focus-visible:ring-destructive bg-destructive/10'
                               : hasMultipleUniqueMachines
-                                ? 'bg-slate-100 cursor-not-allowed opacity-70'
+                                ? 'bg-muted cursor-not-allowed opacity-70'
                                 : ''
                           }
                         />
                         {getErrors.clrA3 && (
-                          <p className="text-[10px] text-red-500 font-bold animate-pulse">
+                          <p className="text-[10px] text-destructive font-bold animate-pulse">
                             {getErrors.clrA3}
                           </p>
                         )}
@@ -1918,8 +1918,8 @@ export default function UsageRecordingModal({
 
             {/* Discount Options Section */}
             {!isSimplifiedLease && (
-              <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <h3 className="text-sm font-bold text-slate-700 pb-2 border-b flex items-center gap-2">
+              <div className="space-y-4 p-4 rounded-xl bg-muted border border-border">
+                <h3 className="text-sm font-bold text-foreground pb-2 border-b flex items-center gap-2">
                   🎁 Apply Discount (Optional)
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -2029,9 +2029,9 @@ export default function UsageRecordingModal({
                 );
                 return uniqueSerials.size > 1;
               })() && (
-                <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-700 pb-2 border-b flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <div className="space-y-4 p-4 rounded-xl bg-muted border border-border">
+                  <h3 className="text-sm font-bold text-foreground pb-2 border-b flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary" />
                     Machine-Wise Readings (Required)
                   </h3>
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
@@ -2079,39 +2079,39 @@ export default function UsageRecordingModal({
                       return (
                         <div
                           key={item.allocationId}
-                          className={`bg-white p-3 rounded-lg border ${
-                            isReplaced ? 'border-amber-200' : 'border-slate-200 shadow-sm'
+                          className={`bg-card p-3 rounded-lg border ${
+                            isReplaced ? 'border-warning/30' : 'border-border shadow-sm'
                           } space-y-3 relative overflow-hidden`}
                         >
                           {isReplaced && (
-                            <div className="absolute top-0 right-0 px-2 py-0.5 bg-amber-100 text-[8px] font-black text-amber-700 rounded-bl-lg uppercase tracking-wider">
+                            <div className="absolute top-0 right-0 px-2 py-0.5 bg-warning/10 text-[8px] font-black text-warning rounded-bl-lg uppercase tracking-wider">
                               Replaced
                             </div>
                           )}
-                          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                            <span className="text-xs font-bold text-slate-600">
+                          <div className="flex justify-between items-center pb-2 border-b border-border">
+                            <span className="text-xs font-bold text-foreground">
                               Machine #{idx + 1}: {item.serialNumber || 'Unknown'}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
+                            <span className="text-[10px] text-muted-foreground font-mono">
                               {item.modelId}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             {/* BW Section */}
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-bold uppercase text-slate-500">
+                              <Label className="text-[10px] font-bold uppercase text-muted-foreground">
                                 B&W Readings
                               </Label>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">Prev A4: {item.startBwA4}</span>
-                                  <span className="text-green-600 font-bold">
+                                  <span className="text-warning">Prev A4: {item.startBwA4}</span>
+                                  <span className="text-success font-bold">
                                     Delta: {Math.max(0, (item.endBwA4 || 0) - item.startBwA4)}
                                   </span>
                                 </div>
                                 <Input
                                   type="number"
-                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-warning/10' : ''}`}
                                   placeholder="A4 Reading"
                                   value={item.endBwA4 || ''}
                                   readOnly={isReplaced}
@@ -2143,14 +2143,14 @@ export default function UsageRecordingModal({
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">Prev A3: {item.startBwA3}</span>
-                                  <span className="text-green-600 font-bold">
+                                  <span className="text-warning">Prev A3: {item.startBwA3}</span>
+                                  <span className="text-success font-bold">
                                     Delta: {Math.max(0, (item.endBwA3 || 0) - item.startBwA3)}
                                   </span>
                                 </div>
                                 <Input
                                   type="number"
-                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-warning/10' : ''}`}
                                   placeholder="A3 Reading"
                                   value={item.endBwA3 || ''}
                                   readOnly={isReplaced}
@@ -2182,21 +2182,19 @@ export default function UsageRecordingModal({
                             </div>
                             {/* Color Section */}
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-bold uppercase text-rose-500">
+                              <Label className="text-[10px] font-bold uppercase text-destructive">
                                 Color Readings
                               </Label>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">
-                                    Prev A4: {item.startColorA4}
-                                  </span>
-                                  <span className="text-green-600 font-bold">
+                                  <span className="text-warning">Prev A4: {item.startColorA4}</span>
+                                  <span className="text-success font-bold">
                                     Delta: {Math.max(0, (item.endColorA4 || 0) - item.startColorA4)}
                                   </span>
                                 </div>
                                 <Input
                                   type="number"
-                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-warning/10' : ''}`}
                                   placeholder="A4 Reading"
                                   value={item.endColorA4 || ''}
                                   readOnly={isReplaced}
@@ -2227,16 +2225,14 @@ export default function UsageRecordingModal({
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-[9px]">
-                                  <span className="text-orange-600">
-                                    Prev A3: {item.startColorA3}
-                                  </span>
-                                  <span className="text-green-600 font-bold">
+                                  <span className="text-warning">Prev A3: {item.startColorA3}</span>
+                                  <span className="text-success font-bold">
                                     Delta: {Math.max(0, (item.endColorA3 || 0) - item.startColorA3)}
                                   </span>
                                 </div>
                                 <Input
                                   type="number"
-                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-warning/10' : ''}`}
                                   placeholder="A3 Reading"
                                   value={item.endColorA3 || ''}
                                   readOnly={isReplaced}
@@ -2277,7 +2273,7 @@ export default function UsageRecordingModal({
             {/* Usage Summary - only for FSM lease and RENT (not EMI lease) */}
             {!isSimplifiedLease && (
               <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
-                <div className="p-3 border-b border-border bg-slate-100/50 flex justify-between items-center">
+                <div className="p-3 border-b border-border bg-muted/50 flex justify-between items-center">
                   <span className="text-xs font-bold text-muted-foreground uppercase">
                     Usage Summary
                   </span>
@@ -2285,27 +2281,27 @@ export default function UsageRecordingModal({
                 <div className="p-4 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
                         Billing Period
                       </p>
-                      <p className="text-xs font-semibold text-slate-600">
+                      <p className="text-xs font-semibold text-foreground">
                         {formatDate(formData.billingPeriodStart)} to{' '}
                         {formatDate(formData.billingPeriodEnd)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
                         Rent Type
                       </p>
-                      <p className="text-xs font-semibold text-slate-600">
+                      <p className="text-xs font-semibold text-foreground">
                         {contract?.rentType?.replace('_', ' ') || 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
                         Reading Taken Date
                       </p>
-                      <p className="text-xs font-semibold text-slate-600">
+                      <p className="text-xs font-semibold text-foreground">
                         {formatDate(formData.readingTakenDate)}
                       </p>
                     </div>
@@ -2313,13 +2309,13 @@ export default function UsageRecordingModal({
 
                   {/* Dynamic Summary Rows */}
                   {ruleItems.combo ? (
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="text-[11px] font-bold text-purple-600 uppercase mb-2">
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-[11px] font-bold text-lease uppercase mb-2">
                         Black & White & Color (Combined)
                       </p>
                       <div className="space-y-1 text-xs pt-1">
                         {/* Summary breakdown is now handled in the standardized section below */}
-                        <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                        <div className="flex flex-col gap-2 pt-2 border-t border-border">
                           {(() => {
                             const isCpc = contract?.rentType?.includes('CPC');
                             const slabs = parseSlabs(ruleItems.combo?.comboSlabRanges);
@@ -2374,14 +2370,14 @@ export default function UsageRecordingModal({
 
                             return (
                               <>
-                                <div className="flex justify-between text-slate-700 font-medium">
+                                <div className="flex justify-between text-foreground font-medium">
                                   <span>Total Billed Units:</span>
                                   <span className="font-bold">
                                     {totalVolume.toLocaleString()} units
                                   </span>
                                 </div>
-                                <div className="pl-3 space-y-1 text-[11px] text-slate-500 border-l-2 border-slate-100 ml-1">
-                                  <div className="flex flex-col border-b border-slate-50 last:border-0 pb-1 mb-1">
+                                <div className="pl-3 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border ml-1">
+                                  <div className="flex flex-col border-b border-border last:border-0 pb-1 mb-1">
                                     <div className="flex justify-between">
                                       <span>
                                         • Current Machine Usage ({currentVolume.toLocaleString()}{' '}
@@ -2392,7 +2388,7 @@ export default function UsageRecordingModal({
                                         {(currentVolume * applicableRate).toFixed(2)}
                                       </span>
                                     </div>
-                                    <div className="text-[9px] text-slate-400 italic pl-2">
+                                    <div className="text-[9px] text-muted-foreground italic pl-2">
                                       (BW A4: {currentDeltaA4.toLocaleString()}, A3:{' '}
                                       {currentDeltaA3.toLocaleString()} | Color A4:{' '}
                                       {currentDeltaClrA4.toLocaleString()}, A3:{' '}
@@ -2402,7 +2398,7 @@ export default function UsageRecordingModal({
                                   {replacedDeltas.machines.map((m, i) => (
                                     <div
                                       key={i}
-                                      className="flex flex-col border-b border-slate-50 last:border-0 pb-1 mb-1"
+                                      className="flex flex-col border-b border-border last:border-0 pb-1 mb-1"
                                     >
                                       <div className="flex justify-between text-[10px]">
                                         <span>• Replaced Device (SN: {m.serialNumber})</span>
@@ -2412,7 +2408,7 @@ export default function UsageRecordingModal({
                                           {((m.bwDelta + m.clrDelta) * applicableRate).toFixed(2)})
                                         </span>
                                       </div>
-                                      <div className="text-[9px] text-slate-400 italic pl-2">
+                                      <div className="text-[9px] text-muted-foreground italic pl-2">
                                         (BW A4: {m.bwA4.toLocaleString()}, A3:{' '}
                                         {m.bwA3.toLocaleString()} | Color A4:{' '}
                                         {m.clrA4.toLocaleString()}, A3: {m.clrA3.toLocaleString()})
@@ -2429,16 +2425,16 @@ export default function UsageRecordingModal({
                                   const chargeable = Math.max(0, totalVolume - included);
                                   if (included > 0) {
                                     return (
-                                      <div className="bg-blue-50/50 p-2 rounded mt-1 border border-blue-100/50 space-y-0.5 text-[10px]">
-                                        <div className="flex justify-between text-blue-700">
+                                      <div className="bg-primary/10 p-2 rounded mt-1 border border-primary/30 space-y-0.5 text-[10px]">
+                                        <div className="flex justify-between text-primary">
                                           <span>Total Gross Units:</span>
                                           <span>{totalVolume.toLocaleString()}</span>
                                         </div>
-                                        <div className="flex justify-between text-slate-500 italic">
+                                        <div className="flex justify-between text-muted-foreground italic">
                                           <span>Less: Included Limit (Free):</span>
                                           <span>- {included.toLocaleString()}</span>
                                         </div>
-                                        <div className="flex justify-between font-bold text-blue-800 border-t border-blue-200/50 pt-0.5">
+                                        <div className="flex justify-between font-bold text-primary border-t border-primary/30 pt-0.5">
                                           <span>Net Chargeable Units:</span>
                                           <span>{chargeable.toLocaleString()} units</span>
                                         </div>
@@ -2448,14 +2444,14 @@ export default function UsageRecordingModal({
                                   return null;
                                 })()}
 
-                                <div className="flex justify-between text-slate-500 text-[11px] mt-1">
+                                <div className="flex justify-between text-muted-foreground text-[11px] mt-1">
                                   <span>Excess Rate:</span>
                                   <span className="font-bold">
                                     {getActiveCurrency()} {applicableRate}{' '}
                                     {applicableRange ? `(${applicableRange} units)` : '/ unit'}
                                   </span>
                                 </div>
-                                <div className="flex justify-between text-orange-600 font-bold mt-1 border-t border-slate-100 pt-1">
+                                <div className="flex justify-between text-warning font-bold mt-1 border-t border-border pt-1">
                                   <span>Total Excess Charge:</span>
                                   <span>
                                     {getActiveCurrency()}{' '}
@@ -2477,12 +2473,12 @@ export default function UsageRecordingModal({
                   ) : (
                     <>
                       {isBw && (
-                        <div className="pt-2 border-t border-slate-100">
-                          <p className="text-[11px] font-bold text-slate-600 uppercase mb-2">
+                        <div className="pt-2 border-t border-border">
+                          <p className="text-[11px] font-bold text-foreground uppercase mb-2">
                             Black & White
                           </p>
                           <div className="space-y-1 text-xs">
-                            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                            <div className="flex flex-col gap-2 pt-2 border-t border-border">
                               {(() => {
                                 const isCpc = contract?.rentType?.includes('CPC');
                                 const slabs = parseSlabs(ruleItems.bw?.bwSlabRanges);
@@ -2522,14 +2518,14 @@ export default function UsageRecordingModal({
 
                                 return (
                                   <>
-                                    <div className="flex justify-between text-slate-700 font-medium">
+                                    <div className="flex justify-between text-foreground font-medium">
                                       <span>Total Billed Units (BW):</span>
                                       <span className="font-bold">
                                         {totalVolume.toLocaleString()} units
                                       </span>
                                     </div>
-                                    <div className="pl-3 space-y-1 text-[11px] text-slate-500 border-l-2 border-slate-100 ml-1">
-                                      <div className="flex flex-col border-b border-slate-50 last:border-0 pb-1 mb-1">
+                                    <div className="pl-3 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border ml-1">
+                                      <div className="flex flex-col border-b border-border last:border-0 pb-1 mb-1">
                                         <div className="flex justify-between">
                                           <span>
                                             • Current Machine Usage (
@@ -2546,7 +2542,7 @@ export default function UsageRecordingModal({
                                         .map((m, i) => (
                                           <div
                                             key={i}
-                                            className="flex flex-col border-b border-slate-50 last:border-0 pb-1 mb-1"
+                                            className="flex flex-col border-b border-border last:border-0 pb-1 mb-1"
                                           >
                                             <div className="flex justify-between text-[10px]">
                                               <span>• Replaced Device (SN: {m.serialNumber})</span>
@@ -2556,7 +2552,7 @@ export default function UsageRecordingModal({
                                                 {(m.bwDelta * applicableRate).toFixed(2)})
                                               </span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 italic pl-2">
+                                            <div className="text-[9px] text-muted-foreground italic pl-2">
                                               (BW A4: {m.bwA4.toLocaleString()}, A3:{' '}
                                               {m.bwA3.toLocaleString()})
                                             </div>
@@ -2571,16 +2567,16 @@ export default function UsageRecordingModal({
                                       const chargeable = Math.max(0, totalVolume - included);
                                       if (included > 0) {
                                         return (
-                                          <div className="bg-blue-50/50 p-2 rounded mt-1 border border-blue-100/50 space-y-0.5 text-[10px]">
-                                            <div className="flex justify-between text-blue-700">
+                                          <div className="bg-primary/10 p-2 rounded mt-1 border border-primary/30 space-y-0.5 text-[10px]">
+                                            <div className="flex justify-between text-primary">
                                               <span>Total Gross Units:</span>
                                               <span>{totalVolume.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between text-slate-500 italic">
+                                            <div className="flex justify-between text-muted-foreground italic">
                                               <span>Less: Included Limit (Free):</span>
                                               <span>- {included.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between font-bold text-blue-800 border-t border-blue-200/50 pt-0.5">
+                                            <div className="flex justify-between font-bold text-primary border-t border-primary/30 pt-0.5">
                                               <span>Net Chargeable Units:</span>
                                               <span>{chargeable.toLocaleString()} units</span>
                                             </div>
@@ -2590,14 +2586,14 @@ export default function UsageRecordingModal({
                                       return null;
                                     })()}
 
-                                    <div className="flex justify-between text-slate-500 text-[11px] mt-1">
+                                    <div className="flex justify-between text-muted-foreground text-[11px] mt-1">
                                       <span>Excess Rate (BW):</span>
                                       <span className="font-bold">
                                         {getActiveCurrency()} {applicableRate}{' '}
                                         {applicableRange ? `(${applicableRange} units)` : '/ unit'}
                                       </span>
                                     </div>
-                                    <div className="flex justify-between text-orange-600 font-bold mt-1 border-t border-slate-100 pt-1">
+                                    <div className="flex justify-between text-warning font-bold mt-1 border-t border-border pt-1">
                                       <span>Excess Charge:</span>
                                       <span>
                                         {getActiveCurrency()}{' '}
@@ -2619,12 +2615,12 @@ export default function UsageRecordingModal({
                       )}
 
                       {isColor && (
-                        <div className="pt-2 border-t border-slate-100">
-                          <p className="text-[11px] font-bold text-rose-600 uppercase mb-2">
+                        <div className="pt-2 border-t border-border">
+                          <p className="text-[11px] font-bold text-destructive uppercase mb-2">
                             Color
                           </p>
                           <div className="space-y-1 text-xs">
-                            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                            <div className="flex flex-col gap-2 pt-2 border-t border-border">
                               {(() => {
                                 const isCpc = contract?.rentType?.includes('CPC');
                                 const slabs = parseSlabs(ruleItems.color?.colorSlabRanges);
@@ -2664,14 +2660,14 @@ export default function UsageRecordingModal({
 
                                 return (
                                   <>
-                                    <div className="flex justify-between text-slate-700 font-medium">
+                                    <div className="flex justify-between text-foreground font-medium">
                                       <span>Total Billed Units (Color):</span>
                                       <span className="font-bold">
                                         {totalVolume.toLocaleString()} units
                                       </span>
                                     </div>
-                                    <div className="pl-3 space-y-1 text-[11px] text-slate-500 border-l-2 border-slate-100 ml-1">
-                                      <div className="flex flex-col border-b border-slate-50 last:border-0 pb-1 mb-1">
+                                    <div className="pl-3 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border ml-1">
+                                      <div className="flex flex-col border-b border-border last:border-0 pb-1 mb-1">
                                         <div className="flex justify-between">
                                           <span>
                                             • Current Machine Usage (
@@ -2688,7 +2684,7 @@ export default function UsageRecordingModal({
                                         .map((m, i) => (
                                           <div
                                             key={i}
-                                            className="flex flex-col border-b border-slate-50 last:border-0 pb-1 mb-1"
+                                            className="flex flex-col border-b border-border last:border-0 pb-1 mb-1"
                                           >
                                             <div className="flex justify-between text-[10px]">
                                               <span>• Replaced Device (SN: {m.serialNumber})</span>
@@ -2698,7 +2694,7 @@ export default function UsageRecordingModal({
                                                 {(m.clrDelta * applicableRate).toFixed(2)})
                                               </span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 italic pl-2">
+                                            <div className="text-[9px] text-muted-foreground italic pl-2">
                                               (Color A4: {m.clrA4.toLocaleString()}, A3:{' '}
                                               {m.clrA3.toLocaleString()})
                                             </div>
@@ -2713,16 +2709,16 @@ export default function UsageRecordingModal({
                                       const chargeable = Math.max(0, totalVolume - included);
                                       if (included > 0) {
                                         return (
-                                          <div className="bg-rose-50/50 p-2 rounded mt-1 border border-rose-100/50 space-y-0.5 text-[10px]">
-                                            <div className="flex justify-between text-rose-700">
+                                          <div className="bg-destructive/10 p-2 rounded mt-1 border border-destructive/30 space-y-0.5 text-[10px]">
+                                            <div className="flex justify-between text-destructive">
                                               <span>Total Gross Units:</span>
                                               <span>{totalVolume.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between text-slate-500 italic">
+                                            <div className="flex justify-between text-muted-foreground italic">
                                               <span>Less: Included Limit (Free):</span>
                                               <span>- {included.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between font-bold text-rose-800 border-t border-rose-200/50 pt-0.5">
+                                            <div className="flex justify-between font-bold text-destructive border-t border-destructive/30 pt-0.5">
                                               <span>Net Chargeable Units:</span>
                                               <span>{chargeable.toLocaleString()} units</span>
                                             </div>
@@ -2732,14 +2728,14 @@ export default function UsageRecordingModal({
                                       return null;
                                     })()}
 
-                                    <div className="flex justify-between text-slate-500 text-[11px] mt-1">
+                                    <div className="flex justify-between text-muted-foreground text-[11px] mt-1">
                                       <span>Excess Rate (Color):</span>
                                       <span className="font-bold">
                                         {getActiveCurrency()} {applicableRate}{' '}
                                         {applicableRange ? `(${applicableRange} units)` : '/ unit'}
                                       </span>
                                     </div>
-                                    <div className="flex justify-between text-orange-600 font-bold mt-1 border-t border-slate-100 pt-1">
+                                    <div className="flex justify-between text-warning font-bold mt-1 border-t border-border pt-1">
                                       <span>Excess Charge:</span>
                                       <span>
                                         {getActiveCurrency()}{' '}
@@ -2762,8 +2758,8 @@ export default function UsageRecordingModal({
                     </>
                   )}
 
-                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center mt-2 text-xs">
-                    <span className="text-slate-500">
+                  <div className="pt-2 border-t border-border flex justify-between items-center mt-2 text-xs">
+                    <span className="text-muted-foreground">
                       {/* Under ADVANCE billing (and not the final period, which has its
                           own "adjusted" framing below) this charge is next period's rent,
                           collected now as its advance — not rent for the period whose
@@ -2772,7 +2768,7 @@ export default function UsageRecordingModal({
                         ? "Monthly Rent (Next Month's Advance)"
                         : 'Monthly Rent'}
                     </span>
-                    <span className="font-bold text-slate-700">
+                    <span className="font-bold text-foreground">
                       {(() => {
                         const amount = Number(
                           contract?.monthlyRent ||
@@ -2794,7 +2790,7 @@ export default function UsageRecordingModal({
 
                   {/* Discount row */}
                   {formData.discountType !== 'NONE' && (
-                    <div className="pt-1 flex flex-col items-end text-xs text-purple-700">
+                    <div className="pt-1 flex flex-col items-end text-xs text-lease">
                       <div className="w-full flex justify-between items-center mb-0.5">
                         <span className="font-medium font-bold">Discount Applied</span>
                         <span className="font-bold">
@@ -2885,7 +2881,7 @@ export default function UsageRecordingModal({
                         </span>
                       </div>
                       {formData.discountType === 'COPIES' && (
-                        <div className="text-[9px] text-purple-600/70 italic text-right">
+                        <div className="text-[9px] text-lease/70 italic text-right">
                           {Number(formData.discountBwCopies || 0) > 0 && (
                             <div>
                               • BW: {formData.discountBwCopies} copies
@@ -2972,27 +2968,27 @@ export default function UsageRecordingModal({
                   {estimatedTax > 0 && (
                     <>
                       <div className="pt-2 flex justify-between items-center text-sm">
-                        <span className="text-slate-500">
+                        <span className="text-muted-foreground">
                           Subtotal (Before {contract?.taxName || 'VAT'})
                         </span>
-                        <span className="text-slate-700">
+                        <span className="text-foreground">
                           {formatCurrency(estimatedCost - estimatedTax, currency)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500">
+                        <span className="text-muted-foreground">
                           {contract?.taxName || 'VAT'}
                           {contract?.taxPercent ? ` (${contract.taxPercent}%)` : ''}
                         </span>
-                        <span className="text-slate-700">
+                        <span className="text-foreground">
                           {formatCurrency(estimatedTax, currency)}
                         </span>
                       </div>
                     </>
                   )}
-                  <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
-                    <span className="font-bold text-sm text-slate-800">Grand Total</span>
-                    <span className="font-bold text-lg text-green-600">
+                  <div className="pt-3 border-t-2 border-border flex justify-between items-center mt-2">
+                    <span className="font-bold text-sm text-foreground">Grand Total</span>
+                    <span className="font-bold text-lg text-success">
                       {formatCurrency(estimatedCost, currency)}
                     </span>
                   </div>
@@ -3022,7 +3018,7 @@ export default function UsageRecordingModal({
                 type="submit"
                 disabled={loading || hasErrors}
                 className={
-                  hasErrors ? 'bg-slate-300 pointer-events-none' : 'bg-blue-600 hover:bg-blue-700'
+                  hasErrors ? 'bg-muted pointer-events-none' : 'bg-primary hover:bg-primary/90'
                 }
               >
                 {loading ? (

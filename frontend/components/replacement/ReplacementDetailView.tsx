@@ -44,8 +44,10 @@ function safeFormatTime(val?: string | null): string {
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-800 break-words">{value ?? '—'}</p>
+      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm font-semibold text-foreground break-words">{value ?? '—'}</p>
     </div>
   );
 }
@@ -53,7 +55,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-100 pb-1.5">
+      <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-1.5">
         {title}
       </h4>
       {children}
@@ -65,7 +67,9 @@ function PhotoStrip({ urls, label }: { urls: string[]; label: string }) {
   if (!urls?.length) return null;
   return (
     <div className="space-y-1.5">
-      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
       <div className="flex flex-wrap gap-2">
         {urls.map((u) => (
           <a key={u} href={u} target="_blank" rel="noreferrer" className="block">
@@ -75,7 +79,7 @@ function PhotoStrip({ urls, label }: { urls: string[]; label: string }) {
               width={104}
               height={104}
               unoptimized
-              className="h-26 w-26 rounded-lg border border-slate-200 object-cover hover:opacity-90 transition-opacity"
+              className="h-26 w-26 rounded-lg border border-border object-cover hover:opacity-90 transition-opacity"
               style={{ height: 104, width: 104 }}
             />
           </a>
@@ -98,29 +102,29 @@ function MeterTable({ detail }: { detail: ReplacementDetail }) {
   ];
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200">
+    <div className="overflow-x-auto rounded-xl border border-border">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50">
+        <thead className="bg-muted">
           <tr>
-            <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Counter
             </th>
-            <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Removed · closing
             </th>
-            <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Installed · opening
             </th>
           </tr>
         </thead>
         <tbody>
           {rows.map(([label, oldV, newV]) => (
-            <tr key={label} className="border-t border-slate-100">
-              <td className="px-3 py-2 font-semibold text-slate-700">{label}</td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-800">
+            <tr key={label} className="border-t border-border">
+              <td className="px-3 py-2 font-semibold text-foreground">{label}</td>
+              <td className="px-3 py-2 text-right font-mono tabular-nums text-foreground">
                 {(oldV ?? 0).toLocaleString()}
               </td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-800">
+              <td className="px-3 py-2 text-right font-mono tabular-nums text-foreground">
                 {(newV ?? 0).toLocaleString()}
               </td>
             </tr>
@@ -149,8 +153,8 @@ function MachineCard({
   } | null;
 }) {
   const ring =
-    tone === 'out' ? 'border-red-200 bg-red-50/40' : 'border-emerald-200 bg-emerald-50/40';
-  const chip = tone === 'out' ? 'text-red-700' : 'text-emerald-700';
+    tone === 'out' ? 'border-destructive/30 bg-destructive/10' : 'border-success/30 bg-success/10';
+  const chip = tone === 'out' ? 'text-destructive' : 'text-success';
   return (
     <div className={`rounded-xl border p-3.5 space-y-2.5 ${ring}`}>
       <p className={`text-[9px] font-black uppercase tracking-widest ${chip}`}>{heading}</p>
@@ -161,20 +165,20 @@ function MachineCard({
           width={320}
           height={160}
           unoptimized
-          className="w-full rounded-lg border border-white object-cover"
+          className="w-full rounded-lg border border-border object-cover"
           style={{ maxHeight: 160 }}
         />
       )}
       <div className="space-y-1.5">
-        <p className="text-sm font-black text-slate-800">{product?.name || '—'}</p>
-        <p className="font-mono text-xs text-slate-600">{serial || '—'}</p>
+        <p className="text-sm font-black text-foreground">{product?.name || '—'}</p>
+        <p className="font-mono text-xs text-foreground">{serial || '—'}</p>
         {(product?.brand || product?.model_name) && (
-          <p className="text-[11px] font-semibold text-slate-500">
+          <p className="text-[11px] font-semibold text-muted-foreground">
             {[product?.brand, product?.model_name].filter(Boolean).join(' · ')}
           </p>
         )}
         {product?.description && (
-          <p className="text-[11px] text-slate-500 leading-relaxed">{product.description}</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{product.description}</p>
         )}
       </div>
     </div>
@@ -194,8 +198,8 @@ export function ReplacementDetailView({ detail }: { detail: ReplacementDetail })
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-mono text-xs font-bold text-blue-600">{r.requestNo}</p>
-          <p className="text-lg font-black text-slate-800">{r.customerName}</p>
+          <p className="font-mono text-xs font-bold text-primary">{r.requestNo}</p>
+          <p className="text-lg font-black text-foreground">{r.customerName}</p>
         </div>
         <Badge className={`border ${REPLACEMENT_STATUS_CLASS[r.status]}`}>
           {REPLACEMENT_STATUS_LABEL[r.status]}
@@ -317,19 +321,19 @@ export function ReplacementDetailView({ detail }: { detail: ReplacementDetail })
           />
         </div>
         {r.rejectionReason && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-            <p className="text-[9px] font-black uppercase tracking-widest text-red-600">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3">
+            <p className="text-[9px] font-black uppercase tracking-widest text-destructive">
               Rejection reason
             </p>
-            <p className="text-sm text-red-800 mt-1">{r.rejectionReason}</p>
+            <p className="text-sm text-destructive mt-1">{r.rejectionReason}</p>
           </div>
         )}
         {r.approvalNote && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700">
+          <div className="rounded-xl border border-success/30 bg-success/10 p-3">
+            <p className="text-[9px] font-black uppercase tracking-widest text-success">
               Customer note
             </p>
-            <p className="text-sm text-emerald-900 mt-1">{r.approvalNote}</p>
+            <p className="text-sm text-success mt-1">{r.approvalNote}</p>
           </div>
         )}
       </Section>

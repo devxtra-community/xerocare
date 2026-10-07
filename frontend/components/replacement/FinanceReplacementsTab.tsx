@@ -108,17 +108,17 @@ export function FinanceReplacementsTab() {
   return (
     <div className="space-y-4">
       {pending > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Wrench size={18} className="shrink-0 text-amber-600" />
-          <p className="text-sm font-semibold text-amber-800">
+        <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <Wrench size={18} className="shrink-0 text-warning" />
+          <p className="text-sm font-semibold text-warning">
             {pending} replacement request{pending === 1 ? '' : 's'} awaiting your decision.
           </p>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-100 bg-card shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <Table className="min-w-[900px] sm:min-w-full">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[900px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="font-bold text-primary">REQUEST</TableHead>
@@ -151,23 +151,23 @@ export function FinanceReplacementsTab() {
                   <TableRow
                     key={r.id}
                     className={
-                      r.status === 'PENDING_FINANCE' ? 'bg-amber-50/40 hover:bg-amber-50/60' : ''
+                      r.status === 'PENDING_FINANCE' ? 'bg-warning/10 hover:bg-warning/10' : ''
                     }
                   >
-                    <TableCell className="font-mono text-xs font-bold text-blue-600">
+                    <TableCell className="font-mono text-xs font-bold text-primary">
                       {r.requestNo}
                     </TableCell>
-                    <TableCell className="font-bold text-slate-700">{r.customerName}</TableCell>
+                    <TableCell className="font-bold text-foreground">{r.customerName}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {fmt(r.raisedAt)}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-slate-600">
+                    <TableCell className="whitespace-nowrap text-foreground">
                       {r.raisedByEmployeeName}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-slate-600">
+                    <TableCell className="font-mono text-xs text-foreground">
                       {r.oldSerialNumber}
                     </TableCell>
-                    <TableCell className="text-sm text-slate-600">{r.reason}</TableCell>
+                    <TableCell className="text-sm text-foreground">{r.reason}</TableCell>
                     <TableCell>
                       <Badge className={`border ${REPLACEMENT_STATUS_CLASS[r.status]}`}>
                         {REPLACEMENT_STATUS_LABEL[r.status]}
@@ -178,7 +178,7 @@ export function FinanceReplacementsTab() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 rounded-lg p-0 text-blue-500 hover:bg-blue-50"
+                          className="h-8 w-8 rounded-lg p-0 text-primary hover:bg-primary/10"
                           title="View full request"
                           onClick={() => setViewingId(r.id)}
                         >
@@ -190,8 +190,8 @@ export function FinanceReplacementsTab() {
                             size="sm"
                             className={`h-8 w-8 rounded-lg p-0 ${
                               (r.dispositionStatus ?? 'PENDING') === 'PENDING'
-                                ? 'animate-pulse text-amber-600 hover:bg-amber-50'
-                                : 'text-slate-400 hover:bg-slate-100'
+                                ? 'animate-pulse text-warning hover:bg-warning/10'
+                                : 'text-muted-foreground hover:bg-muted'
                             }`}
                             title={
                               (r.dispositionStatus ?? 'PENDING') === 'PENDING'
@@ -211,7 +211,7 @@ export function FinanceReplacementsTab() {
                               variant="ghost"
                               size="sm"
                               disabled={busyId === r.id}
-                              className="h-8 w-8 rounded-lg p-0 text-emerald-600 hover:bg-emerald-50"
+                              className="h-8 w-8 rounded-lg p-0 text-success hover:bg-success/10"
                               title="Approve"
                               onClick={() => approve(r)}
                             >
@@ -225,7 +225,7 @@ export function FinanceReplacementsTab() {
                               variant="ghost"
                               size="sm"
                               disabled={busyId === r.id}
-                              className="h-8 w-8 rounded-lg p-0 text-red-500 hover:bg-red-50"
+                              className="h-8 w-8 rounded-lg p-0 text-destructive hover:bg-destructive/10"
                               title="Reject"
                               onClick={() => {
                                 setRejectTarget(r);
@@ -263,7 +263,7 @@ export function FinanceReplacementsTab() {
               <>
                 <Button
                   variant="outline"
-                  className="h-9 border-red-200 text-xs font-black text-red-600 hover:bg-red-50"
+                  className="h-9 border-destructive/30 text-xs font-black text-destructive hover:bg-destructive/10"
                   onClick={() => {
                     setRejectTarget(detail.request);
                     setRejectReason('');
@@ -274,7 +274,7 @@ export function FinanceReplacementsTab() {
                   Reject
                 </Button>
                 <Button
-                  className="h-9 bg-emerald-600 text-xs font-black text-white hover:bg-emerald-700"
+                  className="h-9 bg-success text-xs font-black text-success-foreground hover:bg-success/90"
                   onClick={async () => {
                     await approve(detail.request);
                     setViewingId(null);
@@ -309,7 +309,7 @@ export function FinanceReplacementsTab() {
               Cancel
             </Button>
             <Button
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={!rejectReason.trim() || !!busyId}
               onClick={reject}
             >

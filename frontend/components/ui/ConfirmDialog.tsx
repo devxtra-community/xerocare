@@ -33,22 +33,22 @@ export function ConfirmDialog({
   // Configs for types
   const typeConfig = {
     destructive: {
-      icon: <AlertTriangle className="size-6 text-red-600" />,
-      iconBg: 'bg-red-50',
+      icon: <AlertTriangle className="size-6 text-destructive" />,
+      iconBg: 'bg-destructive/10',
       confirmVariant: 'destructive' as const,
-      confirmClass: 'bg-red-600 hover:bg-[#991b1b] text-white',
+      confirmClass: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground',
     },
     positive: {
-      icon: <CheckCircle2 className="size-6 text-green-600" />,
-      iconBg: 'bg-green-50',
+      icon: <CheckCircle2 className="size-6 text-success" />,
+      iconBg: 'bg-success/10',
       confirmVariant: 'success' as const,
-      confirmClass: 'bg-green-600 hover:bg-[#14532d] text-white',
+      confirmClass: 'bg-success hover:bg-success/90 text-success-foreground',
     },
     neutral: {
-      icon: <Info className="size-6 text-blue-600" />,
-      iconBg: 'bg-blue-50',
+      icon: <Info className="size-6 text-primary" />,
+      iconBg: 'bg-primary/10',
       confirmVariant: 'default' as const,
-      confirmClass: 'bg-blue-600 hover:bg-[#1e3a8a] text-white',
+      confirmClass: 'bg-primary hover:bg-primary/90 text-primary-foreground',
     },
   }[type];
 
@@ -83,10 +83,10 @@ export function ConfirmDialog({
         <div className={cn('p-3 rounded-full mb-4', typeConfig.iconBg)}>{typeConfig.icon}</div>
 
         {/* Title */}
-        <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
+        <h3 className="text-lg font-bold text-foreground mb-2">{title}</h3>
 
         {/* Description */}
-        <div className="text-sm text-gray-500 mb-6 leading-relaxed">{description}</div>
+        <div className="text-sm text-muted-foreground mb-6 leading-relaxed">{description}</div>
 
         {/* Two buttons at bottom right (flex layout centered/spaced for dialog) */}
         <div className="flex w-full items-center justify-end gap-3 mt-2">
@@ -94,7 +94,7 @@ export function ConfirmDialog({
             variant="outline"
             onClick={onClose}
             disabled={busy}
-            className="text-gray-500 border-gray-300 hover:bg-gray-50 hover:text-gray-700 min-w-[90px] h-9"
+            className="text-muted-foreground border-border hover:bg-muted hover:text-foreground min-w-[90px] h-9"
           >
             {cancelText}
           </Button>

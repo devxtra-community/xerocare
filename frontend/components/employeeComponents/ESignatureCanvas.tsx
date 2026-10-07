@@ -65,9 +65,9 @@ export function ESignatureCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'var(--card)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#1a1a2e';
+    ctx.strokeStyle = 'var(--foreground)';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -155,7 +155,7 @@ export function ESignatureCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'var(--card)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     setIsEmpty(true);
     setSaved(false);
@@ -180,13 +180,15 @@ export function ESignatureCanvas({
   return (
     <div className="space-y-2">
       {label && (
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          {label}
+        </p>
       )}
       <div
         className={`border-2 rounded-xl overflow-hidden ${
           readOnly
-            ? 'border-slate-100 bg-slate-50'
-            : 'border-dashed border-slate-300 bg-white cursor-crosshair'
+            ? 'border-border bg-muted'
+            : 'border-dashed border-border bg-card cursor-crosshair'
         }`}
         style={{ width: '100%', aspectRatio: `${width}/${height}` }}
       >
@@ -205,7 +207,7 @@ export function ESignatureCanvas({
             variant="ghost"
             size="sm"
             onClick={handleClear}
-            className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-8 px-3"
+            className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-8 px-3"
           >
             <RotateCcw size={12} className="mr-1" />
             Clear
@@ -216,7 +218,7 @@ export function ESignatureCanvas({
             loading={saved}
             loadingText="Saved ✓"
             disabled={isEmpty}
-            className="text-[10px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-4 rounded-lg disabled:opacity-40"
+            className="text-[10px] font-black uppercase tracking-widest bg-success hover:bg-success/90 text-success-foreground h-8 px-4 rounded-lg disabled:opacity-40"
           >
             <Check size={12} className="mr-1" />
             Save Signature

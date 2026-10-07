@@ -43,10 +43,10 @@ import { toast } from 'sonner';
 const RECEIVE_MODES = ['Cash', 'Bank Transfer', 'Cheque', 'Card'];
 
 const STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  APPROVED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  RECEIVED: 'bg-blue-100 text-blue-700 border-blue-200',
-  REJECTED: 'bg-red-100 text-red-700 border-red-200',
+  PENDING: 'bg-warning/10 text-warning border-warning/30',
+  APPROVED: 'bg-success/10 text-success border-success/30',
+  RECEIVED: 'bg-primary/10 text-primary border-primary/30',
+  REJECTED: 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
 const today = new Date().toISOString().slice(0, 10);
@@ -108,11 +108,11 @@ function IncomeModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">{entry ? 'Edit Income' : 'Add Income'}</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <h2 className="font-bold text-foreground">{entry ? 'Edit Income' : 'Add Income'}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -277,23 +277,23 @@ function ReceiveIncomeModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h3 className="font-bold text-slate-800">Mark Income Received</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-700">
+          <h3 className="font-bold text-foreground">Mark Income Received</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="space-y-4 px-6 py-5">
           <p className="text-sm text-muted-foreground">
             {entry.incomeNo} · {entry.category.replace(/_/g, ' ')} ·{' '}
-            <span className="font-semibold text-emerald-600">
+            <span className="font-semibold text-success">
               {formatCurrency(Number(entry.netAmount), entry.currency)}
             </span>
           </p>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600">Received Via</label>
+            <label className="text-xs font-semibold text-foreground">Received Via</label>
             <Select value={receivedMode} onValueChange={setReceivedMode}>
               <SelectTrigger>
                 <SelectValue />
@@ -309,7 +309,7 @@ function ReceiveIncomeModal({
           </div>
           {!isCheque && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-600">
+              <label className="text-xs font-semibold text-foreground">
                 Deposit To <span className="font-normal text-muted-foreground">(optional)</span>
               </label>
               <Select value={receivedTo} onValueChange={setReceivedTo}>
@@ -330,7 +330,7 @@ function ReceiveIncomeModal({
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600">
+            <label className="text-xs font-semibold text-foreground">
               {isCheque ? 'Cheque Received Date (received from customer)' : 'Received Date'}
             </label>
             <input
@@ -341,32 +341,32 @@ function ReceiveIncomeModal({
             />
           </div>
           {isCheque && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
-              <p className="text-xs font-bold text-amber-700">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 space-y-3">
+              <p className="text-xs font-bold text-warning">
                 Cheque Details — creates a PENDING received cheque. Cash at Bank increases only once
                 Finance deposits and clears it in Accounts → Cheques.
               </p>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">Cheque Number *</label>
+                <label className="text-xs font-semibold text-foreground">Cheque Number *</label>
                 <input
                   required
                   value={chequeNumber}
                   onChange={(e) => setChequeNumber(e.target.value)}
                   placeholder="e.g. CHQ-001234"
-                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">Payer&apos;s Bank</label>
+                <label className="text-xs font-semibold text-foreground">Payer&apos;s Bank</label>
                 <input
                   value={chequeBankName}
                   onChange={(e) => setChequeBankName(e.target.value)}
                   placeholder="e.g. Emirates NBD"
-                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">
+                <label className="text-xs font-semibold text-foreground">
                   Cheque Date *{' '}
                   <span className="font-normal">(earliest date it can be deposited)</span>
                 </label>
@@ -375,7 +375,7 @@ function ReceiveIncomeModal({
                   required
                   value={chequeDate}
                   onChange={(e) => setChequeDate(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -386,7 +386,7 @@ function ReceiveIncomeModal({
             Cancel
           </Button>
           <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
             disabled={receiveMut.isPending || (isCheque && (!chequeNumber || !chequeDate))}
             onClick={() => receiveMut.mutate()}
           >
@@ -483,18 +483,20 @@ export default function IncomeManagementPage() {
   const pendingCount = entries.filter((e) => e.status === 'PENDING').length;
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {isLoading && (
         <div className="flex items-center justify-center py-16">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
       {isError && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-8 text-center space-y-3 max-w-sm w-full mx-auto">
-          <p className="text-red-700 font-medium">Failed to load income entries. Please retry.</p>
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-8 text-center space-y-3 max-w-sm w-full mx-auto">
+          <p className="text-destructive font-medium">
+            Failed to load income entries. Please retry.
+          </p>
           <button
             onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
+            className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold"
           >
             Retry
           </button>
@@ -504,7 +506,7 @@ export default function IncomeManagementPage() {
         <>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">
+              <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
                 Income Management
               </h3>
               <p className="text-muted-foreground">
@@ -557,7 +559,7 @@ export default function IncomeManagementPage() {
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -596,8 +598,8 @@ export default function IncomeManagementPage() {
             </div>
           </div>
 
-          <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-            <Table>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-1">
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -632,22 +634,22 @@ export default function IncomeManagementPage() {
                   </TableRow>
                 ) : (
                   filtered.map((e) => (
-                    <TableRow key={e.id} className="hover:bg-blue-50/50 transition-colors">
+                    <TableRow key={e.id} className="hover:bg-primary/10 transition-colors">
                       <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
                         {e.date?.slice(0, 10)}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                      <TableCell className="font-mono text-xs text-primary font-bold">
                         {e.incomeNo}
                       </TableCell>
                       <TableCell>
-                        <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700">
+                        <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-success/10 text-success">
                           {e.category.replace(/_/g, ' ')}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
                         {e.description}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-emerald-600">
+                      <TableCell className="text-right font-bold text-success">
                         {formatCurrency(Number(e.netAmount), e.currency)}
                       </TableCell>
                       <TableCell>
@@ -662,7 +664,7 @@ export default function IncomeManagementPage() {
                           <button
                             onClick={() => setViewingId(e.id)}
                             title="View full details"
-                            className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                            className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
@@ -672,7 +674,7 @@ export default function IncomeManagementPage() {
                                 <button
                                   onClick={() => approveMut.mutate(e.id)}
                                   title="Approve"
-                                  className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                  className="p-1.5 rounded-md hover:bg-success/10 text-success"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
                                 </button>
@@ -681,7 +683,7 @@ export default function IncomeManagementPage() {
                                 <button
                                   onClick={() => setReceiving(e)}
                                   title="Mark Received"
-                                  className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                  className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                 >
                                   <Wallet className="h-3.5 w-3.5" />
                                 </button>
@@ -693,7 +695,7 @@ export default function IncomeManagementPage() {
                                       setEditing(e);
                                       setShowModal(true);
                                     }}
-                                    className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                    className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                     title="Edit"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
@@ -703,7 +705,7 @@ export default function IncomeManagementPage() {
                                       if (confirm('Delete this income entry?'))
                                         deleteMut.mutate(e.id);
                                     }}
-                                    className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                    className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                                     title="Delete"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />

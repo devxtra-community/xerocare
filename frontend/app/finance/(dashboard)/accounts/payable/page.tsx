@@ -75,11 +75,11 @@ import StatementDialog, {
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
-  Current: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  '1-30 days': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  '31-60 days': 'bg-orange-100 text-orange-700 border-orange-200',
-  '61-90 days': 'bg-red-100 text-red-700 border-red-200',
-  '90+ days': 'bg-red-200 text-red-800 border-red-300',
+  Current: 'bg-success/10 text-success border-success/30',
+  '1-30 days': 'bg-warning/10 text-warning border-warning/30',
+  '31-60 days': 'bg-warning/10 text-warning border-warning/30',
+  '61-90 days': 'bg-destructive/10 text-destructive border-destructive/30',
+  '90+ days': 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
 const PAYABLE_STATUSES = [
@@ -160,10 +160,10 @@ function AddPayableModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Add Payable</h2>
+          <h2 className="font-bold text-foreground">Add Payable</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -317,17 +317,17 @@ function PaymentModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Record Payment</h2>
+          <h2 className="font-bold text-foreground">Record Payment</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <div className="p-3 rounded-lg bg-amber-50 text-sm">
-            <p className="font-medium text-slate-800">{payable.payableTo}</p>
+          <div className="p-3 rounded-lg bg-warning/10 text-sm">
+            <p className="font-medium text-foreground">{payable.payableTo}</p>
             <p className="text-muted-foreground text-xs">
               Outstanding: {formatCurrency(payable.outstanding, payable.currency)}
             </p>
@@ -356,7 +356,7 @@ function PaymentModal({
             <div>
               <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
               {matchingAccounts.length === 0 ? (
-                <p className="text-xs font-medium text-red-600 mt-1">
+                <p className="text-xs font-medium text-destructive mt-1">
                   No{' '}
                   {accountTypeForPaymentMode(form.paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
                   account exists for this branch.
@@ -382,7 +382,7 @@ function PaymentModal({
                 </Select>
               )}
               {balanceError && (
-                <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+                <p className="text-xs font-medium text-destructive mt-1">{balanceError}</p>
               )}
             </div>
           )}
@@ -402,8 +402,8 @@ function PaymentModal({
             </Select>
           </div>
           {isCheque ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <p className="text-xs font-semibold text-amber-700">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 space-y-2">
+              <p className="text-xs font-semibold text-warning">
                 Cheque issued to vendor — bank balance updates when Finance clears it in Accounts →
                 Cheques.
               </p>
@@ -521,21 +521,21 @@ function ExpensePaymentModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Pay Expense</h2>
+          <h2 className="font-bold text-foreground">Pay Expense</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <div className="p-3 rounded-lg bg-amber-50 text-sm">
-            <p className="font-medium text-slate-800">{expense.description}</p>
+          <div className="p-3 rounded-lg bg-warning/10 text-sm">
+            <p className="font-medium text-foreground">{expense.description}</p>
             <p className="text-muted-foreground text-xs">
               Amount: {formatCurrency(expense.outstanding, expense.currency)}
             </p>
-            <p className="text-xs text-amber-700 font-mono">{expense.expenseNo}</p>
+            <p className="text-xs text-warning font-mono">{expense.expenseNo}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Payment Date</label>
@@ -549,7 +549,7 @@ function ExpensePaymentModal({
           <div>
             <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
             {matchingAccounts.length === 0 ? (
-              <p className="text-xs font-medium text-red-600 mt-1">
+              <p className="text-xs font-medium text-destructive mt-1">
                 No{' '}
                 {accountTypeForPaymentMode(form.paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
                 account exists for this branch.
@@ -572,7 +572,7 @@ function ExpensePaymentModal({
               </Select>
             )}
             {balanceError && (
-              <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+              <p className="text-xs font-medium text-destructive mt-1">{balanceError}</p>
             )}
           </div>
           <div>
@@ -620,11 +620,11 @@ function ExpensePaymentModal({
 
 function ExpenseDetailModal({ expense, onClose }: { expense: ExpenseEntry; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="font-bold text-slate-800">{expense.description}</h2>
+            <h2 className="font-bold text-foreground">{expense.description}</h2>
             <p className="text-xs text-muted-foreground">
               {expense.expenseNo} · Accrued Expense (not yet paid)
             </p>
@@ -680,10 +680,10 @@ function SelectVendorModal({
 }) {
   const [chosen, setChosen] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Select Vendor</h2>
+          <h2 className="font-bold text-foreground">Select Vendor</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -1221,7 +1221,7 @@ export default function AccountsPayablePage() {
 
   if (isLoading) {
     return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex items-center justify-center">
+      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -1229,12 +1229,12 @@ export default function AccountsPayablePage() {
 
   if (isError) {
     return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex items-center justify-center">
-        <div className="rounded-xl bg-red-50 border border-red-200 p-8 text-center space-y-3 max-w-sm w-full">
-          <p className="text-red-700 font-medium">Failed to load payables. Please retry.</p>
+      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-8 text-center space-y-3 max-w-sm w-full">
+          <p className="text-destructive font-medium">Failed to load payables. Please retry.</p>
           <button
             onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
           >
             Retry
           </button>
@@ -1244,25 +1244,27 @@ export default function AccountsPayablePage() {
   }
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Accounts Payable</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Accounts Payable
+          </h3>
           <p className="text-muted-foreground">
             Vendor obligations, aging analysis, and payment management
           </p>
         </div>
         {/* Tab pills */}
-        <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="flex items-center gap-1 p-1 bg-card border border-border rounded-xl shadow-sm">
           {(['payable', 'payments', 'expenses', 'credit-notes'] as const).map((t) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
               className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${
                 activeTab === t
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {t === 'payable'
@@ -1350,62 +1352,62 @@ export default function AccountsPayablePage() {
             </div>
 
             {/* Charts section */}
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+            <div className="rounded-2xl bg-card shadow-sm border border-border">
               <button
                 onClick={() => setChartsOpen((o) => !o)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+                className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-2xl"
               >
-                <span className="flex items-center gap-2 font-semibold text-gray-800">
-                  <BarChart2 className="h-4 w-4 text-amber-500" />
+                <span className="flex items-center gap-2 font-semibold text-foreground">
+                  <BarChart2 className="h-4 w-4 text-warning" />
                   AP Analytics
                 </span>
                 {chartsOpen ? (
-                  <ChevronUp className="h-4 w-4 text-gray-400" />
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
               {chartsOpen && (
                 <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                       AP Aging Analysis (Outstanding)
                     </h4>
                     <SimpleBarChart
                       data={agingTotals}
                       xKey="bucket"
-                      bars={[{ key: 'total', color: '#f59e0b', label: 'Payable' }]}
+                      bars={[{ key: 'total', color: 'var(--chart-expense)', label: 'Payable' }]}
                       height={200}
                       currency={currency}
                     />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                       Payable by Type (Total)
                     </h4>
                     <DonutChart data={payCharts?.byType ?? []} height={200} currency={currency} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                       Top 5 Vendors (Total)
                     </h4>
                     <HorizontalBarChart
                       data={payCharts?.topVendors ?? []}
                       height={200}
-                      color="#f59e0b"
+                      color="var(--chart-expense)"
                       currency={currency}
                     />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                       Monthly Payments
                     </h4>
                     <SimpleBarChart
                       data={payCharts?.monthly ?? []}
                       xKey="month"
                       bars={[
-                        { key: 'payable', color: '#f59e0b', label: 'Payable' },
-                        { key: 'paid', color: '#10b981', label: 'Paid' },
+                        { key: 'payable', color: 'var(--chart-expense)', label: 'Payable' },
+                        { key: 'paid', color: 'var(--chart-profit)', label: 'Paid' },
                       ]}
                       height={200}
                       currency={currency}
@@ -1416,7 +1418,7 @@ export default function AccountsPayablePage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-4">
+            <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1585,7 +1587,7 @@ export default function AccountsPayablePage() {
             </div>
 
             {/* Table */}
-            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-1">
               <Table>
                 <TableHeader className="bg-muted/40">
                   <TableRow>
@@ -1630,11 +1632,11 @@ export default function AccountsPayablePage() {
                     </TableRow>
                   ) : (
                     payablePaging.pageRows.map((p) => (
-                      <TableRow key={p.id} className="hover:bg-blue-50/50 transition-colors">
+                      <TableRow key={p.id} className="hover:bg-primary/10 transition-colors">
                         {/* Capped and truncated so one unusually long payee name can
                             never set the width of the whole table again. `title` keeps
                             the full value reachable on hover. */}
-                        <TableCell className="pl-4 font-medium text-slate-800">
+                        <TableCell className="pl-4 font-medium text-foreground">
                           <span
                             className="block max-w-56 truncate"
                             title={p.payableTo || undefined}
@@ -1642,28 +1644,28 @@ export default function AccountsPayablePage() {
                             {p.payableTo}
                           </span>
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-amber-600 font-bold">
+                        <TableCell className="font-mono text-xs text-warning font-bold">
                           {p.referenceNo}
                         </TableCell>
                         <TableCell>
                           <span
                             className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
                               p.source === 'Purchase Order'
-                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                ? 'bg-primary/10 text-primary border-primary/30'
                                 : p.source === 'Manual Entry'
-                                  ? 'bg-slate-100 text-slate-700 border-slate-200'
+                                  ? 'bg-muted text-foreground border-border'
                                   : p.source === 'Input VAT'
-                                    ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                    ? 'bg-info/10 text-info border-info/30'
                                     : p.source === 'Purchase Cost'
-                                      ? 'bg-orange-50 text-orange-700 border-orange-200'
-                                      : 'bg-purple-50 text-purple-700 border-purple-200'
+                                      ? 'bg-warning/10 text-warning border-warning/30'
+                                      : 'bg-lease/10 text-lease border-lease/30'
                             }`}
                           >
                             {p.source}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-warning/10 text-warning border border-warning/30">
                             {p.type.replace(/_/g, ' ')}
                           </span>
                         </TableCell>
@@ -1673,7 +1675,7 @@ export default function AccountsPayablePage() {
                           <span
                             className={
                               p.aging !== 'Current' && Number(p.outstanding ?? 0) > 0.001
-                                ? 'text-red-600 font-medium'
+                                ? 'text-destructive font-medium'
                                 : 'text-muted-foreground'
                             }
                           >
@@ -1683,10 +1685,10 @@ export default function AccountsPayablePage() {
                         <TableCell className="text-right text-muted-foreground text-sm">
                           {formatCurrency(p.amount, p.currency)}
                         </TableCell>
-                        <TableCell className="text-right text-emerald-600 font-medium text-sm">
+                        <TableCell className="text-right text-success font-medium text-sm">
                           {formatCurrency(p.amountPaid, p.currency)}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-slate-800">
+                        <TableCell className="text-right font-bold text-foreground">
                           {formatCurrency(p.outstanding ?? 0, p.currency)}
                         </TableCell>
                         <TableCell>
@@ -1694,7 +1696,7 @@ export default function AccountsPayablePage() {
                               Showing its original bucket read as though the money were
                               still owed and the vendor overdue. */}
                           {Number(p.outstanding ?? 0) <= 0.001 ? (
-                            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            <span className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
                               Paid
                             </span>
                           ) : (
@@ -1716,7 +1718,7 @@ export default function AccountsPayablePage() {
                                  lot, vendor, account and proof are shown. */
                               <button
                                 onClick={() => switchTab('payments')}
-                                className="text-[10px] font-semibold text-blue-600 hover:underline pl-1.5"
+                                className="text-[10px] font-semibold text-primary hover:underline pl-1.5"
                               >
                                 {p.isPendingApproval ? 'Review in Payments' : 'View in Payments'}
                               </button>
@@ -1739,7 +1741,7 @@ export default function AccountsPayablePage() {
                                     });
                                   }
                                 }}
-                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                 title="View full details"
                               >
                                 <Eye className="h-3.5 w-3.5" />
@@ -1762,7 +1764,7 @@ export default function AccountsPayablePage() {
                                       setPayingFor(p as unknown as ManualPayable);
                                     }
                                   }}
-                                  className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600"
+                                  className="p-1.5 rounded-md hover:bg-warning/10 text-warning"
                                   title="Record Payment"
                                 >
                                   <CreditCard className="h-3.5 w-3.5" />

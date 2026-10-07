@@ -145,28 +145,28 @@ interface SaleItem {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    DRAFT: 'bg-slate-100 text-slate-600',
-    SENT: 'bg-blue-100 text-blue-600',
-    SENT_TO_CUSTOMER: 'bg-blue-100 text-blue-600',
-    ACCEPTED: 'bg-green-100 text-green-700',
-    CUSTOMER_ACCEPTED: 'bg-green-100 text-green-700',
-    APPROVED: 'bg-green-100 text-green-700',
-    FINANCE_APPROVED: 'bg-green-100 text-green-700',
-    EMPLOYEE_APPROVED: 'bg-yellow-100 text-yellow-700',
-    REJECTED: 'bg-red-100 text-red-700',
-    FINANCE_REJECTED: 'bg-red-100 text-red-700',
-    CUSTOMER_REJECTED: 'bg-red-100 text-red-700',
-    EXPIRED: 'bg-orange-100 text-orange-700',
-    PENDING: 'bg-yellow-100 text-yellow-700',
-    PAID: 'bg-green-100 text-green-700',
-    ACTIVE_LEASE: 'bg-green-100 text-green-700',
-    ACTIVE_CONTRACT: 'bg-green-100 text-green-700',
-    INVOICED: 'bg-blue-100 text-blue-600',
-    CANCELLED: 'bg-slate-100 text-slate-600',
-    WAITING_FINANCE_APPROVAL: 'bg-amber-100 text-amber-700',
-    TRANSACTION_COMPLETED: 'bg-green-100 text-green-700 font-bold border-green-200',
-    ASSIGNED: 'bg-indigo-100 text-indigo-700',
-    RETAKEN: 'bg-red-100 text-red-700',
+    DRAFT: 'bg-muted text-foreground',
+    SENT: 'bg-primary/10 text-primary',
+    SENT_TO_CUSTOMER: 'bg-primary/10 text-primary',
+    ACCEPTED: 'bg-success/10 text-success',
+    CUSTOMER_ACCEPTED: 'bg-success/10 text-success',
+    APPROVED: 'bg-success/10 text-success',
+    FINANCE_APPROVED: 'bg-success/10 text-success',
+    EMPLOYEE_APPROVED: 'bg-warning/10 text-warning',
+    REJECTED: 'bg-destructive/10 text-destructive',
+    FINANCE_REJECTED: 'bg-destructive/10 text-destructive',
+    CUSTOMER_REJECTED: 'bg-destructive/10 text-destructive',
+    EXPIRED: 'bg-warning/10 text-warning',
+    PENDING: 'bg-warning/10 text-warning',
+    PAID: 'bg-success/10 text-success',
+    ACTIVE_LEASE: 'bg-success/10 text-success',
+    ACTIVE_CONTRACT: 'bg-success/10 text-success',
+    INVOICED: 'bg-primary/10 text-primary',
+    CANCELLED: 'bg-muted text-foreground',
+    WAITING_FINANCE_APPROVAL: 'bg-warning/10 text-warning',
+    TRANSACTION_COMPLETED: 'bg-success/10 text-success font-bold border-success/30',
+    ASSIGNED: 'bg-primary/10 text-primary',
+    RETAKEN: 'bg-destructive/10 text-destructive',
   };
 
   const label: Record<string, string> = {
@@ -196,7 +196,7 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <Badge
-      className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none ${map[status] ?? 'bg-slate-100 text-slate-600'}`}
+      className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none ${map[status] ?? 'bg-muted text-foreground'}`}
     >
       {label[status] ?? status}
     </Badge>
@@ -205,10 +205,10 @@ function StatusBadge({ status }: { status: string }) {
 
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, string> = {
-    PRODUCT_SALE: 'bg-blue-50 text-blue-600 border-blue-200',
-    SPAREPART_SALE: 'bg-teal-50 text-teal-600 border-teal-200 whitespace-nowrap',
-    RENT: 'bg-green-50 text-green-600 border-green-200',
-    LEASE: 'bg-purple-50 text-purple-600 border-purple-200',
+    PRODUCT_SALE: 'bg-primary/10 text-primary border-primary/30',
+    SPAREPART_SALE: 'bg-info/10 text-info border-info/30 whitespace-nowrap',
+    RENT: 'bg-success/10 text-success border-success/30',
+    LEASE: 'bg-lease/10 text-lease border-lease/30',
   };
   const labels: Record<string, string> = {
     PRODUCT_SALE: 'PRODUCT SALE',
@@ -229,7 +229,7 @@ function TypeBadge({ type }: { type: string }) {
 function ConvertedBadge({ q }: { q: Invoice }) {
   if (q.isConverted) {
     return (
-      <Badge className="bg-green-100 text-green-700 rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-green-200">
+      <Badge className="bg-success/10 text-success rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-success/30">
         Converted
       </Badge>
     );
@@ -242,13 +242,13 @@ function ConvertedBadge({ q }: { q: Invoice }) {
     isExpired
   ) {
     return (
-      <Badge className="bg-red-100 text-red-700 rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-red-200">
+      <Badge className="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-destructive/30">
         Not Converted
       </Badge>
     );
   }
   return (
-    <Badge className="bg-yellow-100 text-yellow-700 rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-yellow-200">
+    <Badge className="bg-warning/10 text-warning rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-warning/30">
       Pending
     </Badge>
   );
@@ -914,12 +914,12 @@ export default function EmployeeQuotationTable() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-primary">Quotations</h2>
+          <h2 className="text-xl font-medium text-primary">Quotations</h2>
           <p className="text-sm text-muted-foreground">Create and manage customer quotations</p>
         </div>
         <div className="flex gap-2 self-start sm:self-auto">
           <Button
-            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-primary-foreground gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={() => setFormOpen(true)}
           >
             <Plus size={16} /> Add Quotation
@@ -928,10 +928,10 @@ export default function EmployeeQuotationTable() {
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by number, customer, product..."
               value={search}
@@ -981,7 +981,9 @@ export default function EmployeeQuotationTable() {
           </div>
 
           <div className="flex gap-2 items-center">
-            <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">FROM:</span>
+            <span className="text-[10px] text-muted-foreground font-bold whitespace-nowrap">
+              FROM:
+            </span>
             <Input
               type="date"
               value={startDate}
@@ -991,7 +993,9 @@ export default function EmployeeQuotationTable() {
           </div>
 
           <div className="flex gap-2 items-center">
-            <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">TO:</span>
+            <span className="text-[10px] text-muted-foreground font-bold whitespace-nowrap">
+              TO:
+            </span>
             <Input
               type="date"
               value={endDate}
@@ -1010,7 +1014,7 @@ export default function EmployeeQuotationTable() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs h-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+              className="text-xs h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={() => {
                 setSearch('');
                 setConversionFilter('ALL');
@@ -1026,7 +1030,7 @@ export default function EmployeeQuotationTable() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border p-4">
         <div className="overflow-x-auto mb-4">
           <Table className="min-w-[750px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
@@ -1057,18 +1061,18 @@ export default function EmployeeQuotationTable() {
                 paginated.map((q, index) => (
                   <TableRow
                     key={q.id}
-                    className={`${index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
+                    className={`${index % 2 ? 'bg-primary/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                   >
-                    <TableCell className="text-blue-500 font-bold tracking-tight">
+                    <TableCell className="text-primary font-bold tracking-tight">
                       {q.invoiceNumber?.replace('INV-', 'QTY-')}
                     </TableCell>
                     <TableCell
-                      className="font-semibold text-slate-700 max-w-[200px] truncate"
+                      className="font-semibold text-foreground max-w-[200px] truncate"
                       title={getProductNames(q)}
                     >
                       {getProductNames(q)}
                     </TableCell>
-                    <TableCell className="font-bold text-slate-700">
+                    <TableCell className="font-bold text-foreground">
                       {q.customerName || 'Walk-in'}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
@@ -1077,7 +1081,7 @@ export default function EmployeeQuotationTable() {
                     <TableCell>
                       <TypeBadge type={q.saleType} />
                     </TableCell>
-                    <TableCell className="font-bold text-red-600">
+                    <TableCell className="font-bold text-destructive">
                       {balances[q.id] !== undefined ? (
                         formatCurrency(balances[q.id], currency)
                       ) : (
@@ -1098,8 +1102,8 @@ export default function EmployeeQuotationTable() {
                       <span
                         className={
                           q.expiryDate && new Date(q.expiryDate) < new Date()
-                            ? 'text-red-600 font-bold'
-                            : 'text-slate-700'
+                            ? 'text-destructive font-bold'
+                            : 'text-foreground'
                         }
                       >
                         {safeFormatDate(q.expiryDate, {
@@ -1113,8 +1117,8 @@ export default function EmployeeQuotationTable() {
                       <span
                         className={
                           getRemainingDays(q.expiryDate) === 'Expired'
-                            ? 'text-red-500 font-bold'
-                            : 'text-slate-600'
+                            ? 'text-destructive font-bold'
+                            : 'text-foreground'
                         }
                       >
                         {getRemainingDays(q.expiryDate)}
@@ -1125,7 +1129,7 @@ export default function EmployeeQuotationTable() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
                           onClick={() => handleView(q.id)}
                           title="View Quotation"
                         >
@@ -1134,7 +1138,7 @@ export default function EmployeeQuotationTable() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          className="h-8 w-8 p-0 text-warning hover:text-warning hover:bg-warning/10"
                           onClick={() => handleCreateNewFromExisting(q.id)}
                           title="Create New from this"
                         >
@@ -1144,7 +1148,7 @@ export default function EmployeeQuotationTable() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-70"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-70"
                             onClick={() => handleSendToFinance(q.id)}
                             disabled={sendingQuotationIds.has(q.id)}
                             title={
@@ -1169,7 +1173,7 @@ export default function EmployeeQuotationTable() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                            className="h-8 w-8 p-0 text-success hover:text-success hover:bg-success/10"
                             onClick={() => {
                               setAssignCustomerQId(q.id);
                               setAssignCustomerId('');
@@ -1182,7 +1186,7 @@ export default function EmployeeQuotationTable() {
                           </Button>
                         )}
                         {q.status === 'RETAKEN' && (
-                          <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase select-none">
+                          <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded border border-destructive/30 uppercase select-none">
                             Locked
                           </span>
                         )}
@@ -1191,7 +1195,7 @@ export default function EmployeeQuotationTable() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              className="h-8 w-8 p-0 text-success hover:text-success hover:bg-success/10"
                               onClick={() => {
                                 setSelectedQ(q);
                                 setAccountViewOpen(true);
@@ -1272,12 +1276,12 @@ export default function EmployeeQuotationTable() {
       )}
       {assignCustomerOpen && assignCustomerQId && (
         <Dialog open={assignCustomerOpen} onOpenChange={setAssignCustomerOpen}>
-          <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6">
+          <DialogContent className="sm:max-w-md bg-card border border-border rounded-xl shadow-lg p-6">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold text-slate-800">
+              <DialogTitle className="text-lg font-bold text-foreground">
                 Assign Customer
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500">
+              <DialogDescription className="text-xs text-muted-foreground">
                 To activate this assigned quotation template, select the customer and provide
                 optional notes.
               </DialogDescription>
@@ -1285,7 +1289,7 @@ export default function EmployeeQuotationTable() {
 
             <div className="space-y-4 my-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider">
                   Select Customer
                 </label>
                 <CustomerSelect
@@ -1296,7 +1300,7 @@ export default function EmployeeQuotationTable() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider">
                   Internal Notes / Remarks
                 </label>
                 <Textarea
@@ -1312,14 +1316,14 @@ export default function EmployeeQuotationTable() {
               <Button
                 variant="ghost"
                 onClick={() => setAssignCustomerOpen(false)}
-                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+                className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleAssignCustomerSubmit}
                 disabled={submittingAssignCustomer}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5"
+                className="bg-success hover:bg-success/90 text-success-foreground font-bold text-xs uppercase tracking-wider px-5"
               >
                 {submittingAssignCustomer ? 'Assigning...' : 'Confirm Assignment'}
               </Button>
@@ -1330,12 +1334,12 @@ export default function EmployeeQuotationTable() {
 
       {newFromExistingOpen && sourceQuotationData && (
         <Dialog open={newFromExistingOpen} onOpenChange={setNewFromExistingOpen}>
-          <DialogContent className="sm:max-w-md bg-white border border-slate-100 rounded-xl shadow-lg p-6">
+          <DialogContent className="sm:max-w-md bg-card border border-border rounded-xl shadow-lg p-6">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold text-slate-800">
+              <DialogTitle className="text-lg font-bold text-foreground">
                 Assign Customer
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500">
+              <DialogDescription className="text-xs text-muted-foreground">
                 To activate this assigned quotation template, select the customer and provide
                 optional notes.
               </DialogDescription>
@@ -1343,7 +1347,7 @@ export default function EmployeeQuotationTable() {
 
             <div className="space-y-4 my-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider">
                   Select Customer
                 </label>
                 <CustomerSelect
@@ -1354,7 +1358,7 @@ export default function EmployeeQuotationTable() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider">
                   Internal Notes / Remarks
                 </label>
                 <Textarea
@@ -1370,14 +1374,14 @@ export default function EmployeeQuotationTable() {
               <Button
                 variant="ghost"
                 onClick={() => setNewFromExistingOpen(false)}
-                className="text-xs font-bold uppercase tracking-wider text-slate-500"
+                className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleNewFromExistingSubmit}
                 disabled={submittingNewFromExisting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5"
+                className="bg-success hover:bg-success/90 text-success-foreground font-bold text-xs uppercase tracking-wider px-5"
               >
                 {submittingNewFromExisting ? 'Creating...' : 'Confirm Assignment'}
               </Button>
@@ -1406,12 +1410,12 @@ function CategoryCard({ icon: Icon, label, desc, color, onClick }: CategoryCardP
       onClick={onClick}
       className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 bg-card flex flex-col gap-3 ${color}`}
     >
-      <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-50 flex items-center justify-center text-slate-700">
+      <div className="h-10 w-10 shrink-0 rounded-lg bg-muted flex items-center justify-center text-foreground">
         <Icon size={20} strokeWidth={2.5} />
       </div>
       <div>
-        <h4 className="font-bold text-sm text-slate-800">{label}</h4>
-        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-1">
+        <h4 className="font-bold text-sm text-foreground">{label}</h4>
+        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-1">
           {desc}
         </p>
       </div>
@@ -2125,17 +2129,17 @@ function QuotationFormModal({
     rateValue: string,
   ) => (
     <div className="space-y-3">
-      <div className="flex items-center justify-between bg-gray-100/50 px-3 py-2 rounded-lg border border-slate-200/50">
+      <div className="flex items-center justify-between bg-muted/50 px-3 py-2 rounded-lg border border-border/50">
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+          <span className="text-[10px] font-black text-foreground uppercase tracking-widest">
             {title}
           </span>
           <button
             onClick={() => updateItem(itemIndex, toggleField, !isToggleOn)}
             className={`text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tight transition-all shadow-sm ${
               isToggleOn
-                ? 'bg-blue-600 text-white border border-blue-500 hover:bg-blue-700'
-                : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                ? 'bg-primary text-primary-foreground border border-primary hover:bg-primary/90'
+                : 'bg-card text-muted-foreground border border-border hover:border-primary/30 hover:text-primary'
             }`}
           >
             {isToggleOn ? '✓ Fixed Rate (0-100K) ON' : '+ Enable Fixed Rate (0-100K)'}
@@ -2144,7 +2148,7 @@ function QuotationFormModal({
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-[10px] font-black text-blue-600 px-3 bg-white border-blue-100 hover:bg-blue-50 hover:border-blue-200 shadow-sm gap-2"
+          className="h-7 text-[10px] font-black text-primary px-3 bg-card border-primary/30 hover:bg-primary/10 hover:border-primary/30 shadow-sm gap-2"
           onClick={() => addSlab(itemIndex, type)}
         >
           <Plus size={12} className="stroke-[3]" /> Add Slab
@@ -2152,17 +2156,17 @@ function QuotationFormModal({
       </div>
 
       {isToggleOn && (
-        <div className="flex gap-4 items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-left-2 duration-300">
+        <div className="flex gap-4 items-center bg-primary/10 p-3 rounded-xl border border-primary/30 animate-in fade-in slide-in-from-left-2 duration-300">
           <div className="flex-1">
-            <p className="text-[10px] font-black text-blue-800 uppercase tracking-wider">
+            <p className="text-[10px] font-black text-primary uppercase tracking-wider">
               Fixed Rate Up To 100K
             </p>
-            <p className="text-[9px] text-blue-400 font-bold italic mt-0.5">
+            <p className="text-[9px] text-primary font-bold italic mt-0.5">
               (Applies to usage from 0 to 100,000 units)
             </p>
           </div>
           <div className="relative w-32">
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-300 pointer-events-none">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary pointer-events-none">
               {currency}
             </span>
             <Input
@@ -2174,7 +2178,7 @@ function QuotationFormModal({
                 const v = handleDecimalInput(e.target.value);
                 if (v !== undefined) updateItem(itemIndex, rateField, v);
               }}
-              className="h-9 text-xs font-black text-blue-700 bg-white border-blue-200 focus:ring-2 focus:ring-blue-500/20 pr-10 text-right"
+              className="h-9 text-xs font-black text-primary bg-card border-primary/30 focus:ring-2 focus:ring-primary/20 pr-10 text-right"
             />
           </div>
           <div className="w-8 shrink-0" /> {/* Spacer for alignment */}
@@ -2185,13 +2189,13 @@ function QuotationFormModal({
         <div className="space-y-2 mt-2">
           {/* Table Header */}
           <div className="grid grid-cols-12 gap-3 px-3 mb-1">
-            <div className="col-span-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="col-span-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
               From
             </div>
-            <div className="col-span-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="col-span-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
               To
             </div>
-            <div className="col-span-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">
+            <div className="col-span-5 text-[9px] font-black text-muted-foreground uppercase tracking-widest text-right pr-2">
               Rate per Page ({currency})
             </div>
             <div className="col-span-1" />
@@ -2200,7 +2204,7 @@ function QuotationFormModal({
           {slabs.map((slab, sIdx) => (
             <div
               key={`${type}-${sIdx}`}
-              className="group flex gap-2 items-center bg-white p-1 rounded-xl border border-transparent hover:border-slate-200 hover:shadow-sm transition-all animate-in fade-in slide-in-from-top-1 duration-200"
+              className="group flex gap-2 items-center bg-card p-1 rounded-xl border border-transparent hover:border-border hover:shadow-sm transition-all animate-in fade-in slide-in-from-top-1 duration-200"
             >
               <div className="grid grid-cols-12 gap-3 flex-1 items-center">
                 <div className="col-span-3">
@@ -2209,7 +2213,7 @@ function QuotationFormModal({
                     type="number"
                     value={slab.from}
                     onChange={(e) => updateSlab(itemIndex, type, sIdx, 'from', e.target.value)}
-                    className="h-9 text-xs font-bold bg-slate-50/50 border-slate-100 focus:bg-white text-center"
+                    className="h-9 text-xs font-bold bg-muted/50 border-border focus:bg-card text-center"
                   />
                 </div>
                 <div className="col-span-3">
@@ -2218,15 +2222,15 @@ function QuotationFormModal({
                     type={slab.to === '1000000' ? 'text' : 'number'}
                     value={slab.to === '1000000' ? 'UNLIMITED' : slab.to}
                     onChange={(e) => updateSlab(itemIndex, type, sIdx, 'to', e.target.value)}
-                    className={`h-9 text-xs font-bold text-center border-slate-100 ${
+                    className={`h-9 text-xs font-bold text-center border-border ${
                       slab.to === '1000000'
-                        ? 'text-blue-600 bg-blue-50 border-blue-100'
-                        : 'bg-slate-50/50 focus:bg-white'
+                        ? 'text-primary bg-primary/10 border-primary/30'
+                        : 'bg-muted/50 focus:bg-card'
                     }`}
                   />
                 </div>
                 <div className="col-span-5 relative">
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 pointer-events-none group-hover:text-blue-300">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground pointer-events-none group-hover:text-primary">
                     {currency}
                   </span>
                   <Input
@@ -2238,13 +2242,13 @@ function QuotationFormModal({
                       const v = handleDecimalInput(e.target.value);
                       if (v !== undefined) updateSlab(itemIndex, type, sIdx, 'rate', v);
                     }}
-                    className="h-9 text-xs font-black text-blue-600 bg-blue-50/30 border-blue-50 focus:bg-white text-right pr-10"
+                    className="h-9 text-xs font-black text-primary bg-primary/10 border-primary/30 focus:bg-card text-right pr-10"
                   />
                 </div>
                 <div className="col-span-1 flex justify-center">
                   <button
                     onClick={() => removeSlab(itemIndex, type, sIdx)}
-                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -2891,25 +2895,25 @@ function QuotationFormModal({
     PRODUCT_SALE: {
       icon: ShoppingCart,
       label: 'Product Sale',
-      color: 'bg-blue-600',
+      color: 'bg-primary',
       desc: 'Direct sale of full machines & products',
     },
     SPAREPART_SALE: {
       icon: Wrench,
       label: 'Spare Parts Sale',
-      color: 'bg-teal-600',
+      color: 'bg-info',
       desc: 'Quotation for spare parts and accessories',
     },
     RENT: {
       icon: Key,
       label: 'Rent Quotation',
-      color: 'bg-orange-500',
+      color: 'bg-warning',
       desc: 'Machine rental with pricing & billing cycle',
     },
     LEASE: {
       icon: FileSignature,
       label: 'Lease Quotation',
-      color: 'bg-purple-600',
+      color: 'bg-lease',
       desc: 'Long-term lease with EMI or FSM plan',
     },
   };
@@ -2919,18 +2923,18 @@ function QuotationFormModal({
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-background h-[90vh] flex flex-col">
         {/* Header */}
-        <DialogHeader className="p-6 pb-4 bg-card border-b border-slate-100 shrink-0">
+        <DialogHeader className="p-6 pb-4 bg-card border-b border-border shrink-0">
           <div className="flex items-center gap-4">
             <div
-              className={`h-12 w-12 rounded-xl ${tc.color} text-white flex items-center justify-center shadow-lg`}
+              className={`h-12 w-12 rounded-xl ${tc.color} text-primary-foreground flex items-center justify-center shadow-lg`}
             >
               <tc.icon size={22} />
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
+              <DialogTitle className="text-xl font-bold text-foreground tracking-tight">
                 New Quotation
               </DialogTitle>
-              <DialogDescription className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+              <DialogDescription className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                 {tc.desc}
               </DialogDescription>
             </div>
@@ -2940,18 +2944,16 @@ function QuotationFormModal({
             {[1, 2].map((s) => (
               <div key={s} className="flex items-center gap-2">
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step >= s ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400'}`}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
                 >
                   {s}
                 </div>
                 <span
-                  className={`text-xs font-semibold hidden sm:block ${step >= s ? 'text-primary' : 'text-slate-400'}`}
+                  className={`text-xs font-semibold hidden sm:block ${step >= s ? 'text-primary' : 'text-muted-foreground'}`}
                 >
                   {s === 1 ? 'Type & Customer' : 'Quotation Details'}
                 </span>
-                {s < 2 && (
-                  <div className={`h-px w-8 ${step > s ? 'bg-primary' : 'bg-slate-200'}`} />
-                )}
+                {s < 2 && <div className={`h-px w-8 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
               </div>
             ))}
           </div>
@@ -2971,7 +2973,7 @@ function QuotationFormModal({
                         icon={ShoppingCart}
                         label="Sales Quotation"
                         desc="Full Machines"
-                        color="border-blue-200 hover:border-blue-400"
+                        color="border-primary/30 hover:border-primary/30"
                         onClick={() => {
                           setActiveCategory('SALE');
                           if (allowedTypes.includes('PRODUCT_SALE')) {
@@ -2985,7 +2987,7 @@ function QuotationFormModal({
                         icon={Key}
                         label="Rent Quotation"
                         desc="Machine Rental Plans"
-                        color="border-orange-200 hover:border-orange-400"
+                        color="border-warning/30 hover:border-warning/30"
                         onClick={() => {
                           setActiveCategory('RENT');
                           setQuotationType('RENT');
@@ -2996,7 +2998,7 @@ function QuotationFormModal({
                         icon={FileSignature}
                         label="Lease Quotation"
                         desc="EMI and FSM Options"
-                        color="border-purple-200 hover:border-purple-400"
+                        color="border-lease/30 hover:border-lease/30"
                         onClick={() => {
                           setActiveCategory('LEASE');
                           setQuotationType('LEASE');
@@ -3011,7 +3013,7 @@ function QuotationFormModal({
                           variant="ghost"
                           size="sm"
                           onClick={() => setActiveCategory(null)}
-                          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-primary h-7"
+                          className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary h-7"
                         >
                           ← Back to Categories
                         </Button>
@@ -3025,12 +3027,12 @@ function QuotationFormModal({
                             }}
                             className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
                               quotationType === 'PRODUCT_SALE'
-                                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                : 'border-slate-200 hover:border-blue-300'
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border hover:border-primary/30'
                             }`}
                           >
                             <div
-                              className={`p-2 rounded-lg ${quotationType === 'PRODUCT_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
+                              className={`p-2 rounded-lg ${quotationType === 'PRODUCT_SALE' ? 'bg-card' : 'bg-muted'}`}
                             >
                               <ShoppingCart size={18} />
                             </div>
@@ -3051,12 +3053,12 @@ function QuotationFormModal({
                             }}
                             className={`border-2 rounded-xl p-4 flex flex-col items-start gap-2 transition-all ${
                               quotationType === 'SPAREPART_SALE'
-                                ? 'border-teal-500 bg-teal-50 text-teal-700'
-                                : 'border-slate-200 hover:border-teal-300'
+                                ? 'border-info bg-info/10 text-info'
+                                : 'border-border hover:border-info/30'
                             }`}
                           >
                             <div
-                              className={`p-2 rounded-lg ${quotationType === 'SPAREPART_SALE' ? 'bg-white/60' : 'bg-slate-50'}`}
+                              className={`p-2 rounded-lg ${quotationType === 'SPAREPART_SALE' ? 'bg-card' : 'bg-muted'}`}
                             >
                               <Wrench size={18} />
                             </div>
@@ -3092,7 +3094,7 @@ function QuotationFormModal({
                         variant="ghost"
                         size="sm"
                         onClick={() => setActiveCategory(null)}
-                        className="text-[10px] font-bold uppercase text-slate-400"
+                        className="text-[10px] font-bold uppercase text-muted-foreground"
                       >
                         Change
                       </Button>
@@ -3102,9 +3104,9 @@ function QuotationFormModal({
               </div>
 
               {/* Customer */}
-              <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+              <div className="bg-card p-5 rounded-xl border border-border shadow-sm space-y-2">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-400" /> Customer
+                  <span className="w-2 h-2 rounded-full bg-primary/20" /> Customer
                 </label>
                 <CustomerSelect
                   value={customerId}
@@ -3125,11 +3127,11 @@ function QuotationFormModal({
                   (set on CustomerSelect above), so it's derived automatically and just shown
                   here read-only for transparency rather than asked for again. */}
               {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
-                <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                <div className="bg-card p-5 rounded-xl border border-border shadow-sm space-y-2">
                   <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-400" /> Transaction Type
+                    <span className="w-2 h-2 rounded-full bg-lease/20" /> Transaction Type
                   </label>
-                  <div className="h-9 flex items-center px-3 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+                  <div className="h-9 flex items-center px-3 rounded-md border border-border bg-muted text-sm font-semibold text-foreground">
                     {transactionType === 'B2B'
                       ? 'B2B — Business to Business (Wholesale Price)'
                       : 'B2C — Business to Customer (Retail Price)'}
@@ -3143,7 +3145,7 @@ function QuotationFormModal({
               {/* Validity & Notes (all quotation types) */}
               {['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE'].includes(quotationType) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                  <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
                       Valid For (days)
                     </label>
@@ -3155,7 +3157,7 @@ function QuotationFormModal({
                       className="h-9 text-sm"
                     />
                   </div>
-                  <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                  <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
                       Notes (optional)
                     </label>
@@ -3179,8 +3181,8 @@ function QuotationFormModal({
               {['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-400" />{' '}
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary/20" />{' '}
                       {quotationType === 'PRODUCT_SALE'
                         ? 'Products'
                         : quotationType === 'SPAREPART_SALE'
@@ -3189,8 +3191,8 @@ function QuotationFormModal({
                     </h4>
                   </div>
                   {/* Barcode Scanner Input */}
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 pl-0.5">
+                  <div className="bg-muted p-4 rounded-xl border border-border shadow-inner space-y-2">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 pl-0.5">
                       <Scan size={12} className="text-primary animate-pulse" /> Scan Product or
                       Spare Part Barcode
                     </label>
@@ -3209,7 +3211,7 @@ function QuotationFormModal({
                             }
                           }
                         }}
-                        className="bg-white rounded-lg border-slate-200"
+                        className="bg-card rounded-lg border-border"
                       />
                       <Button
                         type="button"
@@ -3241,7 +3243,7 @@ function QuotationFormModal({
                       type="button"
                       variant="outline"
                       onClick={addManualItem}
-                      className="h-[52px] px-4 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-2 shrink-0"
+                      className="h-[52px] px-4 rounded-xl border-dashed border-2 border-border text-muted-foreground hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-2 shrink-0"
                     >
                       <Plus size={16} /> Custom Item
                     </Button>
@@ -3250,18 +3252,22 @@ function QuotationFormModal({
                   <div className="space-y-3">
                     {saleItems.length === 0 ? (
                       <div className="text-center py-10 border-2 border-dashed border-border rounded-xl">
-                        <p className="text-sm font-bold text-slate-400">No items added yet.</p>
-                        <p className="text-xs text-slate-300 mt-1">Search above to add products.</p>
+                        <p className="text-sm font-bold text-muted-foreground">
+                          No items added yet.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Search above to add products.
+                        </p>
                       </div>
                     ) : (
                       saleItems.map((item, index) => (
                         <div
                           key={index}
-                          className="relative bg-card border border-border rounded-xl p-4 shadow-sm hover:border-blue-300 transition-all"
+                          className="relative bg-card border border-border rounded-xl p-4 shadow-sm hover:border-primary/30 transition-all"
                         >
                           <button
                             onClick={() => removeItem(index)}
-                            className="absolute top-2 right-2 p-2 text-slate-300 hover:text-red-500 transition-colors"
+                            className="absolute top-2 right-2 p-2 text-muted-foreground hover:text-destructive transition-colors"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -3269,7 +3275,7 @@ function QuotationFormModal({
                             {item.isManual ? (
                               <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                                 <div className="md:col-span-3 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Brand
                                   </label>
                                   <Input
@@ -3286,7 +3292,7 @@ function QuotationFormModal({
                                   </datalist>
                                 </div>
                                 <div className="md:col-span-3 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Model
                                   </label>
                                   <Input
@@ -3307,7 +3313,7 @@ function QuotationFormModal({
                                   </datalist>
                                 </div>
                                 <div className="md:col-span-4 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Product Name
                                   </label>
                                   <Input
@@ -3320,7 +3326,7 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                     HS Code
                                   </label>
                                   <Input
@@ -3332,7 +3338,7 @@ function QuotationFormModal({
                                 </div>
 
                                 <div className="md:col-span-6 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Specifications / Description
                                   </label>
                                   <Textarea
@@ -3341,12 +3347,12 @@ function QuotationFormModal({
                                     onChange={(e) =>
                                       updateItem(index, 'description', e.target.value)
                                     }
-                                    className="min-h-[60px] text-sm resize-none bg-slate-50/50"
+                                    className="min-h-[60px] text-sm resize-none bg-muted/50"
                                   />
                                 </div>
                                 {quotationType === 'SPAREPART_SALE' && (
                                   <div className="md:col-span-2 space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                       Quantity
                                     </label>
                                     <Input
@@ -3356,12 +3362,12 @@ function QuotationFormModal({
                                       onChange={(e) =>
                                         updateItem(index, 'quantity', Number(e.target.value))
                                       }
-                                      className="h-9 text-sm bg-slate-50/50 text-center font-bold"
+                                      className="h-9 text-sm bg-muted/50 text-center font-bold"
                                     />
                                   </div>
                                 )}
                                 <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase text-right block">
                                     Rate
                                   </label>
                                   <Input
@@ -3372,7 +3378,7 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase text-center block">
                                     Discount
                                   </label>
                                   <Input
@@ -3384,7 +3390,7 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <p className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Net
                                   </p>
                                   <p className="font-extrabold text-foreground">
@@ -3397,7 +3403,7 @@ function QuotationFormModal({
                                 <div
                                   className={`space-y-1 ${item.itemType === 'SPAREPART' ? 'md:col-span-4' : 'md:col-span-6'}`}
                                 >
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Description
                                   </label>
                                   <Input
@@ -3412,7 +3418,7 @@ function QuotationFormModal({
 
                                 {item.itemType === 'SPAREPART' && (
                                   <div className="md:col-span-2 space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase">
                                       Quantity
                                     </label>
                                     <Input
@@ -3422,13 +3428,13 @@ function QuotationFormModal({
                                       onChange={(e) =>
                                         updateItem(index, 'quantity', Number(e.target.value))
                                       }
-                                      className="h-9 text-sm bg-slate-50/50 text-center font-bold"
+                                      className="h-9 text-sm bg-muted/50 text-center font-bold"
                                     />
                                   </div>
                                 )}
 
                                 <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase text-right block">
                                     Rate ({currency})
                                   </label>
                                   <Input
@@ -3440,7 +3446,7 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase text-center block">
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase text-center block">
                                     Discount
                                   </label>
                                   <Input
@@ -3453,7 +3459,7 @@ function QuotationFormModal({
                                   />
                                 </div>
                                 <div className="md:col-span-2 flex flex-col items-end justify-center h-9 mt-auto">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                  <p className="text-[9px] font-bold text-muted-foreground uppercase">
                                     Net
                                   </p>
                                   <p className="font-extrabold text-foreground">
@@ -3464,18 +3470,18 @@ function QuotationFormModal({
                             )}
                             {/* Replacement Consumables Section */}
                             {quotationType === 'PRODUCT_SALE' && (
-                              <div className="md:col-span-12 mt-2 pt-2 border-t border-slate-100">
-                                <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-200/60 transition-all hover:bg-slate-50">
+                              <div className="md:col-span-12 mt-2 pt-2 border-t border-border">
+                                <div className="bg-muted/50 rounded-xl p-5 border border-border/60 transition-all hover:bg-muted">
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="bg-blue-100 p-1.5 rounded-lg">
-                                        <ShoppingCart size={14} className="text-blue-600" />
+                                      <div className="bg-primary/10 p-1.5 rounded-lg">
+                                        <ShoppingCart size={14} className="text-primary" />
                                       </div>
                                       <div>
-                                        <h5 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+                                        <h5 className="text-[11px] font-black text-foreground uppercase tracking-wider">
                                           Replacement Consumables
                                         </h5>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">
+                                        <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">
                                           (Optional add-ons for this product)
                                         </p>
                                       </div>
@@ -3485,7 +3491,7 @@ function QuotationFormModal({
                                       variant="outline"
                                       size="sm"
                                       onClick={() => addConsumable(index)}
-                                      className="h-8 text-[11px] font-black uppercase text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 gap-2 shadow-sm"
+                                      className="h-8 text-[11px] font-black uppercase text-primary border-primary/30 hover:bg-primary/10 hover:border-primary/30 gap-2 shadow-sm"
                                     >
                                       <span className="text-lg">+</span> Add Part
                                     </Button>
@@ -3494,16 +3500,16 @@ function QuotationFormModal({
                                   {item.consumables && item.consumables.length > 0 ? (
                                     <div className="space-y-3">
                                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-3 mb-1">
-                                        <div className="md:col-span-3 text-[9px] font-black text-slate-400 uppercase">
+                                        <div className="md:col-span-3 text-[9px] font-black text-muted-foreground uppercase">
                                           Part Name
                                         </div>
-                                        <div className="md:col-span-4 text-[9px] font-black text-slate-400 uppercase">
+                                        <div className="md:col-span-4 text-[9px] font-black text-muted-foreground uppercase">
                                           Specifications
                                         </div>
-                                        <div className="md:col-span-3 text-[9px] font-black text-slate-400 uppercase text-center">
+                                        <div className="md:col-span-3 text-[9px] font-black text-muted-foreground uppercase text-center">
                                           Yield
                                         </div>
-                                        <div className="md:col-span-2 text-[9px] font-black text-slate-400 uppercase text-right">
+                                        <div className="md:col-span-2 text-[9px] font-black text-muted-foreground uppercase text-right">
                                           Price ({currency})
                                         </div>
                                       </div>
@@ -3511,12 +3517,12 @@ function QuotationFormModal({
                                       {item.consumables.map((cons, cIdx) => (
                                         <div
                                           key={cIdx}
-                                          className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative group animate-in fade-in slide-in-from-top-1 duration-200"
+                                          className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-card p-3 rounded-lg border border-border shadow-sm relative group animate-in fade-in slide-in-from-top-1 duration-200"
                                         >
                                           <button
                                             type="button"
                                             onClick={() => removeConsumable(index, cIdx)}
-                                            className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-white border border-red-200 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white shadow-md opacity-0 group-hover:opacity-100 transition-all z-20"
+                                            className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-card border border-destructive/30 text-destructive flex items-center justify-center hover:bg-destructive/90 hover:text-destructive-foreground shadow-md opacity-0 group-hover:opacity-100 transition-all z-20"
                                           >
                                             <Trash2 size={12} />
                                           </button>
@@ -3533,7 +3539,7 @@ function QuotationFormModal({
                                                   e.target.value,
                                                 )
                                               }
-                                              className="h-9 text-xs font-bold bg-slate-50/30 border-slate-200 focus:bg-white"
+                                              className="h-9 text-xs font-bold bg-muted/30 border-border focus:bg-card"
                                             />
                                           </div>
                                           <div className="md:col-span-4">
@@ -3548,7 +3554,7 @@ function QuotationFormModal({
                                                   e.target.value,
                                                 )
                                               }
-                                              className="h-9 text-xs font-bold bg-slate-50/30 border-slate-200 focus:bg-white"
+                                              className="h-9 text-xs font-bold bg-muted/30 border-border focus:bg-card"
                                             />
                                           </div>
                                           <div className="md:col-span-3">
@@ -3563,7 +3569,7 @@ function QuotationFormModal({
                                                   e.target.value,
                                                 )
                                               }
-                                              className="h-9 text-xs font-bold text-center bg-slate-50/30 border-slate-200 focus:bg-white"
+                                              className="h-9 text-xs font-bold text-center bg-muted/30 border-border focus:bg-card"
                                             />
                                           </div>
                                           <div className="md:col-span-2">
@@ -3579,15 +3585,15 @@ function QuotationFormModal({
                                                   e.target.value,
                                                 )
                                               }
-                                              className="h-9 text-xs font-black text-right text-blue-700 bg-blue-50/30 border-blue-100 focus:bg-white"
+                                              className="h-9 text-xs font-black text-right text-primary bg-primary/10 border-primary/30 focus:bg-card"
                                             />
                                           </div>
                                         </div>
                                       ))}
                                     </div>
                                   ) : (
-                                    <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/30">
-                                      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight">
+                                    <div className="text-center py-6 border-2 border-dashed border-border rounded-xl bg-muted/30">
+                                      <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-tight">
                                         No Consumables Added
                                       </p>
                                     </div>
@@ -3602,7 +3608,9 @@ function QuotationFormModal({
                   </div>
                   {saleItems.length > 0 && (
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Grand Total</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Grand Total
+                      </p>
                       <p className="text-2xl font-black text-primary">
                         {formatCurrency(saleTotal, currency)}
                       </p>
@@ -3611,20 +3619,20 @@ function QuotationFormModal({
 
                   {/* Warranty Configuration — PRODUCT_SALE only */}
                   {quotationType === 'PRODUCT_SALE' && (
-                    <div className="bg-card p-5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-sm space-y-4 mt-4">
+                    <div className="bg-card p-5 rounded-xl border border-warning/30 bg-warning/10 shadow-sm space-y-4 mt-4">
                       <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-amber-400" /> Warranty
+                        <label className="text-[11px] font-bold text-warning uppercase flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-warning/20" /> Warranty
                           Configuration
                         </label>
-                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                        <Badge className="bg-warning/10 text-warning hover:bg-warning/10 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
                           SALE SPECIFIC
                         </Badge>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">
                             Warranty Type
                           </label>
                           <Select
@@ -3634,7 +3642,7 @@ function QuotationFormModal({
                               setWarrantyManuallySet(true);
                             }}
                           >
-                            <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
+                            <SelectTrigger className="h-9 text-sm border-warning/30 bg-card shadow-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -3651,7 +3659,7 @@ function QuotationFormModal({
                         {(warrantyType === 'duration' || warrantyType === 'both') && (
                           <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
                             <div className="space-y-2">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                 Duration Value
                               </label>
                               <Input
@@ -3662,11 +3670,11 @@ function QuotationFormModal({
                                   setWarrantyDurationValue(e.target.value);
                                   setWarrantyManuallySet(true);
                                 }}
-                                className="h-9 text-sm border-amber-100 shadow-sm"
+                                className="h-9 text-sm border-warning/30 shadow-sm"
                               />
                             </div>
                             <div className="space-y-2">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
                                 Unit
                               </label>
                               <Select
@@ -3676,7 +3684,7 @@ function QuotationFormModal({
                                   setWarrantyManuallySet(true);
                                 }}
                               >
-                                <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
+                                <SelectTrigger className="h-9 text-sm border-warning/30 bg-card">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -3690,7 +3698,7 @@ function QuotationFormModal({
 
                         {(warrantyType === 'copies' || warrantyType === 'both') && (
                           <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
                               Warranty Copy Limit (Total)
                             </label>
                             <Input
@@ -3701,7 +3709,7 @@ function QuotationFormModal({
                                 setWarrantyCopyLimit(e.target.value);
                                 setWarrantyManuallySet(true);
                               }}
-                              className="h-9 text-sm border-amber-100 shadow-sm"
+                              className="h-9 text-sm border-warning/30 shadow-sm"
                             />
                           </div>
                         )}
@@ -3715,12 +3723,12 @@ function QuotationFormModal({
                 <div className="space-y-5 mb-6">
                   {/* Rent Type Selector Moved to Top */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30">
-                      <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-400" /> Rent Type / Model
+                    <div className="bg-card p-4 rounded-xl border border-primary/30 shadow-sm space-y-2 bg-primary/10">
+                      <label className="text-[11px] font-bold text-primary uppercase flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-primary/20" /> Rent Type / Model
                       </label>
                       <Select value={rentType} onValueChange={handleRentTypeChange}>
-                        <SelectTrigger className="h-9 text-sm border-blue-100">
+                        <SelectTrigger className="h-9 text-sm border-primary/30">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -3732,7 +3740,7 @@ function QuotationFormModal({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                    <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Billing Period
                       </label>
@@ -3751,9 +3759,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Machines */}
-                  <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-3">
+                  <div className="bg-card p-5 rounded-xl border border-border shadow-sm space-y-3">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-orange-400" /> Specific Machines
+                      <span className="w-2 h-2 rounded-full bg-warning/20" /> Specific Machines
                       (Products)
                     </label>
                     <ProductSelect
@@ -3773,18 +3781,18 @@ function QuotationFormModal({
                           return (
                             <div
                               key={m.productId || index}
-                              className="flex flex-col gap-3 bg-orange-50 border border-orange-100 rounded-lg px-4 py-3"
+                              className="flex flex-col gap-3 bg-warning/10 border border-warning/30 rounded-lg px-4 py-3"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-2 text-sm font-black text-slate-800">
+                                <span className="flex items-center gap-2 text-sm font-black text-foreground">
                                   {m.imageUrl ? (
                                     <img
                                       src={m.imageUrl}
                                       alt={m.description}
-                                      className="w-8 h-8 rounded object-cover border border-orange-200 bg-white shrink-0"
+                                      className="w-8 h-8 rounded object-cover border border-warning/30 bg-card shrink-0"
                                     />
                                   ) : (
-                                    <span className="w-8 h-8 rounded bg-white border border-orange-200 flex items-center justify-center text-orange-300 shrink-0">
+                                    <span className="w-8 h-8 rounded bg-card border border-warning/30 flex items-center justify-center text-warning shrink-0">
                                       <Package size={14} />
                                     </span>
                                   )}
@@ -3793,7 +3801,7 @@ function QuotationFormModal({
                                 <div className="flex items-center gap-3">
                                   <button
                                     onClick={() => removeItem(index)}
-                                    className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
+                                    className="text-muted-foreground hover:text-destructive transition-colors bg-card hover:bg-destructive/10 p-1 rounded"
                                   >
                                     <Trash2 size={16} />
                                   </button>
@@ -3802,10 +3810,10 @@ function QuotationFormModal({
 
                               {/* Dynamic Pricing Inputs Based on Rent Type */}
                               {rentType !== 'FIXED_FLAT' && (
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-orange-100 shadow-sm">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-card p-3 rounded border border-warning/30 shadow-sm">
                                   {rentType === 'FIXED_LIMIT' && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         B/W Limit
                                       </label>
                                       <Input
@@ -3821,7 +3829,7 @@ function QuotationFormModal({
                                   )}
                                   {rentType === 'FIXED_COMBO' && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Combo Limit
                                       </label>
                                       <Input
@@ -3837,7 +3845,7 @@ function QuotationFormModal({
                                   )}
                                   {rentType === 'FIXED_LIMIT' && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Color Limit
                                       </label>
                                       <Input
@@ -3853,7 +3861,7 @@ function QuotationFormModal({
                                   )}
                                   {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         B/W Excess Rate
                                       </label>
                                       <Input
@@ -3871,7 +3879,7 @@ function QuotationFormModal({
                                   )}
                                   {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Color Excess Rate
                                       </label>
                                       <Input
@@ -3890,7 +3898,7 @@ function QuotationFormModal({
                                   )}
                                   {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Combo Excess Rate
                                       </label>
                                       <Input
@@ -3911,8 +3919,8 @@ function QuotationFormModal({
                               )}
                               {/* Slab Rates UI for CPC */}
                               {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
-                                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                                <div className="mt-3 bg-muted p-3 rounded-lg border border-border">
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center justify-between">
                                     <span>Slab Rates Configuration</span>
                                   </label>
 
@@ -3966,11 +3974,11 @@ function QuotationFormModal({
                   </div>
 
                   {/* Accessories */}
-                  <div className="bg-card p-5 rounded-xl border border-teal-100 shadow-sm space-y-3">
-                    <label className="text-[11px] font-bold text-teal-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-teal-400" /> Accessories (Optional)
+                  <div className="bg-card p-5 rounded-xl border border-info/30 shadow-sm space-y-3">
+                    <label className="text-[11px] font-bold text-info uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-info/20" /> Accessories (Optional)
                     </label>
-                    <p className="text-[10px] text-slate-400 -mt-1">
+                    <p className="text-[10px] text-muted-foreground -mt-1">
                       Extra items supplied with the machine (stand, tray, stapler unit, etc.) —
                       billed once with the first month advance. No meter reading applies.
                     </p>
@@ -3995,29 +4003,29 @@ function QuotationFormModal({
                           return (
                             <div
                               key={m.productId || index}
-                              className="flex items-center gap-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-3"
+                              className="flex items-center gap-3 bg-info/10 border border-info/30 rounded-lg px-3 py-3"
                             >
                               {m.imageUrl ? (
                                 <img
                                   src={m.imageUrl}
                                   alt={m.description}
-                                  className="w-12 h-12 rounded-md object-cover border border-teal-200 bg-white shrink-0"
+                                  className="w-12 h-12 rounded-md object-cover border border-info/30 bg-card shrink-0"
                                 />
                               ) : (
-                                <div className="w-12 h-12 rounded-md bg-white border border-teal-200 flex items-center justify-center text-teal-300 shrink-0">
+                                <div className="w-12 h-12 rounded-md bg-card border border-info/30 flex items-center justify-center text-info shrink-0">
                                   <Package size={18} />
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-black text-slate-800 truncate">
+                                <p className="text-sm font-black text-foreground truncate">
                                   {m.description}
                                 </p>
-                                <p className="text-[9px] font-bold text-teal-600 uppercase tracking-wider">
+                                <p className="text-[9px] font-bold text-info uppercase tracking-wider">
                                   Accessory
                                 </p>
                               </div>
                               <div className="w-14 space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Qty
                                 </label>
                                 <Input
@@ -4029,7 +4037,7 @@ function QuotationFormModal({
                                 />
                               </div>
                               <div className="w-20 space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Rate ({currency})
                                 </label>
                                 <Input
@@ -4045,7 +4053,7 @@ function QuotationFormModal({
                                 />
                               </div>
                               <div className="w-16 space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Discount
                                 </label>
                                 <Input
@@ -4058,16 +4066,16 @@ function QuotationFormModal({
                                 />
                               </div>
                               <div className="w-20 space-y-1 text-right">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Net
                                 </label>
-                                <p className="h-8 flex items-center justify-end text-[11px] font-black text-teal-700">
+                                <p className="h-8 flex items-center justify-end text-[11px] font-black text-info">
                                   {formatCurrency(m.quantity * m.unitPrice, currency)}
                                 </p>
                               </div>
                               <button
                                 onClick={() => removeItem(index)}
-                                className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded shrink-0"
+                                className="text-muted-foreground hover:text-destructive transition-colors bg-card hover:bg-destructive/10 p-1 rounded shrink-0"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -4075,7 +4083,7 @@ function QuotationFormModal({
                           );
                         })}
                         <div className="flex justify-end">
-                          <p className="text-xs font-black text-teal-700">
+                          <p className="text-xs font-black text-info">
                             Accessories Total: {formatCurrency(accessoryTotal, currency)}
                           </p>
                         </div>
@@ -4084,9 +4092,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Payment Timing */}
-                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
+                  <div className="bg-card p-5 rounded-xl border border-lease/30 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-lease uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-lease/20" /> Payment Timing
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -4097,7 +4105,7 @@ function QuotationFormModal({
                           value={paymentTiming}
                           onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
                         >
-                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
+                          <SelectTrigger className="h-9 text-sm w-full border-warning/30">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -4120,7 +4128,7 @@ function QuotationFormModal({
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Description
                         </label>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
                           {rentType === 'CPC' || rentType === 'CPC_COMBO'
                             ? 'Cost-per-copy is billed after the fact — the charge depends on copies actually made, so postpaid is the only option.'
                             : paymentTiming === 'ADVANCE'
@@ -4135,7 +4143,7 @@ function QuotationFormModal({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
                       <>
-                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                        <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center justify-between">
                             <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
                           </label>
@@ -4155,7 +4163,7 @@ function QuotationFormModal({
                           />
                         </div>
                         {paymentTiming === 'ADVANCE' && (
-                          <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                             <label className="text-[11px] font-bold text-muted-foreground uppercase">
                               First Month Advance Payment ({currency})
                             </label>
@@ -4176,16 +4184,16 @@ function QuotationFormModal({
                           </div>
                         )}
                         {paymentTiming === 'ARREARS' && (
-                          <div className="bg-card p-4 rounded-xl border border-violet-100 shadow-sm space-y-2">
-                            <label className="text-[11px] font-bold text-violet-600 uppercase">
+                          <div className="bg-card p-4 rounded-xl border border-lease/30 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-lease uppercase">
                               Postpaid — No Advance Required
                             </label>
-                            <p className="text-[10px] text-slate-400">
+                            <p className="text-[10px] text-muted-foreground">
                               First payment collected after the first billing period completes.
                             </p>
                           </div>
                         )}
-                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                        <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
                             Discount (%)
                           </label>
@@ -4202,9 +4210,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Security Deposit Section */}
-                  <div className="bg-card p-5 rounded-xl border border-amber-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Security Deposit
+                  <div className="bg-card p-5 rounded-xl border border-warning/30 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-warning uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-warning/20" /> Security Deposit
                       (Optional)
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -4235,7 +4243,7 @@ function QuotationFormModal({
                               onChange={(e) =>
                                 setSecurityDepositMode(e.target.value as 'CASH' | 'CHEQUE')
                               }
-                              className="h-9 text-sm w-full rounded-md border border-slate-200 bg-white px-2"
+                              className="h-9 text-sm w-full rounded-md border border-border bg-card px-2"
                             >
                               <option value="CASH">Cash</option>
                               <option value="BANK_TRANSFER">Bank Transfer</option>
@@ -4273,9 +4281,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
-                  <div className="bg-card p-5 rounded-xl border border-blue-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-400" /> Agreement Terms
+                  <div className="bg-card p-5 rounded-xl border border-primary/30 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-primary uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary/20" /> Agreement Terms
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
@@ -4286,7 +4294,7 @@ function QuotationFormModal({
                           type="date"
                           value={effectiveFrom}
                           onChange={(e) => setEffectiveFrom(e.target.value)}
-                          className="h-9 text-sm border-slate-200"
+                          className="h-9 text-sm border-border"
                         />
                       </div>
                       <div className="space-y-2">
@@ -4298,7 +4306,7 @@ function QuotationFormModal({
                           placeholder="12"
                           value={durationMonths}
                           onChange={(e) => setDurationMonths(e.target.value)}
-                          className="h-9 text-sm text-center border-slate-200"
+                          className="h-9 text-sm text-center border-border"
                         />
                       </div>
                       <div className="space-y-2">
@@ -4309,7 +4317,7 @@ function QuotationFormModal({
                           type="date"
                           readOnly
                           value={effectiveTo}
-                          className="h-9 text-sm bg-slate-50 text-right opacity-70 border-slate-200"
+                          className="h-9 text-sm bg-muted text-right opacity-70 border-border"
                         />
                       </div>
                     </div>
@@ -4322,9 +4330,9 @@ function QuotationFormModal({
                 <div className="space-y-5 mb-6">
                   {/* Lease Type Selector Moved to Top */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-purple-200 shadow-sm space-y-2 bg-purple-50/30 min-w-0 w-full">
-                      <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-purple-400" /> Lease Type
+                    <div className="bg-card p-4 rounded-xl border border-lease/30 shadow-sm space-y-2 bg-lease/10 min-w-0 w-full">
+                      <label className="text-[11px] font-bold text-lease uppercase flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-lease/20" /> Lease Type
                       </label>
                       <Select
                         value={leaseType}
@@ -4342,7 +4350,7 @@ function QuotationFormModal({
                           }
                         }}
                       >
-                        <SelectTrigger className="h-9 text-sm border-purple-100 w-full">
+                        <SelectTrigger className="h-9 text-sm border-lease/30 w-full">
                           <SelectValue placeholder="Select Lease Type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -4352,7 +4360,7 @@ function QuotationFormModal({
                       </Select>
                     </div>
 
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2 min-w-0 w-full">
+                    <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2 min-w-0 w-full">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Billing Period
                       </label>
@@ -4370,13 +4378,13 @@ function QuotationFormModal({
                     </div>
 
                     {leaseType === 'FSM' && (
-                      <div className="bg-card p-4 rounded-xl border border-blue-200 shadow-sm space-y-2 bg-blue-50/30 min-w-0 w-full">
-                        <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-blue-400" /> Service Billing Type
-                          (FSM)
+                      <div className="bg-card p-4 rounded-xl border border-primary/30 shadow-sm space-y-2 bg-primary/10 min-w-0 w-full">
+                        <label className="text-[11px] font-bold text-primary uppercase flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-primary/20" /> Service Billing
+                          Type (FSM)
                         </label>
                         <Select value={rentType} onValueChange={handleRentTypeChange}>
-                          <SelectTrigger className="h-9 text-sm border-blue-100 w-full">
+                          <SelectTrigger className="h-9 text-sm border-primary/30 w-full">
                             <SelectValue placeholder="Select Billing Type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -4389,9 +4397,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Machines */}
-                  <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-3">
+                  <div className="bg-card p-5 rounded-xl border border-border shadow-sm space-y-3">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-purple-400" /> Specific Machines
+                      <span className="w-2 h-2 rounded-full bg-lease/20" /> Specific Machines
                       (Products)
                     </label>
                     <ProductSelect
@@ -4411,18 +4419,18 @@ function QuotationFormModal({
                           return (
                             <div
                               key={m.productId || index}
-                              className="flex flex-col gap-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3"
+                              className="flex flex-col gap-3 bg-lease/10 border border-lease/30 rounded-lg px-4 py-3"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-2 text-sm font-black text-slate-800">
+                                <span className="flex items-center gap-2 text-sm font-black text-foreground">
                                   {m.imageUrl ? (
                                     <img
                                       src={m.imageUrl}
                                       alt={m.description}
-                                      className="w-8 h-8 rounded object-cover border border-purple-200 bg-white shrink-0"
+                                      className="w-8 h-8 rounded object-cover border border-lease/30 bg-card shrink-0"
                                     />
                                   ) : (
-                                    <span className="w-8 h-8 rounded bg-white border border-purple-200 flex items-center justify-center text-purple-300 shrink-0">
+                                    <span className="w-8 h-8 rounded bg-card border border-lease/30 flex items-center justify-center text-lease shrink-0">
                                       <Package size={14} />
                                     </span>
                                   )}
@@ -4431,7 +4439,7 @@ function QuotationFormModal({
                                 <div className="flex items-center gap-3">
                                   <button
                                     onClick={() => removeItem(index)}
-                                    className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
+                                    className="text-muted-foreground hover:text-destructive transition-colors bg-card hover:bg-destructive/10 p-1 rounded"
                                   >
                                     <Trash2 size={16} />
                                   </button>
@@ -4441,12 +4449,12 @@ function QuotationFormModal({
                                 against an included allowance counted in A4-equivalents, so
                                 splitting the rate there has no unambiguous meaning. */}
                               {leaseType === 'FSM' && rentType === 'CPC' && (
-                                <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-purple-100 shadow-sm">
+                                <div className="flex items-center justify-between bg-card px-3 py-2 rounded border border-lease/30 shadow-sm">
                                   <div className="min-w-0">
-                                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                                    <p className="text-[10px] font-black text-foreground uppercase tracking-widest">
                                       A3 / A4 Pricing
                                     </p>
-                                    <p className="text-[9px] text-slate-400 font-bold italic mt-0.5">
+                                    <p className="text-[9px] text-muted-foreground font-bold italic mt-0.5">
                                       {m.separateA3Pricing
                                         ? 'A3 pages bill 1:1 at their own rate (no 2x conversion)'
                                         : `A3 pages bill as ${A3_RATE_FACTOR} A4 clicks at the A4 rate`}
@@ -4459,8 +4467,8 @@ function QuotationFormModal({
                                     }
                                     className={`shrink-0 text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tight transition-all shadow-sm ${
                                       m.separateA3Pricing
-                                        ? 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-700'
-                                        : 'bg-white text-slate-500 border border-slate-200 hover:border-purple-300 hover:text-purple-600'
+                                        ? 'bg-lease text-lease-foreground border border-lease hover:bg-lease/90'
+                                        : 'bg-card text-muted-foreground border border-border hover:border-lease/30 hover:text-lease'
                                     }`}
                                   >
                                     {m.separateA3Pricing
@@ -4471,10 +4479,10 @@ function QuotationFormModal({
                               )}
                               {/* Dynamic Pricing Inputs for Lease FSM */}
                               {leaseType === 'FSM' && rentType !== 'FIXED_FLAT' && (
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-purple-100 shadow-sm">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-card p-3 rounded border border-lease/30 shadow-sm">
                                   {rentType === 'FIXED_LIMIT' && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         B/W Limit
                                       </label>
                                       <Input
@@ -4490,7 +4498,7 @@ function QuotationFormModal({
                                   )}
                                   {rentType === 'FIXED_COMBO' && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Combo Limit
                                       </label>
                                       <Input
@@ -4506,7 +4514,7 @@ function QuotationFormModal({
                                   )}
                                   {rentType === 'FIXED_LIMIT' && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Color Limit
                                       </label>
                                       <Input
@@ -4522,7 +4530,7 @@ function QuotationFormModal({
                                   )}
                                   {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         {m.separateA3Pricing && rentType === 'CPC'
                                           ? 'B/W A4 Rate'
                                           : 'B/W Excess Rate'}
@@ -4542,7 +4550,7 @@ function QuotationFormModal({
                                   )}
                                   {rentType === 'CPC' && m.separateA3Pricing && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-lease uppercase tracking-wider block">
                                         B/W A3 Rate
                                       </label>
                                       <Input
@@ -4555,13 +4563,13 @@ function QuotationFormModal({
                                           if (v !== undefined)
                                             updateItem(index, 'bwA3ExcessRate', v);
                                         }}
-                                        className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
+                                        className="h-8 text-[11px] font-bold border-lease/30 focus-visible:ring-lease/30"
                                       />
                                     </div>
                                   )}
                                   {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         {m.separateA3Pricing && rentType === 'CPC'
                                           ? 'Color A4 Rate'
                                           : 'Color Excess Rate'}
@@ -4582,7 +4590,7 @@ function QuotationFormModal({
                                   )}
                                   {rentType === 'CPC' && m.separateA3Pricing && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-lease uppercase tracking-wider block">
                                         Color A3 Rate
                                       </label>
                                       <Input
@@ -4595,13 +4603,13 @@ function QuotationFormModal({
                                           if (v !== undefined)
                                             updateItem(index, 'colorA3ExcessRate', v);
                                         }}
-                                        className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
+                                        className="h-8 text-[11px] font-bold border-lease/30 focus-visible:ring-lease/30"
                                       />
                                     </div>
                                   )}
                                   {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
                                     <div className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                         Combo Excess Rate
                                       </label>
                                       <Input
@@ -4622,8 +4630,8 @@ function QuotationFormModal({
                               )}
                               {/* Slab Rates UI for CPC */}
                               {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
-                                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                                <div className="mt-3 bg-muted p-3 rounded-lg border border-border">
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center justify-between">
                                     <span>Slab Rates Configuration</span>
                                   </label>
 
@@ -4677,11 +4685,11 @@ function QuotationFormModal({
                   </div>
 
                   {/* Accessories */}
-                  <div className="bg-card p-5 rounded-xl border border-teal-100 shadow-sm space-y-3">
-                    <label className="text-[11px] font-bold text-teal-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-teal-400" /> Accessories (Optional)
+                  <div className="bg-card p-5 rounded-xl border border-info/30 shadow-sm space-y-3">
+                    <label className="text-[11px] font-bold text-info uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-info/20" /> Accessories (Optional)
                     </label>
-                    <p className="text-[10px] text-slate-400 -mt-1">
+                    <p className="text-[10px] text-muted-foreground -mt-1">
                       Extra items supplied with the machine (stand, tray, stapler unit, etc.) —
                       billed once with the first month advance. No meter reading applies.
                     </p>
@@ -4706,29 +4714,29 @@ function QuotationFormModal({
                           return (
                             <div
                               key={m.productId || index}
-                              className="flex items-center gap-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-3"
+                              className="flex items-center gap-3 bg-info/10 border border-info/30 rounded-lg px-3 py-3"
                             >
                               {m.imageUrl ? (
                                 <img
                                   src={m.imageUrl}
                                   alt={m.description}
-                                  className="w-12 h-12 rounded-md object-cover border border-teal-200 bg-white shrink-0"
+                                  className="w-12 h-12 rounded-md object-cover border border-info/30 bg-card shrink-0"
                                 />
                               ) : (
-                                <div className="w-12 h-12 rounded-md bg-white border border-teal-200 flex items-center justify-center text-teal-300 shrink-0">
+                                <div className="w-12 h-12 rounded-md bg-card border border-info/30 flex items-center justify-center text-info shrink-0">
                                   <Package size={18} />
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-black text-slate-800 truncate">
+                                <p className="text-sm font-black text-foreground truncate">
                                   {m.description}
                                 </p>
-                                <p className="text-[9px] font-bold text-teal-600 uppercase tracking-wider">
+                                <p className="text-[9px] font-bold text-info uppercase tracking-wider">
                                   Accessory
                                 </p>
                               </div>
                               <div className="w-14 space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Qty
                                 </label>
                                 <Input
@@ -4740,7 +4748,7 @@ function QuotationFormModal({
                                 />
                               </div>
                               <div className="w-20 space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Rate ({currency})
                                 </label>
                                 <Input
@@ -4756,7 +4764,7 @@ function QuotationFormModal({
                                 />
                               </div>
                               <div className="w-16 space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Discount
                                 </label>
                                 <Input
@@ -4769,16 +4777,16 @@ function QuotationFormModal({
                                 />
                               </div>
                               <div className="w-20 space-y-1 text-right">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Net
                                 </label>
-                                <p className="h-8 flex items-center justify-end text-[11px] font-black text-teal-700">
+                                <p className="h-8 flex items-center justify-end text-[11px] font-black text-info">
                                   {formatCurrency(m.quantity * m.unitPrice, currency)}
                                 </p>
                               </div>
                               <button
                                 onClick={() => removeItem(index)}
-                                className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded shrink-0"
+                                className="text-muted-foreground hover:text-destructive transition-colors bg-card hover:bg-destructive/10 p-1 rounded shrink-0"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -4786,7 +4794,7 @@ function QuotationFormModal({
                           );
                         })}
                         <div className="flex justify-end">
-                          <p className="text-xs font-black text-teal-700">
+                          <p className="text-xs font-black text-info">
                             Accessories Total: {formatCurrency(accessoryTotal, currency)}
                           </p>
                         </div>
@@ -4795,9 +4803,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Payment Timing */}
-                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
+                  <div className="bg-card p-5 rounded-xl border border-lease/30 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-lease uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-lease/20" /> Payment Timing
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -4808,7 +4816,7 @@ function QuotationFormModal({
                           value={paymentTiming}
                           onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
                         >
-                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
+                          <SelectTrigger className="h-9 text-sm w-full border-warning/30">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -4831,7 +4839,7 @@ function QuotationFormModal({
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Description
                         </label>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
                           {rentType === 'CPC' || rentType === 'CPC_COMBO'
                             ? 'Cost-per-copy is billed after the fact — the charge depends on copies actually made, so postpaid is the only option.'
                             : paymentTiming === 'ADVANCE'
@@ -4844,7 +4852,7 @@ function QuotationFormModal({
 
                   {/* Lease Config - Remaining Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                    <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Tenure (months)
                       </label>
@@ -4859,7 +4867,7 @@ function QuotationFormModal({
                         className="h-9 text-sm"
                       />
                     </div>
-                    <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                    <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Total Lease Amount ({currency})
                       </label>
@@ -4879,12 +4887,12 @@ function QuotationFormModal({
                             }
                           }
                         }}
-                        className="h-9 text-sm font-bold text-blue-700"
+                        className="h-9 text-sm font-bold text-primary"
                       />
                     </div>
                     {leaseType === 'EMI' && (
-                      <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
-                        <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
+                      <div className="bg-card p-4 rounded-xl border border-lease/30 shadow-sm space-y-2">
+                        <label className="text-[11px] font-bold text-lease uppercase flex items-center justify-between">
                           <span>Monthly EMI ({currency})</span>
                           <span className="text-[9px] lowercase">(auto)</span>
                         </label>
@@ -4900,15 +4908,15 @@ function QuotationFormModal({
                               if (!v) setTotalLeaseAmount('');
                             }
                           }}
-                          className="h-9 text-sm font-bold text-purple-700"
+                          className="h-9 text-sm font-bold text-lease"
                         />
                       </div>
                     )}
                     {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
                       <>
                         {leaseType === 'FSM' && (
-                          <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
-                            <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
+                          <div className="bg-card p-4 rounded-xl border border-lease/30 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-lease uppercase flex items-center justify-between">
                               <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
                               <span className="text-[9px] lowercase">(auto)</span>
                             </label>
@@ -4925,12 +4933,12 @@ function QuotationFormModal({
                                   if (!v) setTotalLeaseAmount('');
                                 }
                               }}
-                              className="h-9 text-sm font-bold text-blue-700"
+                              className="h-9 text-sm font-bold text-primary"
                             />
                           </div>
                         )}
                         {paymentTiming === 'ADVANCE' && (
-                          <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                          <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                             <label className="text-[11px] font-bold text-muted-foreground uppercase">
                               First Month Advance Payment ({currency})
                             </label>
@@ -4951,16 +4959,16 @@ function QuotationFormModal({
                           </div>
                         )}
                         {paymentTiming === 'ARREARS' && (
-                          <div className="bg-card p-4 rounded-xl border border-violet-100 shadow-sm space-y-2">
-                            <label className="text-[11px] font-bold text-violet-600 uppercase">
+                          <div className="bg-card p-4 rounded-xl border border-lease/30 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-lease uppercase">
                               Postpaid — No Advance Required
                             </label>
-                            <p className="text-[10px] text-slate-400">
+                            <p className="text-[10px] text-muted-foreground">
                               First payment collected after the first billing period completes.
                             </p>
                           </div>
                         )}
-                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                        <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
                             Discount (%)
                           </label>
@@ -4977,9 +4985,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Security Deposit Section */}
-                  <div className="bg-card p-5 rounded-xl border border-amber-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Security Deposit
+                  <div className="bg-card p-5 rounded-xl border border-warning/30 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-warning uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-warning/20" /> Security Deposit
                       (Optional)
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -5010,7 +5018,7 @@ function QuotationFormModal({
                               onChange={(e) =>
                                 setSecurityDepositMode(e.target.value as 'CASH' | 'CHEQUE')
                               }
-                              className="h-9 text-sm w-full rounded-md border border-slate-200 bg-white px-2"
+                              className="h-9 text-sm w-full rounded-md border border-border bg-card px-2"
                             >
                               <option value="CASH">Cash</option>
                               <option value="BANK_TRANSFER">Bank Transfer</option>
@@ -5048,9 +5056,9 @@ function QuotationFormModal({
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
-                  <div className="bg-card p-5 rounded-xl border border-blue-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-400" /> Agreement Terms
+                  <div className="bg-card p-5 rounded-xl border border-primary/30 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-primary uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary/20" /> Agreement Terms
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
@@ -5061,7 +5069,7 @@ function QuotationFormModal({
                           type="date"
                           value={effectiveFrom}
                           onChange={(e) => setEffectiveFrom(e.target.value)}
-                          className="h-9 text-sm border-slate-200"
+                          className="h-9 text-sm border-border"
                         />
                       </div>
                       <div className="space-y-2">
@@ -5076,7 +5084,7 @@ function QuotationFormModal({
                             setDurationMonths(e.target.value);
                             setLeaseTenureMonths(e.target.value);
                           }}
-                          className="h-9 text-sm text-center border-slate-200"
+                          className="h-9 text-sm text-center border-border"
                         />
                       </div>
                       <div className="space-y-2">
@@ -5087,27 +5095,27 @@ function QuotationFormModal({
                           type="date"
                           readOnly
                           value={effectiveTo}
-                          className="h-9 text-sm bg-slate-50 text-right opacity-70 border-slate-200"
+                          className="h-9 text-sm bg-muted text-right opacity-70 border-border"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Section 4: Lease Warranty (Conditional) */}
-                  <div className="bg-card p-5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-sm space-y-4 mt-4">
+                  <div className="bg-card p-5 rounded-xl border border-warning/30 bg-warning/10 shadow-sm space-y-4 mt-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-400" /> Warranty
+                      <label className="text-[11px] font-bold text-warning uppercase flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-warning/20" /> Warranty
                         Configuration
                       </label>
-                      <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                      <Badge className="bg-warning/10 text-warning hover:bg-warning/10 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
                         LEASE SPECIFIC
                       </Badge>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Warranty Type
                         </label>
                         <Select
@@ -5117,7 +5125,7 @@ function QuotationFormModal({
                             setWarrantyManuallySet(true);
                           }}
                         >
-                          <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
+                          <SelectTrigger className="h-9 text-sm border-warning/30 bg-card shadow-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -5134,7 +5142,7 @@ function QuotationFormModal({
                       {(warrantyType === 'duration' || warrantyType === 'both') && (
                         <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
                           <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
                               Duration Value
                             </label>
                             <Input
@@ -5145,11 +5153,11 @@ function QuotationFormModal({
                                 setWarrantyDurationValue(e.target.value);
                                 setWarrantyManuallySet(true);
                               }}
-                              className="h-9 text-sm border-amber-100 shadow-sm"
+                              className="h-9 text-sm border-warning/30 shadow-sm"
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
                               Unit
                             </label>
                             <Select
@@ -5159,7 +5167,7 @@ function QuotationFormModal({
                                 setWarrantyManuallySet(true);
                               }}
                             >
-                              <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
+                              <SelectTrigger className="h-9 text-sm border-warning/30 bg-card">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -5173,7 +5181,7 @@ function QuotationFormModal({
 
                       {(warrantyType === 'copies' || warrantyType === 'both') && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">
                             Warranty Copy Limit (Total)
                           </label>
                           <Input
@@ -5184,7 +5192,7 @@ function QuotationFormModal({
                               setWarrantyCopyLimit(e.target.value);
                               setWarrantyManuallySet(true);
                             }}
-                            className="h-9 text-sm border-amber-100 shadow-sm"
+                            className="h-9 text-sm border-warning/30 shadow-sm"
                           />
                         </div>
                       )}
@@ -5197,10 +5205,10 @@ function QuotationFormModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-card border-t border-slate-100 flex items-center justify-between shrink-0">
+        <div className="p-6 bg-card border-t border-border flex items-center justify-between shrink-0">
           <button
             onClick={onClose}
-            className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
             disabled={isSubmitting}
           >
             Discard
@@ -5219,7 +5227,7 @@ function QuotationFormModal({
 
             {step === 1 ? (
               <Button
-                className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] uppercase tracking-widest shadow-md shadow-blue-200"
+                className="h-10 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-[11px] uppercase tracking-widest shadow-md shadow-primary/10"
                 onClick={() => {
                   if (!customerId) {
                     toast.error('Please select a customer first');
@@ -5236,7 +5244,7 @@ function QuotationFormModal({
               </Button>
             ) : (
               <Button
-                className="h-10 px-8 bg-black hover:bg-slate-800 text-white font-bold text-[11px] uppercase tracking-widest shadow-md"
+                className="h-10 px-8 bg-foreground hover:bg-foreground text-primary-foreground font-bold text-[11px] uppercase tracking-widest shadow-md"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >

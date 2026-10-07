@@ -115,13 +115,13 @@ export function CollectSecurityDepositModal({
       <DialogContent className="sm:max-w-md rounded-2xl p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-teal-600" />
+            <ShieldCheck className="h-5 w-5 text-info" />
             Collect Security Deposit
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          <p className="text-xs font-bold text-slate-500">
+          <p className="text-xs font-bold text-muted-foreground">
             {customerName} — {invoiceNumber}
           </p>
 
@@ -165,13 +165,13 @@ export function CollectSecurityDepositModal({
           </div>
 
           {mode === 'CHEQUE' ? (
-            <div className="grid grid-cols-2 gap-3 p-3 bg-teal-50/60 border border-teal-100 rounded-xl">
+            <div className="grid grid-cols-2 gap-3 p-3 bg-info/10 border border-info/30 rounded-xl">
               <div className="space-y-1">
                 <Label>Cheque Number *</Label>
                 <Input
                   value={chequeNumber}
                   onChange={(e) => setChequeNumber(e.target.value)}
-                  className="h-9 bg-white"
+                  className="h-9 bg-card"
                 />
               </div>
               <div className="space-y-1">
@@ -179,7 +179,7 @@ export function CollectSecurityDepositModal({
                 <Input
                   value={chequeBankName}
                   onChange={(e) => setChequeBankName(e.target.value)}
-                  className="h-9 bg-white"
+                  className="h-9 bg-card"
                 />
               </div>
               <div className="space-y-1 col-span-2">
@@ -188,10 +188,10 @@ export function CollectSecurityDepositModal({
                   type="date"
                   value={chequeDate}
                   onChange={(e) => setChequeDate(e.target.value)}
-                  className="h-9 bg-white"
+                  className="h-9 bg-card"
                 />
               </div>
-              <p className="text-[10px] text-teal-700 col-span-2">
+              <p className="text-[10px] text-info col-span-2">
                 This cheque is a guarantee, not a payment — it goes to the Guarantee Cheques
                 section, not the regular cheque register.
               </p>
@@ -199,13 +199,13 @@ export function CollectSecurityDepositModal({
           ) : (
             <div className="space-y-1">
               <Label>Reference</Label>
-              <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+              <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground italic">
                 Auto-generated on save — {autoReferencePreview(mode)}
               </div>
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-500">
+          <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
             <input
               type="checkbox"
               checked={generateBillAfter}
@@ -220,11 +220,7 @@ export function CollectSecurityDepositModal({
           <Button variant="outline" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="bg-teal-600 hover:bg-teal-700"
-          >
+          <Button onClick={handleSubmit} disabled={submitting} className="bg-info hover:bg-info/90">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Deposit'}
           </Button>
         </DialogFooter>

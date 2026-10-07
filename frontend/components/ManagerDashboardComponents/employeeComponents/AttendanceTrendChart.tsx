@@ -34,7 +34,7 @@ export default function AttendanceTrendChart() {
   }, []);
 
   return (
-    <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col h-full min-h-[260px]">
+    <div className="bg-card rounded-xl shadow-sm p-4 border border-primary/30 flex flex-col h-full min-h-[260px]">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-sm font-bold text-primary uppercase">Attendance Trend</h3>
         <div className="flex items-center gap-2">
@@ -54,13 +54,13 @@ export default function AttendanceTrendChart() {
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                tick={{ fill: 'var(--chart-slate)', fontSize: 10, fontWeight: 600 }}
                 dy={10}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                tick={{ fill: 'var(--chart-slate)', fontSize: 10, fontWeight: 600 }}
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
                 tickFormatter={(value) => `${value}%`}
@@ -69,7 +69,7 @@ export default function AttendanceTrendChart() {
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     return (
-                      <div className="bg-primary px-3 py-1.5 shadow-xl rounded-lg text-xs font-bold text-white">
+                      <div className="bg-primary px-3 py-1.5 shadow-xl rounded-lg text-xs font-bold text-primary-foreground">
                         {payload[0].value}% Attendance
                       </div>
                     );
@@ -80,9 +80,14 @@ export default function AttendanceTrendChart() {
               <Line
                 type="monotone"
                 dataKey="attendance"
-                stroke="#1d4ed8"
+                stroke="var(--chart-blue-dark)"
                 strokeWidth={3}
-                dot={{ fill: '#1d4ed8', r: 4, strokeWidth: 2, stroke: '#fff' }}
+                dot={{
+                  fill: 'var(--chart-blue-dark)',
+                  r: 4,
+                  strokeWidth: 2,
+                  stroke: 'var(--card)',
+                }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
                 animationDuration={1500}
               />

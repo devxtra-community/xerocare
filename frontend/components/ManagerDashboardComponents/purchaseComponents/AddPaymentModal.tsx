@@ -340,21 +340,21 @@ export default function AddPaymentModal({
           the bottom of the screen — `overflow-hidden` then clipped it with nothing to
           scroll, so on shorter windows the submit button was simply unreachable. */}
       <DialogContent className="sm:max-w-[450px] border-none shadow-2xl p-0 overflow-hidden rounded-2xl flex flex-col max-h-[90dvh]">
-        <div className="bg-slate-900 px-6 py-6 text-white shrink-0">
+        <div className="bg-foreground px-6 py-6 text-primary-foreground shrink-0">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <CreditCard className="text-blue-400" />
+              <CreditCard className="text-primary" />
               {payFor === 'COST' ? 'Add Purchase Cost' : 'Add Vendor Payment'}
             </DialogTitle>
           </DialogHeader>
           {payFor === 'COST' ? (
-            <div className="mt-2 text-slate-400 text-xs">
+            <div className="mt-2 text-muted-foreground text-xs">
               Paid to a third party — the vendor&apos;s outstanding is unchanged.
             </div>
           ) : (
-            <div className="mt-2 text-slate-400 text-xs">
+            <div className="mt-2 text-muted-foreground text-xs">
               Remaining to pay:{' '}
-              <span className="text-white font-bold">
+              <span className="text-primary-foreground font-bold">
                 {isForeignPurchase
                   ? formatDualCurrency(
                       remainingAmount,
@@ -366,7 +366,7 @@ export default function AddPaymentModal({
                   : formatCurrency(remainingAmount, currencyCode)}
               </span>
               {taxSettledSeparately > 0 && (
-                <div className="mt-1 text-[11px] leading-relaxed text-amber-300">
+                <div className="mt-1 text-[11px] leading-relaxed text-warning">
                   Excludes {formatCurrency(taxSettledSeparately, purchaseCurrency || currencyCode)}{' '}
                   input VAT — settled from Accounts → Tax Report, not paid to the vendor.
                 </div>
@@ -374,20 +374,22 @@ export default function AddPaymentModal({
             </div>
           )}
           {isForeignPurchase && (
-            <p className="mt-1.5 text-[11px] text-amber-300">
+            <p className="mt-1.5 text-[11px] text-warning">
               This purchase is recorded in {purchaseCurrency}. Enter the payment amount below in{' '}
               {currencyCode} — the branch&apos;s currency.
             </p>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-white">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-card">
           <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
             {/* What this money settles. The vendor's goods invoice and the lot's other
                 costs are owed to different parties, so they are capped differently and
                 post to different accounts — asking once here keeps the two apart. */}
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase">Paying For</Label>
+              <Label className="text-xs font-bold text-muted-foreground uppercase">
+                Paying For
+              </Label>
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
@@ -415,23 +417,27 @@ export default function AddPaymentModal({
                     }}
                     className={`rounded-xl border px-3 py-2 text-left transition ${
                       payFor === o.key
-                        ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
-                        : 'border-slate-200 bg-white hover:border-blue-300'
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                        : 'border-border bg-card hover:border-primary/30'
                     }`}
                   >
-                    <span className="block text-sm font-bold text-slate-800">{o.label}</span>
-                    <span className="block text-[10px] leading-tight text-slate-500">{o.hint}</span>
+                    <span className="block text-sm font-bold text-foreground">{o.label}</span>
+                    <span className="block text-[10px] leading-tight text-muted-foreground">
+                      {o.hint}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
             {payFor === 'COST' && (
-              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+              <div className="space-y-3 rounded-xl border border-warning/30 bg-warning/10 p-3">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase">Cost Type</Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase">
+                    Cost Type
+                  </Label>
                   <Select value={costType} onValueChange={setCostType}>
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -445,35 +451,35 @@ export default function AddPaymentModal({
                 </div>
                 {costType === 'Other' && (
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 uppercase">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase">
                       Cost Name *
                     </Label>
                     <Input
                       value={customCostType}
                       onChange={(e) => setCustomCostType(e.target.value)}
                       placeholder="e.g. Port storage charges"
-                      className="bg-white"
+                      className="bg-card"
                     />
                   </div>
                 )}
-                <div className="rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-[11px]">
+                <div className="rounded-lg border border-warning/30 bg-card px-2.5 py-2 text-[11px]">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">
+                    <span className="text-muted-foreground">
                       Already on this lot for{' '}
-                      <span className="font-semibold text-slate-700">
+                      <span className="font-semibold text-foreground">
                         {costType === 'Other'
                           ? costLineForType(customCostType) || 'this cost'
                           : costType}
                       </span>
                     </span>
-                    <span className="font-bold text-slate-800">
+                    <span className="font-bold text-foreground">
                       {formatCurrency(selectedCostLine?.total ?? 0, currencyCode)}
                     </span>
                   </div>
                   {formData.amount > 0 && (
-                    <div className="mt-1 flex justify-between border-t border-dashed border-slate-200 pt-1">
-                      <span className="text-slate-500">After this cost</span>
-                      <span className="font-bold text-emerald-700">
+                    <div className="mt-1 flex justify-between border-t border-dashed border-border pt-1">
+                      <span className="text-muted-foreground">After this cost</span>
+                      <span className="font-bold text-success">
                         {formatCurrency(
                           (selectedCostLine?.total ?? 0) + Number(formData.amount),
                           currencyCode,
@@ -481,14 +487,14 @@ export default function AddPaymentModal({
                       </span>
                     </div>
                   )}
-                  <div className="mt-1 flex justify-between text-slate-400">
+                  <div className="mt-1 flex justify-between text-muted-foreground">
                     <span>All additional costs on the lot</span>
                     <span className="font-semibold">
                       {formatCurrency(totalExistingCosts, currencyCode)}
                     </span>
                   </div>
                 </div>
-                <p className="text-[10px] leading-snug text-amber-700">
+                <p className="text-[10px] leading-snug text-warning">
                   This is added to the lot&apos;s additional costs and posted to its own expense
                   account. It does not reduce the vendor&apos;s balance.
                 </p>
@@ -496,11 +502,11 @@ export default function AddPaymentModal({
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
+              <Label htmlFor="amount" className="text-xs font-bold text-muted-foreground uppercase">
                 {payFor === 'COST' ? 'Cost Amount' : 'Payment Amount'}
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
                   {currencyCode}
                 </span>
                 <Input
@@ -509,7 +515,7 @@ export default function AddPaymentModal({
                   step="0.01"
                   min="0.01"
                   required
-                  className="pl-12 h-11 text-lg font-bold border-slate-200 focus:ring-primary"
+                  className="pl-12 h-11 text-lg font-bold border-border focus:ring-primary"
                   value={formData.amount || ''}
                   onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
                   autoFocus
@@ -518,14 +524,14 @@ export default function AddPaymentModal({
               {/* Partial/full only describe progress against the vendor's invoice — a
                   third-party cost settles nothing on it. */}
               {payFor === 'VENDOR' && formData.amount > 0 && formData.amount < remainingAmount && (
-                <p className="text-[10px] text-yellow-600 font-medium italic">
+                <p className="text-[10px] text-warning font-medium italic">
                   Partial payment recognized
                 </p>
               )}
               {payFor === 'VENDOR' &&
                 formData.amount >= remainingAmount - 0.01 &&
                 formData.amount <= remainingAmount + 0.01 && (
-                  <p className="text-[10px] text-green-600 font-medium italic">
+                  <p className="text-[10px] text-success font-medium italic">
                     Full payment recognized
                   </p>
                 )}
@@ -533,23 +539,23 @@ export default function AddPaymentModal({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                   <Calendar size={12} /> Date
                 </Label>
                 <Input
                   type="date"
                   required
-                  className="h-10 text-xs border-slate-200"
+                  className="h-10 text-xs border-border"
                   value={formData.paymentDate}
                   onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
                 />
               </div>
               {formData.paymentMethod !== 'Cheque' && (
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                     <Hash size={12} /> Ref #
                   </Label>
-                  <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                  <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground italic">
                     Auto-generated — {autoReferencePreview(formData.paymentMethod)}
                   </div>
                 </div>
@@ -557,12 +563,14 @@ export default function AddPaymentModal({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase">Payment Method</Label>
+              <Label className="text-xs font-bold text-muted-foreground uppercase">
+                Payment Method
+              </Label>
               <Select
                 value={formData.paymentMethod}
                 onValueChange={(val) => setFormData({ ...formData, paymentMethod: val })}
               >
-                <SelectTrigger className="h-10 text-xs border-slate-200">
+                <SelectTrigger className="h-10 text-xs border-border">
                   <SelectValue placeholder="Select method" />
                 </SelectTrigger>
                 <SelectContent>
@@ -582,11 +590,11 @@ export default function AddPaymentModal({
 
             {formData.paymentMethod !== 'Cheque' && (
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase">
+                <Label className="text-xs font-bold text-muted-foreground uppercase">
                   Pay From Account
                 </Label>
                 {matchingAccounts.length === 0 ? (
-                  <p className="text-[11px] font-medium text-red-600">
+                  <p className="text-[11px] font-medium text-destructive">
                     No{' '}
                     {accountTypeForPaymentMode(formData.paymentMethod) === 'CASH'
                       ? 'Cash in Hand'
@@ -595,7 +603,7 @@ export default function AddPaymentModal({
                   </p>
                 ) : (
                   <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
-                    <SelectTrigger className="h-10 text-xs border-slate-200">
+                    <SelectTrigger className="h-10 text-xs border-border">
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
@@ -611,49 +619,51 @@ export default function AddPaymentModal({
                   </Select>
                 )}
                 {balanceError && (
-                  <p className="text-[11px] font-medium text-red-600">{balanceError}</p>
+                  <p className="text-[11px] font-medium text-destructive">{balanceError}</p>
                 )}
               </div>
             )}
 
             {formData.paymentMethod === 'Cheque' && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
-                <p className="text-xs font-bold text-amber-700">
+              <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 space-y-3">
+                <p className="text-xs font-bold text-warning">
                   Cheque details — creates a PENDING issued cheque. Cash at Bank moves only when
                   Finance marks it Cleared.
                 </p>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase">
                     Cheque Number *
                   </Label>
                   <Input
                     required
                     placeholder="e.g. CHQ-001234"
-                    className="h-10 text-xs border-slate-200"
+                    className="h-10 text-xs border-border"
                     value={chequeNumber}
                     onChange={(e) => setChequeNumber(e.target.value)}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 uppercase">Our Bank *</Label>
+                    <Label className="text-xs font-bold text-muted-foreground uppercase">
+                      Our Bank *
+                    </Label>
                     <Input
                       required
                       placeholder="e.g. Emirates NBD"
-                      className="h-10 text-xs border-slate-200"
+                      className="h-10 text-xs border-border"
                       value={chequeBankName}
                       onChange={(e) => setChequeBankName(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 uppercase">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase">
                       Cheque Date *
                     </Label>
                     <Input
                       type="date"
                       required
                       title="Earliest date the vendor can present this cheque"
-                      className="h-10 text-xs border-slate-200"
+                      className="h-10 text-xs border-border"
                       value={chequeDueDate}
                       onChange={(e) => setChequeDueDate(e.target.value)}
                     />
@@ -663,19 +673,19 @@ export default function AddPaymentModal({
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                 <FileText size={12} /> Description
               </Label>
               <Input
                 placeholder="e.g. Advance payment for shipping"
-                className="h-10 text-xs border-slate-200"
+                className="h-10 text-xs border-border"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                 <Paperclip size={12} /> Receipt / Screenshot
               </Label>
               <input
@@ -686,15 +696,15 @@ export default function AddPaymentModal({
                 onChange={handleFileChange}
               />
               {attachment ? (
-                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
-                  <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-border bg-muted text-xs">
+                  <span className="truncate text-foreground font-medium">{attachment.name}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setAttachment(null);
                       if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
-                    className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
                     title="Remove attachment"
                   >
                     <X size={14} />
@@ -704,7 +714,7 @@ export default function AddPaymentModal({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
+                  className="w-full h-10 rounded-md border border-dashed border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   Attach receipt image or PDF (optional)
                 </button>
@@ -712,7 +722,7 @@ export default function AddPaymentModal({
             </div>
 
             {getUserFromToken()?.role === 'MANAGER' && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
                 Payment requests require Finance approval before funds are deducted. Outstanding
                 balance updates immediately; cash moves only after approval.
               </div>
@@ -720,7 +730,7 @@ export default function AddPaymentModal({
           </div>
 
           {/* Pinned action bar — stays visible no matter how long the form gets. */}
-          <div className="shrink-0 flex gap-3 border-t border-slate-200 bg-white px-6 py-4">
+          <div className="shrink-0 flex gap-3 border-t border-border bg-card px-6 py-4">
             <Button
               type="button"
               variant="ghost"

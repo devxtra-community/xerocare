@@ -86,22 +86,22 @@ export default function PrinterAssetTable() {
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
-            <TableHead className="font-semibold text-gray-700">Printer Model</TableHead>
-            <TableHead className="font-semibold text-gray-700">Category</TableHead>
-            <TableHead className="font-semibold text-gray-700">Owning Branch</TableHead>
-            <TableHead className="font-semibold text-gray-700">Vendor</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center">Total</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center text-blue-600">
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="font-semibold text-foreground">Printer Model</TableHead>
+            <TableHead className="font-semibold text-foreground">Category</TableHead>
+            <TableHead className="font-semibold text-foreground">Owning Branch</TableHead>
+            <TableHead className="font-semibold text-foreground">Vendor</TableHead>
+            <TableHead className="font-semibold text-foreground text-center">Total</TableHead>
+            <TableHead className="font-semibold text-foreground text-center text-primary">
               Active
             </TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center text-green-600">
+            <TableHead className="font-semibold text-foreground text-center text-success">
               Avail
             </TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center text-red-600">
+            <TableHead className="font-semibold text-foreground text-center text-destructive">
               Svc
             </TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center text-orange-500">
+            <TableHead className="font-semibold text-foreground text-center text-warning">
               Idle
             </TableHead>
           </TableRow>
@@ -110,31 +110,33 @@ export default function PrinterAssetTable() {
           {currentData.map((item, idx) => (
             <TableRow
               key={idx}
-              className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
+              className={`hover:bg-muted/50 ${idx % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}`}
             >
               <TableCell className="font-medium text-foreground">{item.model}</TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-foreground">
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     item.category === 'Lease'
-                      ? 'bg-purple-100 text-purple-700'
+                      ? 'bg-lease/10 text-lease'
                       : item.category === 'Rental'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-muted text-foreground'
                   }`}
                 >
                   {item.category}
                 </span>
               </TableCell>
-              <TableCell className="text-gray-600">{item.branch}</TableCell>
-              <TableCell className="text-gray-600">{item.vendor}</TableCell>
+              <TableCell className="text-foreground">{item.branch}</TableCell>
+              <TableCell className="text-foreground">{item.vendor}</TableCell>
               <TableCell className="text-center font-bold text-foreground">{item.total}</TableCell>
-              <TableCell className="text-center font-medium text-blue-600">{item.active}</TableCell>
-              <TableCell className="text-center font-medium text-green-600">
+              <TableCell className="text-center font-medium text-primary">{item.active}</TableCell>
+              <TableCell className="text-center font-medium text-success">
                 {item.available}
               </TableCell>
-              <TableCell className="text-center font-medium text-red-600">{item.service}</TableCell>
-              <TableCell className="text-center font-medium text-orange-500">{item.idle}</TableCell>
+              <TableCell className="text-center font-medium text-destructive">
+                {item.service}
+              </TableCell>
+              <TableCell className="text-center font-medium text-warning">{item.idle}</TableCell>
             </TableRow>
           ))}
         </TableBody>

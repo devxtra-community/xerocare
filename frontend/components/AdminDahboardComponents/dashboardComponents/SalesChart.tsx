@@ -101,9 +101,9 @@ export default function SalesChart({
   }, [selectedPeriod, selectedYear, branchId]);
 
   return (
-    <div className="rounded-2xl bg-card h-[340px] w-full shadow-sm flex flex-col p-3 border border-gray-100">
+    <div className="rounded-2xl bg-card h-[340px] w-full shadow-sm flex flex-col p-3 border border-border">
       <div className="flex flex-row items-center justify-between pb-2">
-        <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
           Revenue Trend ({selectedYear === 'all' ? 'All Years' : selectedYear})
         </h4>
 
@@ -115,8 +115,8 @@ export default function SalesChart({
                 onClick={() => setSelectedPeriod(period)}
                 className={`px-2 py-0.5 rounded-md transition-colors ${
                   selectedPeriod === period
-                    ? 'bg-primary text-white font-medium'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-primary text-primary-foreground font-medium'
+                    : 'text-foreground hover:bg-muted'
                 }`}
               >
                 {period}
@@ -132,16 +132,16 @@ export default function SalesChart({
             <AreaChart data={data} margin={{ top: 5, left: 0, right: 5, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorSale" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-blue-dark)" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="var(--chart-blue-dark)" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorRent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-blue-soft)" stopOpacity={0.12} />
+                  <stop offset="95%" stopColor="var(--chart-blue-soft)" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorLease" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-blue-lighter)" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="var(--chart-blue-lighter)" stopOpacity={0} />
                 </linearGradient>
               </defs>
 
@@ -152,7 +152,7 @@ export default function SalesChart({
                 axisLine={false}
                 tickLine={false}
                 tickMargin={6}
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
               />
 
               <YAxis
@@ -160,7 +160,7 @@ export default function SalesChart({
                 tickLine={false}
                 tickFormatter={(v) => formatCompactNumber(v)}
                 tickMargin={6}
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
               />
 
               <Tooltip
@@ -181,7 +181,7 @@ export default function SalesChart({
                 type="monotone"
                 dataKey="SALE"
                 name="Sale"
-                stroke="#1d4ed8"
+                stroke="var(--chart-blue-dark)"
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorSale)"
@@ -191,7 +191,7 @@ export default function SalesChart({
                 type="monotone"
                 dataKey="RENT"
                 name="Rent"
-                stroke="#10b981"
+                stroke="var(--chart-blue-soft)"
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorRent)"
@@ -201,7 +201,7 @@ export default function SalesChart({
                 type="monotone"
                 dataKey="LEASE"
                 name="Lease"
-                stroke="#f59e0b"
+                stroke="var(--chart-blue-lighter)"
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorLease)"

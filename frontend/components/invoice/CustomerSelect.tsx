@@ -156,7 +156,7 @@ export function CustomerSelect({ value, onChange, customersOnly = false }: Custo
             type="button"
             variant="outline"
             onClick={() => setCreateCustomerOpen(true)}
-            className="h-10 px-3 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
+            className="h-10 px-3 rounded-xl border-dashed border-2 border-border text-muted-foreground hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
           >
             <Plus size={16} /> Add New Customer
           </Button>
@@ -165,7 +165,7 @@ export function CustomerSelect({ value, onChange, customersOnly = false }: Custo
             type="button"
             variant="outline"
             onClick={() => setCreateLeadOpen(true)}
-            className="h-10 px-3 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
+            className="h-10 px-3 rounded-xl border-dashed border-2 border-border text-muted-foreground hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
           >
             <Plus size={16} /> Create Lead
           </Button>

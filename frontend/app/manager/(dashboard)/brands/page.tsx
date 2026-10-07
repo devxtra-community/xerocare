@@ -89,9 +89,9 @@ function BrandsContent() {
   const totalBrands = brands.length;
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Brand Management</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Brand Management</h3>
         {isAdmin && <BranchFilterBar />}
       </div>
 
@@ -110,7 +110,7 @@ function BrandsContent() {
 
       <div className="flex items-center justify-between">
         <div className="relative w-[260px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search brands..."
             className="pl-9"
@@ -118,13 +118,16 @@ function BrandsContent() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-primary text-white gap-2">
+        <Button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="bg-primary text-primary-foreground gap-2"
+        >
           <Plus size={16} /> Add Brand
         </Button>
       </div>
 
       <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
-        <Table>
+        <Table pagination={{ pageSize: 10 }}>
           <TableHeader>
             <TableRow>
               {['BRAND NAME', 'STATUS', 'CREATED AT', 'DESCRIPTION', 'ACTION'].map((h) => (
@@ -152,14 +155,14 @@ function BrandsContent() {
               </TableRow>
             ) : (
               filteredBrands.map((brand, i) => (
-                <TableRow key={brand.id} className={i % 2 ? 'bg-sky-100/60' : ''}>
+                <TableRow key={brand.id} className={i % 2 ? 'bg-info/10' : ''}>
                   <TableCell className="px-4 font-medium">{brand.name}</TableCell>
                   <TableCell className="px-4">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         brand.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-muted text-foreground'
                       }`}
                     >
                       {brand.status}
@@ -177,7 +180,7 @@ function BrandsContent() {
                   <TableCell className="px-4">
                     <div className="flex gap-3 text-sm">
                       <button
-                        className="text-blue-600 hover:underline flex items-center gap-1"
+                        className="text-primary hover:underline flex items-center gap-1"
                         onClick={() => {
                           setEditingBrand(brand);
                           setIsAddDialogOpen(true);
@@ -186,7 +189,7 @@ function BrandsContent() {
                         <Pencil size={14} /> Edit
                       </button>
                       <button
-                        className="text-red-600 hover:underline flex items-center gap-1"
+                        className="text-destructive hover:underline flex items-center gap-1"
                         onClick={() => setDeletingBrand(brand)}
                       >
                         <Trash2 size={14} /> Delete
@@ -217,7 +220,7 @@ function BrandsContent() {
               <DialogTitle>Confirm Delete</DialogTitle>
             </DialogHeader>
             <div className="py-4 text-center">
-              <Trash2 className="mx-auto text-red-600 mb-2 h-10 w-10" />
+              <Trash2 className="mx-auto text-destructive mb-2 h-10 w-10" />
               <p>
                 Are you sure you want to delete <b>{deletingBrand.name}</b>?
               </p>
@@ -242,7 +245,7 @@ export default function BrandsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-blue-100">
+        <div className="flex items-center justify-center min-h-screen bg-card">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
         </div>
       }

@@ -189,14 +189,14 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
   return (
     <div className="space-y-4">
       {/* Filters Section */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Product / Model
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search product..."
                 value={productFilter}
@@ -206,11 +206,11 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Warehouse
             </label>
             <Select value={warehouseFilter || 'all'} onValueChange={setWarehouseFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Warehouses" />
               </SelectTrigger>
               <SelectContent>
@@ -224,11 +224,11 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Branch
             </label>
             <Select value={branchFilter || 'all'} onValueChange={setBranchFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
@@ -242,11 +242,11 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Brand
             </label>
             <Select value={brandFilter || 'all'} onValueChange={setBrandFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border">
                 <SelectValue placeholder="All Brands" />
               </SelectTrigger>
               <SelectContent>
@@ -264,7 +264,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
           <Button
             size="sm"
             onClick={handleFilter}
-            className="h-9 bg-primary text-white hover:bg-primary/90 text-xs px-4"
+            className="h-9 bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-4"
           >
             Apply Filters
           </Button>
@@ -272,7 +272,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
             size="sm"
             variant="outline"
             onClick={clearFilters}
-            className="h-9 text-gray-500 border-gray-200 hover:bg-gray-50 text-xs px-3"
+            className="h-9 text-muted-foreground border-border hover:bg-muted text-xs px-3"
             title="Clear Filters"
           >
             <FilterX className="h-4 w-4" />
@@ -328,7 +328,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                 currentData.map((item, index) => (
                   <TableRow
                     key={`${item.model_no}-${item.warehouse_name}-${index}`}
-                    className={`hover:bg-muted/50/30 transition-colors ${index % 2 ? 'bg-sky-100/60' : ''}`}
+                    className={`hover:bg-muted/50 transition-colors ${index % 2 ? 'bg-info/10' : ''}`}
                   >
                     <TableCell className="px-6 py-4 text-foreground">
                       <div className="font-medium">{item.model_name}</div>
@@ -341,29 +341,29 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                     <TableCell className="px-6 py-4 text-foreground font-medium">
                       {item.product_name || '-'}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-gray-600">{item.brand || '-'}</TableCell>
-                    <TableCell className="px-6 py-4 text-gray-600 font-medium">
+                    <TableCell className="px-6 py-4 text-foreground">{item.brand || '-'}</TableCell>
+                    <TableCell className="px-6 py-4 text-foreground font-medium">
                       {item.warehouse_name || '-'}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-center font-bold text-blue-600">
+                    <TableCell className="px-6 py-4 text-center font-bold text-primary">
                       {item.total_qty}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
                         {item.available_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning">
                         {item.rented_qty}
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-lease/10 text-lease">
                         {item.lease_qty}
                       </span>
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-center font-semibold text-gray-700">
+                    <TableCell className="px-6 py-4 text-center font-semibold text-foreground">
                       {formatCurrency(item.product_cost || 0, currency)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right pr-6">
@@ -371,7 +371,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-gray-400 hover:text-primary"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
                           onClick={() => {
                             if (item.product_id) {
                               router.push(`/admin/products/${item.product_id}`);
@@ -383,7 +383,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-gray-400 hover:text-primary"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
                           onClick={async () => {
                             if (item.product_id) {
                               try {
@@ -414,7 +414,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
           </Table>
         </div>
 
-        <div className="p-4 border-t border-gray-50 flex items-center justify-between bg-card text-primary font-bold">
+        <div className="p-4 border-t border-border flex items-center justify-between bg-card text-primary font-bold">
           <Pagination
             page={currentPage}
             totalPages={totalPages}

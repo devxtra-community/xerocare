@@ -97,24 +97,27 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px] p-6 rounded-2xl border-none shadow-2xl bg-background">
         <DialogHeader className="pb-2">
-          <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
+          <DialogTitle className="text-xl font-bold text-foreground tracking-tight">
             Create New Lead
           </DialogTitle>
-          <DialogDescription className="text-slate-400 text-xs font-semibold uppercase tracking-wider mt-1">
+          <DialogDescription className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mt-1">
             Register a prospect on the fly
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-3">
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold px-4 py-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive mt-1.5 shrink-0" />
               <div className="flex-1 leading-normal">{errorMessage}</div>
             </div>
           )}
           <div className="space-y-1.5">
-            <Label htmlFor="lead-name" className="text-xs font-bold text-slate-500 uppercase">
-              Lead Name <span className="text-red-500">*</span>
+            <Label
+              htmlFor="lead-name"
+              className="text-xs font-bold text-muted-foreground uppercase"
+            >
+              Lead Name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="lead-name"
@@ -122,7 +125,7 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={loading}
-              className="h-10 px-3 rounded-xl border-slate-200 focus-visible:ring-primary/20"
+              className="h-10 px-3 rounded-xl border-border focus-visible:ring-primary/20"
               required
             />
           </div>
@@ -132,7 +135,7 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
             phone box is derived from it, so it has to be picked first.
           */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Country</Label>
+            <Label className="text-xs font-bold text-muted-foreground uppercase">Country</Label>
             <SearchableSelect
               options={COUNTRY_PHONE_OPTIONS}
               value={country}
@@ -140,22 +143,27 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
               placeholder="Select country"
               emptyText="No country found."
               disabled={loading}
-              className="h-10 w-full justify-between rounded-xl border-slate-200"
+              className="h-10 w-full justify-between rounded-xl border-border"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="lead-phone" className="text-xs font-bold text-slate-500 uppercase">
+              <Label
+                htmlFor="lead-phone"
+                className="text-xs font-bold text-muted-foreground uppercase"
+              >
                 Phone Number
               </Label>
-              <div className="flex items-center h-10 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden relative bg-white">
+              <div className="flex items-center h-10 rounded-xl border border-border focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden relative bg-card">
                 <div className="flex items-center gap-1.5 h-full px-2.5 shrink-0 select-none">
                   {country && <span className="text-lg leading-none">{isoToFlag(country)}</span>}
-                  <span className="text-xs font-semibold text-slate-500">{dialCode || '+--'}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    {dialCode || '+--'}
+                  </span>
                 </div>
 
-                <div className="h-5 w-[1px] bg-slate-200 shrink-0" />
+                <div className="h-5 w-[1px] bg-muted shrink-0" />
 
                 <input
                   id="lead-phone"
@@ -164,12 +172,15 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
                   onChange={(e) => setRawPhone(e.target.value)}
                   placeholder={dialCode ? '5555 1234' : 'select country first'}
                   disabled={loading}
-                  className="flex-1 h-full px-3 bg-transparent outline-none border-none text-xs text-slate-800 placeholder:text-slate-400 font-medium"
+                  className="flex-1 h-full px-3 bg-transparent outline-none border-none text-xs text-foreground placeholder:text-muted-foreground font-medium"
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="lead-email" className="text-xs font-bold text-slate-500 uppercase">
+              <Label
+                htmlFor="lead-email"
+                className="text-xs font-bold text-muted-foreground uppercase"
+              >
                 Email Address
               </Label>
               <Input
@@ -179,14 +190,17 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="h-10 px-3 rounded-xl border-slate-200 focus-visible:ring-primary/20"
+                className="h-10 px-3 rounded-xl border-border focus-visible:ring-primary/20"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="lead-location" className="text-xs font-bold text-slate-500 uppercase">
-              Location <span className="text-red-500">*</span>
+            <Label
+              htmlFor="lead-location"
+              className="text-xs font-bold text-muted-foreground uppercase"
+            >
+              Location <span className="text-destructive">*</span>
             </Label>
             <Input
               id="lead-location"
@@ -194,33 +208,33 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               disabled={loading}
-              className="h-10 px-3 rounded-xl border-slate-200 focus-visible:ring-primary/20"
+              className="h-10 px-3 rounded-xl border-border focus-visible:ring-primary/20"
               required
             />
-            <p className="text-[10px] text-slate-400 font-medium leading-normal mt-0.5">
+            <p className="text-[10px] text-muted-foreground font-medium leading-normal mt-0.5">
               Entering the location now ensures immediate and seamless conversion to customer status
               during quotation creation.
             </p>
           </div>
 
-          <DialogFooter className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
+          <DialogFooter className="pt-4 flex items-center justify-end gap-2 border-t border-border">
             <Button
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={loading}
-              className="h-10 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-bold px-4"
+              className="h-10 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground font-bold px-4"
             >
               Discard
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="h-10 rounded-xl bg-primary text-white hover:bg-primary/95 shadow-md hover:shadow-lg transition-all font-bold px-5 flex items-center gap-2"
+              className="h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 shadow-md hover:shadow-lg transition-all font-bold px-5 flex items-center gap-2"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" />
                   Creating...
                 </>
               ) : (

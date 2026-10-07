@@ -199,11 +199,11 @@ export default function AddAccountDialog({ parent: fixedParent, onClose, onCreat
       categoryKey.trim().length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Add Account</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <h2 className="font-bold text-foreground">Add Account</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -213,7 +213,7 @@ export default function AddAccountDialog({ parent: fixedParent, onClose, onCreat
               <button
                 onClick={() => setKind('MAIN')}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  kind === 'MAIN' ? 'bg-card shadow-sm text-slate-800' : 'text-muted-foreground'
+                  kind === 'MAIN' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground'
                 }`}
               >
                 New Main Account
@@ -221,7 +221,7 @@ export default function AddAccountDialog({ parent: fixedParent, onClose, onCreat
               <button
                 onClick={() => setKind('SUB')}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  kind === 'SUB' ? 'bg-card shadow-sm text-slate-800' : 'text-muted-foreground'
+                  kind === 'SUB' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground'
                 }`}
               >
                 Sub-Account of...

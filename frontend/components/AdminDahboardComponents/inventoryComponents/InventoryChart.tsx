@@ -41,15 +41,15 @@ export default function InventoryChart() {
       <div className="flex flex-row items-center justify-between pb-4">
         <p className="text-xs text-muted-foreground font-medium uppercase">Last 7 Days</p>
 
-        <div className="flex gap-1.5 text-[10px] bg-blue-50/50 p-1 rounded-lg border border-blue-100/50">
+        <div className="flex gap-1.5 text-[10px] bg-primary/10 p-1 rounded-lg border border-primary/30">
           {['Weekly', 'Monthly'].map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
               className={`px-3 py-1.5 rounded-md transition-all duration-200 ${
                 selectedPeriod === period
-                  ? 'bg-primary text-white font-medium shadow-sm'
-                  : 'text-blue-600 hover:text-blue-800'
+                  ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                  : 'text-primary hover:text-primary'
               }`}
             >
               {period}
@@ -67,35 +67,39 @@ export default function InventoryChart() {
                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="stockOutGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-light)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--chart-blue-light)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
             <XAxis
               dataKey="day"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748B', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10 }}
               tickMargin={10}
             />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10 }}
+            />
             <Tooltip
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
                 padding: '8px',
                 fontSize: '11px',
               }}
-              cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              cursor={{ stroke: 'var(--chart-grid)', strokeWidth: 1 }}
             />
             <Legend
               verticalAlign="top"
               align="right"
               height={36}
               iconType="circle"
-              wrapperStyle={{ fontSize: '10px', color: '#64748B', top: -10 }}
+              wrapperStyle={{ fontSize: '10px', color: 'var(--chart-slate-dark)', top: -10 }}
             />
             <Area
               type="monotone"
@@ -109,7 +113,7 @@ export default function InventoryChart() {
             <Area
               type="monotone"
               dataKey="stockOut"
-              stroke="#93c5fd"
+              stroke="var(--chart-blue-light)"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#stockOutGradient)"

@@ -85,7 +85,7 @@ const docStyleBase: React.CSSProperties = {
   fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
   fontSize: 12,
   fontWeight: 300,
-  color: '#1a1a1a',
+  color: 'var(--foreground)',
 };
 
 const SectionHeading = DocSectionTitle;
@@ -125,7 +125,9 @@ function DocumentHeader({
           <div style={{ fontSize: 17, fontWeight: 300, color: ACCENT, marginBottom: 6 }}>
             {COMPANY.name}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 300, color: '#333', lineHeight: 1.5 }}>
+          <div
+            style={{ fontSize: 12, fontWeight: 300, color: 'var(--foreground)', lineHeight: 1.5 }}
+          >
             <div>{agreement.dealerAddress || COMPANY.addressLine1}</div>
             {agreement.dealerPhone ? <div>Mobile: {agreement.dealerPhone}</div> : null}
           </div>
@@ -134,10 +136,10 @@ function DocumentHeader({
           <div style={{ fontSize: 20, fontWeight: 300, color: ACCENT, textTransform: 'uppercase' }}>
             {meta.title}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 300, color: '#333', marginTop: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 300, color: 'var(--foreground)', marginTop: 6 }}>
             Ref: {agreement.agreementNumber}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 300, color: '#333' }}>
+          <div style={{ fontSize: 12, fontWeight: 300, color: 'var(--foreground)' }}>
             Date: {fmtDate(agreement.contractDate)}
           </div>
         </div>
@@ -163,37 +165,43 @@ function PartiesSection({
         {/* Seller */}
         <div className="p-3">
           <FieldLabel>Seller / Dealer</FieldLabel>
-          <p className="text-sm font-black text-slate-800 mb-1">{agreement.dealerName}</p>
+          <p className="text-sm font-black text-foreground mb-1">{agreement.dealerName}</p>
           {agreement.dealerAddress && (
-            <p className="text-[11px] text-slate-500 leading-snug">{agreement.dealerAddress}</p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {agreement.dealerAddress}
+            </p>
           )}
           {agreement.dealerPhone && (
-            <p className="text-[11px] text-slate-500">{agreement.dealerPhone}</p>
+            <p className="text-[11px] text-muted-foreground">{agreement.dealerPhone}</p>
           )}
           {invoice.taxRegistrationNumber && (
-            <p className="text-[10px] text-slate-400 mt-1.5">
+            <p className="text-[10px] text-muted-foreground mt-1.5">
               {invoice.taxName || 'VAT'} Reg. No.: {invoice.taxRegistrationNumber}
             </p>
           )}
           {invoice.employeeName && (
-            <p className="text-[10px] text-slate-400 mt-1">Sales Rep: {invoice.employeeName}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Sales Rep: {invoice.employeeName}
+            </p>
           )}
         </div>
         {/* Buyer */}
         <div className="p-3">
           <FieldLabel>Buyer / Customer</FieldLabel>
-          <p className="text-sm font-black text-slate-800 mb-1">{agreement.customerName}</p>
+          <p className="text-sm font-black text-foreground mb-1">{agreement.customerName}</p>
           {agreement.customerAddress && (
-            <p className="text-[11px] text-slate-500 leading-snug">{agreement.customerAddress}</p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {agreement.customerAddress}
+            </p>
           )}
           {agreement.customerPhone && (
-            <p className="text-[11px] text-slate-500">{agreement.customerPhone}</p>
+            <p className="text-[11px] text-muted-foreground">{agreement.customerPhone}</p>
           )}
           {agreement.customerEmail && (
-            <p className="text-[11px] text-slate-500">{agreement.customerEmail}</p>
+            <p className="text-[11px] text-muted-foreground">{agreement.customerEmail}</p>
           )}
           {agreement.customerVatNumber && (
-            <p className="text-[10px] text-slate-400 mt-1.5">
+            <p className="text-[10px] text-muted-foreground mt-1.5">
               {invoice.taxName || 'VAT'} Reg. No.: {agreement.customerVatNumber}
             </p>
           )}
@@ -230,14 +238,14 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
           <SectionHeading>Equipment / Product Details</SectionHeading>
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+              <tr className="bg-muted">
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-muted-foreground">
                   Description
                 </th>
-                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-muted-foreground">
                   Serial No.
                 </th>
-                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-muted-foreground">
                   Warranty
                 </th>
               </tr>
@@ -249,11 +257,13 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
                     const serial = item.serialNumber || item.sn || alloc?.serialNumber || '—';
                     return (
                       <tr key={idx}>
-                        <td className="px-3 py-2 font-semibold text-slate-700">
+                        <td className="px-3 py-2 font-semibold text-foreground">
                           {item.description}
                         </td>
-                        <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{serial}</td>
-                        <td className="px-3 py-2 text-[11px] text-slate-500">
+                        <td className="px-3 py-2 font-mono text-[11px] text-foreground">
+                          {serial}
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-muted-foreground">
                           {item.warranty || '—'}
                         </td>
                       </tr>
@@ -261,11 +271,11 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
                   })
                 : allocations.map((alloc, idx) => (
                     <tr key={idx}>
-                      <td className="px-3 py-2 font-semibold text-slate-700">Allocated Machine</td>
-                      <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
+                      <td className="px-3 py-2 font-semibold text-foreground">Allocated Machine</td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-foreground">
                         {alloc.serialNumber}
                       </td>
-                      <td className="px-3 py-2 text-[11px] text-slate-500">—</td>
+                      <td className="px-3 py-2 text-[11px] text-muted-foreground">—</td>
                     </tr>
                   ))}
             </tbody>
@@ -274,19 +284,19 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
       )}
       {accessoryItems.length > 0 && (
         <div>
-          <p className="text-[9px] font-black uppercase tracking-widest text-teal-600 mb-2">
+          <p className="text-[9px] font-black uppercase tracking-widest text-info mb-2">
             Accessories Included
           </p>
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-teal-50/50">
-                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
+              <tr className="bg-info/10">
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-info">
                   Description
                 </th>
-                <th className="text-center px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
+                <th className="text-center px-3 py-2 font-black text-[10px] uppercase tracking-widest text-info">
                   Qty
                 </th>
-                <th className="text-right px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
+                <th className="text-right px-3 py-2 font-black text-[10px] uppercase tracking-widest text-info">
                   Price
                 </th>
               </tr>
@@ -294,21 +304,21 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
             <tbody>
               {accessoryItems.map((item, idx) => (
                 <tr key={idx}>
-                  <td className="px-3 py-2 font-semibold text-slate-700">{item.description}</td>
-                  <td className="px-3 py-2 text-center text-slate-600">{item.quantity ?? 1}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">{item.description}</td>
+                  <td className="px-3 py-2 text-center text-foreground">{item.quantity ?? 1}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-foreground">
                     {fmtAmt((item.quantity ?? 1) * Number(item.unitPrice ?? 0), currency)}
                   </td>
                 </tr>
               ))}
-              <tr className="bg-teal-50/30">
+              <tr className="bg-info/10">
                 <td
                   colSpan={2}
-                  className="px-3 py-2 text-right font-black text-teal-700 text-[11px] uppercase"
+                  className="px-3 py-2 text-right font-black text-info text-[11px] uppercase"
                 >
                   Accessories Total
                 </td>
-                <td className="px-3 py-2 text-right font-black text-teal-700">
+                <td className="px-3 py-2 text-right font-black text-info">
                   {fmtAmt(accessoryTotal, currency)}
                 </td>
               </tr>
@@ -335,47 +345,49 @@ function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
       <table className="w-full text-xs">
         <tbody>
           <tr>
-            <td className="px-3 py-2 text-slate-600 font-semibold">Subtotal</td>
-            <td className="px-3 py-2 text-right font-semibold text-slate-800">
+            <td className="px-3 py-2 text-foreground font-semibold">Subtotal</td>
+            <td className="px-3 py-2 text-right font-semibold text-foreground">
               {fmtAmt(subtotal, currency)}
             </td>
           </tr>
           {tax > 0 && (
             <tr>
-              <td className="px-3 py-2 text-slate-500 font-semibold">
+              <td className="px-3 py-2 text-muted-foreground font-semibold">
                 {invoice.taxName || 'VAT'}
                 {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
               </td>
-              <td className="px-3 py-2 text-right font-semibold text-slate-700">
+              <td className="px-3 py-2 text-right font-semibold text-foreground">
                 {fmtAmt(tax, currency)}
               </td>
             </tr>
           )}
           {invoice.customerVatStatus === 'EXEMPT' && (
             <tr>
-              <td className="px-3 py-2 text-slate-500 font-semibold">{invoice.taxName || 'VAT'}</td>
-              <td className="px-3 py-2 text-right font-semibold text-slate-700">
+              <td className="px-3 py-2 text-muted-foreground font-semibold">
+                {invoice.taxName || 'VAT'}
+              </td>
+              <td className="px-3 py-2 text-right font-semibold text-foreground">
                 {invoice.taxName || 'VAT'} Exempt
               </td>
             </tr>
           )}
-          <tr className="bg-slate-50">
-            <td className="px-3 py-2 font-black text-slate-800">Total Amount</td>
-            <td className="px-3 py-2 text-right font-black text-slate-800">
+          <tr className="bg-muted">
+            <td className="px-3 py-2 font-black text-foreground">Total Amount</td>
+            <td className="px-3 py-2 text-right font-black text-foreground">
               {fmtAmt(total, currency)}
             </td>
           </tr>
           {advance > 0 && (
             <>
               <tr>
-                <td className="px-3 py-2 text-slate-500 font-semibold">Advance Paid</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                <td className="px-3 py-2 text-muted-foreground font-semibold">Advance Paid</td>
+                <td className="px-3 py-2 text-right font-semibold text-foreground">
                   − {fmtAmt(advance, currency)}
                 </td>
               </tr>
-              <tr className="bg-slate-50">
-                <td className="px-3 py-2 font-black text-slate-800">Balance Due</td>
-                <td className="px-3 py-2 text-right font-black text-slate-800">
+              <tr className="bg-muted">
+                <td className="px-3 py-2 font-black text-foreground">Balance Due</td>
+                <td className="px-3 py-2 text-right font-black text-foreground">
                   {fmtAmt(balanceDue, currency)}
                 </td>
               </tr>
@@ -413,71 +425,71 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
       <table className="w-full text-xs">
         <tbody>
           <tr>
-            <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Contract Start
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800">
+            <td className="px-3 py-2 font-semibold text-foreground">
               {fmtDate(invoice.effectiveFrom)}
             </td>
           </tr>
           {invoice.effectiveTo && (
             <tr>
-              <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Contract End
               </td>
-              <td className="px-3 py-2 font-semibold text-slate-800">
+              <td className="px-3 py-2 font-semibold text-foreground">
                 {fmtDate(invoice.effectiveTo)}
               </td>
             </tr>
           )}
           <tr>
-            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Billing Cycle
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800">
+            <td className="px-3 py-2 font-semibold text-foreground">
               {billingCycleLabel(invoice.rentPeriod)}
             </td>
           </tr>
           <tr>
-            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Payment Timing
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800 uppercase">
+            <td className="px-3 py-2 font-semibold text-foreground uppercase">
               {invoice.paymentTiming === 'ARREARS' ? 'Arrears (Postpaid)' : 'Advance'}
             </td>
           </tr>
           <tr>
-            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Plan Type
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800">
+            <td className="px-3 py-2 font-semibold text-foreground">
               {planLabel(invoice.rentType)}
             </td>
           </tr>
-          <tr className="bg-slate-50">
-            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+          <tr className="bg-muted">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Monthly Rate
             </td>
-            <td className="px-3 py-2 font-black text-slate-800">
+            <td className="px-3 py-2 font-black text-foreground">
               {fmtAmt(invoice.monthlyRent, currency)}
             </td>
           </tr>
           {monthlyRentTax > 0 && (
             <>
               <tr>
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   {invoice.taxName || 'VAT'}
                   {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
                 </td>
-                <td className="px-3 py-2 font-semibold text-slate-700">
+                <td className="px-3 py-2 font-semibold text-foreground">
                   {fmtAmt(monthlyRentTax, currency)}
                 </td>
               </tr>
-              <tr className="bg-slate-50">
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <tr className="bg-muted">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Monthly Rate (Incl. {invoice.taxName || 'VAT'})
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(monthlyRentInclTax, currency)}
                 </td>
               </tr>
@@ -489,20 +501,20 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
             <>
               {(bwItem.bwIncludedLimit ?? 0) > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     B&W Free Limit (A4)
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {Number(bwItem.bwIncludedLimit).toLocaleString()} copies / billing period
                   </td>
                 </tr>
               )}
               {(bwItem.bwExcessRate ?? 0) > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     B&W Excess Rate (A4)
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {currency} {Number(bwItem.bwExcessRate).toFixed(4)} per copy
                   </td>
                 </tr>
@@ -515,20 +527,20 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
             <>
               {(colorItem.colorIncludedLimit ?? 0) > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Color Free Limit
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {Number(colorItem.colorIncludedLimit).toLocaleString()} copies / billing period
                   </td>
                 </tr>
               )}
               {(colorItem.colorExcessRate ?? 0) > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Color Excess Rate
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {currency} {Number(colorItem.colorExcessRate).toFixed(4)} per copy
                   </td>
                 </tr>
@@ -541,10 +553,10 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
             <>
               {(comboItem.combinedIncludedLimit ?? 0) > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Combined Free Limit
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {Number(comboItem.combinedIncludedLimit).toLocaleString()} copies / billing
                     period
                   </td>
@@ -552,10 +564,10 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               )}
               {(comboItem.combinedExcessRate ?? 0) > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Combined Excess Rate
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {currency} {Number(comboItem.combinedExcessRate).toFixed(4)} per copy
                   </td>
                 </tr>
@@ -608,13 +620,13 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
 
               {/* Contract Rental Value */}
               <div className="mb-4">
-                <p className="text-[9px] font-black uppercase tracking-widest text-blue-600 mb-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-primary mb-2">
                   Contract Rental Value
                 </p>
-                <div className="bg-blue-50/50 rounded p-3">
+                <div className="bg-primary/10 rounded p-3">
                   <div className="flex justify-between">
-                    <span className="text-xs text-slate-600">Monthly Rent × {months} Months</span>
-                    <span className="text-sm font-black text-blue-700">
+                    <span className="text-xs text-foreground">Monthly Rent × {months} Months</span>
+                    <span className="text-sm font-black text-primary">
                       {fmtAmt(rentalValue, currency)}
                     </span>
                   </div>
@@ -623,37 +635,39 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
 
               {/* Initial Payment */}
               <div className="mb-4">
-                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-success mb-2">
                   Initial Payment
                 </p>
                 <div className="space-y-1">
                   {!isArrears && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-600">First Month Advance Payment</span>
+                      <span className="text-foreground">First Month Advance Payment</span>
                       <span className="font-semibold">{fmtAmt(firstAdvance, currency)}</span>
                     </div>
                   )}
                   {isArrears && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-600">First Month Advance</span>
-                      <span className="text-slate-400 italic">Not Applicable (Postpaid)</span>
+                      <span className="text-foreground">First Month Advance</span>
+                      <span className="text-muted-foreground italic">
+                        Not Applicable (Postpaid)
+                      </span>
                     </div>
                   )}
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-600">Security Deposit</span>
+                    <span className="text-foreground">Security Deposit</span>
                     <span className="font-semibold">
                       {secDeposit > 0 ? fmtAmt(secDeposit, currency) : 'None'}
                     </span>
                   </div>
                   {accessoryTotal > 0 && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-600">Accessories</span>
+                      <span className="text-foreground">Accessories</span>
                       <span className="font-semibold">{fmtAmt(accessoryTotal, currency)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-xs font-black pt-1">
-                    <span className="text-emerald-800 uppercase">Initial Amount Payable</span>
-                    <span className="text-emerald-700">{fmtAmt(initialPayable, currency)}</span>
+                    <span className="text-success uppercase">Initial Amount Payable</span>
+                    <span className="text-success">{fmtAmt(initialPayable, currency)}</span>
                   </div>
                 </div>
               </div>
@@ -661,22 +675,22 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               {/* Monthly Schedule */}
               {schedule.length > 0 && (
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-violet-600 mb-2">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-lease mb-2">
                     Contract Rental Schedule
                   </p>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-slate-50">
-                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
+                      <tr className="bg-muted">
+                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-muted-foreground">
                           Period
                         </th>
-                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
+                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-muted-foreground">
                           Start
                         </th>
-                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
+                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-muted-foreground">
                           End
                         </th>
-                        <th className="px-2 py-1 text-right text-[8px] font-black uppercase tracking-widest text-slate-400">
+                        <th className="px-2 py-1 text-right text-[8px] font-black uppercase tracking-widest text-muted-foreground">
                           Base Rent
                         </th>
                       </tr>
@@ -687,10 +701,10 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                           <td className="px-2 py-1 font-semibold">
                             Month {row.month} — {row.label}
                           </td>
-                          <td className="px-2 py-1 text-slate-600">
+                          <td className="px-2 py-1 text-foreground">
                             {fmtDate(row.start.toISOString())}
                           </td>
-                          <td className="px-2 py-1 text-slate-600">
+                          <td className="px-2 py-1 text-foreground">
                             {fmtDate(row.end.toISOString())}
                           </td>
                           <td className="px-2 py-1 text-right font-semibold">
@@ -698,14 +712,14 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                           </td>
                         </tr>
                       ))}
-                      <tr className="bg-blue-50/50">
+                      <tr className="bg-primary/10">
                         <td
                           colSpan={3}
-                          className="px-2 py-1 text-right text-[9px] font-black uppercase tracking-widest text-blue-700"
+                          className="px-2 py-1 text-right text-[9px] font-black uppercase tracking-widest text-primary"
                         >
                           Total Contract Rental Value
                         </td>
-                        <td className="px-2 py-1 text-right text-xs font-black text-blue-700">
+                        <td className="px-2 py-1 text-right text-xs font-black text-primary">
                           {fmtAmt(rentalValue, currency)}
                         </td>
                       </tr>
@@ -747,66 +761,66 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
       <table className="w-full text-xs">
         <tbody>
           <tr>
-            <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Lease Type
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800">
+            <td className="px-3 py-2 font-semibold text-foreground">
               {isEMI ? 'EMI — Equal Monthly Installments' : 'FSM — Full-Service Management'}
             </td>
           </tr>
           <tr>
-            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Tenure
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800">
+            <td className="px-3 py-2 font-semibold text-foreground">
               {invoice.leaseTenureMonths ?? '—'} months
             </td>
           </tr>
           <tr>
-            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Contract Start
             </td>
-            <td className="px-3 py-2 font-semibold text-slate-800">
+            <td className="px-3 py-2 font-semibold text-foreground">
               {fmtDate(invoice.effectiveFrom)}
             </td>
           </tr>
 
           {isEMI ? (
             <>
-              <tr className="bg-slate-50">
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <tr className="bg-muted">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Monthly EMI
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(invoice.monthlyEmiAmount ?? invoice.monthlyLeaseAmount, currency)}
                 </td>
               </tr>
               {monthlyTax > 0 && (
                 <>
                   <tr>
-                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       {invoice.taxName || 'VAT'}
                       {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
                     </td>
-                    <td className="px-3 py-2 font-semibold text-slate-700">
+                    <td className="px-3 py-2 font-semibold text-foreground">
                       {fmtAmt(monthlyTax, currency)}
                     </td>
                   </tr>
-                  <tr className="bg-slate-50">
-                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <tr className="bg-muted">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       Monthly EMI (Incl. {invoice.taxName || 'VAT'})
                     </td>
-                    <td className="px-3 py-2 font-black text-slate-800">
+                    <td className="px-3 py-2 font-black text-foreground">
                       {fmtAmt(monthlyInclTax, currency)}
                     </td>
                   </tr>
                 </>
               )}
               <tr>
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Total Lease Value
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(invoice.totalLeaseAmount ?? invoice.totalAmount, currency)}
                 </td>
               </tr>
@@ -814,37 +828,37 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
           ) : (
             <>
               <tr>
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Service Plan
                 </td>
-                <td className="px-3 py-2 font-semibold text-slate-800">
+                <td className="px-3 py-2 font-semibold text-foreground">
                   {planLabel(invoice.rentType)}
                 </td>
               </tr>
-              <tr className="bg-slate-50">
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <tr className="bg-muted">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Monthly Service Amount
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(invoice.monthlyLeaseAmount ?? invoice.monthlyRent, currency)}
                 </td>
               </tr>
               {monthlyTax > 0 && (
                 <>
                   <tr>
-                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       {invoice.taxName || 'VAT'}
                       {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
                     </td>
-                    <td className="px-3 py-2 font-semibold text-slate-700">
+                    <td className="px-3 py-2 font-semibold text-foreground">
                       {fmtAmt(monthlyTax, currency)}
                     </td>
                   </tr>
-                  <tr className="bg-slate-50">
-                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <tr className="bg-muted">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       Monthly Service Amount (Incl. {invoice.taxName || 'VAT'})
                     </td>
-                    <td className="px-3 py-2 font-black text-slate-800">
+                    <td className="px-3 py-2 font-black text-foreground">
                       {fmtAmt(monthlyInclTax, currency)}
                     </td>
                   </tr>
@@ -854,20 +868,20 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                 <>
                   {(bwItem.bwIncludedLimit ?? 0) > 0 && (
                     <tr>
-                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                         B&W Free Limit (A4)
                       </td>
-                      <td className="px-3 py-2 font-semibold text-slate-700">
+                      <td className="px-3 py-2 font-semibold text-foreground">
                         {Number(bwItem.bwIncludedLimit).toLocaleString()} copies / month
                       </td>
                     </tr>
                   )}
                   {(bwItem.bwExcessRate ?? 0) > 0 && (
                     <tr>
-                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                         B&W Excess Rate
                       </td>
-                      <td className="px-3 py-2 font-semibold text-slate-700">
+                      <td className="px-3 py-2 font-semibold text-foreground">
                         {currency} {Number(bwItem.bwExcessRate).toFixed(4)} / copy
                       </td>
                     </tr>
@@ -878,20 +892,20 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                 <>
                   {(colorItem.colorIncludedLimit ?? 0) > 0 && (
                     <tr>
-                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                         Color Free Limit
                       </td>
-                      <td className="px-3 py-2 font-semibold text-slate-700">
+                      <td className="px-3 py-2 font-semibold text-foreground">
                         {Number(colorItem.colorIncludedLimit).toLocaleString()} copies / month
                       </td>
                     </tr>
                   )}
                   {(colorItem.colorExcessRate ?? 0) > 0 && (
                     <tr>
-                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                         Color Excess Rate
                       </td>
-                      <td className="px-3 py-2 font-semibold text-slate-700">
+                      <td className="px-3 py-2 font-semibold text-foreground">
                         {currency} {Number(colorItem.colorExcessRate).toFixed(4)} / copy
                       </td>
                     </tr>
@@ -959,22 +973,22 @@ function AdvanceSection({
           {hasAdvance && (
             <>
               <tr>
-                <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   {advanceLabel}
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(advanceTax > 0 ? advanceInclTax : advance, currency)}
                 </td>
               </tr>
               {advanceTax > 0 && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     {invoice.taxName || 'VAT'}
                     {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''} on {advanceLabel}
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {fmtAmt(advanceTax, currency)}{' '}
-                    <span className="text-slate-400 font-normal">
+                    <span className="text-muted-foreground font-normal">
                       (base {fmtAmt(advance, currency)})
                     </span>
                   </td>
@@ -982,16 +996,16 @@ function AdvanceSection({
               )}
               {invoice.preferredPaymentMode && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Payment Mode
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {paymentModeLabel(invoice.preferredPaymentMode)}
                   </td>
                 </tr>
               )}
               <tr className={hasDeposit || hasAccessories ? '' : ''}>
-                <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
+                <td colSpan={2} className="px-3 py-2 text-[10px] text-muted-foreground italic">
                   {advanceNote}
                 </td>
               </tr>
@@ -999,26 +1013,26 @@ function AdvanceSection({
           )}
           {hasDeposit && (
             <>
-              <tr className="bg-slate-50">
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <tr className="bg-muted">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                   Security Deposit
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(secDeposit, currency)}
                 </td>
               </tr>
               {invoice.securityDepositMode && (
                 <tr>
-                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Deposit Mode
                   </td>
-                  <td className="px-3 py-2 font-semibold text-slate-700">
+                  <td className="px-3 py-2 font-semibold text-foreground">
                     {paymentModeLabel(invoice.securityDepositMode)}
                   </td>
                 </tr>
               )}
               <tr className={hasAccessories ? '' : ''}>
-                <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
+                <td colSpan={2} className="px-3 py-2 text-[10px] text-muted-foreground italic">
                   {depositNote}
                 </td>
               </tr>
@@ -1026,16 +1040,16 @@ function AdvanceSection({
           )}
           {hasAccessories && (
             <>
-              <tr className="bg-teal-50/40">
-                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-teal-600">
+              <tr className="bg-info/10">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-info">
                   Accessories ({accessoryItems.length})
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">
+                <td className="px-3 py-2 font-black text-foreground">
                   {fmtAmt(accessoryTotal, currency)}
                 </td>
               </tr>
               <tr>
-                <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
+                <td colSpan={2} className="px-3 py-2 text-[10px] text-muted-foreground italic">
                   Accessories are collected once, together with the{' '}
                   {hasAdvance ? advanceLabel.toLowerCase() : 'first payment'} above — see Equipment
                   / Product Details for the itemized list.
@@ -1070,11 +1084,11 @@ function WarrantySection({ invoice }: { invoice: Invoice }) {
       <SectionHeading>Warranty</SectionHeading>
       <div className="px-3 py-2.5 text-xs space-y-1">
         {lines.map((line, i) => (
-          <p key={i} className="font-semibold text-slate-700">
+          <p key={i} className="font-semibold text-foreground">
             {line}
           </p>
         ))}
-        <p className="text-[10px] text-slate-500 mt-1 italic">
+        <p className="text-[10px] text-muted-foreground mt-1 italic">
           Warranty applies from the date of installation/delivery and covers manufacturing defects
           under normal operating conditions.
         </p>
@@ -1091,7 +1105,7 @@ function TermsSection({ agreement }: { agreement: ContractAgreement }) {
     <div>
       <SectionHeading>Terms &amp; Conditions</SectionHeading>
       <div className="px-3 py-3">
-        <pre className="text-[10px] text-slate-600 whitespace-pre-wrap font-sans leading-relaxed">
+        <pre className="text-[10px] text-foreground whitespace-pre-wrap font-sans leading-relaxed">
           {agreement.termsAndConditions}
         </pre>
       </div>
@@ -1108,7 +1122,7 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
       <div className="grid grid-cols-1 sm:grid-cols-2">
         {/* Seller */}
         <div className="p-3">
-          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">
             Seller Signature
           </p>
           {agreement.employeeSignatureData ? (
@@ -1116,9 +1130,9 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
               <img
                 src={agreement.employeeSignatureData}
                 alt="Employee Signature"
-                className="max-h-16 w-full object-contain bg-white p-1 mb-1"
+                className="max-h-16 w-full object-contain bg-card p-1 mb-1"
               />
-              <p className="text-[9px] text-slate-500">
+              <p className="text-[9px] text-muted-foreground">
                 {agreement.employeeSignedByName}
                 {agreement.employeeSignedAt
                   ? ` · ${new Date(agreement.employeeSignedAt).toLocaleDateString('en-GB')}`
@@ -1127,41 +1141,41 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
             </div>
           ) : (
             <div className="py-4 text-center">
-              <p className="text-[10px] text-slate-400">Awaiting seller signature</p>
+              <p className="text-[10px] text-muted-foreground">Awaiting seller signature</p>
             </div>
           )}
           <div className="mt-3 pt-2">
-            <p className="text-[9px] text-slate-400">Authorised Signatory</p>
-            <p className="text-[9px] font-bold text-slate-600">{agreement.dealerName}</p>
+            <p className="text-[9px] text-muted-foreground">Authorised Signatory</p>
+            <p className="text-[9px] font-bold text-foreground">{agreement.dealerName}</p>
           </div>
         </div>
 
         {/* Customer */}
         <div className="p-3">
-          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">
             Customer Signature
           </p>
           {agreement.customerSignedMethod === 'UPLOAD' && agreement.customerSignedDocumentUrl ? (
             <div className="p-2 space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <FileText size={12} className="text-slate-500 shrink-0" />
-                <p className="text-[10px] font-bold text-slate-600">Uploaded Document</p>
+                <FileText size={12} className="text-muted-foreground shrink-0" />
+                <p className="text-[10px] font-bold text-foreground">Uploaded Document</p>
               </div>
               <a
                 href={agreement.customerSignedDocumentUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs font-bold text-slate-700 hover:underline"
+                className="flex items-center gap-1 text-xs font-bold text-foreground hover:underline"
               >
                 <ExternalLink size={10} />
                 View Signed Document
               </a>
               {agreement.customerSignedDocumentNote && (
-                <p className="text-[10px] text-slate-500 pt-1">
+                <p className="text-[10px] text-muted-foreground pt-1">
                   {agreement.customerSignedDocumentNote}
                 </p>
               )}
-              <p className="text-[9px] text-slate-400">
+              <p className="text-[9px] text-muted-foreground">
                 {agreement.customerSignedByName}
                 {agreement.customerSignedAt
                   ? ` · ${new Date(agreement.customerSignedAt).toLocaleDateString('en-GB')}`
@@ -1173,31 +1187,31 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
               <img
                 src={agreement.customerSignatureData}
                 alt="Customer Signature"
-                className="max-h-16 w-full object-contain bg-white p-1 mb-1"
+                className="max-h-16 w-full object-contain bg-card p-1 mb-1"
               />
-              <p className="text-[9px] text-slate-500">
+              <p className="text-[9px] text-muted-foreground">
                 {agreement.customerSignedByName}
                 {agreement.customerSignedAt
                   ? ` · ${new Date(agreement.customerSignedAt).toLocaleDateString('en-GB')}`
                   : ''}
                 {agreement.customerSignedMethod === 'REMOTE' && (
-                  <span className="ml-1 text-slate-400">(Remote)</span>
+                  <span className="ml-1 text-muted-foreground">(Remote)</span>
                 )}
               </p>
             </div>
           ) : (
             <div className="py-4 text-center">
-              <p className="text-[10px] text-slate-400">Awaiting customer signature</p>
+              <p className="text-[10px] text-muted-foreground">Awaiting customer signature</p>
             </div>
           )}
           <div className="mt-3 pt-2">
-            <p className="text-[9px] text-slate-400">Customer / Authorised Representative</p>
-            <p className="text-[9px] font-bold text-slate-600">{agreement.customerName}</p>
+            <p className="text-[9px] text-muted-foreground">Customer / Authorised Representative</p>
+            <p className="text-[9px] font-bold text-foreground">{agreement.customerName}</p>
           </div>
         </div>
       </div>
 
-      <p className="text-[10px] text-slate-400 text-center mt-3 leading-relaxed">
+      <p className="text-[10px] text-muted-foreground text-center mt-3 leading-relaxed">
         By signing above, both parties confirm that they have read, understood, and agreed to the
         terms and conditions set out in this agreement.
       </p>

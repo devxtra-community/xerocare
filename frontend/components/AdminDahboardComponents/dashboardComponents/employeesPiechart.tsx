@@ -11,10 +11,10 @@ interface ChartData {
 }
 
 const COLORS = {
-  Employee: '#003F7D',
-  Finance: '#0284C7',
-  HR: '#9BD0E5',
-  Other: '#CBD5E1',
+  Employee: 'var(--primary-blue-dark)',
+  Finance: 'var(--info)',
+  HR: 'var(--chart-blue-light)',
+  Other: 'var(--border)',
 };
 
 /**
@@ -79,7 +79,7 @@ export default function EmployeePieChart({
 
         // Ensure we always have some data to display or valid empty state
         if (chartData.length === 0) {
-          setData([{ name: 'No Data', value: 1, color: '#f3f4f6', percentage: 0 }]);
+          setData([{ name: 'No Data', value: 1, color: 'var(--muted)', percentage: 0 }]);
           setTotal(0);
         } else {
           setData(chartData);
@@ -93,28 +93,28 @@ export default function EmployeePieChart({
   }, [selectedYear, branchId]);
 
   return (
-    <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex flex-col">
+    <div className="rounded-2xl bg-card p-3 sm:p-4 shadow-sm w-full h-[340px] flex flex-col">
       {!isClient || data.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading distribution...</p>
         </div>
       ) : (
         <div className="flex flex-col h-full">
-          <div className="relative w-[100px] h-[100px] mx-auto mb-2 flex-shrink-0">
-            <PieChart width={100} height={100}>
+          <div className="relative w-[148px] h-[148px] mx-auto mb-3 flex-shrink-0">
+            <PieChart width={148} height={148}>
               <Pie
                 data={data}
                 dataKey="value"
                 nameKey="name"
-                cx={50}
-                cy={50}
-                innerRadius={30}
-                outerRadius={47}
+                cx={74}
+                cy={74}
+                innerRadius={44}
+                outerRadius={68}
                 startAngle={90}
                 endAngle={-270}
                 paddingAngle={3}
-                stroke="#ffffff"
-                strokeWidth={2}
+                stroke="var(--card)"
+                strokeWidth={3}
                 isAnimationActive={false}
               >
                 {data.map((entry, index) => (
@@ -124,34 +124,35 @@ export default function EmployeePieChart({
             </PieChart>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <p className="text-xl font-bold text-foreground leading-none mt-2 ml-2">{total}</p>
-              <p className="text-[8px] text-foreground leading-tight font-medium ml-2">Total</p>
+              <p className="text-2xl font-semibold text-foreground leading-none">{total}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground leading-tight font-medium">
+                Employees
+              </p>
             </div>
           </div>
 
           <div className="w-full flex-1 overflow-hidden">
-            <div className="grid grid-cols-3 text-[10px] font-semibold text-primary border-b border-border pb-1.5 mb-1.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_72px_48px] text-[11px] font-semibold text-primary border-b border-border pb-2 mb-1">
               <span>Department</span>
-              <span className="text-center">
-                Number Of
-                <br />
-                Employees
-              </span>
-              <span className="text-right">%</span>
+              <span className="text-center">Employees</span>
+              <span className="text-right">Share</span>
             </div>
 
             {data.map(
               (item) =>
                 item.name !== 'No Data' && (
-                  <div key={item.name} className="grid grid-cols-3 items-center py-1 text-xs">
-                    <div className="flex items-center gap-1.5">
+                  <div
+                    key={item.name}
+                    className="grid grid-cols-[minmax(0,1fr)_72px_48px] items-center py-1.5 text-[13px]"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
                       <span
-                        className="h-2 w-2 rounded-full"
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="font-medium text-foreground">{item.name}</span>
+                      <span className="truncate font-medium text-foreground">{item.name}</span>
                     </div>
-                    <span className="text-center font-semibold text-foreground">{item.value}</span>
+                    <span className="text-center font-medium text-foreground">{item.value}</span>
                     <span className="text-right font-semibold text-foreground">
                       {item.percentage}%
                     </span>

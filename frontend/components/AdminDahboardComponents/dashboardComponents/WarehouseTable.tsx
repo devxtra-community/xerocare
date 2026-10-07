@@ -152,17 +152,17 @@ export default function WarehouseTable({
             <tbody>
               {currentData.length > 0 ? (
                 currentData.map((item, index) => (
-                  <tr key={item.id} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}>
+                  <tr key={item.id} className={index % 2 === 1 ? 'bg-primary/10' : 'bg-card'}>
                     <td className="py-2 px-2 text-[10px] sm:text-xs font-medium text-foreground">
                       {item.warehouseName}
                     </td>
-                    <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-2 px-2 text-[10px] sm:text-xs text-foreground">
                       {item.branch?.name || 'N/A'}
                     </td>
-                    <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-2 px-2 text-[10px] sm:text-xs text-foreground">
                       {item.location}
                     </td>
-                    <td className="py-2 px-2 text-[10px] sm:text-xs text-gray-700">
+                    <td className="py-2 px-2 text-[10px] sm:text-xs text-foreground">
                       {item.capacity}
                     </td>
                   </tr>

@@ -81,27 +81,31 @@ interface ProductDetail {
 
 const statusConfig: Record<string, { color: string; bg: string; dot: string }> = {
   AVAILABLE: {
-    color: 'text-emerald-700',
-    bg: 'bg-emerald-50 border-emerald-200',
-    dot: 'bg-emerald-500',
+    color: 'text-success',
+    bg: 'bg-success/10 border-success/30',
+    dot: 'bg-success',
   },
-  RENTED: { color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
-  SOLD: { color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200', dot: 'bg-slate-400' },
-  LEASE: { color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200', dot: 'bg-violet-500' },
-  DAMAGED: { color: 'text-red-600', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500' },
-  RETURNED: { color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500' },
+  RENTED: { color: 'text-primary', bg: 'bg-primary/10 border-primary/30', dot: 'bg-primary' },
+  SOLD: { color: 'text-foreground', bg: 'bg-muted border-border', dot: 'bg-muted' },
+  LEASE: { color: 'text-lease', bg: 'bg-lease/10 border-lease/30', dot: 'bg-lease' },
+  DAMAGED: {
+    color: 'text-destructive',
+    bg: 'bg-destructive/10 border-destructive/30',
+    dot: 'bg-destructive',
+  },
+  RETURNED: { color: 'text-warning', bg: 'bg-warning/10 border-warning/30', dot: 'bg-warning' },
 };
 
 function SectionLabel({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <div className="h-5 w-5 rounded-md bg-slate-100 flex items-center justify-center flex-shrink-0">
-        <Icon size={11} className="text-slate-500" />
+      <div className="h-5 w-5 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+        <Icon size={11} className="text-muted-foreground" />
       </div>
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
-      <div className="flex-1 h-px bg-slate-100" />
+      <div className="flex-1 h-px bg-muted" />
     </div>
   );
 }
@@ -110,10 +114,10 @@ function Field({ label, value }: { label: string; value?: string | number | null
   if (value == null || value === '') return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
-      <span className="text-xs font-semibold text-slate-800 break-words">{value}</span>
+      <span className="text-xs font-semibold text-foreground break-words">{value}</span>
     </div>
   );
 }
@@ -225,36 +229,38 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-lg rounded-2xl p-0 overflow-hidden border border-slate-200 shadow-2xl"
+        className="sm:max-w-lg rounded-2xl p-0 overflow-hidden border border-border shadow-2xl"
       >
         <DialogTitle className="sr-only">Product Details</DialogTitle>
 
         {/* ── White header ── */}
-        <div className="bg-white border-b border-slate-100 px-5 pt-5 pb-4 relative">
+        <div className="bg-card border-b border-border px-5 pt-5 pb-4 relative">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+            className="absolute top-4 right-4 h-7 w-7 rounded-full bg-muted hover:bg-muted flex items-center justify-center transition-colors"
           >
-            <X size={13} className="text-slate-500" />
+            <X size={13} className="text-muted-foreground" />
           </button>
 
           <div className="flex items-center gap-3 pr-8">
-            <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <Package size={18} className="text-slate-500" />
+            <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+              <Package size={18} className="text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">
                 Product Details
               </p>
               {product ? (
                 <>
-                  <p className="text-base font-black text-slate-800 leading-tight truncate">
+                  <p className="text-base font-black text-foreground leading-tight truncate">
                     {product.name}
                   </p>
-                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">{product.serial_no}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                    {product.serial_no}
+                  </p>
                 </>
               ) : (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-muted-foreground">Loading…</p>
               )}
             </div>
           </div>
@@ -268,12 +274,12 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                 {product.product_status}
               </span>
               {product.ownership && (
-                <span className="text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-500 rounded-full px-2.5 py-1 border border-slate-200">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-muted text-muted-foreground rounded-full px-2.5 py-1 border border-border">
                   {product.ownership}
                 </span>
               )}
               {availableQty !== null && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 rounded-full px-2.5 py-1 border border-emerald-200">
+                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-success/10 text-success rounded-full px-2.5 py-1 border border-success/30">
                   <CheckCircle2 size={9} />
                   {availableQty} Available
                 </span>
@@ -283,19 +289,19 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
         </div>
 
         {/* ── Body ── */}
-        <div className="p-5 max-h-[68vh] overflow-y-auto space-y-5 bg-slate-50/40">
+        <div className="p-5 max-h-[68vh] overflow-y-auto space-y-5 bg-muted/40">
           {loading && (
             <div className="flex items-center justify-center py-10">
-              <Loader2 size={24} className="animate-spin text-slate-400" />
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
             </div>
           )}
-          {error && <p className="text-center text-sm text-red-500 py-8">{error}</p>}
+          {error && <p className="text-center text-sm text-destructive py-8">{error}</p>}
 
           {product && !loading && (
             <>
               {/* Product image */}
               {product.imageUrl ? (
-                <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-44 flex items-center justify-center">
+                <div className="rounded-xl overflow-hidden border border-border bg-card h-44 flex items-center justify-center">
                   <img
                     src={resolveImageUrl(product.imageUrl)}
                     alt={product.name}
@@ -303,14 +309,14 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                   />
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-white h-24 flex flex-col items-center justify-center gap-2 text-slate-300">
+                <div className="rounded-xl border border-dashed border-border bg-card h-24 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                   <ImageOff size={20} />
                   <span className="text-[10px] font-bold">No image</span>
                 </div>
               )}
 
               {/* ── Product Identity ── */}
-              <div className="bg-white rounded-xl border border-slate-100 p-4">
+              <div className="bg-card rounded-xl border border-border p-4">
                 <SectionLabel icon={Package} label="Product Identity" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <Field label="Product Name" value={product.name} />
@@ -349,7 +355,7 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                 product.warranty ||
                 product.warranty_start_date ||
                 product.warranty_end_date) && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <SectionLabel icon={CalendarDays} label="Dates & Warranty" />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <Field label="Mfg. Date" value={fmtDate(product.MFD)} />
@@ -362,7 +368,7 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
 
               {/* ── Warehouse Details ── */}
               {product.warehouse && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <SectionLabel icon={Warehouse} label="Warehouse Details" />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <Field label="Warehouse Name" value={warehouseName} />
@@ -371,10 +377,10 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                     <Field label="Capacity" value={product.warehouse.capacity} />
                     {availableQty !== null && (
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                           Available Quantity
                         </span>
-                        <span className="text-xs font-black text-emerald-600">
+                        <span className="text-xs font-black text-success">
                           {availableQty} unit{availableQty !== 1 ? 's' : ''} in stock
                         </span>
                       </div>
@@ -385,7 +391,7 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
 
               {/* ── Vendor Details ── */}
               {!hideVendorDetails && product.vendor && vendorName && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <SectionLabel icon={Users} label="Vendor Details" />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <Field label="Vendor Name" value={vendorName} />
@@ -401,21 +407,26 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                   service tickets/contracts and Rent/Lease installation, usage and
                   replacement alike. */}
               {meterReadings.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <SectionLabel icon={Gauge} label="Meter Reading History" />
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-border">
                     {meterReadings.map((r) => (
                       <div key={r.id} className="flex items-center justify-between py-1.5 text-xs">
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-700">
+                          <p className="font-semibold text-foreground">
                             {meterSourceLabel(r.source) ?? r.source}
                             {r.referenceNo && (
-                              <span className="font-normal text-slate-400"> · {r.referenceNo}</span>
+                              <span className="font-normal text-muted-foreground">
+                                {' '}
+                                · {r.referenceNo}
+                              </span>
                             )}
                           </p>
-                          <p className="text-[10px] text-slate-400">{fmtDate(r.readingDate)}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {fmtDate(r.readingDate)}
+                          </p>
                         </div>
-                        <span className="shrink-0 font-bold tabular-nums text-slate-800">
+                        <span className="shrink-0 font-bold tabular-nums text-foreground">
                           {Number(r.totalReading).toLocaleString()}
                         </span>
                       </div>
@@ -425,11 +436,11 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
               )}
 
               {(contractsLoading || contracts.length > 0) && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <SectionLabel icon={FileText} label="Service Agreement History" />
                   {contractsLoading ? (
                     <div className="flex items-center justify-center py-4">
-                      <Loader2 size={16} className="animate-spin text-slate-400" />
+                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -440,26 +451,26 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                             key={c.id}
                             className={`rounded-lg border p-3 ${
                               isCurrent
-                                ? 'border-emerald-200 bg-emerald-50/50'
-                                : 'border-slate-100 bg-slate-50/50'
+                                ? 'border-success/30 bg-success/10'
+                                : 'border-border bg-muted/50'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100 rounded px-1.5 py-0.5">
+                                <span className="text-[9px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/30 rounded px-1.5 py-0.5">
                                   {c.contractType}
                                 </span>
                                 <span
                                   className={`text-[9px] font-black uppercase tracking-wider rounded px-1.5 py-0.5 border ${
                                     isCurrent
-                                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                                      ? 'bg-success/10 text-success border-success/30'
+                                      : 'bg-muted text-muted-foreground border-border'
                                   }`}
                                 >
                                   {c.status}
                                 </span>
                                 {(c.customer?.firstName || c.customer?.lastName) && (
-                                  <span className="text-[10px] text-slate-500 font-semibold truncate">
+                                  <span className="text-[10px] text-muted-foreground font-semibold truncate">
                                     {[c.customer?.firstName, c.customer?.lastName]
                                       .filter(Boolean)
                                       .join(' ')}
@@ -467,12 +478,12 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                                 )}
                               </div>
                               {c.contractType !== 'FSMA' && (
-                                <span className="text-xs font-black text-slate-700">
+                                <span className="text-xs font-black text-foreground">
                                   {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
                                 </span>
                               )}
                             </div>
-                            <div className="mt-1.5 text-[10px] text-slate-400 font-semibold">
+                            <div className="mt-1.5 text-[10px] text-muted-foreground font-semibold">
                               {fmtDate(c.startDate)} → {fmtDate(c.endDate)}
                             </div>
                           </div>
@@ -485,9 +496,9 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
 
               {/* ── Description ── */}
               {product.description && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <SectionLabel icon={Hash} label="Description" />
-                  <p className="text-xs text-slate-600 leading-relaxed">{product.description}</p>
+                  <p className="text-xs text-foreground leading-relaxed">{product.description}</p>
                 </div>
               )}
             </>

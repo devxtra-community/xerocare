@@ -98,7 +98,7 @@ export function TaxLocationFilter({
             onChange({ stateProvince: val === 'ALL' ? undefined : val, city: undefined })
           }
         >
-          <SelectTrigger className="w-40 h-10 bg-white shadow-sm">
+          <SelectTrigger className="w-40 h-10 bg-card shadow-sm">
             <SelectValue placeholder={`All ${stateLabel}s`} />
           </SelectTrigger>
           <SelectContent className="max-h-64">
@@ -116,7 +116,7 @@ export function TaxLocationFilter({
           value={value.city ?? 'ALL'}
           onValueChange={(val) => onChange({ city: val === 'ALL' ? undefined : val })}
         >
-          <SelectTrigger className="w-40 h-10 bg-white shadow-sm">
+          <SelectTrigger className="w-40 h-10 bg-card shadow-sm">
             <SelectValue placeholder="All Cities" />
           </SelectTrigger>
           <SelectContent className="max-h-64">

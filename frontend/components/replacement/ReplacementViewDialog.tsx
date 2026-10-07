@@ -53,19 +53,19 @@ export function ReplacementViewDialog({
         <DialogTitle className="sr-only">Replacement Details</DialogTitle>
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : detail ? (
           <div className="p-5">
             <ReplacementDetailView detail={detail} />
           </div>
         ) : null}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4 sticky bottom-0">
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted p-4 sticky bottom-0">
           {detail && actions?.(detail, load)}
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-9 text-xs font-black text-slate-500"
+            className="h-9 text-xs font-black text-muted-foreground"
           >
             Close
           </Button>

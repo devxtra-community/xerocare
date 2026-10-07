@@ -19,9 +19,9 @@ import Link from 'next/link';
 import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 
 const STATUS_STYLE: Record<string, string> = {
-  HEALTHY: 'bg-emerald-100 text-emerald-700',
-  WATCH: 'bg-yellow-100 text-yellow-700',
-  ALERT: 'bg-red-100 text-red-700',
+  HEALTHY: 'bg-success/10 text-success',
+  WATCH: 'bg-warning/10 text-warning',
+  ALERT: 'bg-destructive/10 text-destructive',
 };
 
 function AccountsOverviewContent() {
@@ -64,26 +64,28 @@ function AccountsOverviewContent() {
   const dataWarnings: string[] = pl?.dataWarnings ?? [];
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Accounts — Consolidated View</h1>
-          <p className="text-sm text-gray-500">All branches consolidated in AED</p>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">
+            Accounts — Consolidated View
+          </h1>
+          <p className="text-sm text-muted-foreground">All branches consolidated in AED</p>
         </div>
       </div>
 
       <BranchFilterBar showPeriod />
 
       {dataWarnings.length > 0 && (
-        <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
-          <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+        <div className="rounded-xl bg-warning/10 border border-warning/30 p-4 space-y-1">
+          <div className="flex items-center gap-2 text-warning font-semibold text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             Consolidated figures are incomplete — one or more services were unavailable. Figures
             shown may be understated.
           </div>
           <ul className="pl-6 list-disc space-y-0.5">
             {dataWarnings.map((w, i) => (
-              <li key={i} className="text-xs text-amber-700">
+              <li key={i} className="text-xs text-warning">
                 {w}
               </li>
             ))}
@@ -95,7 +97,7 @@ function AccountsOverviewContent() {
       {kpiLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-24 bg-white rounded-xl border animate-pulse" />
+            <div key={i} className="h-24 bg-card rounded-xl border animate-pulse" />
           ))}
         </div>
       ) : (
@@ -135,40 +137,42 @@ function AccountsOverviewContent() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Revenue vs Expenses</h3>
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Monthly Revenue vs Expenses
+          </h3>
           <SimpleBarChart
             data={pl?.monthly ?? []}
             xKey="month"
             bars={[
-              { key: 'income', color: '#10b981', label: 'Revenue' },
-              { key: 'expenses', color: '#ef4444', label: 'Expenses' },
+              { key: 'income', color: 'var(--chart-profit)', label: 'Revenue' },
+              { key: 'expenses', color: 'var(--destructive)', label: 'Expenses' },
             ]}
             height={240}
             currency={currency}
           />
         </div>
 
-        <div className="bg-white rounded-xl border p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Branch Revenue Comparison</h3>
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Branch Revenue Comparison</h3>
           <SimpleBarChart
             data={comparison}
             xKey="name"
             bars={[
-              { key: 'revenue', color: '#3b82f6', label: 'Revenue' },
-              { key: 'expenses', color: '#f97316', label: 'Expenses' },
+              { key: 'revenue', color: 'var(--chart-blue-mid)', label: 'Revenue' },
+              { key: 'expenses', color: 'var(--rent)', label: 'Expenses' },
             ]}
             height={240}
             currency={currency}
           />
         </div>
 
-        <div className="md:col-span-2 bg-white rounded-xl border p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Net Profit by Branch</h3>
+        <div className="md:col-span-2 bg-card rounded-xl border p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Net Profit by Branch</h3>
           <SimpleBarChart
             data={comparison}
             xKey="name"
-            bars={[{ key: 'net', color: '#6366f1', label: 'Net Profit' }]}
+            bars={[{ key: 'net', color: 'var(--chart-indigo)', label: 'Net Profit' }]}
             height={200}
             currency={currency}
           />
@@ -176,17 +180,17 @@ function AccountsOverviewContent() {
       </div>
 
       {/* Branch Performance Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <div className="px-5 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800">Branch Performance</h3>
-          <span className="text-xs text-gray-400">AED consolidated</span>
+          <h3 className="font-semibold text-foreground">Branch Performance</h3>
+          <span className="text-xs text-muted-foreground">AED consolidated</span>
         </div>
         {perfLoading ? (
-          <div className="p-8 text-center text-gray-400">Loading…</div>
+          <div className="p-8 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   {[
                     'Branch',
@@ -208,33 +212,35 @@ function AccountsOverviewContent() {
               <tbody className="divide-y">
                 {branchPerf.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-gray-400">
+                    <td colSpan={9} className="text-center py-8 text-muted-foreground">
                       No branch data
                     </td>
                   </tr>
                 ) : (
                   branchPerf.map((row) => (
-                    <tr key={row.branchId} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-700 font-medium">
+                    <tr key={row.branchId} className="hover:bg-muted">
+                      <td className="px-4 py-3 text-foreground font-medium">
                         {getBranchName(row.branchId)}
                       </td>
-                      <td className="px-4 py-3 text-emerald-600">
+                      <td className="px-4 py-3 text-success">
                         {formatCurrency(row.revenue, currency)}
                       </td>
-                      <td className="px-4 py-3 text-red-600">
+                      <td className="px-4 py-3 text-destructive">
                         {formatCurrency(row.expenses, currency)}
                       </td>
                       <td
-                        className={`px-4 py-3 font-semibold ${row.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
+                        className={`px-4 py-3 font-semibold ${row.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}
                       >
                         {formatCurrency(row.netProfit, currency)}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">{row.marginPct?.toFixed(1)}%</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {row.marginPct?.toFixed(1)}%
+                      </td>
                       <td className="px-4 py-3">{formatCurrency(row.receivables, currency)}</td>
                       <td className="px-4 py-3">{formatCurrency(row.payables, currency)}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[row.status] ?? 'bg-gray-100 text-gray-600'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[row.status] ?? 'bg-muted text-foreground'}`}
                         >
                           {row.status}
                         </span>
@@ -242,7 +248,7 @@ function AccountsOverviewContent() {
                       <td className="px-4 py-3">
                         <Link
                           href={`/admin/accounts/branch/${row.branchId}`}
-                          className="text-xs text-blue-600 hover:underline"
+                          className="text-xs text-primary hover:underline"
                         >
                           View →
                         </Link>
@@ -268,9 +274,9 @@ function AccountsOverviewContent() {
           <Link
             key={l.label}
             href={l.href}
-            className="flex items-center justify-between p-4 bg-white rounded-xl border hover:shadow-md transition-shadow text-sm font-medium text-gray-700"
+            className="flex items-center justify-between p-4 bg-card rounded-xl border hover:shadow-md transition-shadow text-sm font-medium text-foreground"
           >
-            {l.label} <span className="text-blue-500">→</span>
+            {l.label} <span className="text-primary">→</span>
           </Link>
         ))}
       </div>
@@ -280,7 +286,7 @@ function AccountsOverviewContent() {
 
 export default function AdminAccountsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <AccountsOverviewContent />
     </Suspense>
   );

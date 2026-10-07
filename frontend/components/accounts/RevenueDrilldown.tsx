@@ -56,14 +56,14 @@ export function DrilldownTree({ node, currency, depth = 0, onView }: DrilldownTr
   return (
     <>
       <div
-        className="grid grid-cols-12 px-5 py-3 items-center hover:bg-blue-50/50 transition-colors text-sm"
+        className="grid grid-cols-12 px-5 py-3 items-center hover:bg-primary/10 transition-colors text-sm"
         style={{ paddingLeft: depth > 0 ? `${20 + depth * 20}px` : undefined }}
       >
-        <span className="col-span-6 font-medium text-slate-800 flex items-center gap-1.5">
+        <span className="col-span-6 font-medium text-foreground flex items-center gap-1.5">
           {hasChildren ? (
             <button
               onClick={() => setOpen((o) => !o)}
-              className="text-muted-foreground hover:text-slate-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               {open ? (
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -83,7 +83,7 @@ export function DrilldownTree({ node, currency, depth = 0, onView }: DrilldownTr
             )}
           </span>
         </span>
-        <span className="col-span-5 text-right font-bold tabular-nums text-slate-800">
+        <span className="col-span-5 text-right font-bold tabular-nums text-foreground">
           {formatCurrency(node.amount, currency)}
         </span>
         <span className="col-span-1 text-right">
@@ -91,7 +91,7 @@ export function DrilldownTree({ node, currency, depth = 0, onView }: DrilldownTr
             <button
               onClick={() => onView(node)}
               title="View transactions"
-              className="p-1 rounded hover:bg-blue-100 text-blue-600 inline-flex items-center gap-1 text-xs font-semibold"
+              className="p-1 rounded hover:bg-primary/10 text-primary inline-flex items-center gap-1 text-xs font-semibold"
             >
               <Eye className="h-3.5 w-3.5" /> View
             </button>
@@ -222,17 +222,17 @@ export function DrilldownModal<T>({
   const total = rows.reduce((s, r) => s + getAmount(r), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="font-bold text-slate-800">{title} — Transactions</h2>
+            <h2 className="font-bold text-foreground">{title} — Transactions</h2>
             <p className="text-xs text-muted-foreground">
               {rows.length} transaction{rows.length === 1 ? '' : 's'}
               {rows.length > 0 && <> · Total {formatCurrency(total, getCurrency(rows[0]))}</>}
             </p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -302,7 +302,7 @@ export function DrilldownModal<T>({
               value={branchFilter || '__ALL__'}
               onValueChange={(v) => setBranchFilter(v === '__ALL__' ? '' : v)}
             >
-              <SelectTrigger className="h-9 border-orange-200 text-sm bg-background">
+              <SelectTrigger className="h-9 border-warning/30 text-sm bg-background">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -441,7 +441,7 @@ const revenueColumns = (isRentLease: boolean): DrilldownColumn<RevenueTransactio
   {
     header: 'Invoice #',
     render: (r) => (
-      <span className="font-mono text-xs text-blue-600 font-bold">{r.invoiceNumber}</span>
+      <span className="font-mono text-xs text-primary font-bold">{r.invoiceNumber}</span>
     ),
   },
   { header: 'Customer', render: (r) => <span className="text-sm">{r.customerName}</span> },
@@ -457,7 +457,7 @@ const revenueColumns = (isRentLease: boolean): DrilldownColumn<RevenueTransactio
           header: 'Type / Period',
           render: (r: RevenueTransactionRow) =>
             r.rowType === 'ADVANCE' ? (
-              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-lease/10 text-lease border border-lease/30">
                 Advance (Signing)
               </span>
             ) : (
@@ -474,7 +474,7 @@ const revenueColumns = (isRentLease: boolean): DrilldownColumn<RevenueTransactio
               <div className="space-y-0.5 text-xs">
                 <div>Base: {formatCurrency(r.baseCharge ?? 0, r.currencyCode)}</div>
                 {(r.exceededCharge ?? 0) > 0 && (
-                  <div className="text-orange-600">
+                  <div className="text-warning">
                     Excess: {formatCurrency(r.exceededCharge ?? 0, r.currencyCode)}
                   </div>
                 )}
@@ -495,7 +495,7 @@ const revenueColumns = (isRentLease: boolean): DrilldownColumn<RevenueTransactio
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(r.amount, r.currencyCode)}
       </span>
     ),

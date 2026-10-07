@@ -15,7 +15,7 @@ function NormalQuotationPreviewContent() {
   const isLease = category === 'lease';
 
   return (
-    <div style={{ backgroundColor: '#e5e7eb', minHeight: '100vh', padding: '40px 0' }}>
+    <div style={{ backgroundColor: 'var(--chart-grid)', minHeight: '100vh', padding: '40px 0' }}>
       {isSparePart ? (
         <SparePartsNormalQuotation />
       ) : isRental ? (
@@ -33,8 +33,8 @@ export default function NormalQuotationPreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+        <div className="flex items-center justify-center min-h-screen bg-muted">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
       }
     >

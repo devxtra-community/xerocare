@@ -304,7 +304,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
     <Dialog open={true} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[80vw] lg:max-w-7xl h-[96vh] flex flex-col p-0 overflow-hidden bg-white shadow-2xl"
+        className="sm:max-w-[80vw] lg:max-w-7xl h-[96vh] flex flex-col p-0 overflow-hidden bg-card shadow-2xl"
       >
         <AddModelDialog
           open={modelDialogOpen}
@@ -321,7 +321,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
             <DialogTitle className="text-xl font-bold">
               {isUploadMode ? 'Upload Lot from Excel' : 'Create New Lot'}
             </DialogTitle>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {isUploadMode
                 ? 'Upload a pre-filled Excel sheet to create a lot.'
                 : 'Fill in the details below to create a new lot inventory.'}
@@ -367,44 +367,44 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
         {isUploadMode ? (
           <div className="flex-1 flex flex-col items-center justify-center p-12 gap-8">
             <div className="text-center space-y-4 max-w-lg">
-              <div className="p-4 rounded-full inline-flex items-center justify-center bg-gray-100 mb-2">
-                <FileSpreadsheet size={48} className="text-gray-600" />
+              <div className="p-4 rounded-full inline-flex items-center justify-center bg-muted mb-2">
+                <FileSpreadsheet size={48} className="text-foreground" />
               </div>
-              <h3 className="text-2xl font-bold">Upload Data</h3>
-              <p className="text-gray-500 text-base">
+              <h3 className="text-xl sm:text-2xl font-medium">Upload Data</h3>
+              <p className="text-muted-foreground text-base">
                 Download the template, fill in your lot details and items, and upload it here.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
               <div
-                className="border rounded-lg p-6 hover:bg-gray-50 transition-colors cursor-pointer flex flex-col items-center text-center gap-3"
+                className="border rounded-lg p-6 hover:bg-muted transition-colors cursor-pointer flex flex-col items-center text-center gap-3"
                 onClick={handleDownloadTemplate}
               >
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <Download className="w-6 h-6 text-gray-600" />
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <Download className="w-6 h-6 text-foreground" />
                 </div>
                 <div>
                   <h4 className="font-semibold">Download Template</h4>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Get the properly formatted Excel file
                   </p>
                 </div>
               </div>
 
-              <div className="border rounded-lg p-6 hover:bg-gray-50 transition-colors cursor-pointer flex flex-col items-center text-center gap-3 relative overflow-hidden">
+              <div className="border rounded-lg p-6 hover:bg-muted transition-colors cursor-pointer flex flex-col items-center text-center gap-3 relative overflow-hidden">
                 <input
                   type="file"
                   accept=".xlsx, .xls"
                   className="absolute inset-0 opacity-0 cursor-pointer z-10"
                   onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                 />
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-gray-600" />
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-foreground" />
                 </div>
                 <div className="z-0">
                   <h4 className="font-semibold">{uploadFile ? 'Change File' : 'Select File'}</h4>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {uploadFile ? uploadFile.name : '.xlsx or .xls files only'}
                   </p>
                 </div>
@@ -440,7 +440,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       name="vendorId"
                       render={({ field }) => (
                         <FormItem className="space-y-1.5">
-                          <FormLabel className="text-sm font-medium text-gray-700">
+                          <FormLabel className="text-sm font-medium text-foreground">
                             Vendor
                           </FormLabel>
                           <FormControl>
@@ -470,7 +470,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       name="warehouseId"
                       render={({ field }) => (
                         <FormItem className="space-y-1.5">
-                          <FormLabel className="text-sm font-medium text-gray-700">
+                          <FormLabel className="text-sm font-medium text-foreground">
                             Warehouse
                           </FormLabel>
                           <FormControl>
@@ -501,7 +501,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       name="lotNumber"
                       render={({ field }) => (
                         <FormItem className="space-y-1.5">
-                          <FormLabel className="text-sm font-medium text-gray-700">
+                          <FormLabel className="text-sm font-medium text-foreground">
                             Lot / Order Number
                           </FormLabel>
                           <FormControl>
@@ -509,7 +509,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                               <Input
                                 placeholder="LT-XXXX-XXXX"
                                 {...field}
-                                className="h-10 bg-gray-50 font-mono"
+                                className="h-10 bg-muted font-mono"
                                 readOnly
                               />
                               <Button
@@ -533,7 +533,9 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       name="purchaseDate"
                       render={({ field }) => (
                         <FormItem className="space-y-1.5">
-                          <FormLabel className="text-sm font-medium text-gray-700">Date</FormLabel>
+                          <FormLabel className="text-sm font-medium text-foreground">
+                            Date
+                          </FormLabel>
                           <FormControl>
                             <Input type="date" {...field} className="h-10" />
                           </FormControl>
@@ -546,7 +548,9 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       name="notes"
                       render={({ field }) => (
                         <FormItem className="space-y-1.5">
-                          <FormLabel className="text-sm font-medium text-gray-700">Notes</FormLabel>
+                          <FormLabel className="text-sm font-medium text-foreground">
+                            Notes
+                          </FormLabel>
                           <FormControl>
                             <Input placeholder="Optional..." {...field} className="h-10" />
                           </FormControl>
@@ -557,7 +561,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                   </div>
 
                   <div className="flex items-center justify-between px-4 py-2 mt-0">
-                    <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                       Lot Items
                     </h3>
                     <Button
@@ -579,7 +583,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           isRequestingNewPart: true,
                         })
                       }
-                      className="h-9 gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
+                      className="h-9 gap-1.5 bg-muted hover:bg-muted text-foreground border-border"
                     >
                       <Plus size={16} /> Add
                     </Button>
@@ -592,11 +596,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                         {fields.map((field, index) => (
                           <div
                             key={field.id}
-                            className="flex flex-col gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200 shadow-sm"
+                            className="flex flex-col gap-3 p-4 rounded-lg bg-muted border border-border shadow-sm"
                           >
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-1">
-                                <Label className="text-xs text-slate-500 font-medium">Type</Label>
+                                <Label className="text-xs text-muted-foreground font-medium">
+                                  Type
+                                </Label>
                                 <FormField
                                   control={formControl}
                                   name={`items.${index}.itemType`}
@@ -618,7 +624,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                       }}
                                       value={typeField.value}
                                     >
-                                      <SelectTrigger className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-slate-300">
+                                      <SelectTrigger className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-border">
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -640,13 +646,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                     {itemTypeField.value === LotItemType.MODEL ? (
                                       <div className="space-y-1">
                                         <div className="flex justify-between items-center h-4 mb-1">
-                                          <Label className="text-xs text-slate-500 font-medium">
+                                          <Label className="text-xs text-muted-foreground font-medium">
                                             Brand *
                                           </Label>
                                           <button
                                             type="button"
                                             onClick={() => setBrandDialogOpen(true)}
-                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                            className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                                           >
                                             + Create Brand?
                                           </button>
@@ -679,13 +685,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                     ) : (
                                       <div className="space-y-1">
                                         <div className="flex justify-between items-center h-4 mb-1">
-                                          <Label className="text-xs text-slate-500 font-medium">
+                                          <Label className="text-xs text-muted-foreground font-medium">
                                             Brand *
                                           </Label>
                                           <button
                                             type="button"
                                             onClick={() => setBrandDialogOpen(true)}
-                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                            className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                                           >
                                             + Create Brand?
                                           </button>
@@ -731,13 +737,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                     {itemTypeField.value === LotItemType.MODEL ? (
                                       <div className="space-y-1">
                                         <div className="flex justify-between items-center h-4 mb-1">
-                                          <Label className="text-xs text-slate-500 font-medium">
+                                          <Label className="text-xs text-muted-foreground font-medium">
                                             Model *
                                           </Label>
                                           <button
                                             type="button"
                                             onClick={() => setModelDialogOpen(true)}
-                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                            className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                                           >
                                             + Create New Model?
                                           </button>
@@ -780,7 +786,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                     ) : (
                                       <div className="space-y-1">
                                         <div className="flex justify-between items-center h-4 mb-1">
-                                          <Label className="text-xs text-slate-500 font-medium">
+                                          <Label className="text-xs text-muted-foreground font-medium">
                                             Part Name *
                                           </Label>
                                           <button
@@ -798,7 +804,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                               form.setValue(`items.${index}.mpn`, '');
                                               form.setValue(`items.${index}.modelIds`, []);
                                             }}
-                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                            className="text-[10px] text-primary hover:text-primary font-medium transition-colors"
                                           >
                                             {watchedItems?.[index]?.isRequestingNewPart !== false
                                               ? '+ Existing Spare Part?'
@@ -882,7 +888,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                     )}
 
                                     <div className="space-y-1">
-                                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                                      <Label className="text-xs text-muted-foreground font-medium h-4 mb-1 block text-center">
                                         Qty
                                       </Label>
                                       <FormField
@@ -894,14 +900,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                             min="1"
                                             placeholder="Qty"
                                             {...qtyField}
-                                            className="text-center h-10 bg-white"
+                                            className="text-center h-10 bg-card"
                                           />
                                         )}
                                       />
                                     </div>
 
                                     <div className="space-y-1">
-                                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                                      <Label className="text-xs text-muted-foreground font-medium h-4 mb-1 block text-center">
                                         Purchase
                                       </Label>
                                       <FormField
@@ -909,7 +915,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                         name={`items.${index}.unitPrice`}
                                         render={({ field: buyField }) => (
                                           <div className="relative">
-                                            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+                                            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">
                                               {currencyCode}
                                             </div>
                                             <Input
@@ -918,7 +924,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                               step="0.01"
                                               placeholder=""
                                               {...buyField}
-                                              className="h-10 pl-9 pr-1 text-right bg-white"
+                                              className="h-10 pl-9 pr-1 text-right bg-card"
                                             />
                                           </div>
                                         )}
@@ -926,7 +932,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                     </div>
 
                                     <div className="space-y-1">
-                                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                                      <Label className="text-xs text-muted-foreground font-medium h-4 mb-1 block text-center">
                                         HS Code
                                       </Label>
                                       <FormField
@@ -936,7 +942,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           <Input
                                             placeholder="HS Code"
                                             {...hsCodeField}
-                                            className="h-10 text-right bg-white"
+                                            className="h-10 text-right bg-card"
                                           />
                                         )}
                                       />
@@ -946,7 +952,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                       type="button"
                                       variant="ghost"
                                       size="icon"
-                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent transition-all h-10 w-10 mb-[1px]"
+                                      className="text-destructive hover:text-destructive hover:bg-destructive/10 border border-transparent transition-all h-10 w-10 mb-[1px]"
                                       onClick={() => remove(index)}
                                     >
                                       <Trash2 className="h-5 w-5" />
@@ -954,9 +960,9 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                   </div>
 
                                   {itemTypeField.value === LotItemType.SPARE_PART && (
-                                    <div className="grid grid-cols-2 gap-4 pb-2 border-t border-dashed border-slate-200 mt-2 pt-4">
+                                    <div className="grid grid-cols-2 gap-4 pb-2 border-t border-dashed border-border mt-2 pt-4">
                                       <div className="space-y-1">
-                                        <Label className="text-xs text-slate-500 font-medium">
+                                        <Label className="text-xs text-muted-foreground font-medium">
                                           Manufacturing Part # (MPN)
                                         </Label>
                                         <FormField
@@ -965,14 +971,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           render={({ field: mpnField }) => (
                                             <Input
                                               placeholder="Search or enter MPN..."
-                                              className="h-10 bg-white"
+                                              className="h-10 bg-card"
                                               {...mpnField}
                                             />
                                           )}
                                         />
                                       </div>
                                       <div className="space-y-1">
-                                        <Label className="text-xs text-slate-500 font-medium">
+                                        <Label className="text-xs text-muted-foreground font-medium">
                                           Compatible Models
                                         </Label>
                                         <FormField
@@ -1021,7 +1027,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                     })),
                                                 ]}
                                                 placeholder="Comp. Models"
-                                                className="bg-white min-h-10 text-xs"
+                                                className="bg-card min-h-10 text-xs"
                                                 disabled={!itemBrand}
                                               />
                                             );
@@ -1036,14 +1042,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           </div>
                         ))}
                         {fields.length === 0 && (
-                          <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 text-sm mt-4">
+                          <div className="text-center py-6 border-2 border-dashed border-border rounded-lg text-muted-foreground text-sm mt-4">
                             No items added yet. Click &quot;Add&quot; to begin.
                           </div>
                         )}
                       </div>
                       <div className="bg-transparent pt-3 text-right flex justify-end items-center gap-2">
-                        <span className="text-gray-600 text-sm font-medium">Items Total:</span>
-                        <span className="font-bold text-lg text-gray-900">
+                        <span className="text-foreground text-sm font-medium">Items Total:</span>
+                        <span className="font-bold text-lg text-foreground">
                           {formatCurrency(calculateItemsTotal(), currencyCode)}
                         </span>
                       </div>
@@ -1053,10 +1059,10 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-2 border-t bg-white flex flex-col sm:flex-row justify-between items-center gap-4 z-10 shrink-0">
+              <div className="px-6 py-2 border-t bg-card flex flex-col sm:flex-row justify-between items-center gap-4 z-10 shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-base text-gray-600 font-bold">Grand Total:</span>
-                  <span className="text-2xl font-bold tracking-tight text-blue-600">
+                  <span className="text-base text-foreground font-bold">Grand Total:</span>
+                  <span className="text-2xl font-bold tracking-tight text-primary">
                     {formatCurrency(calculateGrandTotal(), currencyCode)}
                   </span>
                 </div>
@@ -1065,7 +1071,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                     type="button"
                     variant="ghost"
                     onClick={onClose}
-                    className="text-gray-500 hover:text-gray-700 font-medium"
+                    className="text-muted-foreground hover:text-foreground font-medium"
                   >
                     Cancel
                   </Button>
@@ -1076,7 +1082,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                     disabled={loading || isValidatingLot || !!form.formState.errors.lotNumber}
                     className={cn(
                       buttonVariants({ size: 'sm' }),
-                      'min-w-[120px] bg-blue-700 hover:bg-blue-800 text-white font-semibold',
+                      'min-w-[120px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold',
                     )}
                   >
                     Save Lot

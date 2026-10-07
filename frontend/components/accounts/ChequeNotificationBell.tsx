@@ -23,12 +23,12 @@ export default function ChequeNotificationBell() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+        className="relative p-2 rounded-full hover:bg-muted transition-colors"
         aria-label="Cheque notifications"
       >
-        <Bell className="h-5 w-5 text-gray-600" />
+        <Bell className="h-5 w-5 text-foreground" />
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
             {count > 9 ? '9+' : count}
           </span>
         )}
@@ -37,29 +37,33 @@ export default function ChequeNotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-10 z-20 w-80 rounded-xl border bg-white shadow-xl">
+          <div className="absolute right-0 top-10 z-20 w-80 rounded-xl border bg-card shadow-xl">
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <span className="text-sm font-semibold text-gray-800">Cheque Alerts</span>
-              <span className="text-xs text-gray-400">Due within 3 days</span>
+              <span className="text-sm font-semibold text-foreground">Cheque Alerts</span>
+              <span className="text-xs text-muted-foreground">Due within 3 days</span>
             </div>
             {cheques.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">No upcoming cheques</div>
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                No upcoming cheques
+              </div>
             ) : (
               <ul className="max-h-72 overflow-y-auto divide-y">
                 {cheques.map((c) => (
-                  <li key={c.id} className="px-4 py-3 hover:bg-gray-50">
+                  <li key={c.id} className="px-4 py-3 hover:bg-muted">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{c.partyName}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {c.partyName}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           #{c.chequeNo} · {c.bankName ?? 'Unknown Bank'}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {formatCurrency(c.amount, currency)}
                         </p>
-                        <p className="text-xs text-red-500 font-medium">
+                        <p className="text-xs text-destructive font-medium">
                           Due {String(c.dueDate).slice(0, 10)}
                         </p>
                       </div>
@@ -67,8 +71,8 @@ export default function ChequeNotificationBell() {
                     <span
                       className={`mt-1.5 inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                         c.type === 'RECEIVED'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-blue-100 text-blue-700'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-primary/10 text-primary'
                       }`}
                     >
                       {c.type}
@@ -79,7 +83,7 @@ export default function ChequeNotificationBell() {
             )}
             <a
               href="/finance/accounts/cheques"
-              className="block text-center py-2.5 text-xs text-blue-600 hover:text-blue-700 border-t font-medium"
+              className="block text-center py-2.5 text-xs text-primary hover:text-primary border-t font-medium"
               onClick={() => setOpen(false)}
             >
               View all cheques →

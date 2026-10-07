@@ -203,7 +203,7 @@ export function SalePaymentCollectionModal({
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="sm:max-w-5xl max-h-[88dvh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
               <Wallet className="text-primary" size={20} />
               Payment Collection — {invoiceNumber}
@@ -217,39 +217,39 @@ export function SalePaymentCollectionModal({
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
             {loading ? (
               <div className="flex justify-center py-10">
-                <Loader2 className="animate-spin text-slate-300" size={28} />
+                <Loader2 className="animate-spin text-muted-foreground" size={28} />
               </div>
             ) : summary ? (
               <>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Total</p>
-                    <p className="text-lg font-bold text-slate-800">
+                  <div className="rounded-xl border border-border bg-muted p-3">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">Total</p>
+                    <p className="text-lg font-bold text-foreground">
                       {formatCurrency(displayTotal, summary.currency)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                    <p className="text-[10px] font-black uppercase text-emerald-600">Paid</p>
-                    <p className="text-lg font-bold text-emerald-700">
+                  <div className="rounded-xl border border-success/30 bg-success/10 p-3">
+                    <p className="text-[10px] font-black uppercase text-success">Paid</p>
+                    <p className="text-lg font-bold text-success">
                       {formatCurrency(displayPaid, summary.currency)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-[10px] font-black uppercase text-amber-600">Pending</p>
-                    <p className="text-lg font-bold text-amber-700">
+                  <div className="rounded-xl border border-warning/30 bg-warning/10 p-3">
+                    <p className="text-[10px] font-black uppercase text-warning">Pending</p>
+                    <p className="text-lg font-bold text-warning">
                       {formatCurrency(displayPending, summary.currency)}
                     </p>
                   </div>
                 </div>
                 {hasDeposit && (
-                  <p className="text-[10px] text-slate-400 -mt-2">
+                  <p className="text-[10px] text-muted-foreground -mt-2">
                     Includes {formatCurrency(depositTotal, summary.currency)} security deposit —
                     refundable, held separately from rent/lease revenue.
                   </p>
                 )}
 
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     {advanceOnly
                       ? hasDeposit
                         ? 'Advance & Security Deposit'
@@ -271,7 +271,7 @@ export function SalePaymentCollectionModal({
                 </div>
 
                 {payments.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-6">
+                  <p className="text-sm text-muted-foreground text-center py-6">
                     No collections recorded yet.
                   </p>
                 ) : (
@@ -286,7 +286,7 @@ export function SalePaymentCollectionModal({
                   // is untouched; only the presentation here is merged.
                   <div
                     className={`rounded-xl border overflow-x-auto ${
-                      hasDeposit ? 'border-primary/30 bg-primary/2' : 'border-slate-200'
+                      hasDeposit ? 'border-primary/30 bg-primary/2' : 'border-border'
                     }`}
                   >
                     {hasDeposit && (
@@ -298,7 +298,7 @@ export function SalePaymentCollectionModal({
                       </div>
                     )}
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-slate-500">
+                      <thead className="bg-muted text-muted-foreground">
                         <tr className="text-[11px] font-black uppercase tracking-wide">
                           <th className="text-left px-4 py-3">Request</th>
                           <th className="text-left px-4 py-3">Mode</th>
@@ -308,13 +308,13 @@ export function SalePaymentCollectionModal({
                           <th className="text-left px-4 py-3">Receipt</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-border">
                         {payments.map((pmt) => (
                           <tr key={pmt.id}>
-                            <td className="px-4 py-3 font-mono font-bold text-slate-700">
+                            <td className="px-4 py-3 font-mono font-bold text-foreground">
                               {pmt.requestNo}
                               {pmt.isSecurityDeposit && (
-                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-teal-100 text-teal-700">
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-info/10 text-info">
                                   Deposit
                                 </span>
                               )}
@@ -330,10 +330,10 @@ export function SalePaymentCollectionModal({
                               <span
                                 className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
                                   pmt.status === 'APPROVED'
-                                    ? 'bg-emerald-100 text-emerald-700'
+                                    ? 'bg-success/10 text-success'
                                     : pmt.status === 'REJECTED'
-                                      ? 'bg-red-100 text-red-600'
-                                      : 'bg-amber-100 text-amber-700'
+                                      ? 'bg-destructive/10 text-destructive'
+                                      : 'bg-warning/10 text-warning'
                                 }`}
                               >
                                 {pmt.status}
@@ -341,14 +341,14 @@ export function SalePaymentCollectionModal({
                             </td>
                             <td className="px-4 py-3">
                               {pmt.status === 'REJECTED' ? (
-                                <span className="text-[9px] text-slate-300">—</span>
+                                <span className="text-[9px] text-muted-foreground">—</span>
                               ) : receiptAvailable(pmt) ? (
                                 <div className="flex flex-col gap-1.5">
                                   <div className="flex items-center gap-2 whitespace-nowrap">
                                     <button
                                       onClick={() => handleGenerateReceipt(pmt)}
                                       disabled={generatingReceiptFor === pmt.id}
-                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-amber-200 bg-white text-[11px] font-bold uppercase tracking-wider text-amber-700 hover:bg-amber-50 hover:border-amber-300 disabled:opacity-50"
+                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-warning/30 bg-card text-[11px] font-bold uppercase tracking-wider text-warning hover:bg-warning/10 hover:border-warning/30 disabled:opacity-50"
                                     >
                                       {generatingReceiptFor === pmt.id ? (
                                         <Loader2 size={16} className="animate-spin" />
@@ -360,7 +360,7 @@ export function SalePaymentCollectionModal({
                                     <button
                                       onClick={() => handleSendReceipt(pmt, 'email')}
                                       disabled={sendingFor === pmt.id + 'email'}
-                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-red-200 bg-white text-[11px] font-bold uppercase tracking-wider text-red-700 hover:bg-red-50 hover:border-red-300 disabled:opacity-50"
+                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-destructive/30 bg-card text-[11px] font-bold uppercase tracking-wider text-destructive hover:bg-destructive/10 hover:border-destructive/30 disabled:opacity-50"
                                     >
                                       {sendingFor === pmt.id + 'email' ? (
                                         <Loader2 size={16} className="animate-spin" />
@@ -372,7 +372,7 @@ export function SalePaymentCollectionModal({
                                     <button
                                       onClick={() => handleSendReceipt(pmt, 'whatsapp')}
                                       disabled={sendingFor === pmt.id + 'whatsapp'}
-                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-emerald-200 bg-white text-[11px] font-bold uppercase tracking-wider text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 disabled:opacity-50"
+                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-success/30 bg-card text-[11px] font-bold uppercase tracking-wider text-success hover:bg-success/10 hover:border-success/30 disabled:opacity-50"
                                     >
                                       {sendingFor === pmt.id + 'whatsapp' ? (
                                         <Loader2 size={16} className="animate-spin" />
@@ -386,7 +386,7 @@ export function SalePaymentCollectionModal({
                                       already work. */}
                                   </div>
                                   {pmt.status === 'PENDING' && (
-                                    <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-warning whitespace-nowrap">
                                       <Clock size={13} /> awaiting approval
                                     </span>
                                   )}
@@ -394,7 +394,7 @@ export function SalePaymentCollectionModal({
                               ) : (
                                 // Rent/Lease periodic collection, still PENDING: no receipt
                                 // until Finance approves.
-                                <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 text-[11px] text-warning whitespace-nowrap">
                                   <Clock size={13} /> awaiting approval
                                 </span>
                               )}
@@ -423,7 +423,7 @@ export function SalePaymentCollectionModal({
                 )}
               </>
             ) : (
-              <p className="text-sm text-slate-400 text-center py-6">
+              <p className="text-sm text-muted-foreground text-center py-6">
                 Failed to load payment details.
               </p>
             )}

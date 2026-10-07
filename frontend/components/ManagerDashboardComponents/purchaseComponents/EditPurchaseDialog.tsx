@@ -76,14 +76,14 @@ export default function EditPurchaseDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none shadow-2xl">
         <div className="bg-primary px-6 py-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
-            <Pencil className="h-6 w-6 text-white" />
+          <div className="h-10 w-10 rounded-lg bg-card flex items-center justify-center">
+            <Pencil className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <DialogTitle className="text-xl font-bold text-white">
+            <DialogTitle className="text-xl font-bold text-primary-foreground">
               Edit Lot Amount Costs
             </DialogTitle>
-            <DialogDescription className="text-white/70 text-sm">
+            <DialogDescription className="text-primary-foreground text-sm">
               Update the financial breakdown for Record ID: {purchase.id.slice(0, 8)}
             </DialogDescription>
           </div>
@@ -91,10 +91,10 @@ export default function EditPurchaseDialog({
 
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-6 bg-white overflow-y-auto max-h-[85vh]"
+          className="p-6 space-y-6 bg-card overflow-y-auto max-h-[85vh]"
         >
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
+            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 border-b pb-2">
               <Calculator className="h-4 w-4 text-primary" />
               Adjust Cost Breakdown
             </h4>
@@ -104,13 +104,13 @@ export default function EditPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="edit_documentationFee"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <FileCheck className="h-3.5 w-3.5" />
                   Documentation Fee
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -131,13 +131,13 @@ export default function EditPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="edit_labourCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Users className="h-3.5 w-3.5" />
                   Labour Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -158,13 +158,13 @@ export default function EditPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="edit_handlingFee"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Package className="h-3.5 w-3.5" />
                   Handling Fee
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -185,13 +185,13 @@ export default function EditPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="edit_transportationCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Truck className="h-3.5 w-3.5" />
                   Transportation Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -212,13 +212,13 @@ export default function EditPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="edit_shippingCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Globe className="h-3.5 w-3.5" />
                   Shipping Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -239,13 +239,13 @@ export default function EditPurchaseDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="edit_groundfieldCost"
-                  className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  className="text-xs font-semibold text-foreground flex items-center gap-2"
                 >
                   <Wrench className="h-3.5 w-3.5" />
                   Groundfield Cost
                 </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     {currencyCode}
                   </span>
                   <Input
@@ -264,7 +264,7 @@ export default function EditPurchaseDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 !mt-10 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 !mt-10 border-t border-border">
             <Button
               type="button"
               variant="outline"

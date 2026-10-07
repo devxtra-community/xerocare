@@ -79,7 +79,7 @@ export function SidebarSearch({ items }: { items: SearchableNavItem[] }) {
       {!isOpen ? (
         <button
           onClick={open}
-          className="flex w-full items-center gap-2 px-3 py-2 rounded-md text-sidebar-accent-foreground/50 hover:text-sidebar-accent-foreground hover:bg-card/10 transition-colors"
+          className="flex w-full items-center gap-2 px-3 py-2 rounded-md text-sidebar-foreground hover:text-primary hover:bg-primary/10 transition-colors"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1 text-left text-xs">Quick search...</span>
@@ -89,8 +89,8 @@ export function SidebarSearch({ items }: { items: SearchableNavItem[] }) {
         </button>
       ) : (
         <div className="relative">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-card/15 border border-white/10 focus-within:border-white/30 transition-colors">
-            <Search className="h-3.5 w-3.5 shrink-0 text-sidebar-accent-foreground/50" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-card border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-colors">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <input
               ref={inputRef}
               value={query}
@@ -100,11 +100,11 @@ export function SidebarSearch({ items }: { items: SearchableNavItem[] }) {
               }}
               onKeyDown={handleKeyDown}
               placeholder="Quick search..."
-              className="flex-1 bg-transparent text-xs text-sidebar-accent-foreground placeholder:text-sidebar-accent-foreground/40 outline-none"
+              className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
             />
             <button
               onClick={close}
-              className="text-sidebar-accent-foreground/40 hover:text-sidebar-accent-foreground transition-colors"
+              className="text-muted-foreground hover:text-primary transition-colors"
               aria-label="Clear search"
             >
               <X className="h-3 w-3" />
@@ -112,9 +112,9 @@ export function SidebarSearch({ items }: { items: SearchableNavItem[] }) {
           </div>
 
           {query.trim() && (
-            <div className="absolute top-full mt-1 left-0 right-0 z-50 rounded-md bg-sidebar border border-white/10 shadow-2xl max-h-64 overflow-y-auto">
+            <div className="absolute top-full mt-1 left-0 right-0 z-50 rounded-md bg-card border border-border shadow-lg max-h-64 overflow-y-auto">
               {results.length === 0 ? (
-                <div className="px-4 py-3 text-xs text-sidebar-accent-foreground/50 text-center">
+                <div className="px-4 py-3 text-xs text-muted-foreground text-center">
                   No results for &ldquo;{query}&rdquo;
                 </div>
               ) : (
@@ -131,15 +131,15 @@ export function SidebarSearch({ items }: { items: SearchableNavItem[] }) {
                       onClick={() => navigate(item.href)}
                       className={`flex items-center gap-2.5 w-full px-3 py-2 text-left transition-colors ${
                         i === activeIdx
-                          ? 'bg-card/25 text-sidebar-accent-foreground'
-                          : 'text-sidebar-accent-foreground/80 hover:bg-card/15 hover:text-sidebar-accent-foreground'
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-foreground hover:bg-primary/10 hover:text-primary'
                       }`}
                     >
                       {item.icon && <item.icon className="h-3.5 w-3.5 shrink-0 opacity-60" />}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium truncate">{item.title}</div>
                         {item.group && (
-                          <div className="text-[10px] text-sidebar-accent-foreground/40 truncate leading-tight">
+                          <div className="text-[10px] text-muted-foreground truncate leading-tight">
                             {item.group}
                           </div>
                         )}

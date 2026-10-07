@@ -85,7 +85,7 @@ export function Autocomplete({
         <PopoverAnchor>
           <div className="group relative rounded-xl border border-border bg-card px-3 py-2 transition-all focus-within:ring-4 focus-within:ring-primary/10 focus-within:border-primary">
             <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-slate-400" />
+              <Search className="h-4 w-4 text-muted-foreground" />
               <CommandPrimitive.Input
                 ref={inputRef}
                 value={inputValue}
@@ -99,17 +99,17 @@ export function Autocomplete({
                 }}
                 placeholder={placeholder}
                 disabled={disabled}
-                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 placeholder:font-normal disabled:cursor-not-allowed"
+                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground placeholder:font-normal disabled:cursor-not-allowed"
               />
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               ) : inputValue ? (
                 <button
                   onClick={handleClear}
-                  className="rounded-full p-0.5 hover:bg-slate-100 transition-colors"
+                  className="rounded-full p-0.5 hover:bg-muted transition-colors"
                   type="button"
                 >
-                  <X className="h-3 w-3 text-slate-400" />
+                  <X className="h-3 w-3 text-muted-foreground" />
                 </button>
               ) : null}
             </div>
@@ -121,11 +121,11 @@ export function Autocomplete({
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <div className="rounded-xl border border-slate-100 bg-card p-1 shadow-2xl max-h-[300px] overflow-auto mt-1">
+          <div className="rounded-xl border border-border bg-card p-1 shadow-2xl max-h-[300px] overflow-auto mt-1">
             <CommandList>
               <CommandGroup>
                 {filteredOptions.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-slate-400">{emptyText}</div>
+                  <div className="py-6 text-center text-sm text-muted-foreground">{emptyText}</div>
                 ) : (
                   filteredOptions.map((option) => (
                     <CommandItem

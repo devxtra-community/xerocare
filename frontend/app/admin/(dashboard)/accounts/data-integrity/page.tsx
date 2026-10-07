@@ -21,14 +21,14 @@ export default function DataIntegrityPage() {
   const entries: CashbookEntry[] = data?.data ?? [];
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <AlertTriangle className="h-6 w-6 text-amber-500" />
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground flex items-center gap-2">
+            <AlertTriangle className="h-6 w-6 text-warning" />
             Data Integrity — Orphaned Cashbook Entries
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Cashbook entries whose linked Purchase Order (linked_po_id) no longer exists in the
             Inventory service. Flagged by the nightly reconciliation job (runs at 2:00 AM).
           </p>
@@ -43,31 +43,31 @@ export default function DataIntegrityPage() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center">
-          <p className="text-red-700 font-medium">Failed to load data integrity report.</p>
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+          <p className="text-destructive font-medium">Failed to load data integrity report.</p>
         </div>
       ) : entries.length === 0 ? (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-8 text-center">
-          <p className="text-emerald-700 font-semibold">No orphaned entries detected.</p>
-          <p className="text-sm text-emerald-600 mt-1">
+        <div className="rounded-xl bg-success/10 border border-success/30 p-8 text-center">
+          <p className="text-success font-semibold">No orphaned entries detected.</p>
+          <p className="text-sm text-success mt-1">
             All cashbook entries with linked Purchase Orders are pointing to valid records.
           </p>
         </div>
       ) : (
-        <div className="rounded-xl bg-white border border-amber-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-amber-100 bg-amber-50 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <span className="text-sm font-semibold text-amber-800">
+        <div className="rounded-xl bg-card border border-warning/30 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-warning/30 bg-warning/10 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <span className="text-sm font-semibold text-warning">
               {entries.length} orphaned entr{entries.length === 1 ? 'y' : 'ies'} found
             </span>
-            <span className="text-xs text-amber-600 ml-auto">
+            <span className="text-xs text-warning ml-auto">
               These entries reference POs that no longer exist in Inventory. Investigate or contact
               the inventory team.
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   {[
                     'Reference',
@@ -87,29 +87,29 @@ export default function DataIntegrityPage() {
               </thead>
               <tbody className="divide-y">
                 {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-amber-50/30">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">
+                  <tr key={e.id} className="hover:bg-warning/10">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">
                       {e.referenceNo}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{e.date}</td>
+                    <td className="px-4 py-3 text-foreground">{e.date}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`text-xs font-bold ${e.entryType === 'RECEIPT' ? 'text-emerald-600' : 'text-red-600'}`}
+                        className={`text-xs font-bold ${e.entryType === 'RECEIPT' ? 'text-success' : 'text-destructive'}`}
                       >
                         {e.entryType}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{e.category}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">
+                    <td className="px-4 py-3 text-foreground">{e.category}</td>
+                    <td className="px-4 py-3 font-semibold text-foreground">
                       {formatCurrency(Number(e.amount), currency)}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-amber-700">
+                    <td className="px-4 py-3 font-mono text-xs text-warning">
                       {e.linkedPoId ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-600 font-medium">
+                    <td className="px-4 py-3 text-xs text-foreground font-medium">
                       {getBranchName(e.branchId)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-400">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
                       {new Date(e.createdAt).toLocaleDateString()}
                     </td>
                   </tr>

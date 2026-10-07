@@ -66,8 +66,8 @@ export default function OwnerSelect({
 
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="block text-xs font-medium text-foreground mb-1">
+        {label} {required && <span className="text-destructive">*</span>}
       </label>
       {!adding ? (
         <div className="flex gap-2">
@@ -87,7 +87,7 @@ export default function OwnerSelect({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="shrink-0 border rounded-lg px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-1"
+            className="shrink-0 border rounded-lg px-3 py-2 text-sm text-primary hover:bg-primary/10 flex items-center gap-1"
             title="Add new owner"
           >
             <Plus className="h-3.5 w-3.5" /> New
@@ -100,7 +100,7 @@ export default function OwnerSelect({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Owner / shareholder name"
-            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -112,7 +112,7 @@ export default function OwnerSelect({
             type="button"
             onClick={handleQuickAdd}
             disabled={createMut.isPending}
-            className="shrink-0 bg-blue-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="shrink-0 bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm hover:bg-primary/90 disabled:opacity-50"
           >
             {createMut.isPending ? '…' : 'Add'}
           </button>
@@ -122,7 +122,7 @@ export default function OwnerSelect({
               setAdding(false);
               setNewName('');
             }}
-            className="shrink-0 border rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+            className="shrink-0 border rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
           >
             <X className="h-3.5 w-3.5" />
           </button>

@@ -233,7 +233,7 @@ export default function SaleContractsPage() {
     const installed = contract.installation?.status === 'COMPLETED';
     if (installed)
       return (
-        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] font-black uppercase tracking-wider">
+        <span className="px-2 py-0.5 bg-success/10 text-success rounded-full text-[9px] font-black uppercase tracking-wider">
           Installed
         </span>
       );
@@ -242,24 +242,24 @@ export default function SaleContractsPage() {
       const isFullySigned = contract.agreement?.signatureStatus === 'FULLY_SIGNED';
       if (isFullySigned)
         return (
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-black uppercase tracking-wider">
+          <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-wider">
             Signed
           </span>
         );
       if (contract.agreement)
         return (
-          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[9px] font-black uppercase tracking-wider">
+          <span className="px-2 py-0.5 bg-warning/10 text-warning rounded-full text-[9px] font-black uppercase tracking-wider">
             Partial Sig.
           </span>
         );
       return (
-        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-wider">
+        <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-[9px] font-black uppercase tracking-wider">
           No Agreement
         </span>
       );
     }
     return (
-      <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-wider">
+      <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-[9px] font-black uppercase tracking-wider">
         Active
       </span>
     );
@@ -321,8 +321,10 @@ export default function SaleContractsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Customer Contracts</h1>
-          <p className="text-xs text-slate-400 font-bold mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Customer Contracts
+          </h1>
+          <p className="text-xs text-muted-foreground font-bold mt-0.5">
             Sale, Rent & Lease contracts — agreements, signatures, and payments
           </p>
         </div>
@@ -330,7 +332,7 @@ export default function SaleContractsPage() {
           variant="ghost"
           size="sm"
           onClick={loadData}
-          className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-9"
+          className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-9"
         >
           <RefreshCw size={12} className="mr-1" />
           Refresh
@@ -339,12 +341,15 @@ export default function SaleContractsPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by invoice or customer..."
-          className="pl-9 h-9 border-slate-200 text-sm font-bold"
+          className="pl-9 h-9 border-border text-sm font-bold"
         />
       </div>
 
@@ -352,46 +357,46 @@ export default function SaleContractsPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-slate-400" />
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
-              <FileSignature size={32} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-sm font-bold text-slate-500">No sale contracts found</p>
-              <p className="text-xs text-slate-400 mt-1">
+              <FileSignature size={32} className="mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm font-bold text-muted-foreground">No sale contracts found</p>
+              <p className="text-xs text-muted-foreground mt-1">
                 Sale, rent, and lease contracts appear here after conversion and activation.
               </p>
             </div>
           ) : (
-            <Table>
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
-                <TableRow className="bg-slate-50/70">
+                <TableRow className="bg-muted/70">
                   <TableHead className="w-8" />
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Invoice
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Customer
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Created By
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Type
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Total
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Status
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Agreement
                   </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Delivery
                   </TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -409,66 +414,66 @@ export default function SaleContractsPage() {
 
                   return (
                     <React.Fragment key={contract.id}>
-                      <TableRow className="hover:bg-slate-50/50">
+                      <TableRow className="hover:bg-muted/50">
                         {/* Expand toggle */}
                         <TableCell className="p-0 pl-2">
                           <button
                             onClick={() => togglePayments(contract.id)}
-                            className="p-1 rounded hover:bg-slate-100 text-slate-400"
+                            className="p-1 rounded hover:bg-muted text-muted-foreground"
                             title="Toggle payment history"
                           >
                             {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                           </button>
                         </TableCell>
-                        <TableCell className="font-black text-slate-800 text-sm">
+                        <TableCell className="font-black text-foreground text-sm">
                           {contract.invoiceNumber}
                         </TableCell>
-                        <TableCell className="font-bold text-slate-600 text-sm">
+                        <TableCell className="font-bold text-foreground text-sm">
                           {contract.customerName || '—'}
                         </TableCell>
-                        <TableCell className="text-sm text-slate-600">
+                        <TableCell className="text-sm text-foreground">
                           {contract.createdByEmployeeName || '—'}
                         </TableCell>
                         <TableCell>
-                          <span className="text-[10px] font-black text-slate-500 uppercase">
+                          <span className="text-[10px] font-black text-muted-foreground uppercase">
                             {contract.saleType?.replace('_', ' ')}
                           </span>
                         </TableCell>
-                        <TableCell className="font-black text-slate-800">
+                        <TableCell className="font-black text-foreground">
                           {currency} {Number(contract.totalAmount || 0).toLocaleString()}
                         </TableCell>
                         <TableCell>{statusBadge(contract)}</TableCell>
                         <TableCell>
                           {isSaleType(contract.saleType) ? (
-                            <span className="text-[10px] text-slate-400">—</span>
+                            <span className="text-[10px] text-muted-foreground">—</span>
                           ) : contract.agreement ? (
                             <div className="flex items-center gap-1">
                               {contract.agreement.employeeSignatureData && (
                                 <CheckCircle2
                                   size={12}
-                                  className="text-emerald-500"
+                                  className="text-success"
                                   aria-label="Employee signed"
                                 />
                               )}
                               {customerHasSigned ? (
                                 <CheckCircle2
                                   size={12}
-                                  className="text-blue-500"
+                                  className="text-primary"
                                   aria-label="Customer signed"
                                 />
                               ) : (
                                 <Clock
                                   size={12}
-                                  className="text-amber-400"
+                                  className="text-warning"
                                   aria-label="Customer pending"
                                 />
                               )}
-                              <span className="text-[10px] font-bold text-slate-500">
+                              <span className="text-[10px] font-bold text-muted-foreground">
                                 {contract.agreement.agreementNumber}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-[10px] text-slate-400">—</span>
+                            <span className="text-[10px] text-muted-foreground">—</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -484,8 +489,8 @@ export default function SaleContractsPage() {
                             <SelectTrigger
                               className={`h-7 w-32.5 text-[10px] font-black uppercase tracking-wide ${
                                 contract.deliveryStatus === 'DELIVERED'
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                  : 'border-amber-200 bg-amber-50 text-amber-700'
+                                  ? 'border-success/30 bg-success/10 text-success'
+                                  : 'border-warning/30 bg-warning/10 text-warning'
                               }`}
                             >
                               <SelectValue />
@@ -503,7 +508,7 @@ export default function SaleContractsPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => setViewProductId(contract.currentProductId!)}
-                                className="h-7 w-7 p-0 text-slate-400 hover:bg-slate-50"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted"
                                 title={`View product · ${contract.currentSerialNumber ?? ''}`}
                               >
                                 <Eye size={14} />
@@ -546,16 +551,16 @@ export default function SaleContractsPage() {
                       {/* Payments sub-row */}
                       {isExpanded && (
                         <TableRow>
-                          <TableCell colSpan={9} className="p-0 bg-slate-50/60">
-                            <div className="px-6 py-3 border-l-2 border-indigo-200 ml-6">
+                          <TableCell colSpan={9} className="p-0 bg-muted/60">
+                            <div className="px-6 py-3 border-l-2 border-primary/30 ml-6">
                               <div className="flex items-center justify-between mb-2">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                                   Payment History
                                 </p>
                                 {isSaleType(contract.saleType) && (
                                   <button
                                     onClick={() => setCollectionInvoiceId(contract.id)}
-                                    className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-0.5 transition-colors"
+                                    className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-success bg-success/10 hover:bg-success/10 border border-success/30 rounded px-2 py-0.5 transition-colors"
                                     title="Record a new collection payment (sent to Finance for approval)"
                                   >
                                     <PlusCircle size={9} />
@@ -564,18 +569,18 @@ export default function SaleContractsPage() {
                                 )}
                               </div>
                               {isLoadingPmts ? (
-                                <div className="flex items-center gap-2 py-2 text-slate-400">
+                                <div className="flex items-center gap-2 py-2 text-muted-foreground">
                                   <Loader2 size={12} className="animate-spin" />
                                   <span className="text-xs">Loading payments…</span>
                                 </div>
                               ) : contractPayments.length === 0 ? (
-                                <p className="text-xs text-slate-400 py-1">
+                                <p className="text-xs text-muted-foreground py-1">
                                   No payments recorded yet.
                                 </p>
                               ) : (
                                 <table className="w-full text-xs">
                                   <thead>
-                                    <tr className="text-[9px] text-slate-400 font-black uppercase tracking-wide">
+                                    <tr className="text-[9px] text-muted-foreground font-black uppercase tracking-wide">
                                       <th className="text-left pb-1 pr-4">Request No.</th>
                                       <th className="text-left pb-1 pr-4">Context</th>
                                       <th className="text-left pb-1 pr-4">Mode</th>
@@ -585,12 +590,12 @@ export default function SaleContractsPage() {
                                       <th className="text-left pb-1">Receipt</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-100">
+                                  <tbody className="divide-y divide-border">
                                     {contractPayments.map((pmt) => {
                                       const isGenerating = generatingReceiptFor === pmt.id;
                                       return (
-                                        <tr key={pmt.id} className="text-slate-600">
-                                          <td className="py-1 pr-4 font-mono font-bold text-slate-700">
+                                        <tr key={pmt.id} className="text-foreground">
+                                          <td className="py-1 pr-4 font-mono font-bold text-foreground">
                                             {pmt.requestNo}
                                           </td>
                                           <td className="py-1 pr-4">
@@ -614,10 +619,10 @@ export default function SaleContractsPage() {
                                             <span
                                               className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
                                                 pmt.status === 'APPROVED'
-                                                  ? 'bg-emerald-100 text-emerald-700'
+                                                  ? 'bg-success/10 text-success'
                                                   : pmt.status === 'REJECTED'
-                                                    ? 'bg-red-100 text-red-600'
-                                                    : 'bg-amber-100 text-amber-700'
+                                                    ? 'bg-destructive/10 text-destructive'
+                                                    : 'bg-warning/10 text-warning'
                                               }`}
                                             >
                                               {pmt.status}
@@ -638,7 +643,7 @@ export default function SaleContractsPage() {
                                               <button
                                                 onClick={() => handleGenerateReceipt(pmt)}
                                                 disabled={isGenerating}
-                                                className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                                                className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary disabled:opacity-50"
                                                 title={
                                                   pmt.receiptUrl
                                                     ? 'View Receipt'
@@ -655,12 +660,14 @@ export default function SaleContractsPage() {
                                                 {pmt.receiptUrl ? 'View' : 'Get Receipt'}
                                               </button>
                                             ) : pmt.status === 'PENDING' ? (
-                                              <span className="text-[9px] text-amber-500 flex items-center gap-0.5">
+                                              <span className="text-[9px] text-warning flex items-center gap-0.5">
                                                 <Clock size={9} />
                                                 Pending
                                               </span>
                                             ) : (
-                                              <span className="text-[9px] text-slate-300">—</span>
+                                              <span className="text-[9px] text-muted-foreground">
+                                                —
+                                              </span>
                                             )}
                                           </td>
                                         </tr>
@@ -734,16 +741,16 @@ export default function SaleContractsPage() {
       <Dialog open={installOpen} onOpenChange={(v) => !v && setInstallOpen(false)}>
         <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
           <DialogTitle className="sr-only">Installation Request</DialogTitle>
-          <div className="bg-white p-5 border-b border-slate-100">
+          <div className="bg-card p-5 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center">
-                <Wrench size={18} className="text-slate-600" />
+              <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
+                <Wrench size={18} className="text-foreground" />
               </div>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                   Installation Request
                 </p>
-                <p className="text-base font-black text-slate-800">
+                <p className="text-base font-black text-foreground">
                   {installTarget?.invoiceNumber}
                 </p>
               </div>
@@ -751,11 +758,11 @@ export default function SaleContractsPage() {
           </div>
           <div className="p-5 space-y-4">
             {installTarget?.installation ? (
-              <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-                <p className="text-xs font-black text-blue-700">
+              <div className="p-3 bg-primary/10 rounded-xl border border-primary/30">
+                <p className="text-xs font-black text-primary">
                   Installation request already created
                 </p>
-                <p className="text-[11px] text-blue-600 mt-1">
+                <p className="text-[11px] text-primary mt-1">
                   Status: {installTarget.installation.status}
                   {installTarget.installation.technicianName &&
                     ` — Assigned to ${installTarget.installation.technicianName}`}
@@ -763,19 +770,19 @@ export default function SaleContractsPage() {
               </div>
             ) : (
               <div>
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                   Notes
                 </Label>
                 <Input
                   value={installNotes}
                   onChange={(e) => setInstallNotes(e.target.value)}
                   placeholder="Installation notes or instructions..."
-                  className="h-10 border-slate-200 font-bold text-xs"
+                  className="h-10 border-border font-bold text-xs"
                 />
               </div>
             )}
             <div>
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                 Assign Technician (optional)
               </Label>
               <SearchableSelect
@@ -790,23 +797,23 @@ export default function SaleContractsPage() {
                   );
                 }}
                 placeholder="Search and select technician..."
-                className="h-10 border-slate-200"
+                className="h-10 border-border"
                 options={techOptions}
               />
             </div>
           </div>
-          <div className="p-4 bg-slate-50 border-t flex justify-between gap-2">
+          <div className="p-4 bg-muted border-t flex justify-between gap-2">
             <Button
               variant="ghost"
               onClick={() => setInstallOpen(false)}
-              className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+              className="text-[10px] font-black uppercase tracking-widest text-muted-foreground"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateInstall}
               disabled={isSavingInstall}
-              className="bg-slate-700 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
+              className="bg-foreground hover:bg-foreground text-primary-foreground font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
             >
               {isSavingInstall ? (
                 <Loader2 size={14} className="animate-spin" />

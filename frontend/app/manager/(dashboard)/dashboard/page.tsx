@@ -81,7 +81,7 @@ export default function Dashboard() {
       <div className="flex flex-col space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+            <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
               {branchName} Sales
             </h3>
             <p className="text-sm text-muted-foreground font-medium">
@@ -117,20 +117,20 @@ export default function Dashboard() {
 
       {/* Expiring/Expired Contracts Section */}
       {expiringContracts.length > 0 && (
-        <div className="rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100 flex flex-col space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+        <div className="rounded-[2rem] bg-card p-6 shadow-sm border border-border flex flex-col space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-50 text-red-500 rounded-2xl">
+              <div className="p-3 bg-destructive/10 text-destructive rounded-2xl">
                 <CalendarRange className="h-6 w-6" />
               </div>
               <div>
-                <h4 className="text-lg font-bold text-slate-900">Expiring & Expired Contracts</h4>
-                <p className="text-xs text-slate-400 font-medium">
+                <h4 className="text-lg font-bold text-foreground">Expiring & Expired Contracts</h4>
+                <p className="text-xs text-muted-foreground font-medium">
                   Contracts requiring renewal or action within 30 days
                 </p>
               </div>
             </div>
-            <span className="bg-red-50 text-red-700 font-bold px-3 py-1 rounded-full text-xs animate-pulse">
+            <span className="bg-destructive/10 text-destructive font-bold px-3 py-1 rounded-full text-xs animate-pulse">
               {expiringContracts.length} Attention Required
             </span>
           </div>
@@ -146,37 +146,40 @@ export default function Dashboard() {
               return (
                 <div
                   key={contract.id}
-                  className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-all duration-300"
+                  className="flex items-center justify-between p-4 bg-muted/50 rounded-2xl border border-border hover:bg-muted transition-all duration-300"
                 >
                   <div className="flex items-center gap-3">
                     {isExpired ? (
-                      <div className="p-2 bg-red-100 text-red-600 rounded-full" title="Expired">
+                      <div
+                        className="p-2 bg-destructive/10 text-destructive rounded-full"
+                        title="Expired"
+                      >
                         <AlertCircle className="h-4 w-4" />
                       </div>
                     ) : (
                       <div
-                        className="p-2 bg-amber-100 text-amber-600 rounded-full"
+                        className="p-2 bg-warning/10 text-warning rounded-full"
                         title="Expiring Soon"
                       >
                         <AlertTriangle className="h-4 w-4" />
                       </div>
                     )}
                     <div>
-                      <p className="font-bold text-slate-800 text-sm">
+                      <p className="font-bold text-foreground text-sm">
                         {contract.customerName || 'No Customer Assigned'}
                       </p>
-                      <p className="text-xs text-slate-400 font-medium">
+                      <p className="text-xs text-muted-foreground font-medium">
                         Invoice No: {contract.invoiceNumber} | {contract.saleType}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p
-                      className={`text-xs font-black ${isExpired ? 'text-red-600' : 'text-amber-600'}`}
+                      className={`text-xs font-black ${isExpired ? 'text-destructive' : 'text-warning'}`}
                     >
                       {isExpired ? `EXPIRED ${diffDays} days ago` : `Expires in ${diffDays} days`}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase">
                       {toDate.toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',

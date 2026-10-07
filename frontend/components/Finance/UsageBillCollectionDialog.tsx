@@ -163,23 +163,23 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
       <Dialog open={!!target && !justCollected} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
           <DialogTitle className="sr-only">Add Collect Amount</DialogTitle>
-          <div className="bg-white p-5 border-b border-slate-100">
+          <div className="bg-card p-5 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center">
-                <Coins size={18} className="text-slate-500" />
+              <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
+                <Coins size={18} className="text-muted-foreground" />
               </div>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                   Add Collect Amount
                 </p>
-                <p className="text-base font-black text-slate-800">{target?.invoiceNumber}</p>
+                <p className="text-base font-black text-foreground">{target?.invoiceNumber}</p>
               </div>
             </div>
           </div>
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   Amount (max {target ? formatCurrency(target.amountPending, currency) : ''})
                 </Label>
                 <Input
@@ -193,7 +193,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   {paymentMode === 'CHEQUE' ? 'Cheque Received Date' : 'Date'}
                 </Label>
                 <Input
@@ -205,7 +205,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Payment Mode
               </Label>
               <Select
@@ -228,7 +228,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
             {paymentMode === 'CHEQUE' ? (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Cheque No.
                   </Label>
                   <Input
@@ -238,7 +238,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Bank Name
                   </Label>
                   <Input
@@ -248,7 +248,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                   />
                 </div>
                 <div className="space-y-1 col-span-2">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Cheque Date (earliest date it can be deposited)
                   </Label>
                   <Input
@@ -262,10 +262,10 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Reference
                   </Label>
-                  <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                  <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground italic">
                     Auto-generated on save — {autoReferencePreview(paymentMode)}
                   </div>
                 </div>
@@ -274,7 +274,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                   return (
                     matching.length > 0 && (
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                           Account (optional)
                         </Label>
                         <Select value={cashAccountId || undefined} onValueChange={setCashAccountId}>
@@ -319,9 +319,9 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
         <Dialog open={!!justCollected} onOpenChange={(v) => !v && closeAll()}>
           <DialogContent className="sm:max-w-sm rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
             <DialogTitle className="sr-only">Collection Recorded</DialogTitle>
-            <div className="bg-linear-to-r from-emerald-600 to-emerald-500 p-5 text-white">
+            <div className="bg-linear-to-r from-success to-success p-5 text-primary-foreground">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+                <div className="h-9 w-9 rounded-full bg-card flex items-center justify-center">
                   <Coins size={18} />
                 </div>
                 <div>
@@ -335,7 +335,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
               </div>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {justCollected.requestNo} has been submitted to Accounts for approval. You can send
                 the customer a receipt now — it won&apos;t move Cash in Hand/Bank or the
                 invoice&apos;s Paid figure until Accounts actually approves it.
@@ -384,7 +384,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                 </Button>
               </div>
               <Button
-                className="w-full h-9 text-xs font-black bg-slate-800 hover:bg-slate-900"
+                className="w-full h-9 text-xs font-black bg-foreground hover:bg-foreground"
                 onClick={closeAll}
               >
                 Done

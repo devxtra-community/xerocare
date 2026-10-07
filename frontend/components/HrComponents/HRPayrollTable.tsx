@@ -138,10 +138,10 @@ export default function HRPayrollTable({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, department or email..."
-              className="pl-10 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all w-full"
+              className="pl-10 h-10 bg-card border-primary/30 focus:border-primary/30 focus:ring-4 focus:ring-primary/30 outline-none shadow-sm rounded-xl transition-all w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -151,7 +151,7 @@ export default function HRPayrollTable({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                  className="w-full h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl justify-between px-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Filter className="h-4 w-4" />
@@ -161,7 +161,7 @@ export default function HRPayrollTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
+                className="w-40 rounded-xl p-1 bg-card border-border shadow-xl"
               >
                 <DropdownMenuItem onClick={() => setRoleFilter('All')}>All Roles</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setRoleFilter('EMPLOYEE')}>
@@ -182,7 +182,7 @@ export default function HRPayrollTable({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                  className="w-full h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl justify-between px-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Filter className="h-4 w-4" />
@@ -192,7 +192,7 @@ export default function HRPayrollTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-40 rounded-xl p-1 bg-white border-slate-200 shadow-xl"
+                className="w-40 rounded-xl p-1 bg-card border-border shadow-xl"
               >
                 <DropdownMenuItem onClick={() => setStatusFilter('All')}>
                   All Status
@@ -209,7 +209,7 @@ export default function HRPayrollTable({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl justify-between px-3"
+                  className="w-full h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl justify-between px-3"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Filter className="h-4 w-4" />
@@ -219,7 +219,7 @@ export default function HRPayrollTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-48 rounded-xl p-1 bg-white border-slate-200 shadow-xl max-h-[300px] overflow-y-auto"
+                className="w-48 rounded-xl p-1 bg-card border-border shadow-xl max-h-[300px] overflow-y-auto"
               >
                 <DropdownMenuItem onClick={() => setDepartmentFilter('')}>
                   All Departments
@@ -247,7 +247,7 @@ export default function HRPayrollTable({
           </Button>
           <Button
             variant="outline"
-            className="h-10 bg-card border-blue-400/60 focus:ring-blue-100 rounded-xl flex-1 sm:flex-none"
+            className="h-10 bg-card border-primary/30 focus:ring-primary/30 rounded-xl flex-1 sm:flex-none"
           >
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -255,11 +255,11 @@ export default function HRPayrollTable({
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-auto max-h-[500px] relative">
           <Table className="w-full text-left">
-            <TableHeader className="bg-muted/50/50 sticky top-0 z-20 shadow-sm">
-              <TableRow className="border-b border-gray-100 hover:bg-transparent">
+            <TableHeader className="bg-muted/50 sticky top-0 z-20 shadow-sm">
+              <TableRow className="border-b border-border hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap">
                   Employee Name
                 </TableHead>
@@ -315,8 +315,8 @@ export default function HRPayrollTable({
                 paginatedData.map((record, index) => (
                   <TableRow
                     key={record.id}
-                    className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                      index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
+                    className={`transition-colors h-11 border-b border-border hover:bg-primary/5 ${
+                      index % 2 === 0 ? 'bg-card' : 'bg-primary/10'
                     }`}
                   >
                     <TableCell className="px-3 py-1.5 whitespace-nowrap font-medium text-primary capitalize">
@@ -326,7 +326,7 @@ export default function HRPayrollTable({
                       {record.email}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-800 uppercase">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-foreground uppercase">
                         {record.role}
                       </span>
                     </TableCell>
@@ -344,12 +344,12 @@ export default function HRPayrollTable({
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
                         ${
                           record.status === 'PAID'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-amber-100 text-amber-700'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-warning/10 text-warning'
                         }`}
                       >
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${record.status === 'PAID' ? 'bg-green-600' : 'bg-amber-600'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${record.status === 'PAID' ? 'bg-success' : 'bg-warning'}`}
                         />
                         {record.status}
                       </span>
@@ -361,7 +361,7 @@ export default function HRPayrollTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-primary hover:bg-slate-50"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-muted"
                         onClick={() => handleHistoryClick(record)}
                         title="View Payment History"
                       >
@@ -370,7 +370,7 @@ export default function HRPayrollTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                         onClick={() => handleEditClick(record)}
                         title="Update Current Month"
                       >

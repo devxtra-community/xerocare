@@ -154,10 +154,10 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
     .map((a) => ({ id: a.id, name: a.name, bankName: a.bankName }));
 
   return (
-    <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
       <div className="px-4 py-3 border-b border-border">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-bold text-slate-700">Customer Cheques (Received)</h3>
+          <h3 className="text-sm font-bold text-foreground">Customer Cheques (Received)</h3>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -186,7 +186,7 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
       </div>
       {isLoading ? (
         <div className="flex items-center justify-center py-10">
-          <Loader2 size={20} className="animate-spin text-slate-400" />
+          <Loader2 size={20} className="animate-spin text-muted-foreground" />
         </div>
       ) : cheques.length === 0 ? (
         <div className="py-10 text-center text-sm text-muted-foreground">
@@ -219,30 +219,30 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                 return (
                   <tr
                     key={c.id}
-                    className={`transition-colors ${isOverdue ? 'bg-red-50/40' : 'hover:bg-muted/20'}`}
+                    className={`transition-colors ${isOverdue ? 'bg-destructive/10' : 'hover:bg-muted/20'}`}
                   >
-                    <td className="px-4 py-3 font-mono text-gray-700 text-xs">{c.chequeNo}</td>
+                    <td className="px-4 py-3 font-mono text-foreground text-xs">{c.chequeNo}</td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800 max-w-[140px] truncate">
+                      <p className="font-medium text-foreground max-w-[140px] truncate">
                         {c.partyName}
                       </p>
-                      <p className="text-xs text-gray-400">{c.bankName ?? '—'}</p>
+                      <p className="text-xs text-muted-foreground">{c.bankName ?? '—'}</p>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                    <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                       {formatCurrency(c.amount, currency)}
                     </td>
                     <td
-                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-destructive font-bold' : 'text-muted-foreground'}`}
                     >
                       {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
-                      {isOverdue && <span className="ml-1 text-red-500">⚠</span>}
+                      {isOverdue && <span className="ml-1 text-destructive">⚠</span>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {c.collectedDate ? String(c.collectedDate).slice(0, 10) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
+                        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_STATUS_BADGE[c.status] ?? 'bg-muted text-foreground'}`}
                       >
                         {CHEQUE_STATUS_ICON[c.status]}
                         {c.status}
@@ -252,14 +252,14 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                       <div className="flex gap-1 flex-wrap items-center">
                         <button
                           onClick={() => setViewCheque(c)}
-                          className="text-xs font-medium px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+                          className="text-xs font-medium px-2 py-1 rounded-md bg-muted text-foreground hover:bg-muted inline-flex items-center gap-1"
                         >
                           <Eye size={12} /> View
                         </button>
                         {c.status === 'PENDING' && (
                           <button
                             onClick={() => setActionState({ cheque: c, action: 'deposit' })}
-                            className="text-xs font-medium px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/10"
                           >
                             Deposit
                           </button>
@@ -267,7 +267,7 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                         {c.status === 'DEPOSITED' && (
                           <button
                             onClick={() => setActionState({ cheque: c, action: 'clear' })}
-                            className="text-xs font-medium px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/10"
                           >
                             Clear
                           </button>
@@ -275,7 +275,7 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                         {['PENDING', 'DEPOSITED'].includes(c.status) && (
                           <button
                             onClick={() => setActionState({ cheque: c, action: 'bounce' })}
-                            className="text-xs font-medium px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/10"
                           >
                             Bounce
                           </button>
@@ -283,7 +283,7 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                         {c.status === 'PENDING' && (
                           <button
                             onClick={() => setActionState({ cheque: c, action: 'cancel' })}
-                            className="text-xs font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-muted text-foreground hover:bg-muted"
                           >
                             Decline
                           </button>
@@ -339,7 +339,8 @@ const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | 'SERVICE' | n
  * also the hardest to read. These two constants set the scale in one place so the header,
  * the rows and the action buttons stay in proportion to each other.
  */
-const TH = 'h-12 text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap';
+const TH =
+  'h-12 text-[11px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap';
 
 /** Row action button: a 36px circular target. Tint is supplied per action, never here,
  *  so no row can end up with two competing `hover:bg-*` classes. */
@@ -355,12 +356,12 @@ function PaymentTypeBadges({
 }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-blue-50 text-blue-600">
+      <span className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-primary/10 text-primary">
         {ctxType(paymentContext) ?? '—'}
       </span>
       {isSecurityDeposit && (
         <span
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-teal-50 text-teal-700"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-info/10 text-info"
           title="Refundable security deposit — not rent/revenue"
         >
           <ShieldCheck size={12} />
@@ -1026,11 +1027,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
   const statusBadge = (status: string) => {
     const map: Record<string, { label: string; color: string }> = {
-      PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700' },
-      APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700' },
-      REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-600' },
+      PENDING: { label: 'Pending', color: 'bg-warning/10 text-warning' },
+      APPROVED: { label: 'Approved', color: 'bg-success/10 text-success' },
+      REJECTED: { label: 'Rejected', color: 'bg-destructive/10 text-destructive' },
     };
-    const cfg = map[status] || { label: status, color: 'bg-slate-100 text-slate-500' };
+    const cfg = map[status] || { label: status, color: 'bg-muted text-muted-foreground' };
     return (
       <span
         className={`px-2.5 py-1 rounded-full text-[10px] leading-none font-black uppercase tracking-wider ${cfg.color}`}
@@ -1046,9 +1047,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const advanceBillBadge = (payment: SalePaymentRequest) => {
     if (!payment.advanceBillStatus) return null;
     const map: Record<string, { label: string; color: string }> = {
-      PENDING_APPROVAL: { label: 'Bill: Pending', color: 'bg-amber-50 text-amber-600' },
-      CUSTOMER_APPROVED: { label: 'Bill: Approved', color: 'bg-emerald-50 text-emerald-600' },
-      CUSTOMER_REJECTED: { label: 'Bill: Disputed', color: 'bg-red-50 text-red-600' },
+      PENDING_APPROVAL: { label: 'Bill: Pending', color: 'bg-warning/10 text-warning' },
+      CUSTOMER_APPROVED: { label: 'Bill: Approved', color: 'bg-success/10 text-success' },
+      CUSTOMER_REJECTED: { label: 'Bill: Disputed', color: 'bg-destructive/10 text-destructive' },
     };
     const cfg = map[payment.advanceBillStatus];
     if (!cfg) return null;
@@ -1069,7 +1070,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     if (!payment.isRefunded) return null;
     return (
       <span
-        className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wider border border-current/10 bg-teal-50 text-teal-600"
+        className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wider border border-current/10 bg-info/10 text-info"
         title={
           payment.refundedAt
             ? `Refunded ${new Date(payment.refundedAt).toLocaleDateString('en-GB')}${payment.refundedByName ? ` by ${payment.refundedByName}` : ''}`
@@ -1094,7 +1095,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     <div className="space-y-5">
       {/* Header row */}
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400 font-bold">
+        <p className="text-xs text-muted-foreground font-bold">
           Review and approve sale, rent, and lease collection payments
         </p>
         <div className="flex items-center gap-2">
@@ -1104,7 +1105,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               setDirectPayOpen(true);
               resetDirectPay();
             }}
-            className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl px-4"
+            className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[10px] uppercase tracking-widest rounded-xl px-4"
           >
             <DollarSign size={12} className="mr-1" />
             Record Balance Payment
@@ -1113,7 +1114,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             variant="ghost"
             size="sm"
             onClick={loadData}
-            className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-9"
+            className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-9"
           >
             <RefreshCw size={12} className="mr-1" />
             Refresh
@@ -1168,7 +1169,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           <button
             key={key}
             onClick={() => setTab(key as FilterTab)}
-            className={`rounded-2xl text-left transition-all ${tab === key ? 'ring-2 ring-offset-1 ring-indigo-300' : 'hover:ring-1 hover:ring-slate-200'}`}
+            className={`rounded-2xl text-left transition-all ${tab === key ? 'ring-2 ring-offset-1 ring-primary/30' : 'hover:ring-1 hover:ring-ring'}`}
           >
             <StatCard
               title={label}
@@ -1191,31 +1192,34 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       {/* Search + filters */}
       <div className="space-y-3">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by request no, invoice, customer, or employee..."
-            className="pl-9 h-9 border-slate-200 text-sm font-bold"
+            className="pl-9 h-9 border-border text-sm font-bold"
           />
         </div>
 
         {/* Secondary filter bar */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">
+        <div className="bg-muted border border-border rounded-xl p-3">
+          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2.5">
             <Filter size={11} /> Filters
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {/* Type */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Type
               </label>
               <Select
                 value={typeFilter}
                 onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}
               >
-                <SelectTrigger className="h-8 text-xs font-bold border-slate-200 bg-white">
+                <SelectTrigger className="h-8 text-xs font-bold border-border bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1229,14 +1233,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             </div>
             {/* Mode */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Mode
               </label>
               <Select
                 value={modeFilter}
                 onValueChange={(v) => setModeFilter(v as typeof modeFilter)}
               >
-                <SelectTrigger className="h-8 text-xs font-bold border-slate-200 bg-white">
+                <SelectTrigger className="h-8 text-xs font-bold border-border bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1250,14 +1254,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             </div>
             {/* Deposit */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Deposit
               </label>
               <Select
                 value={depositFilter}
                 onValueChange={(v) => setDepositFilter(v as typeof depositFilter)}
               >
-                <SelectTrigger className="h-8 text-xs font-bold border-slate-200 bg-white">
+                <SelectTrigger className="h-8 text-xs font-bold border-border bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1269,35 +1273,35 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             </div>
             {/* Date From */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Date From
               </label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs font-bold"
+                className="w-full h-8 px-2 rounded-md border border-border bg-card text-xs font-bold"
               />
             </div>
             {/* Date To */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Date To
               </label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs font-bold"
+                className="w-full h-8 px-2 rounded-md border border-border bg-card text-xs font-bold"
               />
             </div>
             {/* Employee */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Recorded By
               </label>
               <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
-                <SelectTrigger className="h-8 text-xs font-bold border-slate-200 bg-white">
+                <SelectTrigger className="h-8 text-xs font-bold border-border bg-card">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1322,7 +1326,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   setDateTo('');
                   setEmployeeFilter('ALL');
                 }}
-                className="text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:underline flex items-center gap-1"
+                className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline flex items-center gap-1"
               >
                 <X size={10} /> Clear filters
               </button>
@@ -1337,15 +1341,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           <CardContent className="p-0">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 size={24} className="animate-spin text-slate-400" />
+                <Loader2 size={24} className="animate-spin text-muted-foreground" />
               </div>
             ) : filteredCustomerGroups.length === 0 ? (
               <div className="text-center py-12">
-                <Users size={32} className="mx-auto mb-3 text-slate-300" />
-                <p className="text-sm font-bold text-slate-500">No customers yet</p>
+                <Users size={32} className="mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm font-bold text-muted-foreground">No customers yet</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-border">
                 {customerPagination.pageRows.map((group) => {
                   const isOpen = expandedCustomers.has(group.name);
                   const approvedTotal = group.payments
@@ -1359,15 +1363,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     <div key={group.name}>
                       <button
                         onClick={() => toggleCustomer(group.name)}
-                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50/60 text-left transition-colors"
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/60 text-left transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center">
-                            <Users size={13} className="text-teal-600" />
+                          <div className="h-8 w-8 rounded-full bg-info/10 flex items-center justify-center">
+                            <Users size={13} className="text-info" />
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-800">{group.name}</p>
-                            <p className="text-[10px] text-slate-400 font-bold">
+                            <p className="text-sm font-black text-foreground">{group.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">
                               {uniqueInvoices} contract{uniqueInvoices !== 1 ? 's' : ''} ·{' '}
                               {group.payments.length} payment
                               {group.payments.length !== 1 ? 's' : ''}
@@ -1377,10 +1381,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         <div className="flex items-center gap-4">
                           {approvedTotal > 0 && (
                             <div className="text-right">
-                              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-success">
                                 Approved
                               </p>
-                              <p className="text-sm font-black text-emerald-700">
+                              <p className="text-sm font-black text-success">
                                 {currency}{' '}
                                 {approvedTotal.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
@@ -1390,10 +1394,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                           )}
                           {pendingTotal > 0 && (
                             <div className="text-right">
-                              <p className="text-[9px] font-black uppercase tracking-widest text-amber-500">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-warning">
                                 Pending
                               </p>
-                              <p className="text-sm font-black text-amber-700">
+                              <p className="text-sm font-black text-warning">
                                 {currency}{' '}
                                 {pendingTotal.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
@@ -1402,17 +1406,17 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             </div>
                           )}
                           {isOpen ? (
-                            <ChevronDown size={14} className="text-slate-400" />
+                            <ChevronDown size={14} className="text-muted-foreground" />
                           ) : (
-                            <ChevronRight size={14} className="text-slate-400" />
+                            <ChevronRight size={14} className="text-muted-foreground" />
                           )}
                         </div>
                       </button>
                       {isOpen && (
-                        <div className="bg-slate-50/50 border-t border-slate-100 px-4 pb-4">
+                        <div className="bg-muted/50 border-t border-border px-4 pb-4">
                           <table className="w-full text-xs mt-3">
                             <thead>
-                              <tr className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                              <tr className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">
                                 <th className="text-left pb-2 pr-4">Request No.</th>
                                 <th className="text-left pb-2 pr-4">Invoice</th>
                                 <th className="text-left pb-2 pr-4">Type</th>
@@ -1423,10 +1427,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                 <th className="text-right pb-2">Receipt</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                               {group.payments.map((pmt) => (
-                                <tr key={pmt.id} className="text-slate-600">
-                                  <td className="py-1.5 pr-4 font-mono font-bold text-slate-700">
+                                <tr key={pmt.id} className="text-foreground">
+                                  <td className="py-1.5 pr-4 font-mono font-bold text-foreground">
                                     {pmt.requestNo}
                                   </td>
                                   <td className="py-1.5 pr-4 font-bold">{pmt.invoiceNumber}</td>
@@ -1439,7 +1443,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   <td className="py-1.5 pr-4">
                                     {pmt.paymentMode.replace('_', ' ')}
                                   </td>
-                                  <td className="py-1.5 pr-4 text-right font-mono font-black text-slate-800">
+                                  <td className="py-1.5 pr-4 text-right font-mono font-black text-foreground">
                                     {pmt.currency}{' '}
                                     {Number(pmt.amount).toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
@@ -1459,7 +1463,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => openReceiptView(pmt)}
-                                      className="h-6 w-6 p-0 text-slate-400 hover:bg-slate-200"
+                                      className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted"
                                       title="View Receipt"
                                     >
                                       <Eye size={11} />
@@ -1493,17 +1497,19 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           <CardContent className="p-0">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 size={24} className="animate-spin text-slate-400" />
+                <Loader2 size={24} className="animate-spin text-muted-foreground" />
               </div>
             ) : receiptRows.length === 0 ? (
               <div className="text-center py-12">
-                <DollarSign size={32} className="mx-auto mb-3 text-slate-300" />
-                <p className="text-sm font-bold text-slate-500">No payments in this category</p>
+                <DollarSign size={32} className="mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm font-bold text-muted-foreground">
+                  No payments in this category
+                </p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
+                  <TableRow className="bg-muted/70 hover:bg-muted/70">
                     <TableHead className={TH}>Request No.</TableHead>
                     <TableHead className={TH}>Invoice</TableHead>
                     <TableHead className={TH}>Customer</TableHead>
@@ -1521,42 +1527,42 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     pagePendingEstimates.map((inv) => (
                       <TableRow
                         key={`est-${inv.id}`}
-                        className="hover:bg-amber-50/40 bg-amber-50/20 [&>td]:py-4"
+                        className="hover:bg-warning/10 bg-warning/10 [&>td]:py-4"
                       >
-                        <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
+                        <TableCell className="font-black text-foreground text-[13px] whitespace-nowrap">
                           {inv.invoiceNumber}
                         </TableCell>
-                        <TableCell className="font-bold text-slate-400 text-sm whitespace-nowrap">
+                        <TableCell className="font-bold text-muted-foreground text-sm whitespace-nowrap">
                           —
                         </TableCell>
-                        <TableCell className="font-bold text-slate-600 text-sm">
+                        <TableCell className="font-bold text-foreground text-sm">
                           {inv.customerName || '—'}
                         </TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
                             Service Estimate
                           </span>
                         </TableCell>
                         <TableCell>
                           {/* An estimate has no payment mode because no money has moved.
                               Saying so beats a bare dash, which reads as missing data. */}
-                          <span className="text-[11px] font-black text-slate-400 uppercase whitespace-nowrap">
+                          <span className="text-[11px] font-black text-muted-foreground uppercase whitespace-nowrap">
                             Not Collected
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-black text-slate-800 text-[15px] whitespace-nowrap">
+                        <TableCell className="text-right font-black text-foreground text-[15px] whitespace-nowrap">
                           {formatCurrency(estimateAmount(inv), currency)}
                         </TableCell>
-                        <TableCell className="text-[12px] font-bold text-slate-500 whitespace-nowrap">
+                        <TableCell className="text-[12px] font-bold text-muted-foreground whitespace-nowrap">
                           {inv.createdAt
                             ? new Date(inv.createdAt).toLocaleDateString('en-GB')
                             : '—'}
                         </TableCell>
-                        <TableCell className="text-[12px] font-bold text-slate-500">
+                        <TableCell className="text-[12px] font-bold text-muted-foreground">
                           {inv.employeeName || '—'}
                         </TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
                             Awaiting Approval
                           </span>
                         </TableCell>
@@ -1565,7 +1571,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-slate-500 hover:bg-slate-100"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted"
                               title="View estimate breakdown"
                               onClick={() => setViewEstimate(inv)}
                             >
@@ -1574,7 +1580,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 px-2 text-[11px] font-bold text-green-700 hover:bg-green-50"
+                              className="h-7 px-2 text-[11px] font-bold text-success hover:bg-success/10"
                               disabled={estimateBusyId === inv.id}
                               onClick={() => approveEstimate(inv)}
                             >
@@ -1583,7 +1589,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 px-2 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                              className="h-7 px-2 text-[11px] font-bold text-destructive hover:bg-destructive/10"
                               disabled={estimateBusyId === inv.id}
                               onClick={() => {
                                 setRejectEstimate(inv);
@@ -1600,40 +1606,40 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     pageAcceptedEstimates.map((inv) => (
                       <TableRow
                         key={`acc-${inv.id}`}
-                        className="hover:bg-emerald-50/40 bg-emerald-50/20 [&>td]:py-4"
+                        className="hover:bg-success/10 bg-success/10 [&>td]:py-4"
                       >
-                        <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
+                        <TableCell className="font-black text-foreground text-[13px] whitespace-nowrap">
                           {inv.invoiceNumber}
                         </TableCell>
-                        <TableCell className="font-bold text-slate-400 text-sm whitespace-nowrap">
+                        <TableCell className="font-bold text-muted-foreground text-sm whitespace-nowrap">
                           —
                         </TableCell>
-                        <TableCell className="font-bold text-slate-600 text-sm">
+                        <TableCell className="font-bold text-foreground text-sm">
                           {inv.customerName || '—'}
                         </TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-success/10 text-success px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
                             Customer Accepted
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-[11px] font-black text-slate-400 uppercase whitespace-nowrap">
+                          <span className="text-[11px] font-black text-muted-foreground uppercase whitespace-nowrap">
                             Not Collected
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-black text-slate-800 text-[15px] whitespace-nowrap">
+                        <TableCell className="text-right font-black text-foreground text-[15px] whitespace-nowrap">
                           {formatCurrency(estimateAmount(inv), currency)}
                         </TableCell>
-                        <TableCell className="text-[12px] font-bold text-slate-500 whitespace-nowrap">
+                        <TableCell className="text-[12px] font-bold text-muted-foreground whitespace-nowrap">
                           {inv.createdAt
                             ? new Date(inv.createdAt).toLocaleDateString('en-GB')
                             : '—'}
                         </TableCell>
-                        <TableCell className="text-[12px] font-bold text-slate-500">
+                        <TableCell className="text-[12px] font-bold text-muted-foreground">
                           {inv.employeeName || '—'}
                         </TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-success/10 text-success px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
                             Raise Receivable
                           </span>
                         </TableCell>
@@ -1642,7 +1648,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-slate-500 hover:bg-slate-100"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted"
                               title="View estimate breakdown"
                               onClick={() => setViewEstimate(inv)}
                             >
@@ -1650,7 +1656,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             </Button>
                             <Button
                               size="sm"
-                              className="h-7 px-2 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                              className="h-7 px-2 text-[11px] font-bold bg-success hover:bg-success/90 text-success-foreground"
                               disabled={estimateBusyId === inv.id}
                               onClick={() => takeIntoAccounts(inv)}
                             >
@@ -1661,14 +1667,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </TableRow>
                     ))}
                   {pagePayments.map((pmt) => (
-                    <TableRow key={pmt.id} className="hover:bg-slate-50/50 [&>td]:py-4">
-                      <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
+                    <TableRow key={pmt.id} className="hover:bg-muted/50 [&>td]:py-4">
+                      <TableCell className="font-black text-foreground text-[13px] whitespace-nowrap">
                         {pmt.requestNo}
                       </TableCell>
-                      <TableCell className="font-bold text-slate-700 text-sm whitespace-nowrap">
+                      <TableCell className="font-bold text-foreground text-sm whitespace-nowrap">
                         {pmt.invoiceNumber}
                       </TableCell>
-                      <TableCell className="font-bold text-slate-600 text-sm">
+                      <TableCell className="font-bold text-foreground text-sm">
                         {pmt.customerName}
                       </TableCell>
                       <TableCell>
@@ -1678,18 +1684,18 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         />
                       </TableCell>
                       <TableCell>
-                        <span className="text-[11px] font-black text-slate-600 uppercase whitespace-nowrap">
+                        <span className="text-[11px] font-black text-foreground uppercase whitespace-nowrap">
                           {pmt.paymentMode === 'ONLINE_PAYMENT'
                             ? 'ONLINE (CARD)'
                             : pmt.paymentMode.replace('_', ' ')}
                         </span>
                         {pmt.paymentMode === 'ONLINE_PAYMENT' && pmt.cardLast4 && (
-                          <span className="block text-[10px] font-bold text-slate-400">
+                          <span className="block text-[10px] font-bold text-muted-foreground">
                             {pmt.issuerBank ? `${pmt.issuerBank} · ` : ''}••••{pmt.cardLast4}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-black text-slate-800 text-[15px] whitespace-nowrap">
+                      <TableCell className="text-right font-black text-foreground text-[15px] whitespace-nowrap">
                         {pmt.currency}{' '}
                         {Number(pmt.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         {/* What the customer paid is the figure above; what the bank
@@ -1697,13 +1703,13 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             processing fee, never a charge to the customer. */}
                         {pmt.paymentMode === 'ONLINE_PAYMENT' &&
                           pmt.netSettlementAmount != null && (
-                            <span className="block text-[10px] font-bold text-slate-400">
+                            <span className="block text-[10px] font-bold text-muted-foreground">
                               net {pmt.currency}{' '}
                               {Number(pmt.netSettlementAmount).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                               })}
                               {pmt.commissionAmount != null && (
-                                <span className="text-red-500">
+                                <span className="text-destructive">
                                   {' '}
                                   (−
                                   {Number(pmt.commissionAmount).toLocaleString(undefined, {
@@ -1715,10 +1721,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             </span>
                           )}
                       </TableCell>
-                      <TableCell className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                      <TableCell className="text-xs font-bold text-muted-foreground whitespace-nowrap">
                         {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell className="text-xs font-bold text-slate-500">
+                      <TableCell className="text-xs font-bold text-muted-foreground">
                         {pmt.recordedByEmployeeName}
                       </TableCell>
                       <TableCell>
@@ -1734,7 +1740,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             size="sm"
                             variant="ghost"
                             onClick={() => openReceiptView(pmt)}
-                            className={`${ACTION_BTN} text-slate-400 hover:text-blue-600 hover:bg-slate-100 hover:ring-1 hover:ring-slate-200`}
+                            className={`${ACTION_BTN} text-muted-foreground hover:text-primary hover:bg-muted hover:ring-1 hover:ring-ring`}
                             title="View Receipt"
                           >
                             <Eye size={18} />
@@ -1748,7 +1754,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   setActionTarget(pmt);
                                   setActionType('approve');
                                 }}
-                                className={`${ACTION_BTN} text-emerald-600 hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200`}
+                                className={`${ACTION_BTN} text-success hover:bg-success/10 hover:ring-1 hover:ring-success/30`}
                                 title="Approve"
                               >
                                 <CheckCircle2 size={18} />
@@ -1762,7 +1768,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   setRejectReason('');
                                   setApprovingAccountId('');
                                 }}
-                                className={`${ACTION_BTN} text-red-500 hover:bg-red-50 hover:ring-1 hover:ring-red-200`}
+                                className={`${ACTION_BTN} text-destructive hover:bg-destructive/10 hover:ring-1 hover:ring-destructive/30`}
                                 title="Reject"
                               >
                                 <XCircle size={18} />
@@ -1777,7 +1783,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                 variant="ghost"
                                 disabled={isActing}
                                 onClick={() => handleReverseApplication(pmt)}
-                                className={`${ACTION_BTN} text-amber-500 hover:bg-amber-50 hover:ring-1 hover:ring-amber-200`}
+                                className={`${ACTION_BTN} text-warning hover:bg-warning/10 hover:ring-1 hover:ring-warning/30`}
                                 title={`Reverse the ${pmt.currency} ${Number(pmt.appliedAmount).toFixed(2)} applied from this deposit`}
                               >
                                 <RotateCcw size={18} />
@@ -1791,7 +1797,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => openApplyDeposit(pmt)}
-                                className={`${ACTION_BTN} text-indigo-500 hover:bg-indigo-50 hover:ring-1 hover:ring-indigo-200`}
+                                className={`${ACTION_BTN} text-primary hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
                                 title="Apply deposit to an outstanding bill"
                               >
                                 <Wallet size={18} />
@@ -1811,7 +1817,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   setRefundAccountId('');
                                   setRefundRemarks('');
                                 }}
-                                className={`${ACTION_BTN} text-teal-500 hover:bg-teal-50 hover:ring-1 hover:ring-teal-200`}
+                                className={`${ACTION_BTN} text-info hover:bg-info/10 hover:ring-1 hover:ring-info/30`}
                                 title="Refund Security Deposit"
                               >
                                 <Undo2 size={18} />
@@ -1845,7 +1851,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             <DialogHeader>
               <DialogTitle className="text-base flex items-center gap-2">
                 Service Estimate {viewEstimate.invoiceNumber}
-                <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-2 py-0.5 text-[10px] font-black uppercase">
                   Awaiting Approval
                 </span>
               </DialogTitle>
@@ -1854,32 +1860,32 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
                     Customer
                   </p>
-                  <p className="font-bold text-slate-700">{viewEstimate.customerName || '—'}</p>
+                  <p className="font-bold text-foreground">{viewEstimate.customerName || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
                     Raised By
                   </p>
-                  <p className="font-bold text-slate-700">{viewEstimate.employeeName || '—'}</p>
+                  <p className="font-bold text-foreground">{viewEstimate.employeeName || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
                     Date
                   </p>
-                  <p className="font-bold text-slate-700">
+                  <p className="font-bold text-foreground">
                     {viewEstimate.createdAt
                       ? new Date(viewEstimate.createdAt).toLocaleDateString('en-GB')
                       : '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
                     Service Ticket
                   </p>
-                  <p className="font-bold text-slate-700">
+                  <p className="font-bold text-foreground">
                     {viewEstimate.serviceTicketId
                       ? viewEstimate.serviceTicketId.slice(0, 8).toUpperCase()
                       : '—'}
@@ -1887,23 +1893,23 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-3 py-2 bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="px-3 py-2 bg-muted text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   Costing
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-border">
                   {(viewEstimate.items || []).length === 0 && (
-                    <div className="px-3 py-3 text-[11px] text-slate-400">
+                    <div className="px-3 py-3 text-[11px] text-muted-foreground">
                       No line items recorded on this estimate.
                     </div>
                   )}
                   {(viewEstimate.items || []).map((it, i) => (
                     <div key={i} className="px-3 py-2 flex items-center justify-between text-xs">
-                      <span className="text-slate-600">
+                      <span className="text-foreground">
                         {it.description}
                         {Number(it.quantity) > 1 ? ` × ${it.quantity}` : ''}
                       </span>
-                      <span className="font-bold text-slate-800">
+                      <span className="font-bold text-foreground">
                         {formatCurrency(
                           (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
                           currency,
@@ -1913,25 +1919,25 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   ))}
                   {Number(viewEstimate.visitChargeAmount) > 0 && (
                     <div className="px-3 py-2 flex items-center justify-between text-xs">
-                      <span className="text-slate-600">Visit Charge</span>
-                      <span className="font-bold text-slate-800">
+                      <span className="text-foreground">Visit Charge</span>
+                      <span className="font-bold text-foreground">
                         {formatCurrency(Number(viewEstimate.visitChargeAmount), currency)}
                       </span>
                     </div>
                   )}
                   {Number(viewEstimate.discountAmount) > 0 && (
                     <div className="px-3 py-2 flex items-center justify-between text-xs">
-                      <span className="text-emerald-700">Discount</span>
-                      <span className="font-bold text-emerald-700">
+                      <span className="text-success">Discount</span>
+                      <span className="font-bold text-success">
                         − {formatCurrency(Number(viewEstimate.discountAmount), currency)}
                       </span>
                     </div>
                   )}
-                  <div className="px-3 py-2.5 flex items-center justify-between bg-slate-50">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-600">
+                  <div className="px-3 py-2.5 flex items-center justify-between bg-muted">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-foreground">
                       Total
                     </span>
-                    <span className="text-sm font-black text-slate-900">
+                    <span className="text-sm font-black text-foreground">
                       {formatCurrency(estimateAmount(viewEstimate), currency)}
                     </span>
                   </div>
@@ -1939,13 +1945,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               </div>
 
               {viewEstimate.technicianNoteToFinance && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-amber-700 font-bold mb-0.5">
+                <div className="rounded-xl bg-warning/10 border border-warning/30 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-warning font-bold mb-0.5">
                     Technician Note to Finance
                   </p>
-                  <p className="text-[11px] text-amber-900">
-                    {viewEstimate.technicianNoteToFinance}
-                  </p>
+                  <p className="text-[11px] text-warning">{viewEstimate.technicianNoteToFinance}</p>
                 </div>
               )}
             </div>
@@ -1955,7 +1959,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 Close
               </Button>
               <Button
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-destructive hover:bg-destructive/90"
                 onClick={() => {
                   setRejectEstimate(viewEstimate);
                   setRejectEstimateReason('');
@@ -1965,7 +1969,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 Reject
               </Button>
               <Button
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-success hover:bg-success/90"
                 disabled={estimateBusyId === viewEstimate.id}
                 onClick={() => {
                   approveEstimate(viewEstimate);
@@ -1996,7 +2000,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 onChange={(e) => setRejectEstimateReason(e.target.value)}
                 rows={3}
                 placeholder="Why is this estimate being rejected?"
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full text-xs p-3 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-destructive/30"
               />
             </div>
             <DialogFooter>
@@ -2004,7 +2008,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 Cancel
               </Button>
               <Button
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-destructive hover:bg-destructive/90"
                 disabled={
                   rejectEstimateReason.trim().length < 5 || estimateBusyId === rejectEstimate.id
                 }
@@ -2030,22 +2034,22 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           }}
         >
           <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
-            <DialogTitle className="text-base font-black text-slate-800">
+            <DialogTitle className="text-base font-black text-foreground">
               Apply Security Deposit to a Bill
             </DialogTitle>
             <div className="space-y-4">
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
+              <div className="rounded-xl border border-primary/30 bg-primary/10 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary">
                   Deposit held · {actionTarget.customerName}
                 </p>
-                <p className="text-lg font-black text-indigo-800">
+                <p className="text-lg font-black text-primary">
                   {actionTarget.currency}{' '}
                   {(Number(actionTarget.amount) - Number(actionTarget.appliedAmount ?? 0)).toFixed(
                     2,
                   )}
                 </p>
                 {Number(actionTarget.appliedAmount ?? 0) > 0 && (
-                  <p className="text-[10px] font-bold text-indigo-600">
+                  <p className="text-[10px] font-bold text-primary">
                     {actionTarget.currency} {Number(actionTarget.appliedAmount).toFixed(2)} of{' '}
                     {Number(actionTarget.amount).toFixed(2)} already applied
                   </p>
@@ -2054,15 +2058,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
               {applyLoading ? (
                 <div className="flex items-center justify-center py-6">
-                  <Loader2 size={20} className="animate-spin text-slate-400" />
+                  <Loader2 size={20} className="animate-spin text-muted-foreground" />
                 </div>
               ) : applyBills.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs font-bold text-slate-400">
+                <p className="rounded-lg border border-dashed border-border bg-muted px-3 py-4 text-center text-xs font-bold text-muted-foreground">
                   No customer-approved bill on this contract still has an outstanding balance.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Settle which bill?
                   </label>
                   {applyBills.map((b) => {
@@ -2078,11 +2082,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         onClick={() => setApplyBillId(b.usageRecordId)}
                         className={`w-full rounded-xl border p-3 text-left transition-colors ${
                           selected
-                            ? 'border-indigo-400 bg-indigo-50'
-                            : 'border-slate-200 hover:bg-slate-50'
+                            ? 'border-primary/30 bg-primary/10'
+                            : 'border-border hover:bg-muted'
                         }`}
                       >
-                        <p className="text-xs font-black text-slate-800">
+                        <p className="text-xs font-black text-foreground">
                           {b.billType === 'ADVANCE' ? 'Advance Bill' : 'Usage Bill'} ·{' '}
                           {new Date(b.billingPeriodStart).toLocaleDateString('en-GB', {
                             day: '2-digit',
@@ -2095,11 +2099,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             year: 'numeric',
                           })}
                         </p>
-                        <p className="text-[11px] font-bold text-slate-500">
+                        <p className="text-[11px] font-bold text-muted-foreground">
                           Outstanding {actionTarget.currency} {Number(b.amountPending).toFixed(2)}
                         </p>
                         {selected && (
-                          <p className="mt-1 text-[11px] font-black text-indigo-700">
+                          <p className="mt-1 text-[11px] font-black text-primary">
                             Applying {actionTarget.currency} {willApply.toFixed(2)} → remaining{' '}
                             {actionTarget.currency}{' '}
                             {(Number(b.amountPending) - willApply).toFixed(2)}
@@ -2108,7 +2112,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </button>
                     );
                   })}
-                  <p className="text-[10px] leading-relaxed text-slate-400">
+                  <p className="text-[10px] leading-relaxed text-muted-foreground">
                     No cash moves — the deposit already held is used to settle the bill, so
                     Outstanding drops and the deposit liability reduces by the same amount.
                   </p>
@@ -2122,14 +2126,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     setActionType(null);
                     setActionTarget(null);
                   }}
-                  className="text-xs font-bold text-slate-500"
+                  className="text-xs font-bold text-muted-foreground"
                 >
                   Cancel
                 </Button>
                 <Button
                   disabled={!applyBillId || isActing}
                   onClick={handleApplyDeposit}
-                  className="bg-indigo-600 text-xs font-black text-white hover:bg-indigo-700"
+                  className="bg-primary text-xs font-black text-primary-foreground hover:bg-primary/90"
                 >
                   {isActing ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
                   Apply Deposit
@@ -2154,7 +2158,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             <DialogTitle className="sr-only">Payment Receipt</DialogTitle>
             {isLoadingInvoice ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 size={24} className="animate-spin text-slate-400" />
+                <Loader2 size={24} className="animate-spin text-muted-foreground" />
               </div>
             ) : (
               <>
@@ -2164,14 +2168,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   currency={currency}
                   printRef={printRef}
                 />
-                <div className="p-4 bg-slate-50 border-t space-y-3">
+                <div className="p-4 bg-muted border-t space-y-3">
                   {/* Send-receipt inline form */}
                   {sendType && (
-                    <div className="flex items-center gap-2 p-2.5 bg-white border border-slate-200 rounded-xl">
+                    <div className="flex items-center gap-2 p-2.5 bg-card border border-border rounded-xl">
                       {sendType === 'email' ? (
-                        <Mail size={13} className="text-indigo-500 shrink-0" />
+                        <Mail size={13} className="text-primary shrink-0" />
                       ) : (
-                        <MessageSquare size={13} className="text-emerald-500 shrink-0" />
+                        <MessageSquare size={13} className="text-success shrink-0" />
                       )}
                       <Input
                         autoFocus
@@ -2190,7 +2194,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         size="sm"
                         onClick={handleSendReceipt}
                         disabled={isSending}
-                        className="h-7 px-3 text-[10px] font-black uppercase bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg"
+                        className="h-7 px-3 text-[10px] font-black uppercase bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg"
                       >
                         {isSending ? (
                           <Loader2 size={11} className="animate-spin" />
@@ -2206,7 +2210,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                           setSendRecipient('');
                         }}
                         disabled={isSending}
-                        className="h-7 w-7 p-0 text-slate-400"
+                        className="h-7 w-7 p-0 text-muted-foreground"
                       >
                         <XCircle size={11} />
                       </Button>
@@ -2220,14 +2224,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                           size="sm"
                           variant="ghost"
                           onClick={() => setActionType('reject')}
-                          className="text-[10px] font-black uppercase text-red-500 h-9"
+                          className="text-[10px] font-black uppercase text-destructive h-9"
                         >
                           Reject
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => setActionType('approve')}
-                          className="text-[10px] font-black uppercase bg-emerald-600 text-white hover:bg-emerald-700 h-9 px-5 rounded-xl"
+                          className="text-[10px] font-black uppercase bg-success text-success-foreground hover:bg-success/90 h-9 px-5 rounded-xl"
                         >
                           Approve
                         </Button>
@@ -2243,7 +2247,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             setSendType('email');
                             setSendRecipient('');
                           }}
-                          className="h-9 px-3 text-[10px] font-black uppercase text-indigo-500 hover:bg-indigo-50"
+                          className="h-9 px-3 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
                           title="Send receipt by email"
                         >
                           <Mail size={12} className="mr-1" /> Email
@@ -2255,7 +2259,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             setSendType('whatsapp');
                             setSendRecipient('');
                           }}
-                          className="h-9 px-3 text-[10px] font-black uppercase text-emerald-600 hover:bg-emerald-50"
+                          className="h-9 px-3 text-[10px] font-black uppercase text-success hover:bg-success/10"
                           title="Send receipt via WhatsApp"
                         >
                           <MessageSquare size={12} className="mr-1" /> WhatsApp
@@ -2266,7 +2270,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       size="sm"
                       variant="ghost"
                       onClick={() => window.print()}
-                      className="text-[10px] font-black uppercase text-slate-400 h-9 ml-auto"
+                      className="text-[10px] font-black uppercase text-muted-foreground h-9 ml-auto"
                     >
                       <Printer size={12} className="mr-1" /> Print
                     </Button>
@@ -2279,7 +2283,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         setSendType(null);
                         setSendRecipient('');
                       }}
-                      className="text-[10px] font-black uppercase text-slate-400 h-9"
+                      className="text-[10px] font-black uppercase text-muted-foreground h-9"
                     >
                       Close
                     </Button>
@@ -2303,10 +2307,12 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           }}
         >
           <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
-            <DialogTitle className="text-lg font-black text-slate-800">Approve Payment</DialogTitle>
-            <DialogDescription className="text-sm text-slate-500 leading-relaxed">
+            <DialogTitle className="text-lg font-black text-foreground">
+              Approve Payment
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
               This will post{' '}
-              <span className="font-black text-emerald-600">
+              <span className="font-black text-success">
                 {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
               </span>{' '}
               ({actionTarget.paymentMode.replace('_', ' ')}) to the invoice ledger for{' '}
@@ -2318,11 +2324,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 asks for it. */}
             {actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
               actionTarget.commissionAmount == null && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-warning">
                     Bank Commission
                   </p>
-                  <p className="mt-1 text-[11px] font-bold text-slate-500">
+                  <p className="mt-1 text-[11px] font-bold text-muted-foreground">
                     {actionTarget.issuerBank} {actionTarget.cardNetwork}{' '}
                     {actionTarget.cardType === 'DEBIT' ? 'Debit' : 'Credit'} — no rate is on file.
                     Enter the agreed percentage to apply it to this payment.
@@ -2336,11 +2342,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       value={approvingCommissionRate}
                       onChange={(e) => setApprovingCommissionRate(e.target.value)}
                       placeholder="e.g. 2.25"
-                      className="h-9 w-32 border-slate-200 text-sm font-bold"
+                      className="h-9 w-32 border-border text-sm font-bold"
                     />
-                    <span className="text-sm font-black text-slate-500">%</span>
+                    <span className="text-sm font-black text-muted-foreground">%</span>
                     {approvingCommissionRate !== '' && Number(approvingCommissionRate) >= 0 && (
-                      <span className="text-xs font-bold text-slate-600">
+                      <span className="text-xs font-bold text-foreground">
                         = {actionTarget.currency}{' '}
                         {(
                           (Number(actionTarget.amount) * Number(approvingCommissionRate)) /
@@ -2354,7 +2360,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </span>
                     )}
                   </div>
-                  <p className="mt-1.5 text-[10px] font-bold text-slate-400">
+                  <p className="mt-1.5 text-[10px] font-bold text-muted-foreground">
                     Saving a rate under Accounts → Card Processing Fees applies it to every future
                     payment on this bank automatically.
                   </p>
@@ -2365,36 +2371,36 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 places, so state them before the click rather than after. */}
             {actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
               actionTarget.commissionAmount != null && (
-                <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 text-xs">
-                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs">
+                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-primary">
                     Card Settlement
                   </p>
                   {actionTarget.cardLast4 && (
-                    <div className="mb-1.5 font-bold text-slate-600">
+                    <div className="mb-1.5 font-bold text-foreground">
                       {actionTarget.issuerBank} {actionTarget.cardNetwork}{' '}
                       {actionTarget.cardType === 'DEBIT' ? 'Debit' : 'Credit'} · ••••
                       {actionTarget.cardLast4}
                     </div>
                   )}
-                  <div className="flex justify-between font-bold text-slate-600">
+                  <div className="flex justify-between font-bold text-foreground">
                     <span>Customer paid (reduces receivable)</span>
                     <span>
                       {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between font-bold text-slate-600">
+                  <div className="flex justify-between font-bold text-foreground">
                     <span>
                       Processing fee
                       {actionTarget.commissionRateApplied != null &&
                         ` (${actionTarget.commissionRateApplied}%)`}
                     </span>
-                    <span className="text-red-600">
+                    <span className="text-destructive">
                       − {actionTarget.currency} {Number(actionTarget.commissionAmount).toFixed(2)}
                     </span>
                   </div>
-                  <div className="mt-1 flex justify-between border-t border-dashed border-indigo-200 pt-1 font-black text-slate-800">
+                  <div className="mt-1 flex justify-between border-t border-dashed border-primary/30 pt-1 font-black text-foreground">
                     <span>Posted to the bank account</span>
-                    <span className="text-emerald-700">
+                    <span className="text-success">
                       {actionTarget.currency}{' '}
                       {Number(actionTarget.netSettlementAmount ?? actionTarget.amount).toFixed(2)}
                     </span>
@@ -2404,11 +2410,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             {MODES_NEEDING_ACCOUNT.includes(actionTarget.paymentMode) &&
               !actionTarget.cashAccountId && (
                 <div className="mt-3 space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Post to Account <span className="text-red-500">*</span>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Post to Account <span className="text-destructive">*</span>
                   </Label>
                   <Select value={approvingAccountId} onValueChange={setApprovingAccountId}>
-                    <SelectTrigger className="h-9 w-full min-w-0 border-slate-200 text-sm font-bold overflow-hidden">
+                    <SelectTrigger className="h-9 w-full min-w-0 border-border text-sm font-bold overflow-hidden">
                       <SelectValue placeholder="Select cash / bank account…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2433,14 +2439,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 variant="ghost"
                 onClick={() => setActionType(null)}
                 disabled={isActing}
-                className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-black uppercase tracking-widest text-muted-foreground"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleApprove}
                 disabled={isActing}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
+                className="bg-success hover:bg-success/90 text-success-foreground font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
               >
                 {isActing ? <Loader2 size={14} className="animate-spin" /> : 'Approve'}
               </Button>
@@ -2453,21 +2459,21 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       {actionType === 'reject' && actionTarget && (
         <Dialog open onOpenChange={() => !isActing && setActionType(null)}>
           <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
-            <DialogTitle className="text-lg font-black text-slate-800">Reject Payment</DialogTitle>
-            <DialogDescription className="text-sm text-slate-500">
+            <DialogTitle className="text-lg font-black text-foreground">Reject Payment</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
               The payment will be returned to{' '}
               <span className="font-black">{actionTarget.recordedByEmployeeName}</span> for
               correction. Please provide a reason.
             </DialogDescription>
             <div className="mt-3">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                 Rejection Reason *
               </Label>
               <Input
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="e.g., incorrect amount, wrong mode..."
-                className="h-10 border-slate-200 font-bold text-sm"
+                className="h-10 border-border font-bold text-sm"
               />
             </div>
             <DialogFooter className="flex justify-between mt-4">
@@ -2475,14 +2481,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 variant="ghost"
                 onClick={() => setActionType(null)}
                 disabled={isActing}
-                className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-black uppercase tracking-widest text-muted-foreground"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleReject}
                 disabled={isActing || !rejectReason.trim()}
-                className="bg-red-500 hover:bg-red-600 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
               >
                 {isActing ? <Loader2 size={14} className="animate-spin" /> : 'Reject'}
               </Button>
@@ -2505,23 +2511,23 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           }}
         >
           <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
-            <DialogTitle className="text-lg font-black text-slate-800">
+            <DialogTitle className="text-lg font-black text-foreground">
               Refund Security Deposit
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-500 leading-relaxed">
+            <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
               This will pay out{' '}
-              <span className="font-black text-teal-600">
+              <span className="font-black text-info">
                 {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
               </span>{' '}
               to <span className="font-black">{actionTarget.customerName}</span> and reduce the
               selected account&apos;s balance by that amount. This cannot be undone.
             </DialogDescription>
             <div className="mt-3 space-y-1">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Refund From Account <span className="text-red-500">*</span>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Refund From Account <span className="text-destructive">*</span>
               </Label>
               <Select value={refundAccountId} onValueChange={setRefundAccountId}>
-                <SelectTrigger className="h-9 w-full min-w-0 border-slate-200 text-sm font-bold overflow-hidden">
+                <SelectTrigger className="h-9 w-full min-w-0 border-border text-sm font-bold overflow-hidden">
                   <SelectValue placeholder="Select cash / bank account…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2541,14 +2547,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               </Select>
             </div>
             <div className="mt-3">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                 Remarks (optional)
               </Label>
               <Input
                 value={refundRemarks}
                 onChange={(e) => setRefundRemarks(e.target.value)}
                 placeholder="e.g., contract ended, no damages found..."
-                className="h-10 border-slate-200 font-bold text-sm"
+                className="h-10 border-border font-bold text-sm"
               />
             </div>
             <DialogFooter className="flex justify-between mt-4">
@@ -2556,14 +2562,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 variant="ghost"
                 onClick={() => setActionType(null)}
                 disabled={isActing}
-                className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-black uppercase tracking-widest text-muted-foreground"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleRefund}
                 disabled={isActing || !refundAccountId}
-                className="bg-teal-600 hover:bg-teal-700 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
+                className="bg-info hover:bg-info/90 text-info-foreground font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
               >
                 {isActing ? <Loader2 size={14} className="animate-spin" /> : 'Refund'}
               </Button>
@@ -2584,7 +2590,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       >
         <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl p-0 overflow-hidden">
           <DialogTitle className="sr-only">Record Sale Balance Payment</DialogTitle>
-          <div className="bg-linear-to-r from-indigo-700 to-indigo-500 p-5 text-white">
+          <div className="bg-linear-to-r from-primary to-primary p-5 text-primary-foreground">
             <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-0.5">
               Finance · Direct Recording
             </p>
@@ -2597,7 +2603,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           {directPayStep === 'search' ? (
             <div className="p-5 space-y-4">
               <div>
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1.5 block">
                   Invoice Number
                 </Label>
                 <div className="flex gap-2">
@@ -2606,12 +2612,12 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     onChange={(e) => setDirectPayInvoiceNo(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleDirectInvoiceSearch()}
                     placeholder="e.g. INV-2025-001"
-                    className="h-10 border-slate-200 font-bold text-sm flex-1"
+                    className="h-10 border-border font-bold text-sm flex-1"
                   />
                   <Button
                     onClick={handleDirectInvoiceSearch}
                     disabled={isSearchingInvoice || !directPayInvoiceNo.trim()}
-                    className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 rounded-xl"
+                    className="h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs px-4 rounded-xl"
                   >
                     {isSearchingInvoice ? <Loader2 size={14} className="animate-spin" /> : 'Find'}
                   </Button>
@@ -2624,7 +2630,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     setDirectPayOpen(false);
                     resetDirectPay();
                   }}
-                  className="text-[10px] font-black uppercase text-slate-400"
+                  className="text-[10px] font-black uppercase text-muted-foreground"
                 >
                   Cancel
                 </Button>
@@ -2632,21 +2638,19 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             </div>
           ) : (
             <div className="p-5 space-y-3">
-              <div className="p-3 bg-indigo-50 rounded-xl">
-                <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-1">
+              <div className="p-3 bg-primary/10 rounded-xl">
+                <p className="text-[9px] font-black uppercase tracking-widest text-primary mb-1">
                   Invoice
                 </p>
-                <p className="text-sm font-black text-indigo-800">
-                  {directPayInvoice?.invoiceNumber}
-                </p>
-                <p className="text-xs text-indigo-600 font-bold">
+                <p className="text-sm font-black text-primary">{directPayInvoice?.invoiceNumber}</p>
+                <p className="text-xs text-primary font-bold">
                   {directPayInvoice?.customerName || '—'} · {currency}{' '}
                   {Number(directPayInvoice?.totalAmount || 0).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                   })}
                 </p>
                 {directPayExisting && directPayExisting.approvedTotal > 0 && (
-                  <p className="text-[10px] text-indigo-500 font-bold mt-1.5">
+                  <p className="text-[10px] text-primary font-bold mt-1.5">
                     Already approved: {currency}{' '}
                     {directPayExisting.approvedTotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -2655,15 +2659,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 )}
               </div>
               {directPayExisting && directPayExisting.pending.length > 0 && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
+                <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-warning mb-1">
                     Already has {directPayExisting.pending.length} pending request
                     {directPayExisting.pending.length > 1 ? 's' : ''} — {currency}{' '}
                     {directPayExisting.pendingTotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                     })}
                   </p>
-                  <ul className="text-[10px] text-amber-700 font-bold space-y-0.5">
+                  <ul className="text-[10px] text-warning font-bold space-y-0.5">
                     {directPayExisting.pending.map((p) => (
                       <li key={p.id}>
                         {p.requestNo} · {currency}{' '}
@@ -2672,7 +2676,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </li>
                     ))}
                   </ul>
-                  <p className="text-[10px] text-amber-600 mt-1">
+                  <p className="text-[10px] text-warning mt-1">
                     Recording the full remaining balance here will overpay once that request is also
                     approved. Approve or reject it first, or reduce the amount below.
                   </p>
@@ -2680,7 +2684,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                     Amount ({currency}) *
                   </Label>
                   <Input
@@ -2688,10 +2692,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     value={directAmount}
                     onChange={(e) => setDirectAmount(e.target.value)}
                     placeholder="0.00"
-                    className="h-10 border-slate-200 font-black text-indigo-600"
+                    className="h-10 border-border font-black text-primary"
                   />
                   {directPayExisting && (
-                    <p className="text-[10px] text-slate-400 font-bold mt-1">
+                    <p className="text-[10px] text-muted-foreground font-bold mt-1">
                       Safe to record without overpaying: {currency}{' '}
                       {directPayExisting.safeRemaining.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -2700,7 +2704,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   )}
                 </div>
                 <div>
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                     Payment Mode
                   </Label>
                   <Select
@@ -2714,7 +2718,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       setDirectCardQuoteError(null);
                     }}
                   >
-                    <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                    <SelectTrigger className="h-10 border-border font-bold text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2734,14 +2738,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                     {directMode === 'CHEQUE' ? 'Cheque Received Date' : 'Payment Date'}
                   </Label>
                   <Input
                     type="date"
                     value={directDate}
                     onChange={(e) => setDirectDate(e.target.value)}
-                    className="h-10 border-slate-200 font-bold text-xs"
+                    className="h-10 border-border font-bold text-xs"
                   />
                 </div>
               </div>
@@ -2756,11 +2760,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               )}
               {directMode !== 'CHEQUE' && (
                 <div>
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                     Deposit to Account *
                   </Label>
                   <Select value={directAccountId} onValueChange={setDirectAccountId}>
-                    <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                    <SelectTrigger className="h-10 border-border font-bold text-xs">
                       <SelectValue placeholder="Select cash / bank account…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2777,40 +2781,40 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 </div>
               )}
               {directMode === 'CHEQUE' && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-700">
+                <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl space-y-2">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-warning">
                     Cheque Details
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                      <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                         Cheque No.
                       </Label>
                       <Input
                         value={directChequeNo}
                         onChange={(e) => setDirectChequeNo(e.target.value)}
-                        className="h-9 border-slate-200 font-bold text-xs"
+                        className="h-9 border-border font-bold text-xs"
                       />
                     </div>
                     <div>
-                      <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                      <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                         Bank Name
                       </Label>
                       <Input
                         value={directChequeBank}
                         onChange={(e) => setDirectChequeBank(e.target.value)}
-                        className="h-9 border-slate-200 font-bold text-xs"
+                        className="h-9 border-border font-bold text-xs"
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                      <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                         Cheque Date (earliest date it can be deposited)
                       </Label>
                       <Input
                         type="date"
                         value={directChequeDate}
                         onChange={(e) => setDirectChequeDate(e.target.value)}
-                        className="h-9 border-slate-200 font-bold text-xs"
+                        className="h-9 border-border font-bold text-xs"
                       />
                     </div>
                   </div>
@@ -2818,23 +2822,23 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               )}
               {directMode !== 'CHEQUE' && (
                 <div>
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                     Reference #
                   </Label>
-                  <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                  <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground italic">
                     Auto-generated on save — {autoReferencePreview(directMode)}
                   </div>
                 </div>
               )}
               <div>
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                   Remarks
                 </Label>
                 <Input
                   value={directRemarks}
                   onChange={(e) => setDirectRemarks(e.target.value)}
                   placeholder="Optional notes..."
-                  className="h-10 border-slate-200 font-bold text-xs"
+                  className="h-10 border-border font-bold text-xs"
                 />
               </div>
               <div className="flex justify-between gap-2 pt-1">
@@ -2842,7 +2846,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   variant="ghost"
                   onClick={() => setDirectPayStep('search')}
                   disabled={isSavingDirect}
-                  className="text-[10px] font-black uppercase text-slate-400"
+                  className="text-[10px] font-black uppercase text-muted-foreground"
                 >
                   Back
                 </Button>
@@ -2853,7 +2857,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     !directAmount ||
                     (MODES_NEEDING_ACCOUNT.includes(directMode) && !directAccountId)
                   }
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
                 >
                   {isSavingDirect ? (
                     <Loader2 size={14} className="animate-spin" />

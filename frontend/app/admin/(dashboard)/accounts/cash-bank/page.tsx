@@ -31,13 +31,13 @@ import StatementDialog, {
 } from '@/components/shared/StatementDialog';
 
 const TYPE_BADGE: Record<string, string> = {
-  CASH: 'bg-emerald-100 text-emerald-700',
-  BANK: 'bg-blue-100 text-blue-700',
+  CASH: 'bg-success/10 text-success',
+  BANK: 'bg-primary/10 text-primary',
 };
 
 const TXN_BADGE: Record<string, string> = {
-  RECEIPT: 'bg-emerald-100 text-emerald-700',
-  PAYMENT: 'bg-red-100 text-red-700',
+  RECEIPT: 'bg-success/10 text-success',
+  PAYMENT: 'bg-destructive/10 text-destructive',
 };
 
 function SelectAccountModal({
@@ -51,16 +51,16 @@ function SelectAccountModal({
 }) {
   const [chosen, setChosen] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-bold text-gray-900">Select Account</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="font-bold text-foreground">Select Account</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             ×
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             A statement needs one specific account — choose which account this statement is for.
           </p>
           <Select value={chosen} onValueChange={setChosen}>
@@ -199,16 +199,18 @@ function CashBankContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cash & Bank — Consolidated</h1>
-          <p className="text-sm text-gray-500">All branches</p>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">
+            Cash & Bank — Consolidated
+          </h1>
+          <p className="text-sm text-muted-foreground">All branches</p>
         </div>
         <button
           onClick={handleGenerateStatementClick}
           disabled={generatingStatement}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted disabled:opacity-50"
         >
           <FileText className="h-4 w-4" />{' '}
           {generatingStatement ? 'Generating…' : 'Generate Statement'}
@@ -240,24 +242,24 @@ function CashBankContent() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border p-4">
-        <h3 className="text-sm font-semibold text-gray-600 mb-3">Account Balances</h3>
+      <div className="bg-card rounded-xl border p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Account Balances</h3>
         <SimpleBarChart
           data={accounts.map((a) => ({ name: a.name, balance: Number(a.currentBalance) }))}
           xKey="name"
-          bars={[{ key: 'balance', color: '#3b82f6', label: 'Balance' }]}
+          bars={[{ key: 'balance', color: 'var(--chart-blue-mid)', label: 'Balance' }]}
           height={200}
           currency={currency}
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <div className="flex border-b">
           {(['accounts', 'cashbook'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-sm font-medium ${activeTab === tab ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 text-sm font-medium ${activeTab === tab ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {tab === 'accounts' ? 'Accounts' : 'Cashbook'}
             </button>
@@ -265,19 +267,19 @@ function CashBankContent() {
         </div>
         <div className="flex items-center gap-3 p-4 border-b">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={
                 activeTab === 'accounts' ? 'Search accounts...' : 'Search transactions...'
               }
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           {activeTab === 'accounts' && (
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="border-orange-200 text-sm">
+              <SelectTrigger className="border-warning/30 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -291,11 +293,11 @@ function CashBankContent() {
 
         {activeTab === 'accounts' ? (
           loadingAccounts ? (
-            <div className="p-8 text-center text-gray-400">Loading…</div>
+            <div className="p-8 text-center text-muted-foreground">Loading…</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <thead className="bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
                     {['Account Name', 'Type', 'Account No', 'Bank', 'Currency', 'Balance'].map(
                       (h) => (
@@ -309,26 +311,26 @@ function CashBankContent() {
                 <tbody className="divide-y">
                   {filteredAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-gray-400">
+                      <td colSpan={6} className="text-center py-8 text-muted-foreground">
                         No accounts found
                       </td>
                     </tr>
                   ) : (
                     filteredAccounts.map((a) => (
-                      <tr key={a.id} className="hover:bg-gray-50">
+                      <tr key={a.id} className="hover:bg-muted">
                         <td className="px-4 py-3 font-medium">{a.name}</td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[a.type] ?? 'bg-gray-100 text-gray-700'}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[a.type] ?? 'bg-muted text-foreground'}`}
                           >
                             {a.type}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                           {a.accountNumber ?? '—'}
                         </td>
-                        <td className="px-4 py-3 text-gray-500">{a.bankName ?? '—'}</td>
-                        <td className="px-4 py-3 text-gray-500">{a.currency}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{a.bankName ?? '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{a.currency}</td>
                         <td className="px-4 py-3 font-semibold">
                           {formatCurrency(a.currentBalance, currency)}
                         </td>
@@ -340,11 +342,11 @@ function CashBankContent() {
             </div>
           )
         ) : loadingCashbook ? (
-          <div className="p-8 text-center text-gray-400">Loading…</div>
+          <div className="p-8 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   {['Reference', 'Date', 'Type', 'Description', 'Category', 'Amount'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium">
@@ -356,18 +358,20 @@ function CashBankContent() {
               <tbody className="divide-y">
                 {filteredCashbook.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No transactions found
                     </td>
                   </tr>
                 ) : (
                   filteredCashbook.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.referenceNo}</td>
+                    <tr key={e.id} className="hover:bg-muted">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {e.referenceNo}
+                      </td>
                       <td className="px-4 py-3">{String(e.date).slice(0, 10)}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${TXN_BADGE[e.entryType] ?? 'bg-gray-100 text-gray-700'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${TXN_BADGE[e.entryType] ?? 'bg-muted text-foreground'}`}
                         >
                           {e.entryType}
                         </span>
@@ -375,9 +379,9 @@ function CashBankContent() {
                       <td className="px-4 py-3 max-w-[200px] truncate" title={e.description}>
                         {e.description}
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
                         {e.category === 'GUARANTEE_CHEQUE' ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-[10px]">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success/10 text-success font-semibold border border-success/30 text-[10px]">
                             Guarantee Cheque
                           </span>
                         ) : (
@@ -385,7 +389,7 @@ function CashBankContent() {
                         )}
                       </td>
                       <td
-                        className={`px-4 py-3 font-semibold ${e.entryType === 'RECEIPT' ? 'text-emerald-600' : 'text-red-600'}`}
+                        className={`px-4 py-3 font-semibold ${e.entryType === 'RECEIPT' ? 'text-success' : 'text-destructive'}`}
                       >
                         {e.entryType === 'RECEIPT' ? '+' : '-'}
                         {formatCurrency(e.amount, currency)}
@@ -419,7 +423,7 @@ function CashBankContent() {
 
 export default function AdminCashBankPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <CashBankContent />
     </Suspense>
   );

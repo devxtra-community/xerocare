@@ -90,12 +90,12 @@ export default function BranchSalesChart({
   }, [selectedPeriod, selectedYear]);
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm border border-primary/30 flex flex-col p-4">
       {/* Header */}
       <div className="flex items-center justify-between pb-4">
         <div>
-          <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
-          <p className="text-[10px] text-gray-500">{subtitle}</p>
+          <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+          <p className="text-[10px] text-muted-foreground">{subtitle}</p>
         </div>
         <YearSelector selectedYear={selectedYear} onYearChange={onYearChange} />
       </div>
@@ -145,7 +145,7 @@ export default function BranchSalesChart({
               />
 
               <Tooltip
-                cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
+                cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
                     const date = new Date(label);
@@ -163,8 +163,8 @@ export default function BranchSalesChart({
                             year: isAll ? undefined : 'numeric',
                           });
                     return (
-                      <div className="bg-white p-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-50 flex flex-col gap-2 min-w-[120px]">
-                        <p className="text-xs font-bold text-gray-700 mb-2">{formattedDate}</p>
+                      <div className="bg-card p-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-border flex flex-col gap-2 min-w-[120px]">
+                        <p className="text-xs font-bold text-foreground mb-2">{formattedDate}</p>
                         {payload.map((entry: unknown, index: number) => {
                           const item = entry as { name: string; value: number; color: string };
                           return (
@@ -210,8 +210,13 @@ export default function BranchSalesChart({
                 stroke="var(--chart-blue)"
                 fill="url(#saleGradient)"
                 strokeWidth={2}
-                dot={{ r: 4, fill: 'var(--chart-blue)', stroke: '#fff', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: 'var(--chart-blue)', stroke: '#fff', strokeWidth: 2 }}
+                dot={{ r: 4, fill: 'var(--chart-blue)', stroke: 'var(--card)', strokeWidth: 2 }}
+                activeDot={{
+                  r: 6,
+                  fill: 'var(--chart-blue)',
+                  stroke: 'var(--card)',
+                  strokeWidth: 2,
+                }}
               />
               <Area
                 type="monotone"
@@ -220,11 +225,16 @@ export default function BranchSalesChart({
                 stroke="var(--chart-blue-light)"
                 fill="url(#rentGradient)"
                 strokeWidth={2}
-                dot={{ r: 4, fill: 'var(--chart-blue-light)', stroke: '#fff', strokeWidth: 2 }}
+                dot={{
+                  r: 4,
+                  fill: 'var(--chart-blue-light)',
+                  stroke: 'var(--card)',
+                  strokeWidth: 2,
+                }}
                 activeDot={{
                   r: 6,
                   fill: 'var(--chart-blue-light)',
-                  stroke: '#fff',
+                  stroke: 'var(--card)',
                   strokeWidth: 2,
                 }}
               />
@@ -235,11 +245,16 @@ export default function BranchSalesChart({
                 stroke="var(--chart-blue-lighter)"
                 fill="url(#leaseGradient)"
                 strokeWidth={2}
-                dot={{ r: 4, fill: 'var(--chart-blue-lighter)', stroke: '#fff', strokeWidth: 2 }}
+                dot={{
+                  r: 4,
+                  fill: 'var(--chart-blue-lighter)',
+                  stroke: 'var(--card)',
+                  strokeWidth: 2,
+                }}
                 activeDot={{
                   r: 6,
                   fill: 'var(--chart-blue-lighter)',
-                  stroke: '#fff',
+                  stroke: 'var(--card)',
                   strokeWidth: 2,
                 }}
               />

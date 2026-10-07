@@ -120,10 +120,10 @@ export default function SendDocumentModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px] rounded-2xl p-6 overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
             Share {docLabel}
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
+          <DialogDescription className="text-xs text-muted-foreground">
             Download or deliver the {docLabel.toLowerCase()} to {customerName} for ticket{' '}
             {ticketNumber}.
             {docType === 'quotation' && (
@@ -138,16 +138,16 @@ export default function SendDocumentModal({
 
         <form onSubmit={handleSend} className="space-y-4 py-3">
           {/* Email Block */}
-          <div className="space-y-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+          <div className="space-y-2 border border-border rounded-xl p-3 bg-muted/50">
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={emailEnabled}
                   onChange={(e) => setEmailEnabled(e.target.checked)}
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
                 />
-                <Mail className="h-4 w-4 text-slate-400" />
+                <Mail className="h-4 w-4 text-muted-foreground" />
                 Send via Email
               </label>
             </div>
@@ -158,22 +158,22 @@ export default function SendDocumentModal({
                 placeholder="customer@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-9 text-xs bg-white border-slate-200 rounded-lg mt-1"
+                className="h-9 text-xs bg-card border-border rounded-lg mt-1"
               />
             )}
           </div>
 
           {/* WhatsApp Block */}
-          <div className="space-y-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+          <div className="space-y-2 border border-border rounded-xl p-3 bg-muted/50">
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={phoneEnabled}
                   onChange={(e) => setPhoneEnabled(e.target.checked)}
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
                 />
-                <Phone className="h-4 w-4 text-slate-400" />
+                <Phone className="h-4 w-4 text-muted-foreground" />
                 Send via WhatsApp
               </label>
             </div>
@@ -184,23 +184,23 @@ export default function SendDocumentModal({
                 placeholder="+974xxxxxxxx"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="h-9 text-xs bg-white border-slate-200 rounded-lg mt-1"
+                className="h-9 text-xs bg-card border-border rounded-lg mt-1"
               />
             )}
           </div>
 
-          <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+          <div className="flex flex-col gap-2 pt-2 border-t border-border">
             <Button
               type="button"
               variant="outline"
               disabled={downloading || sending}
               onClick={handleDownload}
-              className="w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-slate-200 text-slate-700 hover:bg-slate-50"
+              className="w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-border text-foreground hover:bg-muted"
             >
               {downloading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               ) : (
-                <Download className="h-4 w-4 text-slate-500" />
+                <Download className="h-4 w-4 text-muted-foreground" />
               )}
               Download PDF Document
             </Button>
@@ -218,12 +218,12 @@ export default function SendDocumentModal({
               <Button
                 type="submit"
                 disabled={sending || (!emailEnabled && !phoneEnabled)}
-                className="rounded-xl text-xs font-bold h-10 bg-slate-900 hover:bg-slate-800 text-white flex items-center gap-2 px-5"
+                className="rounded-xl text-xs font-bold h-10 bg-foreground hover:bg-foreground text-primary-foreground flex items-center gap-2 px-5"
               >
                 {sending ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" />
                 ) : (
-                  <Send className="h-4 w-4 text-white" />
+                  <Send className="h-4 w-4 text-primary-foreground" />
                 )}
                 Send Document
               </Button>

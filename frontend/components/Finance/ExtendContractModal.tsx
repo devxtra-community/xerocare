@@ -75,7 +75,7 @@ export function ExtendContractModal({ contract, onClose, onExtended }: ExtendCon
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Current End Date
               </p>
-              <p className="text-sm font-black text-slate-800 mt-1">
+              <p className="text-sm font-black text-foreground mt-1">
                 {currentEnd ? format(currentEnd, 'dd MMM yyyy') : '—'}
               </p>
             </div>
@@ -103,11 +103,11 @@ export function ExtendContractModal({ contract, onClose, onExtended }: ExtendCon
               className="h-10"
             />
             {!isValid && (
-              <p className="text-[11px] text-red-500">Enter a whole number between 1 and 60.</p>
+              <p className="text-[11px] text-destructive">Enter a whole number between 1 and 60.</p>
             )}
           </div>
 
-          <p className="text-[11px] text-slate-400 leading-relaxed">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
             The quotation&apos;s month count and displayed contract value update automatically from
             the new end date
             {contract.saleType === 'LEASE' ? ' (lease tenure is extended too)' : ''}. Finance can

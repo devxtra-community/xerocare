@@ -190,25 +190,25 @@ export default function HrTable({
           <tbody>
             {currentData.length > 0 ? (
               currentData.map((item, index) => (
-                <tr key={index} className={index % 2 !== 0 ? 'bg-blue-50/40' : 'bg-transparent'}>
+                <tr key={index} className={index % 2 !== 0 ? 'bg-primary/10' : 'bg-transparent'}>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium">
                     <div className="flex items-center gap-1 sm:gap-2">
-                      <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] sm:text-xs font-medium text-gray-700">
+                      <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-muted flex items-center justify-center text-[10px] sm:text-xs font-medium text-foreground">
                         {item.avatar}
                       </div>
                       <span className="text-foreground truncate">{item.Fullname}</span>
                     </div>
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {item.Branch}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {item.Position}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {item.startDate}
                   </td>
-                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
+                  <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-foreground">
                     {item.salary}
                   </td>
                 </tr>

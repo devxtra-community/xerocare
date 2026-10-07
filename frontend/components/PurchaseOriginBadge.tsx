@@ -15,7 +15,7 @@ export function PurchaseOriginBadge({ origin, className }: PurchaseOriginBadgePr
   const meta = origin ? PURCHASE_ORIGIN_META[origin as PurchaseOrigin] : undefined;
 
   if (!meta) {
-    return <span className={cn('text-xs text-slate-400', className)}>—</span>;
+    return <span className={cn('text-xs text-muted-foreground', className)}>—</span>;
   }
 
   return (

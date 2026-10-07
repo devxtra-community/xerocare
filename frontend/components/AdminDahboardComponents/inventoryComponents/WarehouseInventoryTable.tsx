@@ -88,7 +88,7 @@ export default function WarehouseInventoryTable() {
             {currentData.map((item, index) => (
               <TableRow
                 key={item.id}
-                className={`border-none ${index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}`}
+                className={`border-none ${index % 2 === 1 ? 'bg-primary/10' : 'bg-card'}`}
               >
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                   {item.name}
@@ -96,17 +96,17 @@ export default function WarehouseInventoryTable() {
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center">
                   {item.totalProducts}
                 </TableCell>
-                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center font-bold text-gray-700">
+                <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-center font-bold text-foreground">
                   {item.totalQty.toLocaleString()}
                 </TableCell>
                 <TableCell className="py-1.5 sm:py-2 px-1 sm:px-2 text-center">
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                       item.status === 'Critical'
-                        ? 'bg-red-100 text-red-700'
+                        ? 'bg-destructive/10 text-destructive'
                         : item.status === 'Warning'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-green-100 text-green-700'
+                          ? 'bg-warning/10 text-warning'
+                          : 'bg-success/10 text-success'
                     }`}
                   >
                     {item.status}

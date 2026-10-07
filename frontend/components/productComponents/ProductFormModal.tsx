@@ -373,7 +373,7 @@ export function ProductFormModal({
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Paste product description and features here"
-                className="resize-y min-h-[300px] text-sm leading-relaxed whitespace-pre-wrap focus-visible:ring-0 focus-visible:ring-offset-0 border-slate-200 focus:border-slate-300"
+                className="resize-y min-h-[300px] text-sm leading-relaxed whitespace-pre-wrap focus-visible:ring-0 focus-visible:ring-offset-0 border-border focus:border-border"
                 rows={12}
               />
             </div>
@@ -381,7 +381,7 @@ export function ProductFormModal({
 
           <div className="pt-4 border-t mt-6">
             <div className="flex justify-between items-center mb-4">
-              <label className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+              <label className="text-sm font-bold text-foreground uppercase tracking-wide">
                 Replacement Consumables
               </label>
               <Button
@@ -406,7 +406,7 @@ export function ProductFormModal({
             {form.consumables.map((consumable, idx) => (
               <div
                 key={idx}
-                className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-200 relative group shadow-sm"
+                className="bg-muted p-4 rounded-lg mb-4 border border-border relative group shadow-sm"
               >
                 <button
                   type="button"
@@ -415,13 +415,13 @@ export function ProductFormModal({
                     newC.splice(idx, 1);
                     setForm({ ...form, consumables: newC });
                   }}
-                  className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                  className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors p-1"
                 >
                   <X size={16} />
                 </button>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="col-span-1">
-                    <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                       Part Number
                     </label>
                     <Input
@@ -436,7 +436,7 @@ export function ProductFormModal({
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                       Description
                     </label>
                     <Input
@@ -451,7 +451,7 @@ export function ProductFormModal({
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                       Yield
                     </label>
                     <Input
@@ -466,7 +466,7 @@ export function ProductFormModal({
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                       Price
                     </label>
                     <Input
@@ -486,8 +486,10 @@ export function ProductFormModal({
               </div>
             ))}
             {form.consumables.length === 0 && (
-              <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg">
-                <p className="text-xs text-slate-400">No replacement consumables added yet.</p>
+              <div className="text-center py-6 border-2 border-dashed border-border rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  No replacement consumables added yet.
+                </p>
               </div>
             )}
           </div>
@@ -610,8 +612,8 @@ export function ProductFormModal({
                           <span
                             className={
                               available > 0
-                                ? 'text-green-600 font-medium'
-                                : 'text-red-500 font-bold'
+                                ? 'text-success font-medium'
+                                : 'text-destructive font-bold'
                             }
                           >
                             {available > 0
@@ -732,7 +734,7 @@ export function ProductFormModal({
 
           <div className="pt-4 border-t mt-6">
             <div className="flex justify-between items-center mb-4">
-              <label className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+              <label className="text-sm font-bold text-foreground uppercase tracking-wide">
                 Key Features
               </label>
               <Button
@@ -745,7 +747,7 @@ export function ProductFormModal({
                     features: [...prev.features, { subHeading: '', description: '' }],
                   }))
                 }
-                className="h-8 text-xs px-3 border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+                className="h-8 text-xs px-3 border-success text-success hover:bg-success/10"
               >
                 <Plus size={14} className="mr-1.5" /> Add Feature
               </Button>
@@ -754,7 +756,7 @@ export function ProductFormModal({
             {form.features.map((feature, idx) => (
               <div
                 key={idx}
-                className="bg-emerald-50/30 p-4 rounded-lg mb-4 border border-emerald-100 relative group shadow-sm"
+                className="bg-success/10 p-4 rounded-lg mb-4 border border-success/30 relative group shadow-sm"
               >
                 <button
                   type="button"
@@ -763,13 +765,13 @@ export function ProductFormModal({
                     newF.splice(idx, 1);
                     setForm({ ...form, features: newF });
                   }}
-                  className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                  className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors p-1"
                 >
                   <X size={16} />
                 </button>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-emerald-700 uppercase mb-1 block">
+                    <label className="text-[11px] font-semibold text-success uppercase mb-1 block">
                       Sub Heading
                     </label>
                     <Input
@@ -780,11 +782,11 @@ export function ProductFormModal({
                         setForm({ ...form, features: newF });
                       }}
                       placeholder="e.g. Speed"
-                      className="h-9 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                      className="h-9 focus:border-success focus:ring-1 focus:ring-success/20"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-emerald-700 uppercase mb-1 block">
+                    <label className="text-[11px] font-semibold text-success uppercase mb-1 block">
                       Description
                     </label>
                     <Textarea
@@ -795,15 +797,15 @@ export function ProductFormModal({
                         setForm({ ...form, features: newF });
                       }}
                       placeholder="e.g. 30 ppm print speed for high productivity"
-                      className="resize-none min-h-[60px] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                      className="resize-none min-h-[60px] text-sm focus:border-success focus:ring-1 focus:ring-success/20"
                     />
                   </div>
                 </div>
               </div>
             ))}
             {form.features.length === 0 && (
-              <div className="text-center py-6 border-2 border-dashed border-emerald-100 rounded-lg">
-                <p className="text-xs text-emerald-400">No special features added yet.</p>
+              <div className="text-center py-6 border-2 border-dashed border-success/30 rounded-lg">
+                <p className="text-xs text-success">No special features added yet.</p>
               </div>
             )}
           </div>
@@ -825,14 +827,14 @@ export function ProductFormModal({
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                  className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-primary-foreground"
                   title="Remove Image"
                 >
                   <X size={20} />
                 </button>
               </div>
             ) : (
-              <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-gray-400">
+              <div className="h-16 w-16 rounded border flex items-center justify-center text-xs text-muted-foreground">
                 No Image
               </div>
             )}
@@ -850,7 +852,11 @@ export function ProductFormModal({
         <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button className="bg-primary text-white" onClick={handleSubmit} disabled={isSubmitting}>
+        <Button
+          className="bg-primary text-primary-foreground"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+        >
           {isSubmitting ? 'Processing...' : 'Confirm'}
         </Button>
       </div>
@@ -868,7 +874,7 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <div className="bg-card rounded-2xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between mb-4">
           <h2 className="font-semibold text-lg">{title}</h2>

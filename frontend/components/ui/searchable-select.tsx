@@ -94,7 +94,7 @@ export function SearchableSelect({
               stretch a fixed-width dialog and spill its buttons off the edge. */}
           {selectedOption ? (
             <div className="flex min-w-0 flex-col items-start overflow-hidden">
-              <span className="w-full truncate text-left font-bold text-sm text-slate-700">
+              <span className="w-full truncate text-left font-bold text-sm text-foreground">
                 {selectedOption.label}
               </span>
             </div>
@@ -111,17 +111,17 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[800px] p-0 bg-card z-[9999] pointer-events-auto shadow-2xl border-slate-200"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[800px] p-0 bg-card z-[9999] pointer-events-auto shadow-2xl border-border"
         align="start"
         sideOffset={4}
       >
         <div className="flex flex-col bg-card rounded-md">
           {/* Native Search Input */}
-          <div className="flex items-center border-b px-4 py-3 bg-slate-50/50">
-            <Search className="mr-3 h-5 w-5 shrink-0 text-slate-400" />
+          <div className="flex items-center border-b px-4 py-3 bg-muted/50">
+            <Search className="mr-3 h-5 w-5 shrink-0 text-muted-foreground" />
             <input
               className={cn(
-                'flex h-10 w-full bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50',
+                'flex h-10 w-full bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
               )}
               placeholder="Search..."
               value={searchQuery}
@@ -151,7 +151,7 @@ export function SearchableSelect({
                     'relative flex select-none items-center justify-between rounded-sm px-3 py-2 text-sm outline-none transition-all duration-200 group',
                     option.disabled
                       ? 'cursor-not-allowed opacity-50 bg-muted/50'
-                      : 'cursor-pointer hover:bg-blue-600 hover:shadow-sm',
+                      : 'cursor-pointer hover:bg-primary/90 hover:shadow-sm',
                   )}
                 >
                   <div className="flex flex-col min-w-0 flex-1">
@@ -159,14 +159,14 @@ export function SearchableSelect({
                       className={cn(
                         'font-bold text-sm transition-colors duration-200 truncate',
                         option.disabled
-                          ? 'text-slate-400'
-                          : 'text-slate-700 group-hover:text-white',
+                          ? 'text-muted-foreground'
+                          : 'text-foreground group-hover:text-primary-foreground',
                       )}
                     >
                       {option.label}
                     </span>
                     {option.description && (
-                      <p className="text-[10px] font-medium leading-tight mt-0.5 transition-colors duration-200 text-slate-400 group-hover:text-blue-100 truncate">
+                      <p className="text-[10px] font-medium leading-tight mt-0.5 transition-colors duration-200 text-muted-foreground group-hover:text-primary truncate">
                         {option.description}
                       </p>
                     )}
@@ -175,7 +175,7 @@ export function SearchableSelect({
                     className={cn(
                       'ml-2 h-4 w-4 shrink-0 transition-colors duration-200',
                       value === option.value
-                        ? 'opacity-100 text-blue-600 group-hover:text-white'
+                        ? 'opacity-100 text-primary group-hover:text-primary-foreground'
                         : 'opacity-0',
                     )}
                   />

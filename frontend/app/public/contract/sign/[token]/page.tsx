@@ -71,36 +71,36 @@ export default function RemoteSigningPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-slate-50 p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary to-muted p-4 sm:p-8">
       <div className="w-full max-w-2xl mx-auto">
         {/* Logo / Brand */}
         <div className="text-center mb-6">
-          <div className="h-12 w-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <FileSignature size={24} className="text-white" />
+          <div className="h-12 w-12 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <FileSignature size={24} className="text-primary-foreground" />
           </div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
             Contract Signing Portal
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+        <div className="bg-card rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
           {/* Loading */}
           {state === 'loading' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 size={28} className="animate-spin text-indigo-500" />
-              <p className="text-sm font-bold text-slate-500">Loading your contract...</p>
+              <Loader2 size={28} className="animate-spin text-primary" />
+              <p className="text-sm font-bold text-muted-foreground">Loading your contract...</p>
             </div>
           )}
 
           {/* Error */}
           {state === 'error' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle size={24} className="text-red-500" />
+              <div className="h-12 w-12 bg-destructive/10 rounded-full flex items-center justify-center">
+                <AlertTriangle size={24} className="text-destructive" />
               </div>
-              <p className="text-sm font-black text-slate-800">Unable to Load Contract</p>
-              <p className="text-xs text-slate-500">{errorMsg}</p>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-sm font-black text-foreground">Unable to Load Contract</p>
+              <p className="text-xs text-muted-foreground">{errorMsg}</p>
+              <p className="text-xs text-muted-foreground mt-2">
                 This link may have expired or already been used. Please contact the dealer for a new
                 link.
               </p>
@@ -110,19 +110,19 @@ export default function RemoteSigningPage() {
           {/* Done */}
           {state === 'done' && doneData && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-14 w-14 bg-emerald-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 size={28} className="text-emerald-500" />
+              <div className="h-14 w-14 bg-success/10 rounded-full flex items-center justify-center">
+                <CheckCircle2 size={28} className="text-success" />
               </div>
-              <p className="text-lg font-black text-slate-800">Contract Signed!</p>
-              <p className="text-sm text-slate-500">
+              <p className="text-lg font-black text-foreground">Contract Signed!</p>
+              <p className="text-sm text-muted-foreground">
                 Agreement{' '}
-                <span className="font-black text-indigo-600">{doneData.agreementNumber}</span> has
-                been signed successfully.
+                <span className="font-black text-primary">{doneData.agreementNumber}</span> has been
+                signed successfully.
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Signed on {new Date(doneData.signedAt).toLocaleString()}
               </p>
-              <p className="text-xs text-slate-400 mt-3 max-w-sm leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 max-w-sm leading-relaxed">
                 Thank you for signing. A copy of this agreement is held securely by the dealer. You
                 may close this tab.
               </p>
@@ -133,7 +133,7 @@ export default function RemoteSigningPage() {
           {(state === 'ready' || state === 'signing') && contract && (
             <>
               {contract.invoice ? (
-                <div className="border border-slate-200 rounded-2xl p-4 sm:p-6 overflow-x-auto">
+                <div className="border border-border rounded-2xl p-4 sm:p-6 overflow-x-auto">
                   <ContractDocumentBody
                     invoice={contract.invoice}
                     agreement={contract.agreement as ContractAgreement}
@@ -141,21 +141,21 @@ export default function RemoteSigningPage() {
                   />
                 </div>
               ) : (
-                <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-center text-xs text-amber-700 font-bold">
+                <div className="p-4 bg-warning/10 rounded-xl border border-warning/30 text-center text-xs text-warning font-bold">
                   Contract details could not be fully loaded — please contact the dealer if this
                   persists.
                 </div>
               )}
 
               <div>
-                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                   Your Full Name *
                 </Label>
                 <Input
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="h-10 font-bold border-slate-200"
+                  className="h-10 font-bold border-border"
                 />
               </div>
 
@@ -168,14 +168,14 @@ export default function RemoteSigningPage() {
                 height={160}
               />
 
-              <p className="text-[10px] text-slate-400 leading-relaxed text-center">
+              <p className="text-[10px] text-muted-foreground leading-relaxed text-center">
                 By signing above, you agree to the terms and conditions of this contract.
               </p>
 
               <Button
                 onClick={handleSign}
                 disabled={!sigData || !customerName.trim() || isSaving}
-                className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-lg shadow-indigo-100 disabled:opacity-40"
+                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-sm rounded-xl shadow-lg shadow-primary/10 disabled:opacity-40"
               >
                 {isSaving ? (
                   <Loader2 size={18} className="animate-spin" />
@@ -190,7 +190,7 @@ export default function RemoteSigningPage() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-slate-400 mt-4">
+        <p className="text-center text-[10px] text-muted-foreground mt-4">
           Secured by Xerocare • This link is for one-time use only
         </p>
       </div>

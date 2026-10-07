@@ -44,8 +44,7 @@ export function Modal({
       }}
     >
       <DialogPrimitive.Portal>
-        {/* Backdrop: bg-black/40 backdrop-blur-sm */}
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity duration-150 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/50 transition-opacity duration-150 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out" />
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <DialogPrimitive.Content
             onPointerDownOutside={(e) => {
@@ -61,8 +60,7 @@ export function Modal({
               // off the bottom, and `overflow-hidden` clipped them rather than letting
               // anyone scroll to them — the form became impossible to submit. Short
               // dialogs never reach the cap and are unaffected.
-              'relative w-full bg-white rounded-xl shadow-xl p-6 overflow-hidden outline-none',
-              'max-h-[calc(100vh-2rem)] flex flex-col',
+              'relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-xl border border-border bg-card p-6 text-card-foreground shadow-xl outline-none',
               'transition-all duration-150 ease-out',
               'data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:scale-100 data-[state=open]:duration-150',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:scale-95 data-[state=closed]:duration-150',
@@ -72,7 +70,7 @@ export function Modal({
           >
             {title ? (
               <div className="mb-4 shrink-0 pr-10">
-                <DialogPrimitive.Title className="text-xl font-bold text-gray-900">
+                <DialogPrimitive.Title className="text-xl font-bold text-foreground">
                   {title}
                 </DialogPrimitive.Title>
               </div>
@@ -83,7 +81,7 @@ export function Modal({
             {showCloseButton && (
               <DialogPrimitive.Close
                 onClick={onClose}
-                className="absolute top-4 right-4 rounded-full p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
+                className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <X className="size-5" />
                 <span className="sr-only">Close</span>

@@ -249,25 +249,25 @@ export default function UsageHistoryDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-7xl max-h-[90vh] overflow-hidden flex flex-col rounded-[2.5rem] p-0 border-none bg-white shadow-2xl">
+        <DialogContent className="sm:max-w-7xl max-h-[90vh] overflow-hidden flex flex-col rounded-[2.5rem] p-0 border-none bg-card shadow-2xl">
           {/* Modern Header */}
-          <DialogHeader className="p-8 pb-6 border-b border-slate-50">
+          <DialogHeader className="p-8 pb-6 border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-5">
-                <div className="p-4 bg-blue-50 rounded-2xl text-blue-600 shadow-inner">
+                <div className="p-4 bg-primary/10 rounded-2xl text-primary shadow-inner">
                   <History className="h-7 w-7" />
                 </div>
                 <div>
-                  <DialogTitle className="text-3xl font-black text-slate-900 tracking-tight">
+                  <DialogTitle className="text-3xl font-black text-foreground tracking-tight">
                     Usage History
                   </DialogTitle>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                       Contract Audit for:
                     </span>
                     <Badge
                       variant="secondary"
-                      className="bg-slate-100 text-slate-900 font-bold px-3 py-1 rounded-full border-none"
+                      className="bg-muted text-foreground font-bold px-3 py-1 rounded-full border-none"
                     >
                       {customerName}
                     </Badge>
@@ -278,7 +278,7 @@ export default function UsageHistoryDialog({
                 variant="outline"
                 size="sm"
                 onClick={fetchHistory}
-                className="rounded-xl border-slate-200 hover:bg-slate-50 text-slate-600 font-bold px-5"
+                className="rounded-xl border-border hover:bg-muted text-foreground font-bold px-5"
               >
                 <Loader2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Sync Logs
@@ -289,62 +289,64 @@ export default function UsageHistoryDialog({
           {/* Dynamic Table Body */}
           <div className="flex-1 overflow-auto p-8 pt-6">
             {loading ? (
-              <div className="flex flex-col items-center justify-center h-80 gap-4 text-slate-400">
-                <div className="p-6 bg-blue-50/50 rounded-full animate-pulse">
-                  <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+              <div className="flex flex-col items-center justify-center h-80 gap-4 text-muted-foreground">
+                <div className="p-6 bg-primary/10 rounded-full animate-pulse">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 </div>
                 <p className="font-bold text-lg">Aggregating contract data...</p>
               </div>
             ) : history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-80 gap-6 bg-slate-50/50 rounded-[2rem] border-2 border-dashed border-slate-100">
-                <History className="h-16 w-16 text-slate-200" />
+              <div className="flex flex-col items-center justify-center h-80 gap-6 bg-muted/50 rounded-[2rem] border-2 border-dashed border-border">
+                <History className="h-16 w-16 text-muted-foreground" />
                 <div className="text-center">
-                  <p className="text-slate-900 font-bold text-xl">No usage records found</p>
-                  <p className="text-slate-400 mt-1">
+                  <p className="text-foreground font-bold text-xl">No usage records found</p>
+                  <p className="text-muted-foreground mt-1">
                     Meter readings will appear here after they are recorded.
                   </p>
                 </div>
               </div>
             ) : (
               <>
-                <div className="rounded-[1.5rem] border border-slate-100 overflow-hidden shadow-sm">
+                <div className="rounded-[1.5rem] border border-border overflow-hidden shadow-sm">
                   <Table>
-                    <TableHeader className="bg-slate-900 border-none">
-                      <TableRow className="hover:bg-slate-900 border-none">
-                        <TableHead className="font-bold text-white py-5 px-6">PERIOD</TableHead>
+                    <TableHeader className="bg-foreground border-none">
+                      <TableRow className="hover:bg-foreground border-none">
+                        <TableHead className="font-bold text-primary-foreground py-5 px-6">
+                          PERIOD
+                        </TableHead>
                         {!isCpc && !isEmiLease && (
-                          <TableHead className="font-bold text-white text-right">
+                          <TableHead className="font-bold text-primary-foreground text-right">
                             FREE LIMIT
                           </TableHead>
                         )}
                         {!isEmiLease && (
                           <>
-                            <TableHead className="font-bold text-white text-right">USAGE</TableHead>
-                            <TableHead className="font-bold text-white text-center">
+                            <TableHead className="font-bold text-primary-foreground text-right">
+                              USAGE
+                            </TableHead>
+                            <TableHead className="font-bold text-primary-foreground text-center">
                               STATUS
                             </TableHead>
-                            <TableHead className="font-bold text-orange-400 text-right">
+                            <TableHead className="font-bold text-warning text-right">
                               CHARGE
                             </TableHead>
                           </>
                         )}
-                        <TableHead className="font-bold text-white text-right">
+                        <TableHead className="font-bold text-primary-foreground text-right">
                           {isEmiLease ? 'EMI' : 'RENT'}
                         </TableHead>
                         {!isEmiLease && (
-                          <TableHead className="font-bold text-emerald-400 text-right">
+                          <TableHead className="font-bold text-success text-right">
                             DISCOUNT
                           </TableHead>
                         )}
-                        <TableHead className="font-bold text-blue-400 text-right">
-                          ADVANCE
+                        <TableHead className="font-bold text-primary text-right">ADVANCE</TableHead>
+                        <TableHead className="font-bold text-info text-right">DEPOSIT</TableHead>
+                        <TableHead className="font-bold text-primary text-right">TOTAL</TableHead>
+                        <TableHead className="font-bold text-primary-foreground text-center">
+                          APPROVAL
                         </TableHead>
-                        <TableHead className="font-bold text-teal-300 text-right">
-                          DEPOSIT
-                        </TableHead>
-                        <TableHead className="font-bold text-blue-400 text-right">TOTAL</TableHead>
-                        <TableHead className="font-bold text-white text-center">APPROVAL</TableHead>
-                        <TableHead className="font-bold text-white text-center rounded-tr-[1.5rem]">
+                        <TableHead className="font-bold text-primary-foreground text-center rounded-tr-[1.5rem]">
                           ACTION
                         </TableHead>
                       </TableRow>
@@ -353,29 +355,29 @@ export default function UsageHistoryDialog({
                       {paginatedHistory.map((record) => (
                         <TableRow
                           key={record.id}
-                          className={`group border-b border-slate-50 last:border-0 transition-all duration-300 ${
+                          className={`group border-b border-border last:border-0 transition-all duration-300 ${
                             record.billType === 'ADVANCE'
-                              ? 'bg-indigo-50/40 hover:bg-indigo-50/70'
-                              : 'hover:bg-blue-50/20'
+                              ? 'bg-primary/10 hover:bg-primary/10'
+                              : 'hover:bg-primary/10'
                           }`}
                         >
                           <TableCell className="py-6 px-6">
                             <div className="flex flex-col">
                               {record.billType === 'ADVANCE' ? (
                                 <>
-                                  <span className="font-bold text-indigo-900 text-sm">
+                                  <span className="font-bold text-primary text-sm">
                                     First Month Advance
                                   </span>
-                                  <span className="text-[10px] text-indigo-400 font-black uppercase mt-0.5">
+                                  <span className="text-[10px] text-primary font-black uppercase mt-0.5">
                                     Collected {safeFormatDate(record.periodStart, 'dd MMM yyyy')}
                                   </span>
                                 </>
                               ) : (
                                 <>
-                                  <span className="font-bold text-slate-900 text-sm">
+                                  <span className="font-bold text-foreground text-sm">
                                     {formatDateLabel(record.periodStart, record.periodEnd)}
                                   </span>
-                                  <span className="text-[10px] text-slate-400 font-black uppercase mt-0.5">
+                                  <span className="text-[10px] text-muted-foreground font-black uppercase mt-0.5">
                                     {safeFormatDate(record.periodStart, 'MMMM yyyy')}
                                   </span>
                                 </>
@@ -383,13 +385,15 @@ export default function UsageHistoryDialog({
                             </div>
                           </TableCell>
                           {!isCpc && !isEmiLease && (
-                            <TableCell className="text-right font-bold text-slate-500">
+                            <TableCell className="text-right font-bold text-muted-foreground">
                               {/* An advance bill has no meter period, so a free limit
                                   would be meaningless here rather than merely zero. */}
                               {record.billType === 'ADVANCE' ? (
-                                <span className="text-slate-300">—</span>
+                                <span className="text-muted-foreground">—</span>
                               ) : record.freeLimit === 'No Free Limit' ? (
-                                <span className="text-[10px] text-slate-300 italic">No Limit</span>
+                                <span className="text-[10px] text-muted-foreground italic">
+                                  No Limit
+                                </span>
                               ) : (
                                 Number(record.freeLimit).toLocaleString()
                               )}
@@ -399,13 +403,13 @@ export default function UsageHistoryDialog({
                             <>
                               <TableCell className="text-right">
                                 {record.billType === 'ADVANCE' ? (
-                                  <span className="text-slate-300">—</span>
+                                  <span className="text-muted-foreground">—</span>
                                 ) : (
                                   <div className="flex flex-col items-end">
-                                    <span className="font-black text-slate-900 text-sm">
+                                    <span className="font-black text-foreground text-sm">
                                       {record.totalUsage.toLocaleString()}
                                     </span>
-                                    <span className="text-[9px] text-slate-400 font-bold uppercase">
+                                    <span className="text-[9px] text-muted-foreground font-bold uppercase">
                                       Units
                                     </span>
                                   </div>
@@ -414,15 +418,15 @@ export default function UsageHistoryDialog({
                               {!isCpc ? (
                                 <TableCell className="text-center">
                                   {record.billType === 'ADVANCE' ? (
-                                    <Badge className="rounded-full border-none bg-indigo-100 px-3 py-1 text-[10px] font-black text-indigo-700 shadow-sm">
+                                    <Badge className="rounded-full border-none bg-primary/10 px-3 py-1 text-[10px] font-black text-primary shadow-sm">
                                       ADVANCE
                                     </Badge>
                                   ) : (
                                     <Badge
                                       className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
                                         record.exceededCount > 0
-                                          ? 'bg-orange-100 text-orange-700'
-                                          : 'bg-emerald-100 text-emerald-700'
+                                          ? 'bg-warning/10 text-warning'
+                                          : 'bg-success/10 text-success'
                                       }`}
                                     >
                                       {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
@@ -430,9 +434,9 @@ export default function UsageHistoryDialog({
                                   )}
                                 </TableCell>
                               ) : (
-                                <TableCell className="text-right font-bold text-slate-700">
+                                <TableCell className="text-right font-bold text-foreground">
                                   {record.billType === 'ADVANCE' ? (
-                                    <span className="text-slate-300">—</span>
+                                    <span className="text-muted-foreground">—</span>
                                   ) : (
                                     (() => {
                                       try {
@@ -484,9 +488,9 @@ export default function UsageHistoryDialog({
                               )}
                               <TableCell className="text-right">
                                 {record.billType === 'ADVANCE' ? (
-                                  <span className="text-slate-300">—</span>
+                                  <span className="text-muted-foreground">—</span>
                                 ) : (
-                                  <span className="font-black text-orange-600 text-sm">
+                                  <span className="font-black text-warning text-sm">
                                     {formatCurrency(Number(record.exceededAmount), currency)}
                                   </span>
                                 )}
@@ -494,27 +498,27 @@ export default function UsageHistoryDialog({
                             </>
                           )}
 
-                          <TableCell className="text-right font-bold text-slate-700">
+                          <TableCell className="text-right font-bold text-foreground">
                             {record.billType === 'ADVANCE' ? (
-                              <span className="text-slate-300">—</span>
+                              <span className="text-muted-foreground">—</span>
                             ) : (
                               formatCurrency(Number(record.rent), currency)
                             )}
                           </TableCell>
                           {!isEmiLease && (
-                            <TableCell className="text-right font-bold text-emerald-600">
+                            <TableCell className="text-right font-bold text-success">
                               {record.billType === 'ADVANCE' ? (
-                                <span className="text-slate-300">—</span>
+                                <span className="text-muted-foreground">—</span>
                               ) : (
                                 formatCurrency(Number(record.discountAmount || 0), currency)
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-right font-bold text-blue-600">
+                          <TableCell className="text-right font-bold text-primary">
                             {/* This column is the advance CREDITED BACK on a period bill,
                                 not the advance itself — blank on the advance bill row. */}
                             {record.billType === 'ADVANCE' ? (
-                              <span className="text-slate-300">—</span>
+                              <span className="text-muted-foreground">—</span>
                             ) : (
                               formatCurrency(Number(record.advanceAdjusted || 0), currency)
                             )}
@@ -522,19 +526,19 @@ export default function UsageHistoryDialog({
                           <TableCell className="text-right">
                             {Number(record.depositAmount || 0) > 0 ? (
                               <div className="flex flex-col items-end">
-                                <span className="font-black text-sm text-teal-700">
+                                <span className="font-black text-sm text-info">
                                   {formatCurrency(Number(record.depositAmount), currency)}
                                 </span>
-                                <span className="text-[9px] font-bold uppercase text-teal-500">
+                                <span className="text-[9px] font-bold uppercase text-info">
                                   Refundable
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-slate-300">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right bg-blue-50/30 group-hover:bg-blue-100/50 transition-colors">
-                            <span className="font-black text-blue-700 text-base">
+                          <TableCell className="text-right bg-primary/10 group-hover:bg-primary/10 transition-colors">
+                            <span className="font-black text-primary text-base">
                               {formatCurrency(Number(record.finalTotal), currency)}
                             </span>
                           </TableCell>
@@ -545,15 +549,15 @@ export default function UsageHistoryDialog({
                               const meta: Record<string, { label: string; className: string }> = {
                                 PENDING_APPROVAL: {
                                   label: 'Pending',
-                                  className: 'bg-amber-100 text-amber-700',
+                                  className: 'bg-warning/10 text-warning',
                                 },
                                 CUSTOMER_APPROVED: {
                                   label: 'Approved',
-                                  className: 'bg-emerald-100 text-emerald-700',
+                                  className: 'bg-success/10 text-success',
                                 },
                                 CUSTOMER_REJECTED: {
                                   label: 'Disputed',
-                                  className: 'bg-red-100 text-red-700',
+                                  className: 'bg-destructive/10 text-destructive',
                                 },
                               };
                               const cfg = status ? meta[status] : undefined;
@@ -569,7 +573,7 @@ export default function UsageHistoryDialog({
                                   {cfg.label}
                                 </Badge>
                               ) : (
-                                <span className="text-[10px] text-slate-300 italic">—</span>
+                                <span className="text-[10px] text-muted-foreground italic">—</span>
                               );
                             })()}
                           </TableCell>
@@ -579,7 +583,7 @@ export default function UsageHistoryDialog({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-all"
                                 onClick={() => setViewingBillId(record.id)}
                                 title="View Bill"
                               >
@@ -589,7 +593,7 @@ export default function UsageHistoryDialog({
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-all"
                                   onClick={() => setPreviewImage(record.meterImageUrl || null)}
                                   title="View Reading Image"
                                 >
@@ -601,8 +605,8 @@ export default function UsageHistoryDialog({
                                 variant="ghost"
                                 className={`h-8 w-8 p-0 rounded-full transition-all ${
                                   record.emailSentAt
-                                    ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
-                                    : 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
+                                    ? 'text-success hover:text-success hover:bg-success/10'
+                                    : 'text-primary hover:text-primary hover:bg-primary/10'
                                 }`}
                                 onClick={() => handleSendInvoice(record)}
                                 disabled={sendingId === record.id}
@@ -631,7 +635,7 @@ export default function UsageHistoryDialog({
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
+                                    className="h-8 w-8 p-0 text-warning hover:text-warning hover:bg-warning/10 rounded-full transition-all"
                                     onClick={() => {
                                       setEditingRecord(record);
                                       setIsEditModalOpen(true);
@@ -722,12 +726,12 @@ export default function UsageHistoryDialog({
                 alt="Meter Reading"
                 width={1200}
                 height={800}
-                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl border-4 border-white/20 backdrop-blur-sm"
+                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl border-4 border-border backdrop-blur-sm"
               />
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full h-12 w-12 shadow-xl backdrop-blur-md transition-all hover:scale-110"
+                className="absolute top-4 right-4 bg-foreground hover:bg-foreground text-primary-foreground rounded-full h-12 w-12 shadow-xl backdrop-blur-md transition-all hover:scale-110"
                 onClick={() => setPreviewImage(null)}
               >
                 <X className="h-7 w-7" />
@@ -776,13 +780,13 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-full"
+          className="h-8 w-8 text-muted-foreground hover:text-lease hover:bg-lease/10 rounded-full"
           title="View Detailed Breakdown"
         >
           <Eye className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl bg-white">
+      <DialogContent className="max-w-2xl bg-card">
         <DialogHeader>
           <DialogTitle>Usage Breakdown</DialogTitle>
           <DialogDescription>
@@ -793,7 +797,7 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
 
         <div className="mt-4 border rounded-lg overflow-hidden">
           <Table>
-            <TableHeader className="bg-slate-50">
+            <TableHeader className="bg-muted">
               <TableRow>
                 <TableHead>Item</TableHead>
                 <TableHead className="text-right">Free Limit</TableHead>
@@ -809,14 +813,14 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                   <TableRow>
                     <TableCell className="font-medium">
                       Black & White
-                      <div className="text-[10px] text-slate-500 font-normal">
+                      <div className="text-[10px] text-muted-foreground font-normal">
                         A4: {record.bwA4Delta} | A3: {record.bwA3Delta}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">{bwLimit}</TableCell>
                     <TableCell className="text-right">{bwUsage}</TableCell>
                     <TableCell
-                      className={`text-right ${bwExceeded > 0 ? 'text-red-600 font-bold' : ''}`}
+                      className={`text-right ${bwExceeded > 0 ? 'text-destructive font-bold' : ''}`}
                     >
                       {bwExceeded}
                     </TableCell>
@@ -828,14 +832,14 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                   <TableRow>
                     <TableCell className="font-medium">
                       Color
-                      <div className="text-[10px] text-slate-500 font-normal">
+                      <div className="text-[10px] text-muted-foreground font-normal">
                         A4: {record.colorA4Delta} | A3: {record.colorA3Delta}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">{colorLimit}</TableCell>
                     <TableCell className="text-right">{colorUsage}</TableCell>
                     <TableCell
-                      className={`text-right ${colorExceeded > 0 ? 'text-red-600 font-bold' : ''}`}
+                      className={`text-right ${colorExceeded > 0 ? 'text-destructive font-bold' : ''}`}
                     >
                       {colorExceeded}
                     </TableCell>
@@ -851,14 +855,14 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                 <TableRow>
                   <TableCell className="font-medium">
                     Combined
-                    <div className="text-[10px] text-slate-500 font-normal">
+                    <div className="text-[10px] text-muted-foreground font-normal">
                       Total: {bwUsage + colorUsage}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">{combinedLimit}</TableCell>
                   <TableCell className="text-right">{bwUsage + colorUsage}</TableCell>
                   <TableCell
-                    className={`text-right ${combinedExceeded > 0 ? 'text-red-600 font-bold' : ''}`}
+                    className={`text-right ${combinedExceeded > 0 ? 'text-destructive font-bold' : ''}`}
                   >
                     {combinedExceeded}
                   </TableCell>
@@ -871,7 +875,7 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
 
               {!isFixedLimit && !isFxedCombo && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-slate-500 italic py-6">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground italic py-6">
                     Detailed breakdown available for Fixed Limit contracts only.
                     <br />
                     <span className="font-bold mt-2 block">
@@ -887,12 +891,12 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
         {/* Per-Machine Breakdown (Replacements Support) */}
         {record.items && record.items.length > 0 && (
           <div className="mt-6 space-y-3">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
               Per-Machine Details
             </h4>
-            <div className="rounded-xl border border-slate-100 overflow-hidden">
+            <div className="rounded-xl border border-border overflow-hidden">
               <Table>
-                <TableHeader className="bg-slate-50/50">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="text-[10px] font-bold h-8">MACHINE</TableHead>
                     <TableHead className="text-[10px] font-bold h-8 text-right">
@@ -906,36 +910,36 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
                 </TableHeader>
                 <TableBody>
                   {record.items.map((item, idx) => (
-                    <TableRow key={idx} className="h-10 hover:bg-slate-50/30 transition-colors">
+                    <TableRow key={idx} className="h-10 hover:bg-muted/30 transition-colors">
                       <TableCell className="py-2">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-slate-700">
+                          <span className="text-[10px] font-bold text-foreground">
                             SN: {item.allocation?.serialNumber || item.allocationId.slice(0, 8)}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-2">
                         <div className="flex flex-col items-end">
-                          <span className="text-[11px] font-black text-slate-600">
+                          <span className="text-[11px] font-black text-foreground">
                             {item.deltaBwA4 + item.deltaBwA3 * 2}
                           </span>
-                          <span className="text-[8px] text-slate-400">
+                          <span className="text-[8px] text-muted-foreground">
                             ({item.deltaBwA4}/{item.deltaBwA3})
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-2">
                         <div className="flex flex-col items-end">
-                          <span className="text-[11px] font-black text-rose-600">
+                          <span className="text-[11px] font-black text-destructive">
                             {item.deltaColorA4 + item.deltaColorA3 * 2}
                           </span>
-                          <span className="text-[8px] text-rose-400">
+                          <span className="text-[8px] text-destructive">
                             ({item.deltaColorA4}/{item.deltaColorA3})
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-2">
-                        <span className="text-xs font-bold text-slate-900">
+                        <span className="text-xs font-bold text-foreground">
                           {item.deltaBwA4 +
                             item.deltaBwA3 * 2 +
                             item.deltaColorA4 +
@@ -952,11 +956,11 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
 
         {/* Readings Summary */}
         <div className="mt-4 grid grid-cols-2 gap-4">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-            <h4 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
+          <div className="p-4 bg-muted rounded-xl border border-border">
+            <h4 className="text-sm font-bold text-foreground mb-2 uppercase tracking-wide">
               Black & White Readings
             </h4>
-            <div className="flex justify-between text-sm text-slate-600">
+            <div className="flex justify-between text-sm text-foreground">
               <span>
                 A4: <strong>{record.bwA4Delta}</strong>
               </span>
@@ -965,11 +969,11 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
               </span>
             </div>
           </div>
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-            <h4 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
+          <div className="p-4 bg-muted rounded-xl border border-border">
+            <h4 className="text-sm font-bold text-foreground mb-2 uppercase tracking-wide">
               Color Readings
             </h4>
-            <div className="flex justify-between text-sm text-slate-600">
+            <div className="flex justify-between text-sm text-foreground">
               <span>
                 A4: <strong>{record.colorA4Delta}</strong>
               </span>

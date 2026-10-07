@@ -849,9 +849,9 @@ export default function ServiceContractsPage() {
   });
 
   const getStatusBadgeClass = (status: string) => {
-    if (status === 'ACTIVE') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (status === 'EXPIRED') return 'bg-rose-50 text-rose-700 border-rose-200';
-    return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (status === 'ACTIVE') return 'bg-success/10 text-success border-success/30';
+    if (status === 'EXPIRED') return 'bg-destructive/10 text-destructive border-destructive/30';
+    return 'bg-warning/10 text-warning border-warning/30';
   };
 
   const customerOptions = customers.map((c) => ({
@@ -1074,18 +1074,18 @@ export default function ServiceContractsPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-            <FileText className="h-6 w-6 text-blue-600" />
+          <h1 className="text-xl sm:text-2xl font-medium tracking-tight text-foreground flex items-center gap-2">
+            <FileText className="h-6 w-6 text-primary" />
             Service Contracts
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Manage Service Agreements (FSMA, SMA, AMC) for customer and external machines.
           </p>
         </div>
         {canManageContracts && (
           <Button
             onClick={handleOpenCreateModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm flex items-center gap-2"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
             Add Service Contract
@@ -1095,71 +1095,71 @@ export default function ServiceContractsPage() {
 
       {/* Analytics Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
               Total Contracts
             </CardTitle>
-            <Layers className="h-4 w-4 text-slate-400" />
+            <Layers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-slate-800">{contracts.length}</div>
-            <p className="text-xs text-slate-400 mt-1">All service agreements registered</p>
+            <div className="text-2xl font-bold text-foreground">{contracts.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">All service agreements registered</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
               Active FSMA
             </CardTitle>
-            <Activity className="h-4 w-4 text-indigo-600" />
+            <Activity className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-indigo-600">
+            <div className="text-2xl font-bold text-primary">
               {contracts.filter((c) => c.contractType === 'FSMA' && c.status === 'ACTIVE').length}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Full service maintenance contracts</p>
+            <p className="text-xs text-muted-foreground mt-1">Full service maintenance contracts</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
               Active SMA
             </CardTitle>
-            <Activity className="h-4 w-4 text-emerald-600" />
+            <Activity className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-emerald-600">
+            <div className="text-2xl font-bold text-success">
               {contracts.filter((c) => c.contractType === 'SMA' && c.status === 'ACTIVE').length}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Service maintenance contracts</p>
+            <p className="text-xs text-muted-foreground mt-1">Service maintenance contracts</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
               Active AMC
             </CardTitle>
-            <Activity className="h-4 w-4 text-amber-600" />
+            <Activity className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-amber-600">
+            <div className="text-2xl font-bold text-warning">
               {contracts.filter((c) => c.contractType === 'AMC' && c.status === 'ACTIVE').length}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Annual maintenance contracts</p>
+            <p className="text-xs text-muted-foreground mt-1">Annual maintenance contracts</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filtering and Search Controls */}
-      <div className="flex flex-col md:flex-row items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+      <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 rounded-xl shadow-sm border border-border">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by customer, serial number, model, or type..."
-            className="pl-9 bg-slate-50/50 focus-visible:ring-blue-500 border-slate-200/80"
+            className="pl-9 bg-muted/50 focus-visible:ring-primary border-border/80"
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -1170,8 +1170,8 @@ export default function ServiceContractsPage() {
               onClick={() => setFilterType(type)}
               className={`text-xs px-4 py-2 font-medium ${
                 filterType === type
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                  : 'hover:bg-slate-50 border-slate-200 text-slate-600'
+                  ? 'bg-primary hover:bg-primary/90 text-primary-foreground border-primary'
+                  : 'hover:bg-muted border-border text-foreground'
               }`}
             >
               {type}
@@ -1181,22 +1181,24 @@ export default function ServiceContractsPage() {
       </div>
 
       {/* Main Table */}
-      <Card className="shadow-sm border-slate-200/80 overflow-hidden">
-        <Table className="w-full table-fixed">
-          <TableHeader className="bg-slate-50/80">
+      <Card className="shadow-sm border-border/80 overflow-hidden">
+        <Table pagination={{ pageSize: 10 }} className="w-full table-fixed">
+          <TableHeader className="bg-muted/80">
             <TableRow>
-              <TableHead className="font-bold text-xs text-slate-600 w-[16%]">Customer</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[19%]">
+              <TableHead className="font-bold text-xs text-foreground w-[16%]">Customer</TableHead>
+              <TableHead className="font-bold text-xs text-foreground w-[19%]">
                 Machine (Model)
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[9%]">Type</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[10%]">Start Date</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[10%]">End Date</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[9%] text-right">
+              <TableHead className="font-bold text-xs text-foreground w-[9%]">Type</TableHead>
+              <TableHead className="font-bold text-xs text-foreground w-[10%]">
+                Start Date
+              </TableHead>
+              <TableHead className="font-bold text-xs text-foreground w-[10%]">End Date</TableHead>
+              <TableHead className="font-bold text-xs text-foreground w-[9%] text-right">
                 Value
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[9%]">Status</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[18%] text-right">
+              <TableHead className="font-bold text-xs text-foreground w-[9%]">Status</TableHead>
+              <TableHead className="font-bold text-xs text-foreground w-[18%] text-right">
                 Actions
               </TableHead>
             </TableRow>
@@ -1204,13 +1206,13 @@ export default function ServiceContractsPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-sm text-slate-500">
+                <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
                   Loading service contracts...
                 </TableCell>
               </TableRow>
             ) : filteredContracts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-sm text-slate-500">
+                <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
                   No service contracts found matching the criteria.
                 </TableCell>
               </TableRow>
@@ -1219,20 +1221,20 @@ export default function ServiceContractsPage() {
                 const customer = customers.find((cust) => cust.id === c.customerId);
                 const product = products.find((prod) => prod.id === c.productId);
                 return (
-                  <TableRow key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="font-bold text-xs text-slate-800 truncate py-3">
+                  <TableRow key={c.id} className="hover:bg-muted/50 transition-colors">
+                    <TableCell className="font-bold text-xs text-foreground truncate py-3">
                       {customer ? customer.name : 'Unknown Customer'}
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-xs text-slate-800 truncate flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-foreground truncate flex items-center gap-1.5">
                           {c.machine
                             ? `${c.machine.brand} ${c.machine.modelName}`
                             : product
                               ? `${product.brand} ${product.name}`
                               : 'Unknown Product'}
                           {c.machine?.machineType === 'COMPUTER' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-50 text-violet-700 border border-violet-100">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-lease/10 text-lease border border-lease/30">
                               COMPUTER
                             </span>
                           )}
@@ -1241,10 +1243,10 @@ export default function ServiceContractsPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center self-start px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                        <span className="inline-flex items-center self-start px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/30">
                           {c.contractType}
                         </span>
-                        <span className="text-[9px] text-slate-400 leading-tight">
+                        <span className="text-[9px] text-muted-foreground leading-tight">
                           {c.contractType === 'AMC' && 'Annual fee — invoiced at signing'}
                           {c.contractType === 'SMA' &&
                             c.copyLimit != null &&
@@ -1258,16 +1260,18 @@ export default function ServiceContractsPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 py-3">
+                    <TableCell className="text-xs text-foreground py-3">
                       {c.startDate ? new Date(c.startDate).toLocaleDateString() : 'N/A'}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 py-3">
+                    <TableCell className="text-xs text-foreground py-3">
                       {c.endDate ? new Date(c.endDate).toLocaleDateString() : 'N/A'}
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-slate-700 text-right py-3">
+                    <TableCell className="text-xs font-bold text-foreground text-right py-3">
                       <div className="flex flex-col items-end gap-1">
                         {c.contractType === 'FSMA' ? (
-                          <span className="text-slate-400 font-medium">Per-click billing</span>
+                          <span className="text-muted-foreground font-medium">
+                            Per-click billing
+                          </span>
                         ) : (
                           <span>
                             {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
@@ -1285,10 +1289,10 @@ export default function ServiceContractsPage() {
                                   : 'PENDING';
                             const cls =
                               paid === 'PAID'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                ? 'bg-success/10 text-success border-success/30'
                                 : paid === 'PARTIAL'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-rose-50 text-rose-700 border-rose-200';
+                                  ? 'bg-warning/10 text-warning border-warning/30'
+                                  : 'bg-destructive/10 text-destructive border-destructive/30';
                             return (
                               <>
                                 <span
@@ -1299,7 +1303,7 @@ export default function ServiceContractsPage() {
                                 </span>
                                 {summary.pendingApprovalCount > 0 && (
                                   <span
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border bg-amber-50 text-amber-700 border-amber-200"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border bg-warning/10 text-warning border-warning/30"
                                     title={`${getActiveCurrency()} ${summary.pendingApprovalAmount.toFixed(2)} awaiting Finance approval`}
                                   >
                                     <Clock className="h-2.5 w-2.5" />
@@ -1312,7 +1316,7 @@ export default function ServiceContractsPage() {
                             );
                           })()
                         ) : (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-slate-50 text-slate-400 border-slate-200">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-muted text-muted-foreground border-border">
                             NO INVOICE
                           </span>
                         )}
@@ -1335,7 +1339,7 @@ export default function ServiceContractsPage() {
                             size="icon"
                             onClick={() => setViewProductId(c.productId)}
                             title="View machine details"
-                            className="h-7 w-7 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           >
                             <Package className="h-3.5 w-3.5" />
                           </Button>
@@ -1345,7 +1349,7 @@ export default function ServiceContractsPage() {
                           size="icon"
                           onClick={() => router.push(`/employee/service/contracts/${c.id}`)}
                           title="View contract details"
-                          className="h-7 w-7 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
@@ -1356,7 +1360,7 @@ export default function ServiceContractsPage() {
                             onClick={() => openContractInvoice(c)}
                             disabled={loadingInvoiceView}
                             title="View / download / send invoice"
-                            className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           >
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
@@ -1368,7 +1372,7 @@ export default function ServiceContractsPage() {
                               size="icon"
                               onClick={() => openBillingDialog(c)}
                               title="Meter readings & monthly billing"
-                              className="h-7 w-7 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/50"
+                              className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
                             >
                               <Gauge className="h-3.5 w-3.5" />
                             </Button>
@@ -1380,7 +1384,7 @@ export default function ServiceContractsPage() {
                               size="icon"
                               onClick={() => openPaymentDialog(c)}
                               title="Record an installment payment"
-                              className="h-7 w-7 text-slate-500 hover:text-green-600 hover:bg-green-50/50"
+                              className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
                             >
                               <DollarSign className="h-3.5 w-3.5" />
                             </Button>
@@ -1390,7 +1394,7 @@ export default function ServiceContractsPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenEditModal(c)}
-                            className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
@@ -1401,7 +1405,7 @@ export default function ServiceContractsPage() {
                             size="icon"
                             onClick={() => handleDelete(c.id)}
                             title="Delete contract"
-                            className="h-7 w-7 text-slate-500 hover:text-rose-600 hover:bg-rose-50/50"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -1419,15 +1423,15 @@ export default function ServiceContractsPage() {
       {/* Create / Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
-          className="max-w-xl w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col overflow-hidden"
+          className="max-w-xl w-full p-0 bg-card rounded-xl shadow-2xl border border-border max-h-[85vh] flex flex-col overflow-hidden"
           onInteractOutside={(e) => e.preventDefault()}
         >
-          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
               {editingContract ? 'Edit Service Contract' : 'Create Service Contract'}
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               Fill in the form below to configure coverage rules and billing parameters for the
               service agreement.
             </DialogDescription>
@@ -1438,26 +1442,26 @@ export default function ServiceContractsPage() {
               {/* Customer Selection — fixed for the contract's lifetime once created */}
               <div className="col-span-2 flex flex-col space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-600">
+                  <label className="text-xs font-bold text-foreground">
                     {editingContract ? 'Customer' : 'Select Customer'}
                   </label>
                   {!editingContract && (
                     <button
                       type="button"
                       onClick={() => setShowAddCustomer(true)}
-                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                      className="text-[11px] font-bold text-primary hover:text-primary transition-colors"
                     >
                       + New Customer
                     </button>
                   )}
                 </div>
                 {editingContract ? (
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="text-xs font-semibold text-slate-700">
+                  <div className="p-2.5 bg-muted border border-border rounded-xl">
+                    <span className="text-xs font-semibold text-foreground">
                       {customers.find((cust) => cust.id === formState.customerId)?.name ||
                         'Unknown Customer'}
                     </span>
-                    <span className="block text-[10px] text-slate-400 mt-0.5">
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
                       The customer cannot be changed — this contract belongs to them.
                     </span>
                   </div>
@@ -1475,15 +1479,15 @@ export default function ServiceContractsPage() {
 
               {/* CUSTOMER MACHINES SUMMARY PANEL */}
               {formState.customerId && !editingContract && (
-                <div className="col-span-2 border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-3">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
-                    <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Activity className="h-3.5 w-3.5 text-blue-600" /> Customer Machine Registry &
+                <div className="col-span-2 border border-border rounded-xl p-4 bg-muted/50 space-y-3">
+                  <div className="flex justify-between items-center border-b border-border pb-1.5">
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Activity className="h-3.5 w-3.5 text-primary" /> Customer Machine Registry &
                       History
                     </h4>
                     <div className="flex items-center gap-2">
                       {loadingIntel && (
-                        <span className="text-[10px] text-slate-400 font-normal animate-pulse">
+                        <span className="text-[10px] text-muted-foreground font-normal animate-pulse">
                           Loading machines...
                         </span>
                       )}
@@ -1491,7 +1495,7 @@ export default function ServiceContractsPage() {
                         type="button"
                         variant="outline"
                         onClick={openExternalDialog}
-                        className="h-7 px-2.5 text-[10px] font-bold border-blue-200 text-blue-700 hover:bg-blue-50 flex items-center gap-1"
+                        className="h-7 px-2.5 text-[10px] font-bold border-primary/30 text-primary hover:bg-primary/10 flex items-center gap-1"
                       >
                         <Plus className="h-3 w-3" />
                         External Machine
@@ -1500,11 +1504,11 @@ export default function ServiceContractsPage() {
                   </div>
 
                   {loadingIntel ? (
-                    <div className="py-4 text-center text-xs text-slate-400">
+                    <div className="py-4 text-center text-xs text-muted-foreground">
                       Fetching customer machine details...
                     </div>
                   ) : customerMachines.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">
+                    <div className="py-4 text-center text-xs text-muted-foreground">
                       No machines registered for this customer. If they bought the machine
                       elsewhere, add it with “External Machine” above.
                     </div>
@@ -1518,41 +1522,41 @@ export default function ServiceContractsPage() {
                           }}
                           className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 text-left ${
                             formState.productId === m.id
-                              ? 'border-blue-600 bg-blue-50/30 shadow-sm'
-                              : 'border-slate-100 bg-white hover:border-slate-200'
+                              ? 'border-primary bg-primary/10 shadow-sm'
+                              : 'border-border bg-card hover:border-border'
                           }`}
                         >
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-slate-800">{m.modelName}</span>
+                            <span className="font-bold text-foreground">{m.modelName}</span>
                             <div className="flex items-center gap-1.5">
                               {m.underWarranty && (
-                                <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 font-bold px-1.5 py-0.5 rounded uppercase">
+                                <span className="text-[9px] bg-warning/10 text-warning border border-warning/30 font-bold px-1.5 py-0.5 rounded uppercase">
                                   Still under warranty
                                 </span>
                               )}
-                              <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded uppercase">
+                              <span className="text-[9px] bg-muted text-foreground font-bold px-1.5 py-0.5 rounded uppercase">
                                 {m.ownership}
                               </span>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-slate-500 mt-1">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-muted-foreground mt-1">
                             <div>
                               Serial:{' '}
-                              <span className="font-mono text-slate-700 font-semibold">
+                              <span className="font-mono text-foreground font-semibold">
                                 {m.serialNumber}
                               </span>
                             </div>
                             <div>
                               Meter:{' '}
-                              <span className="font-mono text-slate-700 font-semibold">
+                              <span className="font-mono text-foreground font-semibold">
                                 {m.meterReading != null ? m.meterReading.toLocaleString() : 'N/A'}
                               </span>
                             </div>
                             <div>
                               Warranty:{' '}
                               <span
-                                className={`font-semibold ${m.underWarranty ? 'text-emerald-700' : 'text-slate-700'}`}
+                                className={`font-semibold ${m.underWarranty ? 'text-success' : 'text-foreground'}`}
                               >
                                 {m.warrantyEnd || 'N/A'}
                               </span>
@@ -1560,7 +1564,7 @@ export default function ServiceContractsPage() {
                             <div>
                               Active Contract:{' '}
                               <span
-                                className={`font-bold ${m.activeContract && m.activeContract !== 'None' ? 'text-indigo-600' : 'text-slate-700'}`}
+                                className={`font-bold ${m.activeContract && m.activeContract !== 'None' ? 'text-primary' : 'text-foreground'}`}
                               >
                                 {m.activeContract || 'None'}
                               </span>
@@ -1587,20 +1591,20 @@ export default function ServiceContractsPage() {
                         ? `${prodMachine.brand} ${prodMachine.name} (S/N: ${prodMachine.serial_no})`
                         : 'Selected machine';
                   return (
-                    <div className="col-span-2 flex items-center justify-between p-2.5 bg-emerald-50/50 border border-emerald-200 rounded-xl">
-                      <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+                    <div className="col-span-2 flex items-center justify-between p-2.5 bg-success/10 border border-success/30 rounded-xl">
+                      <span className="text-xs font-semibold text-success flex items-center gap-1.5">
                         <Check className="h-3.5 w-3.5" />
                         {label}
                       </span>
                       {editingContract ? (
-                        <span className="text-[10px] font-bold text-slate-400">
+                        <span className="text-[10px] font-bold text-muted-foreground">
                           Machine cannot be changed
                         </span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => setFormState((prev) => ({ ...prev, productId: '' }))}
-                          className="text-[10px] font-bold text-slate-400 hover:text-rose-600"
+                          className="text-[10px] font-bold text-muted-foreground hover:text-destructive"
                         >
                           Clear
                         </button>
@@ -1609,18 +1613,18 @@ export default function ServiceContractsPage() {
                   );
                 })()
               ) : (
-                <div className="col-span-2 p-2.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-400 text-center">
+                <div className="col-span-2 p-2.5 bg-muted border border-dashed border-border rounded-xl text-xs text-muted-foreground text-center">
                   Select a machine from the registry above, or register an external machine.
                 </div>
               )}
 
               {/* METER READING CHECK — copies can expire a warranty before time does */}
               {needsMeterCheck && (
-                <div className="col-span-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
-                  <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
+                <div className="col-span-2 p-3 bg-warning/10 border border-warning/30 rounded-xl space-y-2">
+                  <label className="text-[10px] uppercase font-bold tracking-wider text-warning block">
                     Verify Warranty — Current Meter Reading (Total Copies)
                   </label>
-                  <p className="text-[11px] text-amber-700/80">
+                  <p className="text-[11px] text-warning/80">
                     This machine has a copy-limited warranty. Ask the customer for the current meter
                     reading to confirm whether the warranty is really still active.
                   </p>
@@ -1636,19 +1640,21 @@ export default function ServiceContractsPage() {
                         setFormState((prev) => ({ ...prev, startMeterReading: e.target.value }));
                       }
                     }}
-                    className="h-9 text-xs bg-white border-amber-200 rounded-lg focus-visible:ring-amber-500 font-mono"
+                    className="h-9 text-xs bg-card border-warning/30 rounded-lg focus-visible:ring-warning font-mono"
                   />
                   {checkingWarranty ? (
-                    <p className="text-[11px] text-slate-400 animate-pulse">Checking warranty…</p>
+                    <p className="text-[11px] text-muted-foreground animate-pulse">
+                      Checking warranty…
+                    </p>
                   ) : liveWarranty ? (
                     liveWarranty.isUnderWarranty ? (
-                      <p className="text-[11px] font-semibold text-amber-800">
+                      <p className="text-[11px] font-semibold text-warning">
                         ⚠ Machine is STILL UNDER WARRANTY —{' '}
                         {formatWarranty(liveWarranty).text.replace('Active ', '')}. Service & parts
                         are already covered; a service contract is usually not needed yet.
                       </p>
                     ) : (
-                      <p className="text-[11px] font-semibold text-emerald-700">
+                      <p className="text-[11px] font-semibold text-success">
                         ✓ Warranty EXPIRED
                         {liveWarranty.expiredBy ? ` (limit hit: ${liveWarranty.expiredBy})` : ''}.
                         This machine is a valid candidate for a service contract.
@@ -1660,7 +1666,7 @@ export default function ServiceContractsPage() {
 
               {/* Contract Type */}
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Contract Type</label>
+                <label className="text-xs font-bold text-foreground">Contract Type</label>
                 <select
                   value={formState.contractType}
                   disabled={!isMeteredMachineSelected}
@@ -1670,7 +1676,7 @@ export default function ServiceContractsPage() {
                       contractType: e.target.value as ServiceContractType,
                     }))
                   }
-                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="h-10 px-3 border border-border rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-muted disabled:text-muted-foreground"
                 >
                   {isMeteredMachineSelected && (
                     <option value="FSMA">FSMA (Full Service — per click)</option>
@@ -1681,7 +1687,7 @@ export default function ServiceContractsPage() {
                   <option value="AMC">AMC (Annual Maintenance — monthly fee)</option>
                 </select>
                 {!isMeteredMachineSelected && (
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-muted-foreground">
                     {selectedMachineType === 'COMPUTER' ? 'Computers' : 'This machine type'} have no
                     usage meter — only AMC (flat annual fee) applies. No meter readings will be
                     tracked for this contract.
@@ -1692,23 +1698,24 @@ export default function ServiceContractsPage() {
               {/* Contract Value — FSMA has no upfront value, it's pure pay-per-click */}
               {formState.contractType === 'FSMA' ? (
                 <div className="flex flex-col space-y-1">
-                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1">
                     <DollarSign className="h-3 w-3" />
                     Billing
                   </label>
-                  <div className="h-10 flex items-center px-3 border border-slate-100 rounded-lg bg-slate-50 text-xs text-slate-500">
+                  <div className="h-10 flex items-center px-3 border border-border rounded-lg bg-muted text-xs text-muted-foreground">
                     No upfront value
                   </div>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-muted-foreground">
                     FSMA has no contract value — the entire charge comes from monthly per-click
                     meter readings, set below.
                   </p>
                 </div>
               ) : (
                 <div className="flex flex-col space-y-1">
-                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1">
                     <DollarSign className="h-3 w-3" />
-                    Contract Value ({getActiveCurrency()})<span className="text-red-500">*</span>
+                    Contract Value ({getActiveCurrency()})
+                    <span className="text-destructive">*</span>
                   </label>
                   <Input
                     type="number"
@@ -1720,10 +1727,10 @@ export default function ServiceContractsPage() {
                         contractValue: Number(e.target.value) || 0,
                       }))
                     }
-                    className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                    className="h-10 border-border focus-visible:ring-primary"
                     placeholder="0.00"
                   />
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-muted-foreground">
                     {formState.contractType === 'AMC'
                       ? 'Annual fee — invoiced in full at signing, collected as one or more installments.'
                       : 'Invoiced in full at signing. SMA copy-limit excess is billed separately, monthly.'}
@@ -1732,8 +1739,10 @@ export default function ServiceContractsPage() {
               )}
 
               {/* Plan summary + fixed coverage */}
-              <div className="col-span-2 p-3 bg-blue-50/40 border border-blue-100 rounded-xl space-y-2">
-                <p className="text-[11px] text-slate-600">{PLAN_SUMMARY[formState.contractType]}</p>
+              <div className="col-span-2 p-3 bg-primary/10 border border-primary/30 rounded-xl space-y-2">
+                <p className="text-[11px] text-foreground">
+                  {PLAN_SUMMARY[formState.contractType]}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {COVERAGE_LABELS.map(({ key, label }) => {
                     const covered = COVERAGE_BY_TYPE[formState.contractType][key];
@@ -1742,8 +1751,8 @@ export default function ServiceContractsPage() {
                         key={String(key)}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
                           covered
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                            ? 'bg-success/10 text-success border-success/30'
+                            : 'bg-destructive/10 text-destructive border-destructive/30'
                         }`}
                       >
                         {covered ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
@@ -1756,19 +1765,19 @@ export default function ServiceContractsPage() {
 
               {/* Every contract is invoiced in full at signing; optional amount collected on the spot */}
               {!editingContract && (
-                <div className="col-span-2 border border-slate-100 rounded-2xl p-4 bg-emerald-50/30 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                <div className="col-span-2 border border-border rounded-2xl p-4 bg-success/10 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-success">
                     <DollarSign className="h-3.5 w-3.5" />
                     Payment Collected at Signing (optional)
                   </div>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-muted-foreground">
                     An invoice for the full contract value is raised automatically. If the customer
                     is paying now — in full or in part — record it here; it lands on that same
                     invoice. Leave blank to invoice as pending and collect later.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Amount Paid Now ({getActiveCurrency()})
                       </label>
                       <Input
@@ -1780,12 +1789,12 @@ export default function ServiceContractsPage() {
                         onChange={(e) =>
                           setInitialPaymentForm((prev) => ({ ...prev, amount: e.target.value }))
                         }
-                        className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-emerald-500"
+                        className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-success"
                         placeholder="0.00"
                       />
                     </div>
                     <div className="flex flex-col space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Payment Mode
                       </label>
                       <select
@@ -1796,7 +1805,7 @@ export default function ServiceContractsPage() {
                             paymentMode: e.target.value as ContractInitialPayment['paymentMode'],
                           }))
                         }
-                        className="h-9 px-3 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        className="h-9 px-3 border border-border rounded-xl text-xs bg-card focus:outline-none focus:ring-1 focus:ring-success"
                       >
                         <option value="CASH">Cash</option>
                         <option value="BANK_TRANSFER">Bank Transfer</option>
@@ -1805,7 +1814,7 @@ export default function ServiceContractsPage() {
                       </select>
                     </div>
                     <div className="flex flex-col space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Payment Date
                       </label>
                       <Input
@@ -1817,11 +1826,11 @@ export default function ServiceContractsPage() {
                             paymentDate: e.target.value,
                           }))
                         }
-                        className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-emerald-500"
+                        className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-success"
                       />
                     </div>
                     <div className="flex flex-col space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Reference Number
                       </label>
                       <Input
@@ -1832,7 +1841,7 @@ export default function ServiceContractsPage() {
                             referenceNumber: e.target.value,
                           }))
                         }
-                        className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-emerald-500"
+                        className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-success"
                         placeholder="Optional"
                       />
                     </div>
@@ -1844,7 +1853,7 @@ export default function ServiceContractsPage() {
               {formState.contractType === 'SMA' && (
                 <>
                   <div className="flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1">
                       <Gauge className="h-3 w-3" />
                       Current Meter Reading (at signing) *
                     </label>
@@ -1855,16 +1864,16 @@ export default function ServiceContractsPage() {
                       onChange={(e) =>
                         setFormState((prev) => ({ ...prev, startMeterReading: e.target.value }))
                       }
-                      className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                      className="h-10 border-border focus-visible:ring-primary font-mono"
                       placeholder="e.g. 85000"
                     />
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] text-muted-foreground">
                       Contract copies are counted from this baseline.
                       {machineCurrentMeter != null && (
                         <>
                           {' '}
                           Machine&apos;s current meter:{' '}
-                          <span className="font-mono font-semibold text-slate-600">
+                          <span className="font-mono font-semibold text-foreground">
                             {machineCurrentMeter.toLocaleString()}
                           </span>{' '}
                           — cannot enter less than this.
@@ -1873,7 +1882,7 @@ export default function ServiceContractsPage() {
                     </p>
                   </div>
                   <div className="flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600">Copy Limit *</label>
+                    <label className="text-xs font-bold text-foreground">Copy Limit *</label>
                     <Input
                       type="number"
                       min={1}
@@ -1881,15 +1890,15 @@ export default function ServiceContractsPage() {
                       onChange={(e) =>
                         setFormState((prev) => ({ ...prev, copyLimit: e.target.value }))
                       }
-                      className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                      className="h-10 border-border focus-visible:ring-primary font-mono"
                       placeholder="e.g. 100000"
                     />
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] text-muted-foreground">
                       Contract ends at 1 year or this many copies — whichever first.
                     </p>
                   </div>
                   <div className="flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600">
+                    <label className="text-xs font-bold text-foreground">
                       Excess Rate per Copy ({getActiveCurrency()})
                     </label>
                     <Input
@@ -1900,15 +1909,15 @@ export default function ServiceContractsPage() {
                       onChange={(e) =>
                         setFormState((prev) => ({ ...prev, overagePerCopyRate: e.target.value }))
                       }
-                      className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                      className="h-10 border-border focus-visible:ring-primary font-mono"
                       placeholder="e.g. 0.05"
                     />
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] text-muted-foreground">
                       Charged per copy beyond the limit if the customer continues the SMA.
                     </p>
                   </div>
                   <div className="flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1">
                       <DollarSign className="h-3 w-3" />
                       Monthly Base Fee ({getActiveCurrency()}) — optional
                     </label>
@@ -1920,7 +1929,7 @@ export default function ServiceContractsPage() {
                       onChange={(e) =>
                         setFormState((prev) => ({ ...prev, monthlyCharge: e.target.value }))
                       }
-                      className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                      className="h-10 border-border focus-visible:ring-primary"
                       placeholder="0.00"
                     />
                   </div>
@@ -1931,7 +1940,7 @@ export default function ServiceContractsPage() {
               {formState.contractType === 'FSMA' && (
                 <>
                   <div className="col-span-2 flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600">
+                    <label className="text-xs font-bold text-foreground">
                       Per-Click Billing Mode *
                     </label>
                     <div className="flex gap-2">
@@ -1944,14 +1953,14 @@ export default function ServiceContractsPage() {
                           }
                           className={`flex-1 p-2.5 border rounded-xl text-left transition ${
                             formState.fsmaBillingMode === mode
-                              ? 'border-blue-600 bg-blue-50/40 shadow-sm'
-                              : 'border-slate-200 bg-white hover:border-slate-300'
+                              ? 'border-primary bg-primary/10 shadow-sm'
+                              : 'border-border bg-card hover:border-border'
                           }`}
                         >
-                          <span className="block text-xs font-bold text-slate-800">
+                          <span className="block text-xs font-bold text-foreground">
                             {mode === 'COMBINED' ? 'Combined' : 'Individual'}
                           </span>
-                          <span className="block text-[10px] text-slate-500 mt-0.5">
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">
                             {mode === 'COMBINED'
                               ? 'One rate for every click (total meter)'
                               : 'Separate B&W and colour rates & meters'}
@@ -1964,7 +1973,7 @@ export default function ServiceContractsPage() {
                   {formState.fsmaBillingMode === 'INDIVIDUAL' ? (
                     <>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-600">
+                        <label className="text-xs font-bold text-foreground">
                           B&W Rate per Click ({getActiveCurrency()}) *
                         </label>
                         <Input
@@ -1975,12 +1984,12 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setFormState((prev) => ({ ...prev, ratePerClickBW: e.target.value }))
                           }
-                          className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                          className="h-10 border-border focus-visible:ring-primary font-mono"
                           placeholder="e.g. 0.03"
                         />
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-600">
+                        <label className="text-xs font-bold text-foreground">
                           Colour Rate per Click ({getActiveCurrency()}) *
                         </label>
                         <Input
@@ -1991,12 +2000,12 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setFormState((prev) => ({ ...prev, ratePerClickColor: e.target.value }))
                           }
-                          className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                          className="h-10 border-border focus-visible:ring-primary font-mono"
                           placeholder="e.g. 0.15"
                         />
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                        <label className="text-xs font-bold text-foreground flex items-center gap-1">
                           <Gauge className="h-3 w-3" />
                           Start Meter — B&W *
                         </label>
@@ -2007,12 +2016,12 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setFormState((prev) => ({ ...prev, startMeterBW: e.target.value }))
                           }
-                          className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                          className="h-10 border-border focus-visible:ring-primary font-mono"
                           placeholder="e.g. 60000"
                         />
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                        <label className="text-xs font-bold text-foreground flex items-center gap-1">
                           <Gauge className="h-3 w-3" />
                           Start Meter — Colour *
                         </label>
@@ -2023,13 +2032,13 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setFormState((prev) => ({ ...prev, startMeterColor: e.target.value }))
                           }
-                          className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                          className="h-10 border-border focus-visible:ring-primary font-mono"
                           placeholder="e.g. 25000"
                         />
                       </div>
-                      <div className="col-span-2 text-[11px] text-slate-500">
+                      <div className="col-span-2 text-[11px] text-muted-foreground">
                         Total start meter:{' '}
-                        <span className="font-mono font-semibold text-slate-700">
+                        <span className="font-mono font-semibold text-foreground">
                           {(
                             (Number(formState.startMeterBW) || 0) +
                             (Number(formState.startMeterColor) || 0)
@@ -2039,7 +2048,7 @@ export default function ServiceContractsPage() {
                         {machineCurrentMeter != null && (
                           <>
                             {' · '}machine&apos;s current meter:{' '}
-                            <span className="font-mono font-semibold text-slate-700">
+                            <span className="font-mono font-semibold text-foreground">
                               {machineCurrentMeter.toLocaleString()}
                             </span>{' '}
                             — total cannot be less than this
@@ -2050,7 +2059,7 @@ export default function ServiceContractsPage() {
                   ) : (
                     <>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-600">
+                        <label className="text-xs font-bold text-foreground">
                           Rate per Click ({getActiveCurrency()}) *
                         </label>
                         <Input
@@ -2064,12 +2073,12 @@ export default function ServiceContractsPage() {
                               ratePerClickCombined: e.target.value,
                             }))
                           }
-                          className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                          className="h-10 border-border focus-visible:ring-primary font-mono"
                           placeholder="e.g. 0.06"
                         />
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                        <label className="text-xs font-bold text-foreground flex items-center gap-1">
                           <Gauge className="h-3 w-3" />
                           Start Meter — Total *
                         </label>
@@ -2080,13 +2089,13 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setFormState((prev) => ({ ...prev, startMeterReading: e.target.value }))
                           }
-                          className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                          className="h-10 border-border focus-visible:ring-primary font-mono"
                           placeholder="e.g. 85000"
                         />
                         {machineCurrentMeter != null && (
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-[10px] text-muted-foreground">
                             Machine&apos;s current meter:{' '}
-                            <span className="font-mono font-semibold text-slate-600">
+                            <span className="font-mono font-semibold text-foreground">
                               {machineCurrentMeter.toLocaleString()}
                             </span>{' '}
                             — cannot enter less than this
@@ -2100,7 +2109,7 @@ export default function ServiceContractsPage() {
 
               {/* Start Date */}
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                <label className="text-xs font-bold text-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   Start Date
                 </label>
@@ -2108,13 +2117,13 @@ export default function ServiceContractsPage() {
                   type="date"
                   value={formState.startDate}
                   onChange={(e) => setFormState((prev) => ({ ...prev, startDate: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                  className="h-10 border-border focus-visible:ring-primary"
                 />
               </div>
 
               {/* End Date */}
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                <label className="text-xs font-bold text-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   End Date
                 </label>
@@ -2122,17 +2131,17 @@ export default function ServiceContractsPage() {
                   type="date"
                   value={formState.endDate}
                   onChange={(e) => setFormState((prev) => ({ ...prev, endDate: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                  className="h-10 border-border focus-visible:ring-primary"
                 />
               </div>
 
               {/* Status */}
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Status</label>
+                <label className="text-xs font-bold text-foreground">Status</label>
                 <select
                   value={formState.status}
                   onChange={(e) => setFormState((prev) => ({ ...prev, status: e.target.value }))}
-                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="h-10 px-3 border border-border rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="EXPIRED">EXPIRED</option>
@@ -2142,28 +2151,28 @@ export default function ServiceContractsPage() {
 
               {/* Notes */}
               <div className="col-span-2 flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Notes</label>
+                <label className="text-xs font-bold text-foreground">Notes</label>
                 <Input
                   value={formState.notes}
                   onChange={(e) => setFormState((prev) => ({ ...prev, notes: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                  className="h-10 border-border focus-visible:ring-primary"
                   placeholder="Special terms, agreed exclusions, PO reference..."
                 />
               </div>
             </div>
 
-            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-white">
+            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-border bg-card">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsModalOpen(false)}
-                className="h-10 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+                className="h-10 px-4 border-border text-foreground hover:bg-muted font-medium text-xs"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm"
+                className="h-10 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs shadow-sm"
               >
                 Save Contract
               </Button>
@@ -2179,20 +2188,20 @@ export default function ServiceContractsPage() {
           if (!open) setBillingContract(null);
         }}
       >
-        <DialogContent className="max-w-2xl w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Gauge className="h-5 w-5 text-emerald-600" />
+        <DialogContent className="max-w-2xl w-full p-0 bg-card rounded-xl shadow-2xl border border-border max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Gauge className="h-5 w-5 text-success" />
               Meter Readings & Billing
               {billingContract && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/30">
                   {billingContract.contractType}
                   {billingContract.contractType === 'FSMA' &&
                     ` · ${billingContract.fsmaBillingMode === 'INDIVIDUAL' ? 'Individual' : 'Combined'}`}
                 </span>
               )}
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               {billingContract?.contractType === 'AMC' &&
                 'AMC covers service visits & labour for the contract fee — meter readings here are optional, for tracking only, and are never charged.'}
               {billingContract?.contractType === 'SMA' &&
@@ -2206,15 +2215,15 @@ export default function ServiceContractsPage() {
             <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
               {/* Contract billing parameters */}
               <div className="grid grid-cols-3 gap-3 text-[11px]">
-                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                  <span className="block text-slate-400 font-semibold uppercase text-[9px]">
+                <div className="p-2.5 bg-muted border border-border rounded-lg">
+                  <span className="block text-muted-foreground font-semibold uppercase text-[9px]">
                     {billingContract.contractType === 'AMC'
                       ? 'Contract Value'
                       : billingContract.contractType === 'SMA'
                         ? 'Copy Limit'
                         : 'Rate'}
                   </span>
-                  <span className="font-bold text-slate-800">
+                  <span className="font-bold text-foreground">
                     {billingContract.contractType === 'AMC' &&
                       `${getActiveCurrency()} ${Number(billingContract.contractValue ?? 0).toFixed(2)}`}
                     {billingContract.contractType === 'SMA' &&
@@ -2225,11 +2234,11 @@ export default function ServiceContractsPage() {
                         : `${getActiveCurrency()} ${Number(billingContract.ratePerClickCombined ?? 0)}/click`)}
                   </span>
                 </div>
-                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                  <span className="block text-slate-400 font-semibold uppercase text-[9px]">
+                <div className="p-2.5 bg-muted border border-border rounded-lg">
+                  <span className="block text-muted-foreground font-semibold uppercase text-[9px]">
                     Last Reading
                   </span>
-                  <span className="font-bold text-slate-800 font-mono">
+                  <span className="font-bold text-foreground font-mono">
                     {billingContract.contractType === 'FSMA' &&
                     billingContract.fsmaBillingMode === 'INDIVIDUAL'
                       ? `BW ${Number(lastReading?.bwReading ?? billingContract.startMeterBW ?? 0).toLocaleString()} · Col ${Number(lastReading?.colorReading ?? billingContract.startMeterColor ?? 0).toLocaleString()}`
@@ -2238,24 +2247,24 @@ export default function ServiceContractsPage() {
                         ).toLocaleString()}
                   </span>
                 </div>
-                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                  <span className="block text-slate-400 font-semibold uppercase text-[9px]">
+                <div className="p-2.5 bg-muted border border-border rounded-lg">
+                  <span className="block text-muted-foreground font-semibold uppercase text-[9px]">
                     Billed to Date
                   </span>
-                  <span className="font-bold text-emerald-700">
+                  <span className="font-bold text-success">
                     {getActiveCurrency()} {totalBilled.toFixed(2)}
                   </span>
                 </div>
               </div>
 
               {billingContract.contractType === 'SMA' && (
-                <p className="text-[11px] text-amber-700 bg-amber-50/60 border border-amber-100 rounded-lg p-2.5">
+                <p className="text-[11px] text-warning bg-warning/10 border border-warning/30 rounded-lg p-2.5">
                   Toner is always chargeable under SMA. Service visits, labour and spare parts stay
                   free while the contract is within time and copy limit.
                 </p>
               )}
               {billingContract.contractType === 'AMC' && (
-                <p className="text-[11px] text-blue-700 bg-blue-50/60 border border-blue-100 rounded-lg p-2.5">
+                <p className="text-[11px] text-primary bg-primary/10 border border-primary/30 rounded-lg p-2.5">
                   AMC has no per-click or monthly meter billing — readings are optional and kept
                   only to track machine usage. Spare parts and toner are billed as used via service
                   tickets.
@@ -2265,9 +2274,9 @@ export default function ServiceContractsPage() {
               {/* Record new reading */}
               <form
                 onSubmit={handleSaveReading}
-                className="p-3 border border-slate-200 rounded-xl space-y-3 bg-slate-50/40"
+                className="p-3 border border-border rounded-xl space-y-3 bg-muted/40"
               >
-                <span className="text-xs font-bold text-slate-700 block">
+                <span className="text-xs font-bold text-foreground block">
                   Record{' '}
                   {billingContract.contractType === 'AMC'
                     ? 'Meter Reading (tracking only)'
@@ -2278,7 +2287,7 @@ export default function ServiceContractsPage() {
                   billingContract.fsmaBillingMode === 'INDIVIDUAL' ? (
                     <>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           B&W Meter *
                         </label>
                         <Input
@@ -2288,12 +2297,12 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setReadingForm((prev) => ({ ...prev, bwReading: e.target.value }))
                           }
-                          className="h-9 text-xs bg-white font-mono"
+                          className="h-9 text-xs bg-card font-mono"
                           placeholder="Current B&W meter"
                         />
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
                           Colour Meter *
                         </label>
                         <Input
@@ -2303,13 +2312,13 @@ export default function ServiceContractsPage() {
                           onChange={(e) =>
                             setReadingForm((prev) => ({ ...prev, colorReading: e.target.value }))
                           }
-                          className="h-9 text-xs bg-white font-mono"
+                          className="h-9 text-xs bg-card font-mono"
                           placeholder="Current colour meter"
                         />
                       </div>
-                      <div className="col-span-2 text-[10px] text-slate-400">
+                      <div className="col-span-2 text-[10px] text-muted-foreground">
                         Total meter:{' '}
-                        <span className="font-mono font-semibold text-slate-600">
+                        <span className="font-mono font-semibold text-foreground">
                           {(
                             (Number(readingForm.bwReading) || 0) +
                             (Number(readingForm.colorReading) || 0)
@@ -2319,7 +2328,7 @@ export default function ServiceContractsPage() {
                     </>
                   ) : billingContract.contractType === 'AMC' ? (
                     <div className="flex flex-col space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Total Meter (optional, for tracking)
                       </label>
                       <Input
@@ -2329,13 +2338,13 @@ export default function ServiceContractsPage() {
                         onChange={(e) =>
                           setReadingForm((prev) => ({ ...prev, totalReading: e.target.value }))
                         }
-                        className="h-9 text-xs bg-white font-mono"
+                        className="h-9 text-xs bg-card font-mono"
                         placeholder="Current total meter"
                       />
                     </div>
                   ) : (
                     <div className="flex flex-col space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
                         Total Meter *
                       </label>
                       <Input
@@ -2345,19 +2354,21 @@ export default function ServiceContractsPage() {
                         onChange={(e) =>
                           setReadingForm((prev) => ({ ...prev, totalReading: e.target.value }))
                         }
-                        className="h-9 text-xs bg-white font-mono"
+                        className="h-9 text-xs bg-card font-mono"
                         placeholder="Current total meter"
                       />
                     </div>
                   )}
                   <div className="flex flex-col space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Notes</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Notes
+                    </label>
                     <Input
                       value={readingForm.notes}
                       onChange={(e) =>
                         setReadingForm((prev) => ({ ...prev, notes: e.target.value }))
                       }
-                      className="h-9 text-xs bg-white"
+                      className="h-9 text-xs bg-card"
                       placeholder="e.g. July billing cycle"
                     />
                   </div>
@@ -2366,17 +2377,17 @@ export default function ServiceContractsPage() {
                 {/* Live amount preview */}
                 {readingPreview &&
                   ('error' in readingPreview && readingPreview.error ? (
-                    <p className="text-[11px] font-semibold text-rose-600">
+                    <p className="text-[11px] font-semibold text-destructive">
                       {readingPreview.error}
                     </p>
                   ) : (
-                    <p className="text-[11px] font-semibold text-slate-700">
+                    <p className="text-[11px] font-semibold text-foreground">
                       To collect this period:{' '}
-                      <span className="text-emerald-700 font-bold">
+                      <span className="text-success font-bold">
                         {getActiveCurrency()} {(readingPreview.amount ?? 0).toFixed(2)}
                       </span>
                       {readingPreview.detail && (
-                        <span className="text-slate-400 font-normal">
+                        <span className="text-muted-foreground font-normal">
                           {' '}
                           — {readingPreview.detail}
                         </span>
@@ -2387,7 +2398,7 @@ export default function ServiceContractsPage() {
                 <Button
                   type="submit"
                   disabled={savingReading}
-                  className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm"
+                  className="h-9 px-4 bg-success hover:bg-success/90 text-success-foreground font-medium text-xs shadow-sm"
                 >
                   {savingReading
                     ? 'Saving...'
@@ -2399,31 +2410,35 @@ export default function ServiceContractsPage() {
 
               {/* History */}
               <div>
-                <span className="text-xs font-bold text-slate-700 block mb-2">Reading History</span>
+                <span className="text-xs font-bold text-foreground block mb-2">
+                  Reading History
+                </span>
                 {loadingReadings ? (
-                  <p className="text-xs text-slate-400 py-3 text-center">Loading history...</p>
+                  <p className="text-xs text-muted-foreground py-3 text-center">
+                    Loading history...
+                  </p>
                 ) : readings.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-3 text-center">
+                  <p className="text-xs text-muted-foreground py-3 text-center">
                     No readings recorded yet.
                   </p>
                 ) : (
-                  <div className="border border-slate-100 rounded-lg overflow-hidden">
+                  <div className="border border-border rounded-lg overflow-hidden">
                     <Table>
-                      <TableHeader className="bg-slate-50/80">
+                      <TableHeader className="bg-muted/80">
                         <TableRow>
-                          <TableHead className="text-[10px] font-bold text-slate-500">
+                          <TableHead className="text-[10px] font-bold text-muted-foreground">
                             Date
                           </TableHead>
-                          <TableHead className="text-[10px] font-bold text-slate-500">
+                          <TableHead className="text-[10px] font-bold text-muted-foreground">
                             Meter
                           </TableHead>
-                          <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                          <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                             Clicks
                           </TableHead>
-                          <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                          <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                             Amount
                           </TableHead>
-                          <TableHead className="text-[10px] font-bold text-slate-500">
+                          <TableHead className="text-[10px] font-bold text-muted-foreground">
                             Notes
                           </TableHead>
                         </TableRow>
@@ -2431,10 +2446,10 @@ export default function ServiceContractsPage() {
                       <TableBody>
                         {readings.map((r) => (
                           <TableRow key={r.id}>
-                            <TableCell className="text-[11px] text-slate-600 py-2">
+                            <TableCell className="text-[11px] text-foreground py-2">
                               {new Date(r.readingDate).toLocaleDateString()}
                             </TableCell>
-                            <TableCell className="text-[11px] font-mono text-slate-600 py-2">
+                            <TableCell className="text-[11px] font-mono text-foreground py-2">
                               {billingContract.contractType === 'FSMA' &&
                               billingContract.fsmaBillingMode === 'INDIVIDUAL'
                                 ? `BW ${Number(r.bwReading ?? 0).toLocaleString()} · Col ${Number(r.colorReading ?? 0).toLocaleString()}`
@@ -2442,16 +2457,16 @@ export default function ServiceContractsPage() {
                                   ? Number(r.totalReading).toLocaleString()
                                   : '—'}
                             </TableCell>
-                            <TableCell className="text-[11px] font-mono text-slate-600 py-2 text-right">
+                            <TableCell className="text-[11px] font-mono text-foreground py-2 text-right">
                               {billingContract.contractType === 'FSMA' &&
                               billingContract.fsmaBillingMode === 'INDIVIDUAL'
                                 ? `${r.clicksBW.toLocaleString()} + ${r.clicksColor.toLocaleString()}`
                                 : r.clicksTotal.toLocaleString()}
                             </TableCell>
-                            <TableCell className="text-[11px] font-bold text-emerald-700 py-2 text-right">
+                            <TableCell className="text-[11px] font-bold text-success py-2 text-right">
                               {getActiveCurrency()} {Number(r.amountCharged).toFixed(2)}
                             </TableCell>
-                            <TableCell className="text-[11px] text-slate-400 py-2 truncate max-w-[120px]">
+                            <TableCell className="text-[11px] text-muted-foreground py-2 truncate max-w-[120px]">
                               {r.notes || '—'}
                             </TableCell>
                           </TableRow>
@@ -2464,12 +2479,12 @@ export default function ServiceContractsPage() {
             </div>
           )}
 
-          <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+          <DialogFooter className="px-6 py-4 border-t border-border bg-card">
             <Button
               type="button"
               variant="outline"
               onClick={() => setBillingContract(null)}
-              className="h-9 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+              className="h-9 px-4 border-border text-foreground hover:bg-muted font-medium text-xs"
             >
               Close
             </Button>
@@ -2479,13 +2494,13 @@ export default function ServiceContractsPage() {
 
       {/* External Machine Registration Dialog */}
       <Dialog open={externalDialogOpen} onOpenChange={setExternalDialogOpen}>
-        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Plus className="h-5 w-5 text-blue-600" />
+        <DialogContent className="max-w-md w-full p-0 bg-card rounded-xl shadow-2xl border border-border">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
               Register External Machine
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               Machine bought elsewhere — saved to this customer so a service contract and tickets
               can be raised against it.
             </DialogDescription>
@@ -2494,7 +2509,7 @@ export default function ServiceContractsPage() {
           <form onSubmit={handleSaveExternalMachine}>
             <div className="grid grid-cols-2 gap-4 px-6 py-4">
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Brand *</label>
+                <label className="text-xs font-bold text-foreground">Brand *</label>
                 <div className="flex gap-1.5 items-center">
                   <div className="flex-1 min-w-0">
                     <SearchableSelect
@@ -2504,7 +2519,7 @@ export default function ServiceContractsPage() {
                         setExternalForm((prev) => ({ ...prev, brand: val, modelName: '' }))
                       }
                       placeholder="Select brand..."
-                      className="h-10 rounded-lg border-slate-200 bg-card text-sm"
+                      className="h-10 rounded-lg border-border bg-card text-sm"
                     />
                   </div>
                   <Button
@@ -2512,14 +2527,14 @@ export default function ServiceContractsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() => setShowAddBrandDialog(true)}
-                    className="h-10 w-10 shrink-0 border-slate-200 rounded-lg bg-card hover:bg-slate-50 text-slate-500"
+                    className="h-10 w-10 shrink-0 border-border rounded-lg bg-card hover:bg-muted text-muted-foreground"
                   >
                     <Plus size={16} />
                   </Button>
                 </div>
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Model Name *</label>
+                <label className="text-xs font-bold text-foreground">Model Name *</label>
                 <div className="flex gap-1.5 items-center">
                   <div className="flex-1 min-w-0">
                     <SearchableSelect
@@ -2539,7 +2554,7 @@ export default function ServiceContractsPage() {
                         setExternalForm((prev) => ({ ...prev, modelName: val }))
                       }
                       placeholder="Select model..."
-                      className="h-10 rounded-lg border-slate-200 bg-card text-sm"
+                      className="h-10 rounded-lg border-border bg-card text-sm"
                     />
                   </div>
                   <Button
@@ -2547,25 +2562,25 @@ export default function ServiceContractsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() => setShowAddModelDialog(true)}
-                    className="h-10 w-10 shrink-0 border-slate-200 rounded-lg bg-card hover:bg-slate-50 text-slate-500"
+                    className="h-10 w-10 shrink-0 border-border rounded-lg bg-card hover:bg-muted text-muted-foreground"
                   >
                     <Plus size={16} />
                   </Button>
                 </div>
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Serial Number *</label>
+                <label className="text-xs font-bold text-foreground">Serial Number *</label>
                 <Input
                   value={externalForm.serialNumber}
                   onChange={(e) =>
                     setExternalForm((prev) => ({ ...prev, serialNumber: e.target.value }))
                   }
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                  className="h-10 border-border focus-visible:ring-primary font-mono"
                   placeholder="e.g. CNX123456"
                 />
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Machine Type</label>
+                <label className="text-xs font-bold text-foreground">Machine Type</label>
                 <select
                   value={externalForm.machineType}
                   onChange={(e) =>
@@ -2574,14 +2589,14 @@ export default function ServiceContractsPage() {
                       machineType: e.target.value as 'PRINTER' | 'COMPUTER' | 'OTHER',
                     }))
                   }
-                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="h-10 px-3 border border-border rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="PRINTER">Printer / Copier</option>
                   <option value="COMPUTER">Computer</option>
                   <option value="OTHER">Other</option>
                 </select>
                 {externalForm.machineType !== 'PRINTER' && (
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-muted-foreground">
                     No usage meter — this machine can only be enrolled in an AMC contract, no meter
                     readings.
                   </p>
@@ -2590,7 +2605,7 @@ export default function ServiceContractsPage() {
               {externalForm.machineType === 'PRINTER' && (
                 <>
                   <div className="flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1">
                       <Gauge className="h-3 w-3" />
                       Current Meter Reading *
                     </label>
@@ -2601,12 +2616,12 @@ export default function ServiceContractsPage() {
                       onChange={(e) =>
                         setExternalForm((prev) => ({ ...prev, meterReading: e.target.value }))
                       }
-                      className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                      className="h-10 border-border focus-visible:ring-primary font-mono"
                       placeholder="e.g. 85000"
                     />
                   </div>
                   <div className="flex flex-col space-y-1">
-                    <label className="text-xs font-bold text-slate-600">Print Type</label>
+                    <label className="text-xs font-bold text-foreground">Print Type</label>
                     <select
                       value={externalForm.printColour}
                       onChange={(e) =>
@@ -2615,7 +2630,7 @@ export default function ServiceContractsPage() {
                           printColour: e.target.value as 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
                         }))
                       }
-                      className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="h-10 px-3 border border-border rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                     >
                       <option value="BLACK_WHITE">Black & White</option>
                       <option value="COLOUR">Colour</option>
@@ -2625,31 +2640,31 @@ export default function ServiceContractsPage() {
                 </>
               )}
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Notes</label>
+                <label className="text-xs font-bold text-foreground">Notes</label>
                 <Input
                   value={externalForm.description}
                   onChange={(e) =>
                     setExternalForm((prev) => ({ ...prev, description: e.target.value }))
                   }
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                  className="h-10 border-border focus-visible:ring-primary"
                   placeholder="Condition, accessories..."
                 />
               </div>
             </div>
 
-            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-white">
+            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-border bg-card">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setExternalDialogOpen(false)}
-                className="h-10 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+                className="h-10 px-4 border-border text-foreground hover:bg-muted font-medium text-xs"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={savingExternal}
-                className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm"
+                className="h-10 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs shadow-sm"
               >
                 {savingExternal ? 'Saving...' : 'Register & Select'}
               </Button>
@@ -2673,34 +2688,34 @@ export default function ServiceContractsPage() {
 
       {/* AMC INSTALLMENT PAYMENT DIALOG */}
       <Dialog open={!!payingContract} onOpenChange={(open) => !open && setPayingContract(null)}>
-        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
+        <DialogContent className="max-w-md w-full p-0 bg-card rounded-xl shadow-2xl border border-border">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-success" />
               Record Payment
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               Recorded against the same invoice raised at signing — an updated receipt reflecting
               this payment can be sent from the invoice.
             </DialogDescription>
           </DialogHeader>
 
           {payingContract?.invoiceId && contractPaymentSummaries[payingContract.invoiceId] && (
-            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex flex-col gap-2">
+            <div className="mx-6 mt-4 p-3 bg-muted border border-border rounded-xl text-xs flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">
+                <span className="text-muted-foreground">
                   Paid {getActiveCurrency()}{' '}
                   {contractPaymentSummaries[payingContract.invoiceId].totalPaid.toFixed(2)} of{' '}
                   {getActiveCurrency()}{' '}
                   {contractPaymentSummaries[payingContract.invoiceId].totalAmount.toFixed(2)}
                 </span>
-                <span className="font-bold text-slate-700">
+                <span className="font-bold text-foreground">
                   Balance {getActiveCurrency()}{' '}
                   {contractPaymentSummaries[payingContract.invoiceId].pendingBalance.toFixed(2)}
                 </span>
               </div>
               {contractPaymentSummaries[payingContract.invoiceId].pendingApprovalCount > 0 && (
-                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                <div className="flex items-center gap-1.5 text-warning bg-warning/10 border border-warning/30 rounded-lg px-2 py-1.5">
                   <Clock className="h-3.5 w-3.5 shrink-0" />
                   <span className="font-semibold">
                     {contractPaymentSummaries[payingContract.invoiceId].pendingApprovalCount === 1
@@ -2720,7 +2735,7 @@ export default function ServiceContractsPage() {
           <form onSubmit={handleRecordContractPayment}>
             <div className="grid grid-cols-2 gap-4 px-6 py-4">
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">
+                <label className="text-xs font-bold text-foreground">
                   Amount ({getActiveCurrency()}) *
                 </label>
                 <Input
@@ -2729,12 +2744,12 @@ export default function ServiceContractsPage() {
                   min={0}
                   value={payingForm.amount}
                   onChange={(e) => setPayingForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                   placeholder="0.00"
                 />
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Payment Mode *</label>
+                <label className="text-xs font-bold text-foreground">Payment Mode *</label>
                 <select
                   value={payingForm.paymentMode}
                   onChange={(e) =>
@@ -2743,7 +2758,7 @@ export default function ServiceContractsPage() {
                       paymentMode: e.target.value as ContractInitialPayment['paymentMode'],
                     }))
                   }
-                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="h-10 px-3 border border-border rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-success"
                 >
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
@@ -2752,44 +2767,44 @@ export default function ServiceContractsPage() {
                 </select>
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Payment Date *</label>
+                <label className="text-xs font-bold text-foreground">Payment Date *</label>
                 <Input
                   type="date"
                   value={payingForm.paymentDate}
                   onChange={(e) =>
                     setPayingForm((prev) => ({ ...prev, paymentDate: e.target.value }))
                   }
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                 />
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Reference Number</label>
+                <label className="text-xs font-bold text-foreground">Reference Number</label>
                 <Input
                   value={payingForm.referenceNumber}
                   onChange={(e) =>
                     setPayingForm((prev) => ({ ...prev, referenceNumber: e.target.value }))
                   }
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                   placeholder="Optional"
                 />
               </div>
               <div className="col-span-2 flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Remarks</label>
+                <label className="text-xs font-bold text-foreground">Remarks</label>
                 <Input
                   value={payingForm.remarks}
                   onChange={(e) => setPayingForm((prev) => ({ ...prev, remarks: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                   placeholder="Optional"
                 />
               </div>
             </div>
 
-            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-white">
+            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-border bg-card">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setPayingContract(null)}
-                className="h-10 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+                className="h-10 px-4 border-border text-foreground hover:bg-muted font-medium text-xs"
               >
                 Cancel
               </Button>
@@ -2798,7 +2813,7 @@ export default function ServiceContractsPage() {
                 loading={savingPayment}
                 loadingText="Recording..."
                 disabled={savingPayment}
-                className="h-10 px-4 bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm"
+                className="h-10 px-4 bg-success hover:bg-success/90 text-success-foreground font-medium text-xs shadow-sm"
               >
                 Record Payment
               </LoadingButton>

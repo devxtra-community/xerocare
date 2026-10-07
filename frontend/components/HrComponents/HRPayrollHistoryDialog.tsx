@@ -118,7 +118,7 @@ export default function HRPayrollHistoryDialog({
             </div>
           ) : (
             <>
-              <div className="rounded-xl border border-gray-100 overflow-hidden">
+              <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
@@ -138,11 +138,11 @@ export default function HRPayrollHistoryDialog({
                   </TableHeader>
                   <TableBody>
                     {paginatedHistory.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-blue-50/30 transition-colors">
+                      <TableRow key={record.id} className="hover:bg-primary/10 transition-colors">
                         <TableCell className="font-medium text-sm py-3">
                           {MONTH_NAMES[record.month - 1]} {record.year}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-sm text-blue-700">
+                        <TableCell className="text-right font-bold text-sm text-primary">
                           {getActiveCurrency()}{' '}
                           {parseFloat(record.salary_amount.toString()).toLocaleString()}
                         </TableCell>
@@ -153,8 +153,8 @@ export default function HRPayrollHistoryDialog({
                             text-[10px] font-bold px-2 py-0.5 rounded-full
                             ${
                               record.status === 'PAID'
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                                ? 'bg-success/10 text-success border-success/30'
+                                : 'bg-warning/10 text-warning border-warning/30'
                             }
                           `}
                           >

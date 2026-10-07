@@ -88,7 +88,7 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-800 text-xs">
+      <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-xl flex items-start gap-3 text-destructive text-xs">
         <ShieldAlert className="h-4 w-4 flex-shrink-0 mt-0.5" />
         <div>
           <p className="font-bold">Access Limited</p>
@@ -100,7 +100,7 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
 
   if (logs.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground border border-dashed border-gray-100 rounded-xl">
+      <div className="text-center py-8 text-muted-foreground border border-dashed border-border rounded-xl">
         <Activity className="h-8 w-8 mx-auto opacity-30 mb-2" />
         <p className="text-xs font-semibold">No activity logs recorded yet.</p>
       </div>
@@ -112,49 +112,49 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
     if (act.includes('REJECT') || act.includes('CANCEL')) {
       return {
         icon: XCircle,
-        color: 'text-rose-600 bg-rose-50 border-rose-200',
-        badge: 'bg-rose-50 text-rose-700 border-rose-100',
+        color: 'text-destructive bg-destructive/10 border-destructive/30',
+        badge: 'bg-destructive/10 text-destructive border-destructive/30',
       };
     }
     if (act.includes('APPROVE') || act.includes('ACTIVATE') || act.includes('ACCEPT')) {
       return {
         icon: CheckCircle2,
-        color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-        badge: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+        color: 'text-success bg-success/10 border-success/30',
+        badge: 'bg-success/10 text-success border-success/30',
       };
     }
     if (act.includes('ALLOCAT')) {
       return {
         icon: Cpu,
-        color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
-        badge: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+        color: 'text-primary bg-primary/10 border-primary/30',
+        badge: 'bg-primary/10 text-primary border-primary/30',
       };
     }
     if (act.includes('PAY') || act.includes('COLLECT')) {
       return {
         icon: Coins,
-        color: 'text-amber-600 bg-amber-50 border-amber-200',
-        badge: 'bg-amber-50 text-amber-700 border-amber-100',
+        color: 'text-warning bg-warning/10 border-warning/30',
+        badge: 'bg-warning/10 text-warning border-warning/30',
       };
     }
     if (act.includes('CREATE') || act.includes('NEW') || act.includes('CONVERT')) {
       return {
         icon: PlusCircle,
-        color: 'text-blue-600 bg-blue-50 border-blue-200',
-        badge: 'bg-blue-50 text-blue-700 border-blue-100',
+        color: 'text-primary bg-primary/10 border-primary/30',
+        badge: 'bg-primary/10 text-primary border-primary/30',
       };
     }
     if (act.includes('NOTIF') || act.includes('SEND') || act.includes('EMAIL')) {
       return {
         icon: Mail,
-        color: 'text-sky-600 bg-sky-50 border-sky-200',
-        badge: 'bg-sky-50 text-sky-700 border-sky-100',
+        color: 'text-info bg-info/10 border-info/30',
+        badge: 'bg-info/10 text-info border-info/30',
       };
     }
     return {
       icon: Activity,
-      color: 'text-slate-600 bg-slate-50 border-slate-200',
-      badge: 'bg-slate-50 text-slate-700 border-slate-100',
+      color: 'text-foreground bg-muted border-border',
+      badge: 'bg-muted text-foreground border-border',
     };
   };
 
@@ -181,8 +181,8 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
     );
 
     return (
-      <div className="mt-3 p-3 bg-slate-900 rounded-lg text-[10px] font-mono text-slate-300 space-y-1.5 border border-slate-800 shadow-inner overflow-x-auto">
-        <p className="text-slate-500 font-bold mb-1 border-b border-slate-800 pb-1">
+      <div className="mt-3 p-3 bg-foreground rounded-lg text-[10px] font-mono text-muted-foreground space-y-1.5 border border-border shadow-inner overflow-x-auto">
+        <p className="text-muted-foreground font-bold mb-1 border-b border-border pb-1">
           Value Comparison:
         </p>
         {allKeys.map((key) => {
@@ -200,14 +200,14 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
           return (
             <div
               key={key}
-              className="grid grid-cols-1 gap-1 py-1 border-b border-slate-800/50 last:border-0"
+              className="grid grid-cols-1 gap-1 py-1 border-b border-border/50 last:border-0"
             >
-              <span className="text-sky-400 font-semibold">{key}:</span>
+              <span className="text-info font-semibold">{key}:</span>
               <div className="pl-2 space-y-0.5">
                 {oVal !== undefined && (
-                  <p className="text-rose-400 line-through">- {formatVal(oVal)}</p>
+                  <p className="text-destructive line-through">- {formatVal(oVal)}</p>
                 )}
-                {nVal !== undefined && <p className="text-emerald-400">+ {formatVal(nVal)}</p>}
+                {nVal !== undefined && <p className="text-success">+ {formatVal(nVal)}</p>}
               </div>
             </div>
           );
@@ -218,9 +218,9 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-        <Activity className="h-4 w-4 text-gray-500" />
-        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+      <div className="flex items-center gap-2 border-b border-border pb-2">
+        <Activity className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
           Activity History Logs
         </h3>
         <Badge variant="secondary" className="ml-auto text-[10px] font-bold">
@@ -229,7 +229,7 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
       </div>
 
       <div className="max-h-[350px] overflow-y-auto pr-2 scrollbar-thin">
-        <div className="relative pl-6 space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
+        <div className="relative pl-6 space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-muted">
           {logs.map((log) => {
             const style = getEventStyle(log.action);
             const IconComponent = style.icon;
@@ -247,23 +247,23 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
 
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-xs font-extrabold text-gray-800 leading-none">
+                    <span className="text-xs font-extrabold text-foreground leading-none">
                       {log.action.replace(/_/g, ' ')}
                     </span>
                     <Badge variant="outline" className={`text-[9px] font-bold py-0 ${style.badge}`}>
                       {log.action}
                     </Badge>
-                    <span className="text-[10px] text-gray-400 flex items-center gap-1 ml-auto font-medium">
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 ml-auto font-medium">
                       <Clock className="h-3 w-3" />
                       {fmtLogDate(log.createdAt)}
                     </span>
                   </div>
 
-                  <p className="text-xs text-gray-600 font-medium leading-relaxed">
+                  <p className="text-xs text-foreground font-medium leading-relaxed">
                     {log.details || log.action}
                   </p>
 
-                  <div className="flex items-center gap-1 text-[10px] text-gray-400 font-semibold mt-1">
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold mt-1">
                     <User className="h-3 w-3" />
                     <span>By: {log.performedBy}</span>
 

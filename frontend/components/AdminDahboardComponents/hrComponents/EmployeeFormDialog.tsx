@@ -354,16 +354,16 @@ export default function EmployeeFormDialog({
           {/* Profile Image Section */}
           <div className="flex flex-col items-center gap-4">
             <div
-              className="relative h-24 w-24 rounded-full bg-blue-50 border-2 border-dashed border-blue-200 flex items-center justify-center cursor-pointer overflow-hidden group"
+              className="relative h-24 w-24 rounded-full bg-primary/10 border-2 border-dashed border-primary/30 flex items-center justify-center cursor-pointer overflow-hidden group"
               onClick={() => profileInputRef.current?.click()}
             >
               {profilePreview ? (
                 <Image src={profilePreview} alt="Profile preview" fill className="object-cover" />
               ) : (
-                <ImagePlus className="h-8 w-8 text-blue-400 group-hover:text-blue-500 transition-colors" />
+                <ImagePlus className="h-8 w-8 text-primary group-hover:text-primary transition-colors" />
               )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <span className="text-[10px] text-white font-bold">CHANGE</span>
+              <div className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <span className="text-[10px] text-primary-foreground font-bold">CHANGE</span>
               </div>
             </div>
             <input
@@ -373,14 +373,14 @@ export default function EmployeeFormDialog({
               accept="image/*"
               onChange={(e) => handleFileChange(e, 'profile')}
             />
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               Profile Picture
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 First Name
               </label>
               <Input
@@ -389,11 +389,11 @@ export default function EmployeeFormDialog({
                 value={formData.first_name}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Last Name
               </label>
               <Input
@@ -402,12 +402,12 @@ export default function EmployeeFormDialog({
                 value={formData.last_name}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Email Address
               </label>
               <Input
@@ -418,12 +418,12 @@ export default function EmployeeFormDialog({
                 onChange={handleChange}
                 required
                 disabled={!!initialData}
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Country
               </label>
               <SearchableSelect
@@ -432,13 +432,13 @@ export default function EmployeeFormDialog({
                 options={COUNTRY_PHONE_OPTIONS}
                 placeholder="Select country"
                 emptyText="No country found."
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Phone Number <span className="normal-case text-gray-300">(optional)</span>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Phone Number <span className="normal-case text-muted-foreground">(optional)</span>
               </label>
               <Input
                 name="phone"
@@ -446,19 +446,19 @@ export default function EmployeeFormDialog({
                 placeholder={dialCode ? `${dialCode} 50 123 4567` : 'Select a country first'}
                 value={formData.phone}
                 onChange={handleChange}
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Role / Designation
               </label>
               <Select
                 value={formData.role}
                 onValueChange={(val) => handleSelectChange('role', val)}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -473,7 +473,7 @@ export default function EmployeeFormDialog({
             {/* Employee Job - Only show for EMPLOYEE role */}
             {formData.role === 'EMPLOYEE' && (
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Employee Job / Responsibility *
                 </label>
                 <Select
@@ -481,7 +481,7 @@ export default function EmployeeFormDialog({
                   onValueChange={(val) => handleSelectChange('employee_job', val)}
                   required={formData.role === 'EMPLOYEE'}
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                     <SelectValue placeholder="Select job type" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -498,7 +498,7 @@ export default function EmployeeFormDialog({
             {/* Finance Job - Only show for FINANCE role */}
             {formData.role === 'FINANCE' && (
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Finance Job / Responsibility *
                 </label>
                 <Select
@@ -506,7 +506,7 @@ export default function EmployeeFormDialog({
                   onValueChange={(val) => handleSelectChange('finance_job', val)}
                   required={formData.role === 'FINANCE'}
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                     <SelectValue placeholder="Select finance job type" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -521,7 +521,7 @@ export default function EmployeeFormDialog({
             )}
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Salary ({getActiveCurrency()})
               </label>
               <Input
@@ -531,12 +531,12 @@ export default function EmployeeFormDialog({
                 value={formData.salary}
                 onChange={handleChange}
                 required
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Contract Expire Date
               </label>
               <Input
@@ -544,26 +544,26 @@ export default function EmployeeFormDialog({
                 type="date"
                 value={formData.expire_date}
                 onChange={handleChange}
-                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Employee Status
               </label>
               <Select
                 value={formData.status}
                 onValueChange={(val) => handleSelectChange('status', val)}
               >
-                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="ACTIVE" className="text-green-600 font-medium">
+                  <SelectItem value="ACTIVE" className="text-success font-medium">
                     Active
                   </SelectItem>
-                  <SelectItem value="INACTIVE" className="text-amber-600 font-medium">
+                  <SelectItem value="INACTIVE" className="text-warning font-medium">
                     Inactive
                   </SelectItem>
                 </SelectContent>
@@ -571,7 +571,7 @@ export default function EmployeeFormDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Assigned Branch
               </label>
               {isAdmin || hrNeedsBranchSelect ? (
@@ -584,10 +584,10 @@ export default function EmployeeFormDialog({
                   }))}
                   placeholder="Select Branch"
                   emptyText="No branches found."
-                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30"
                 />
               ) : (
-                <div className="h-12 rounded-xl bg-gray-100 border-none shadow-sm flex items-center px-4 text-gray-700 font-medium">
+                <div className="h-12 rounded-xl bg-muted border-none shadow-sm flex items-center px-4 text-foreground font-medium">
                   {currentUserBranch?.name || 'Loading...'}
                 </div>
               )}
@@ -596,21 +596,23 @@ export default function EmployeeFormDialog({
 
           {/* ID Proof Section */}
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               ID Proof Document (Passport/Emirates ID)
             </label>
             <div
               className={`h-20 rounded-xl border-2 border-dashed flex items-center justify-between px-6 cursor-pointer transition-colors ${
                 idProof
-                  ? 'border-green-200 bg-green-50'
-                  : 'border-border bg-muted/50 hover:border-blue-200'
+                  ? 'border-success/30 bg-success/10'
+                  : 'border-border bg-muted/50 hover:border-primary/30'
               }`}
               onClick={() => idProofInputRef.current?.click()}
             >
               <div className="flex items-center gap-3">
-                <FileText className={`h-5 w-5 ${idProof ? 'text-green-500' : 'text-gray-400'}`} />
+                <FileText
+                  className={`h-5 w-5 ${idProof ? 'text-success' : 'text-muted-foreground'}`}
+                />
                 <span
-                  className={`text-sm ${idProof ? 'text-green-700 font-medium' : 'text-muted-foreground'}`}
+                  className={`text-sm ${idProof ? 'text-success font-medium' : 'text-muted-foreground'}`}
                 >
                   {idProof ? idProof.name : 'Click to upload ID proof'}
                 </span>
@@ -622,7 +624,7 @@ export default function EmployeeFormDialog({
                     e.stopPropagation();
                     setIdProof(null);
                   }}
-                  className="p-1 hover:bg-green-100 rounded-full text-green-700"
+                  className="p-1 hover:bg-success/10 rounded-full text-success"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -638,9 +640,9 @@ export default function EmployeeFormDialog({
           </div>
 
           {/* Legal Documents (Passport / Visa / Contract / License …) */}
-          <div className="space-y-3 border-t border-gray-100 pt-5">
+          <div className="space-y-3 border-t border-border pt-5">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Legal Documents
               </label>
               <Button
@@ -669,8 +671,8 @@ export default function EmployeeFormDialog({
                   key={doc.id}
                   className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm ${
                     pendingDelete
-                      ? 'border-red-100 bg-red-50/60 opacity-60'
-                      : 'border-gray-100 bg-muted/40'
+                      ? 'border-destructive/30 bg-destructive/10 opacity-60'
+                      : 'border-border bg-muted/40'
                   }`}
                 >
                   <div className="min-w-0">
@@ -687,12 +689,12 @@ export default function EmployeeFormDialog({
                         </span>
                       )}
                       {status === 'expired' && (
-                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                        <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold text-destructive">
                           EXPIRED
                         </span>
                       )}
                       {status === 'soon' && (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                        <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold text-warning">
                           EXPIRES SOON
                         </span>
                       )}
@@ -708,7 +710,7 @@ export default function EmployeeFormDialog({
                         href={doc.viewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                        className="rounded-full p-1.5 text-primary hover:bg-primary/10"
                         title="Open document"
                       >
                         <ExternalLink className="h-4 w-4" />
@@ -716,7 +718,7 @@ export default function EmployeeFormDialog({
                     )}
                     <button
                       type="button"
-                      className="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                      className="rounded-full p-1.5 text-destructive hover:bg-destructive/10"
                       title={pendingDelete ? 'Keep document' : 'Remove document'}
                       onClick={() =>
                         setDocsToDelete((prev) =>
@@ -735,15 +737,15 @@ export default function EmployeeFormDialog({
             {draftDocs.map((d) => (
               <div
                 key={d.tempId}
-                className="space-y-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/40 p-4"
+                className="space-y-3 rounded-xl border border-dashed border-primary/30 bg-primary/10 p-4"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
                     New document
                   </span>
                   <button
                     type="button"
-                    className="rounded-full p-1 text-gray-500 hover:bg-white"
+                    className="rounded-full p-1 text-muted-foreground hover:bg-card"
                     onClick={() =>
                       setDraftDocs((prev) => prev.filter((x) => x.tempId !== d.tempId))
                     }
@@ -753,7 +755,7 @@ export default function EmployeeFormDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Type *
                     </label>
                     <Select
@@ -762,7 +764,7 @@ export default function EmployeeFormDialog({
                         updateDraft(d.tempId, { docType: val as EmployeeDocumentType })
                       }
                     >
-                      <SelectTrigger className="h-10 rounded-lg bg-white text-sm">
+                      <SelectTrigger className="h-10 rounded-lg bg-card text-sm">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
@@ -775,61 +777,61 @@ export default function EmployeeFormDialog({
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Document No.
                     </label>
                     <Input
                       value={d.documentNumber}
                       onChange={(e) => updateDraft(d.tempId, { documentNumber: e.target.value })}
                       placeholder="e.g. A1234567"
-                      className="h-10 rounded-lg bg-white text-sm"
+                      className="h-10 rounded-lg bg-card text-sm"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Label
                     </label>
                     <Input
                       value={d.label}
                       onChange={(e) => updateDraft(d.tempId, { label: e.target.value })}
                       placeholder="Optional note"
-                      className="h-10 rounded-lg bg-white text-sm"
+                      className="h-10 rounded-lg bg-card text-sm"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Issue date
                       </label>
                       <Input
                         type="date"
                         value={d.issueDate}
                         onChange={(e) => updateDraft(d.tempId, { issueDate: e.target.value })}
-                        className="h-10 rounded-lg bg-white text-sm"
+                        className="h-10 rounded-lg bg-card text-sm"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Expiry date
                       </label>
                       <Input
                         type="date"
                         value={d.expiryDate}
                         onChange={(e) => updateDraft(d.tempId, { expiryDate: e.target.value })}
-                        className="h-10 rounded-lg bg-white text-sm"
+                        className="h-10 rounded-lg bg-card text-sm"
                       />
                     </div>
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     File *
                   </label>
                   <Input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png,.webp"
                     onChange={(e) => updateDraft(d.tempId, { file: e.target.files?.[0] ?? null })}
-                    className="h-10 rounded-lg bg-white text-sm file:mr-3 file:rounded file:border-0 file:bg-blue-100 file:px-2 file:py-1 file:text-xs file:font-semibold"
+                    className="h-10 rounded-lg bg-card text-sm file:mr-3 file:rounded file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-xs file:font-semibold"
                   />
                 </div>
               </div>
@@ -846,7 +848,7 @@ export default function EmployeeFormDialog({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>
@@ -857,7 +859,7 @@ export default function EmployeeFormDialog({
               disabled={isSubmitting}
               className={cn(
                 buttonVariants(),
-                'h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70',
+                'h-12 px-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70',
               )}
             >
               {initialData ? 'Update Employee' : 'Create Employee'}

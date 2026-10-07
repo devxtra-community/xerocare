@@ -32,15 +32,15 @@ import {
  */
 
 /** Surface colour the charts are drawn on — also the colour of the gaps between marks. */
-const SURFACE = '#ffffff';
+const SURFACE = 'var(--card)';
 
-const INK = '#0f172a';
-const INK_LABEL = '#475569';
-const INK_MUTED = '#64748b';
-const INK_FAINT = '#94a3b8';
+const INK = 'var(--foreground)';
+const INK_LABEL = 'var(--muted-foreground)';
+const INK_MUTED = 'var(--chart-slate-dark)';
+const INK_FAINT = 'var(--chart-slate)';
 
 /** One step off the surface. Hairline and solid: a dashed grid reads as a threshold. */
-const GRID_STROKE = '#eef2f6';
+const GRID_STROKE = 'var(--chart-grid)';
 
 /**
  * Bars are capped, never stretched to fill their slot. A five-bucket aging chart across
@@ -63,8 +63,8 @@ const CATEGORY_TICK = { fontSize: 11, fill: INK_LABEL } as const;
  */
 const NO_MOUNT_ANIMATION = { isAnimationActive: false } as const;
 
-const BAR_CURSOR = { fill: 'rgba(15,23,42,0.04)' } as const;
-const LINE_CURSOR = { stroke: '#cbd5e1', strokeWidth: 1 } as const;
+const BAR_CURSOR = { fill: 'color-mix(in srgb, var(--foreground) 4%, transparent)' } as const;
+const LINE_CURSOR = { stroke: 'var(--border)', strokeWidth: 1 } as const;
 
 /**
  * Legend labels in ink, not in the series colour.
@@ -85,17 +85,17 @@ const LEGEND_PROPS = {
 };
 
 const COLORS = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#06b6d4',
-  '#f97316',
-  '#84cc16',
-  '#ec4899',
-  '#64748b',
-  '#14b8a6',
+  'var(--chart-blue-mid)',
+  'var(--chart-profit)',
+  'var(--chart-expense)',
+  'var(--destructive)',
+  'var(--lease)',
+  'var(--info)',
+  'var(--rent)',
+  'var(--success)',
+  'var(--danger)',
+  'var(--chart-slate-dark)',
+  'var(--success)',
 ];
 
 /**
@@ -103,13 +103,13 @@ const COLORS = [
  *
  * It has to be a neutral (an "Other" bucket that wears an identity hue claims to be a
  * category), but it still shares a ring with slots 1-6, so it was run through the palette
- * validator alongside them: the first choice, `#94a3b8`, came back at deutan ΔE 4.6 and
+ * validator alongside them: the first choice, `var(--chart-slate)`, came back at deutan ΔE 4.6 and
  * normal-vision ΔE 10.2 against the cyan slot — indistinguishable from it. This step
  * clears both (worst adjacent pair 18.9 normal, and the categorical pairs unchanged at
  * 8.9 protan). The validator still reports it under the chroma floor, which is the check
  * that stops an identity hue from reading as gray; here reading as gray is the point.
  */
-const OTHER_COLOR = '#64748b';
+const OTHER_COLOR = 'var(--chart-slate-dark)';
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
 
@@ -270,7 +270,7 @@ function isBlank(values: number[]): boolean {
 
 function EmptyState() {
   return (
-    <div className="flex h-full items-center justify-center text-sm text-gray-400">
+    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
       No data available
     </div>
   );
@@ -331,9 +331,9 @@ function ChartTooltip({
     <div
       style={{
         background: SURFACE,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--chart-grid)',
         borderRadius: 10,
-        boxShadow: '0 6px 20px rgba(15,23,42,0.10)',
+        boxShadow: '0 6px 20px color-mix(in srgb, var(--foreground) 10%, transparent)',
         padding: '8px 10px',
         minWidth: 150,
       }}
@@ -346,7 +346,7 @@ function ChartTooltip({
             color: INK,
             marginBottom: 6,
             paddingBottom: 6,
-            borderBottom: '1px solid #f1f5f9',
+            borderBottom: '1px solid var(--muted)',
           }}
         >
           {prettyLabel(String(label))}
@@ -655,7 +655,7 @@ function CategoryTick(props: { x?: number; y?: number; payload?: { value?: strin
 export function HorizontalBarChart({
   data,
   height = 300,
-  color = '#3b82f6',
+  color = 'var(--chart-blue-mid)',
   currency = 'AED',
 }: HBarProps) {
   const fmt = makeFmt(currency);

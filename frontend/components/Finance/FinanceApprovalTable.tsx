@@ -114,12 +114,12 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     if (rentalItems.length > 0) {
       allocatedMachinesHtml = `
                 <div style="margin-bottom: 24px;">
-                    <h3 style="color: #1e40af; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">Allocated Equipment</h3>
+                    <h3 style="color: var(--primary); border-bottom: 1px solid var(--chart-grid); padding-bottom: 8px;">Allocated Equipment</h3>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
                         <thead>
-                            <tr style="background-color: #f3f4f6;">
-                                <th style="padding: 10px; text-align: left; font-size: 14px; border: 1px solid #e5e7eb;">Model Description</th>
-                                <th style="padding: 10px; text-align: left; font-size: 14px; border: 1px solid #e5e7eb;">Serial Number</th>
+                            <tr style="background-color: var(--muted);">
+                                <th style="padding: 10px; text-align: left; font-size: 14px; border: 1px solid var(--chart-grid);">Model Description</th>
+                                <th style="padding: 10px; text-align: left; font-size: 14px; border: 1px solid var(--chart-grid);">Serial Number</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -138,8 +138,8 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                                     );
                                     return `
                                     <tr>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb; font-size: 14px;">${item?.description || 'Equipment'}</td>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb; font-size: 14px; font-weight: bold;">${alloc.serialNumber}</td>
+                                        <td style="padding: 10px; border: 1px solid var(--chart-grid); font-size: 14px;">${item?.description || 'Equipment'}</td>
+                                        <td style="padding: 10px; border: 1px solid var(--chart-grid); font-size: 14px; font-weight: bold;">${alloc.serialNumber}</td>
                                     </tr>
                                 `;
                                   })
@@ -152,8 +152,8 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                                       ?.serial_no || 'Pending Allocation';
                                   return `
                                     <tr>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb; font-size: 14px;">${item.description}</td>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb; font-size: 14px; font-weight: bold;">${serialNo}</td>
+                                        <td style="padding: 10px; border: 1px solid var(--chart-grid); font-size: 14px;">${item.description}</td>
+                                        <td style="padding: 10px; border: 1px solid var(--chart-grid); font-size: 14px; font-weight: bold;">${serialNo}</td>
                                     </tr>
                                 `;
                                 })
@@ -170,10 +170,10 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     if (rules.length > 0) {
       pricingRulesHtml = `
                 <div style="margin-bottom: 24px;">
-                    <h3 style="color: #1e40af; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">Slabs & Usage Rates</h3>
+                    <h3 style="color: var(--primary); border-bottom: 1px solid var(--chart-grid); padding-bottom: 8px;">Slabs & Usage Rates</h3>
                     ${rules
                       .map((rule) => {
-                        let ruleHtml = `<div style="margin-top: 15px; padding: 15px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">`;
+                        let ruleHtml = `<div style="margin-top: 15px; padding: 15px; background-color: var(--muted); border: 1px solid var(--chart-grid); border-radius: 8px;">`;
                         ruleHtml += `<h4 style="margin: 0 0 10px 0;">${rule.description}</h4>`;
 
                         const renderRateTable = (
@@ -182,18 +182,18 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                           excessRate?: number,
                         ) => {
                           if (!slabs?.length && !excessRate) return '';
-                          let tbl = `<div style="margin-top: 10px;"><strong style="font-size: 13px; color: #4b5563;">${title} Rates:</strong>`;
+                          let tbl = `<div style="margin-top: 10px;"><strong style="font-size: 13px; color: var(--muted-foreground);">${title} Rates:</strong>`;
                           tbl += `<table style="width: 100%; border-collapse: collapse; margin-top: 5px;">`;
                           if (slabs && slabs.length > 0) {
                             slabs.forEach((s) => {
-                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${s.from} - ${s.to}</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${s.rate}</td></tr>`;
+                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid var(--chart-grid); font-size: 13px;">${s.from} - ${s.to}</td><td style="padding: 6px; border-bottom: 1px solid var(--chart-grid); font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${s.rate}</td></tr>`;
                             });
                             if (excessRate) {
                               const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
-                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">> ${maxTo}</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${excessRate}</td></tr>`;
+                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid var(--chart-grid); font-size: 13px;">> ${maxTo}</td><td style="padding: 6px; border-bottom: 1px solid var(--chart-grid); font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${excessRate}</td></tr>`;
                             }
                           } else if (excessRate) {
-                            tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">Base Rate</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${excessRate}</td></tr>`;
+                            tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid var(--chart-grid); font-size: 13px;">Base Rate</td><td style="padding: 6px; border-bottom: 1px solid var(--chart-grid); font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${excessRate}</td></tr>`;
                           }
                           tbl += `</table></div>`;
                           return tbl;
@@ -223,12 +223,12 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     }
 
     return `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
-                <h2 style="color: #111827;">Contract Details: ${invoice.invoiceNumber}</h2>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: var(--foreground);">
+                <h2 style="color: var(--foreground);">Contract Details: ${invoice.invoiceNumber}</h2>
                 <p>Dear <strong>${invoice.customerName}</strong>,</p>
                 <p>Please find the details of your service contract below. Kindly review the information and upload the signed confirmation document.</p>
                 
-                <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 24px;">
+                <div style="background-color: color-mix(in srgb, var(--success) 10%, transparent); padding: 20px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--success) 10%, transparent); margin-bottom: 24px;">
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr><td style="padding: 6px 0;"><strong>Contract Type:</strong></td><td style="padding: 6px 0;">${
                           invoice.saleType
@@ -260,7 +260,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 ${allocatedMachinesHtml}
                 ${pricingRulesHtml}
 
-                <p style="margin-top: 32px; font-size: 14px; color: #4b5563;">Thank you for your business. Please reach out if you have any questions.</p>
+                <p style="margin-top: 32px; font-size: 14px; color: var(--muted-foreground);">Thank you for your business. Please reach out if you have any questions.</p>
                 <p style="font-size: 14px;">Best regards,<br><strong>XeroCare Team</strong></p>
             </div>
         `;
@@ -379,7 +379,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                     <span
                       className={
                         inv.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED')
-                          ? 'text-rose-600'
+                          ? 'text-destructive'
                           : ''
                       }
                     >
@@ -400,7 +400,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                         if (cn.type === 'DIRECT_REFUND') label = 'CASH REFUND';
                         else if (cn.type === 'CREDIT_EXCHANGE') label = 'CREDIT RETURN';
                         return (
-                          <Badge className="w-fit bg-purple-100 text-purple-600 border-none text-[8px] h-3 px-1 mt-0.5">
+                          <Badge className="w-fit bg-lease/10 text-lease border-none text-[8px] h-3 px-1 mt-0.5">
                             {label}
                           </Badge>
                         );
@@ -411,14 +411,14 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-medium text-slate-800">{inv.customerName}</span>
+                    <span className="font-medium text-foreground">{inv.customerName}</span>
                     {(() => {
                       const completedExchange = inv.creditNotes?.find(
                         (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
                       );
                       if (completedExchange?.replacementProductName) {
                         return (
-                          <span className="text-[10px] text-violet-600 font-bold italic line-clamp-1">
+                          <span className="text-[10px] text-lease font-bold italic line-clamp-1">
                             {completedExchange.replacementProductName}
                           </span>
                         );
@@ -430,7 +430,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 <TableCell>
                   <Badge variant="outline">{inv.saleType}</Badge>
                 </TableCell>
-                <TableCell className="font-bold text-slate-900">
+                <TableCell className="font-bold text-foreground">
                   {(() => {
                     const completedExchange = inv.creditNotes?.find(
                       (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
@@ -438,10 +438,10 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                     if (completedExchange && Number(completedExchange.replacementAmount) > 0) {
                       return (
                         <div className="flex flex-col">
-                          <span className="text-violet-700">
+                          <span className="text-lease">
                             {formatCurrency(Number(completedExchange.replacementAmount), currency)}
                           </span>
-                          <span className="text-[9px] text-slate-400 font-normal line-through">
+                          <span className="text-[9px] text-muted-foreground font-normal line-through">
                             {formatCurrency(inv.totalAmount, currency)}
                           </span>
                         </div>
@@ -450,7 +450,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                     return formatCurrency(inv.totalAmount, currency);
                   })()}
                 </TableCell>
-                <TableCell className="text-blue-600 font-semibold">
+                <TableCell className="text-primary font-semibold">
                   {formatCurrency(inv.advanceAmount || 0, currency)}
                 </TableCell>
                 <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
@@ -465,8 +465,8 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                           disabled={sendingEmailId === inv.id}
                           className={
                             inv.emailSentAt
-                              ? 'border-green-200 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 gap-1.5 shadow-sm'
-                              : 'border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 gap-1.5 shadow-sm'
+                              ? 'border-success/30 bg-success/10 hover:bg-success/10 text-success hover:text-success gap-1.5 shadow-sm'
+                              : 'border-primary/30 bg-primary/10 hover:bg-primary/10 text-primary hover:text-primary gap-1.5 shadow-sm'
                           }
                           onClick={() => handleSendEmail(inv)}
                           title={
@@ -492,7 +492,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                         </Button>
                         <Button
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 shadow-sm"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/10 shadow-sm"
                           onClick={() => handleActivateClick(inv)}
                           title="Process Agreement"
                         >
@@ -502,7 +502,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                     ) : inv.status === 'EMPLOYEE_APPROVED' ? (
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5"
+                        className="bg-success hover:bg-success/90 text-success-foreground shadow-sm gap-1.5"
                         onClick={() => handleAccept(inv)}
                         title="Accept Transaction Pricing"
                       >
@@ -517,8 +517,8 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                           disabled={sendingEmailId === inv.id}
                           className={
                             inv.emailSentAt
-                              ? 'border-green-200 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 gap-1.5 shadow-sm'
-                              : 'border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 gap-1.5 shadow-sm'
+                              ? 'border-success/30 bg-success/10 hover:bg-success/10 text-success hover:text-success gap-1.5 shadow-sm'
+                              : 'border-primary/30 bg-primary/10 hover:bg-primary/10 text-primary hover:text-primary gap-1.5 shadow-sm'
                           }
                           onClick={() => handleSendEmail(inv)}
                           title={
@@ -544,7 +544,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                         </Button>
                         <Button
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 shadow-sm"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/10 shadow-sm"
                           onClick={() => handleActivateClick(inv)}
                           title="Upload Confirmation & Activate"
                         >
@@ -556,7 +556,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                       inv.contractStatus !== 'ACTIVE' ? (
                       <Button
                         size="sm"
-                        className="bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200 shadow-sm"
+                        className="bg-warning hover:bg-warning/90 text-warning-foreground shadow-warning/10 shadow-sm"
                         onClick={() => handleAllocateClick(inv)}
                         title="Allocate Machines"
                       >
@@ -565,7 +565,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                     ) : (
                       <Badge
                         variant="outline"
-                        className="bg-green-50 text-green-700 border-green-200"
+                        className="bg-success/10 text-success border-success/30"
                       >
                         Processed
                       </Badge>

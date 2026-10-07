@@ -112,20 +112,20 @@ export default function CardSettlementsReport() {
   return (
     <div className="space-y-5 p-6">
       <div>
-        <h1 className="flex items-center gap-2 text-xl font-black text-slate-800">
-          <Landmark size={20} className="text-indigo-600" />
+        <h1 className="flex items-center gap-2 text-xl font-medium text-foreground">
+          <Landmark size={20} className="text-primary" />
           Card Settlements
         </h1>
-        <p className="mt-1 max-w-3xl text-xs font-medium text-slate-500">
+        <p className="mt-1 max-w-3xl text-xs font-medium text-muted-foreground">
           What customers paid by card, what the acquirer&apos;s commission took, and what should
           therefore have reached the bank. Group totals are per settlement day, so a single deposit
           on the bank statement can be matched to the receipts behind it.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted p-4 md:grid-cols-6">
         <div>
-          <Label className="text-[10px] font-black uppercase text-slate-400">From</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">From</Label>
           <Input
             type="date"
             className="mt-1 h-9"
@@ -134,7 +134,7 @@ export default function CardSettlementsReport() {
           />
         </div>
         <div>
-          <Label className="text-[10px] font-black uppercase text-slate-400">To</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">To</Label>
           <Input
             type="date"
             className="mt-1 h-9"
@@ -143,12 +143,14 @@ export default function CardSettlementsReport() {
           />
         </div>
         <div>
-          <Label className="text-[10px] font-black uppercase text-slate-400">Card Type</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">
+            Card Type
+          </Label>
           <Select
             value={cardType || 'ALL'}
             onValueChange={(v) => setCardType(v === 'ALL' ? '' : v)}
           >
-            <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+            <SelectTrigger className="mt-1 h-9 bg-card text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -161,12 +163,12 @@ export default function CardSettlementsReport() {
           </Select>
         </div>
         <div>
-          <Label className="text-[10px] font-black uppercase text-slate-400">Network</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">Network</Label>
           <Select
             value={cardNetwork || 'ALL'}
             onValueChange={(v) => setCardNetwork(v === 'ALL' ? '' : v)}
           >
-            <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+            <SelectTrigger className="mt-1 h-9 bg-card text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -180,12 +182,12 @@ export default function CardSettlementsReport() {
           </Select>
         </div>
         <div>
-          <Label className="text-[10px] font-black uppercase text-slate-400">Country</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">Country</Label>
           <Select
             value={issuerCountry || 'ALL'}
             onValueChange={(v) => setIssuerCountry(v === 'ALL' ? '' : v)}
           >
-            <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+            <SelectTrigger className="mt-1 h-9 bg-card text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -199,9 +201,12 @@ export default function CardSettlementsReport() {
           </Select>
         </div>
         <div>
-          <Label className="text-[10px] font-black uppercase text-slate-400">Search</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">Search</Label>
           <div className="relative mt-1">
-            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search
+              size={13}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               className="h-9 pl-7"
               placeholder="Bank, invoice, ref, ••••1234"
@@ -244,22 +249,22 @@ export default function CardSettlementsReport() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 py-16 text-sm text-slate-400">
+        <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
           <Loader2 size={16} className="animate-spin" /> Loading settlements…
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-          <CreditCard size={22} className="mx-auto mb-2 text-slate-400" />
-          <p className="text-sm font-bold text-slate-600">No card settlements in this period</p>
+        <div className="rounded-xl border border-dashed border-border bg-muted p-10 text-center">
+          <CreditCard size={22} className="mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm font-bold text-foreground">No card settlements in this period</p>
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full min-w-[640px] text-sm">
-              <caption className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
+              <caption className="border-b border-border bg-muted px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 By settlement day — match these against your bank deposits
               </caption>
-              <thead className="bg-white text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <thead className="bg-card text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-right">Receipts</th>
@@ -268,16 +273,16 @@ export default function CardSettlementsReport() {
                   <th className="px-3 py-2 text-right">Expected Deposit</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {days.map((d) => (
                   <tr key={d.date}>
-                    <td className="px-3 py-2 font-bold text-slate-700">{d.date}</td>
+                    <td className="px-3 py-2 font-bold text-foreground">{d.date}</td>
                     <td className="px-3 py-2 text-right">{d.count}</td>
                     <td className="px-3 py-2 text-right font-mono">{fmt(d.gross)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-red-600">
+                    <td className="px-3 py-2 text-right font-mono text-destructive">
                       −{fmt(d.commission)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono font-black text-emerald-700">
+                    <td className="px-3 py-2 text-right font-mono font-black text-success">
                       {fmt(d.net)}
                     </td>
                   </tr>
@@ -286,9 +291,9 @@ export default function CardSettlementsReport() {
             </table>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full min-w-[1000px] text-sm">
-              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500">
+              <thead className="bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Invoice</th>
@@ -301,34 +306,34 @@ export default function CardSettlementsReport() {
                   <th className="px-3 py-2 text-right">Net</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="px-3 py-2 text-xs font-bold text-slate-600">
+                    <td className="px-3 py-2 text-xs font-bold text-foreground">
                       {new Date(r.transactionDate).toLocaleDateString('en-GB')}
                     </td>
-                    <td className="px-3 py-2 font-bold text-slate-700">{r.invoiceNumber}</td>
+                    <td className="px-3 py-2 font-bold text-foreground">{r.invoiceNumber}</td>
                     <td className="px-3 py-2 text-xs">
-                      <span className="font-bold text-slate-700">{r.issuerBank ?? '—'}</span>
-                      <span className="block text-slate-400">
+                      <span className="font-bold text-foreground">{r.issuerBank ?? '—'}</span>
+                      <span className="block text-muted-foreground">
                         {r.cardNetwork} {r.cardType === 'DEBIT' ? 'Debit' : 'Credit'}
                         {r.cardLast4 ? ` ••••${r.cardLast4}` : ''}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-xs uppercase text-slate-600">
+                    <td className="px-3 py-2 text-xs uppercase text-foreground">
                       {r.cardHolderName ?? '—'}
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
                       {r.transactionReference ?? '—'}
                     </td>
                     <td className="px-3 py-2 text-right font-mono">{fmt(r.gross)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs text-slate-500">
+                    <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                       {r.ratePercent != null ? `${Number(r.ratePercent)}%` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-red-600">
+                    <td className="px-3 py-2 text-right font-mono text-destructive">
                       −{fmt(r.commission)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono font-black text-emerald-700">
+                    <td className="px-3 py-2 text-right font-mono font-black text-success">
                       {fmt(r.net ?? r.gross)}
                     </td>
                   </tr>

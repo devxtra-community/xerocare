@@ -25,6 +25,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 
 type DateRange = 'all' | 'today' | 'last_7' | 'last_30' | 'this_month' | 'last_month' | 'custom';
 
@@ -62,21 +64,30 @@ export default function APInvoiceListPage() {
       return dateMatch && searchMatch;
     });
   }, [search, dateRange, fromDate, toDate]);
+  const invoicePaging = useTablePagination(
+    filteredInvoices,
+    `${search}|${dateRange}|${fromDate}|${toDate}`,
+    10,
+  );
 
   // Analytics Logic
   const totalPayable = filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
   const pendingApproval = filteredInvoices.filter((i) => i.status === 'Pending_Approval').length;
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 bg-muted/50/50 min-h-screen">
+    <div className="p-4 sm:p-8 space-y-8 bg-muted/50 min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Vendor Invoices</h1>
+          <h1 className="text-xl sm:text-2xl font-medium tracking-tight text-foreground">
+            Vendor Invoices
+          </h1>
           <p className="text-sm text-muted-foreground">
             Manage accounts payable and vendor obligations.
           </p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white">Record Vendor Invoice</Button>
+        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          Record Vendor Invoice
+        </Button>
       </div>
 
       {/* 1. AP Quick Insights */}
@@ -85,19 +96,19 @@ export default function APInvoiceListPage() {
           title="Total Payables"
           value={totalPayable}
           currency={currency}
-          icon={<ArrowDownLeft className="text-blue-600" />}
+          icon={<ArrowDownLeft className="text-primary" />}
         />
         <StatsCard
           title="Pending Approval"
           value={pendingApproval}
           isCount
-          icon={<Clock className="text-amber-600" />}
+          icon={<Clock className="text-warning" />}
         />
         <StatsCard
           title="Avg. Payment Term"
           value="14 Days"
           isText
-          icon={<Calendar className="text-slate-600" />}
+          icon={<Calendar className="text-foreground" />}
         />
       </div>
 
@@ -108,7 +119,7 @@ export default function APInvoiceListPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by vendor or invoice #..."
-              className="pl-10 bg-muted/50/50 border-none"
+              className="pl-10 bg-muted/50 border-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -150,7 +161,7 @@ export default function APInvoiceListPage() {
       {/* 3. Invoice Table */}
       <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-muted/50/50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="pl-6">Invoice & Vendor</TableHead>
               <TableHead>Dates</TableHead>
@@ -166,16 +177,16 @@ export default function APInvoiceListPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInvoices.map((inv) => {
+              invoicePaging.pageRows.map((inv) => {
                 const vendor = vendors.find((v) => v.id === inv.vendorId);
                 return (
                   <TableRow
                     key={inv.id}
-                    className="group cursor-pointer hover:bg-muted/50/50 transition-colors"
+                    className="group cursor-pointer hover:bg-muted/50 transition-colors"
                   >
                     <TableCell className="pl-6 py-4">
                       <Link href={`/finance/ap/invoices/${inv.id}`} className="block">
-                        <div className="font-bold text-foreground group-hover:text-blue-600 transition-colors flex items-center gap-2">
+                        <div className="font-bold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
                           {inv.invoiceNumber}
                           <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -185,7 +196,7 @@ export default function APInvoiceListPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm font-medium text-slate-700">
+                      <div className="text-sm font-medium text-foreground">
                         Issued: {inv.invoiceDate}
                       </div>
                       <div className="text-[11px] text-muted-foreground">Due: {inv.dueDate}</div>
@@ -207,6 +218,15 @@ export default function APInvoiceListPage() {
             )}
           </TableBody>
         </Table>
+        {filteredInvoices.length > 0 && (
+          <Pagination
+            page={invoicePaging.page}
+            totalPages={invoicePaging.totalPages}
+            total={invoicePaging.total}
+            limit={invoicePaging.pageSize}
+            onPageChange={invoicePaging.setPage}
+          />
+        )}
       </div>
     </div>
   );
@@ -225,7 +245,7 @@ interface StatsCardProps {
 
 function StatsCard({ title, value, icon, currency, isText }: StatsCardProps) {
   return (
-    <Card className="border-none shadow-sm ring-1 ring-slate-200">
+    <Card className="border-none shadow-sm ring-1 ring-ring">
       <CardContent className="p-6 flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -236,7 +256,7 @@ function StatsCard({ title, value, icon, currency, isText }: StatsCardProps) {
             {isText ? value : value.toLocaleString()}
           </p>
         </div>
-        <div className="h-12 w-12 bg-muted/50 rounded-2xl flex items-center justify-center border border-slate-100">
+        <div className="h-12 w-12 bg-muted/50 rounded-2xl flex items-center justify-center border border-border">
           {icon}
         </div>
       </CardContent>

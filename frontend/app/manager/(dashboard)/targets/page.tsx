@@ -195,10 +195,10 @@ export default function ManagerTargetsPage() {
     <div className="min-h-full p-6 space-y-6">
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" /> Branch Achievement Dashboard
           </h1>
-          <p className="text-sm text-gray-500">Monthly targets and incentive tracking</p>
+          <p className="text-sm text-muted-foreground">Monthly targets and incentive tracking</p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -248,8 +248,8 @@ export default function ManagerTargetsPage() {
         {/* ALL EMPLOYEES — every branch employee, sales/rent/lease done this
             month even if no target was ever assigned to them. */}
         <TabsContent value="activity" className="mt-4">
-          <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden">
-            <Table>
+          <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -323,8 +323,8 @@ export default function ManagerTargetsPage() {
             </Button>
           </div>
 
-          <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden">
-            <Table>
+          <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -389,15 +389,15 @@ export default function ManagerTargetsPage() {
                           {Number(r.achievement.achievementPercent).toFixed(1)}%
                         </TableCell>
                         <TableCell>{Number(r.achievement.appliedTierPercent)}%</TableCell>
-                        <TableCell className="font-semibold text-emerald-600">
+                        <TableCell className="font-semibold text-success">
                           {formatCurrency(r.achievement.incentiveAmount, r.target.currencyCode)}
                         </TableCell>
                         <TableCell>
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               r.achievement.isFinalized
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-amber-100 text-amber-700'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-warning/10 text-warning'
                             }`}
                           >
                             {r.achievement.isFinalized ? 'Finalized' : 'Live'}
@@ -414,7 +414,7 @@ export default function ManagerTargetsPage() {
           {rows.length > 0 && (
             <div className="text-sm text-muted-foreground">
               Total incentive for {month}:{' '}
-              <span className="font-semibold text-emerald-600">
+              <span className="font-semibold text-success">
                 {formatCurrency(totalIncentive, rows[0]?.target.currencyCode)}
               </span>
             </div>
@@ -423,8 +423,8 @@ export default function ManagerTargetsPage() {
 
         {/* LEADERBOARD — targeted employees ranked by achievement %. */}
         <TabsContent value="leaderboard" className="mt-4">
-          <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden">
-            <Table>
+          <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-14">Rank</TableHead>
@@ -468,11 +468,11 @@ export default function ManagerTargetsPage() {
                           <span
                             className={`font-bold ${
                               r.rank === 1
-                                ? 'text-amber-500'
+                                ? 'text-warning'
                                 : r.rank === 2
-                                  ? 'text-slate-400'
+                                  ? 'text-muted-foreground'
                                   : r.rank === 3
-                                    ? 'text-orange-700'
+                                    ? 'text-warning'
                                     : 'text-muted-foreground'
                             }`}
                           >
@@ -496,7 +496,7 @@ export default function ManagerTargetsPage() {
                         <TableCell className="font-semibold">
                           {Number(r.achievement.achievementPercent).toFixed(1)}%
                         </TableCell>
-                        <TableCell className="font-semibold text-emerald-600">
+                        <TableCell className="font-semibold text-success">
                           {formatCurrency(r.achievement.incentiveAmount, r.target.currencyCode)}
                         </TableCell>
                       </TableRow>

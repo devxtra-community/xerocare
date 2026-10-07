@@ -526,17 +526,17 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-4 pt-4">
         <div className="relative w-full sm:w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search vendors..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm transition-all"
+            className="pl-9 h-10 bg-card border-primary/30 focus:border-primary/30 focus:ring-4 focus:ring-primary/30 outline-none shadow-sm transition-all"
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <Button
-            className="bg-primary text-white gap-2"
+            className="bg-primary text-primary-foreground gap-2"
             onClick={() => {
               setEditingVendor(null);
               setFormOpen(true);
@@ -569,11 +569,11 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                   className: 'font-semibold text-[11px] text-primary uppercase',
                   cell: (v: Vendor) =>
                     v.branchName ? (
-                      <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
+                      <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-muted text-foreground">
                         {v.branchName}
                       </span>
                     ) : (
-                      <span className="text-[10px] font-bold uppercase text-gray-400">
+                      <span className="text-[10px] font-bold uppercase text-muted-foreground">
                         Unassigned
                       </span>
                     ),
@@ -609,7 +609,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                 <span className="font-bold text-primary">
                   {formatCurrency(primaryAmount, branchCurrency)}
                   {!isDomestic && (
-                    <span className="block text-[10px] font-normal text-slate-400">
+                    <span className="block text-[10px] font-normal text-muted-foreground">
                       {isMulti
                         ? '(multi-currency)'
                         : `(${formatCurrency(v.purchaseValue, singleForeign!)})`}
@@ -629,7 +629,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
               const isMulti = codes.length > 1;
               if (isDomestic) {
                 return (
-                  <span className="font-bold text-red-600">
+                  <span className="font-bold text-destructive">
                     {formatCurrency(v.outstandingAmount, branchCurrency)}
                   </span>
                 );
@@ -642,15 +642,15 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
               );
               if (converted === null) {
                 return (
-                  <span className="font-bold text-red-600">
+                  <span className="font-bold text-destructive">
                     {formatCurrency(v.outstandingAmount, v.currency)}
                   </span>
                 );
               }
               return (
-                <span className="font-bold text-red-600">
+                <span className="font-bold text-destructive">
                   {formatCurrency(converted, branchCurrency)}
-                  <span className="block text-[10px] font-normal text-slate-400">
+                  <span className="block text-[10px] font-normal text-muted-foreground">
                     {isMulti
                       ? '(multi-currency)'
                       : `(${formatCurrency(v.outstandingAmount, v.currency)})`}
@@ -667,12 +667,12 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
               <span
                 className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ${
                   v.status === 'Active'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-yellow-100 text-yellow-700'
+                    ? 'bg-success/10 text-success'
+                    : 'bg-warning/10 text-warning'
                 }`}
               >
                 <span
-                  className={`h-1.5 w-1.5 rounded-full ${v.status === 'Active' ? 'bg-green-600' : 'bg-yellow-600'}`}
+                  className={`h-1.5 w-1.5 rounded-full ${v.status === 'Active' ? 'bg-success' : 'bg-warning'}`}
                 />
                 {v.status}
               </span>
@@ -687,7 +687,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                   onClick={() => router.push(`${basePath}/vendors/${v.id}`)}
                 >
                   <Eye className="h-4 w-4" />
@@ -695,7 +695,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-slate-700 hover:bg-slate-100"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                   onClick={() => {
                     setEditingVendor(v);
                     setFormOpen(true);
@@ -706,7 +706,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
+                  className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                   title="Create RFQ"
                   onClick={() => router.push(`${basePath}/rfqs/create?vendorId=${v.id}`)}
                 >
@@ -715,7 +715,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setDeleteVendorTarget(v)}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -965,7 +965,7 @@ export function VendorFormModal({
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-none border border-slate-200 shadow-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-none border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-primary">
             {initialData ? 'Update Vendor' : 'Add Vendor'}
@@ -975,7 +975,7 @@ export function VendorFormModal({
         <div className="space-y-7 pt-4">
           {/* ── Basic Information ─────────────────────────────────────── */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+            <div className="flex items-center gap-2 pb-1 border-b border-border">
               <User size={14} className="text-primary" />
               <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
                 Basic Information
@@ -983,7 +983,7 @@ export function VendorFormModal({
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               <div className="col-span-2 space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Vendor Name
                 </label>
                 <Input
@@ -995,7 +995,7 @@ export function VendorFormModal({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Contact Person
                 </label>
                 <Input
@@ -1007,7 +1007,7 @@ export function VendorFormModal({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Email
                 </label>
                 <Input
@@ -1022,14 +1022,14 @@ export function VendorFormModal({
 
           {/* ── Location ──────────────────────────────────────────────── */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+            <div className="flex items-center gap-2 pb-1 border-b border-border">
               <MapPin size={14} className="text-primary" />
               <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Location</h4>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               {/* Country combobox */}
               <div className="col-span-2 space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Country
                 </label>
                 <Popover
@@ -1074,7 +1074,7 @@ export function VendorFormModal({
                                   form.countryCode === c.code ? 'opacity-100' : 'opacity-0',
                                 )}
                               />
-                              <span className="font-mono text-xs text-gray-400 w-8 shrink-0">
+                              <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">
                                 {c.code}
                               </span>
                               <span className="truncate">{c.name}</span>
@@ -1091,7 +1091,7 @@ export function VendorFormModal({
               {countryCode && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       {stateLabel}
                     </label>
                     {states.length > 0 ? (
@@ -1128,7 +1128,7 @@ export function VendorFormModal({
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       City
                     </label>
                     {cities.length > 0 ? (
@@ -1170,14 +1170,14 @@ export function VendorFormModal({
                 country has to be picked before the number can be entered.
               */}
               <div className="col-span-2 space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Phone{' '}
-                  <span className="text-blue-400 normal-case font-normal">
+                  <span className="text-primary normal-case font-normal">
                     (code auto from country)
                   </span>
                 </label>
                 <div className="flex h-11 rounded-xl bg-card border shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20">
-                  <div className="flex items-center px-3 bg-blue-50 border-r border-blue-100 text-xs font-mono font-bold text-blue-600 whitespace-nowrap shrink-0 min-w-[52px] justify-center">
+                  <div className="flex items-center px-3 bg-primary/10 border-r border-primary/30 text-xs font-mono font-bold text-primary whitespace-nowrap shrink-0 min-w-[52px] justify-center">
                     {form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
                       ? COUNTRY_DIAL_CODES[form.countryCode]
                       : '+--'}
@@ -1191,7 +1191,7 @@ export function VendorFormModal({
                     }
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="flex-1 h-full px-3 bg-transparent text-sm outline-none placeholder:text-gray-300"
+                    className="flex-1 h-full px-3 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   />
                 </div>
               </div>
@@ -1200,7 +1200,7 @@ export function VendorFormModal({
 
           {/* ── Currency & Tax ────────────────────────────────────────── */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+            <div className="flex items-center gap-2 pb-1 border-b border-border">
               <Landmark size={14} className="text-primary" />
               <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
                 Currency & Tax
@@ -1209,9 +1209,9 @@ export function VendorFormModal({
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               {/* Currency (auto-filled, manually overridable) */}
               <div className="col-span-2 space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Currency{' '}
-                  <span className="text-blue-400 normal-case font-normal">(auto from country)</span>
+                  <span className="text-primary normal-case font-normal">(auto from country)</span>
                 </label>
                 <Input
                   placeholder="e.g. QAR, USD, INR"
@@ -1227,7 +1227,7 @@ export function VendorFormModal({
                   staff for something their business does not have. */}
               {hasTax && (
                 <div className="col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     {taxName} Number
                   </label>
                   <input
@@ -1246,7 +1246,7 @@ export function VendorFormModal({
 
           {/* ── Account Settings ──────────────────────────────────────── */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+            <div className="flex items-center gap-2 pb-1 border-b border-border">
               <Settings size={14} className="text-primary" />
               <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
                 Account Settings
@@ -1256,7 +1256,7 @@ export function VendorFormModal({
               {/* Branch (admin only — managers' vendors are pinned to their own branch) */}
               {isAdmin && (
                 <div className={isAdmin ? 'space-y-2' : 'col-span-2 space-y-2'}>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Branch
                   </label>
                   <Select
@@ -1281,7 +1281,7 @@ export function VendorFormModal({
               )}
 
               <div className={isAdmin ? 'space-y-2' : 'col-span-2 space-y-2'}>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Status
                 </label>
                 <Select
@@ -1303,7 +1303,7 @@ export function VendorFormModal({
           {/* Bank Accounts Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Bank Accounts ({form.bankAccounts.length})
               </label>
               {!addingBank && (
@@ -1311,7 +1311,7 @@ export function VendorFormModal({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-7 text-[11px] gap-1 border-blue-200 text-blue-700"
+                  className="h-7 text-[11px] gap-1 border-primary/30 text-primary"
                   onClick={() => {
                     setAddingBank(true);
                     setEditingBankIndex(null);
@@ -1333,28 +1333,28 @@ export function VendorFormModal({
                 {form.bankAccounts.map((acc, idx) => (
                   <div
                     key={idx}
-                    className={`flex items-start gap-3 p-3 rounded-xl border ${acc.isPrimary ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 bg-card'}`}
+                    className={`flex items-start gap-3 p-3 rounded-xl border ${acc.isPrimary ? 'border-primary/30 bg-primary/10' : 'border-border bg-card'}`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-foreground">{acc.bankName}</span>
                         {acc.isPrimary && (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase">
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">
                             Primary
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
+                      <p className="text-[11px] text-muted-foreground">{acc.accountHolderName}</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                        <p className="text-[11px] font-mono text-foreground">{acc.accountNumber}</p>
                         {acc.accountType && (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-lease/10 text-lease">
                             {acc.accountType}
                           </span>
                         )}
                       </div>
                       {(acc.swiftCode || acc.iban || acc.address) && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
                           {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
                           {acc.iban && ` • ${getBankCodeLabel(acc.bankCountry)}: ${acc.iban}`}
                           {acc.address && ` • ${acc.address}`}
@@ -1370,7 +1370,7 @@ export function VendorFormModal({
                           setEditingBankIndex(idx);
                           setAddingBank(true);
                         }}
-                        className="p-1 rounded-lg hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-1 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -1379,7 +1379,7 @@ export function VendorFormModal({
                           type="button"
                           title="Set as primary"
                           onClick={() => setPrimary(idx)}
-                          className="p-1 rounded-lg hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
+                          className="p-1 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
                         >
                           <Star className="h-3.5 w-3.5" />
                         </button>
@@ -1388,7 +1388,7 @@ export function VendorFormModal({
                         type="button"
                         title="Remove account"
                         onClick={() => removeBankAccount(idx)}
-                        className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                       >
                         <Trash className="h-3.5 w-3.5" />
                       </button>
@@ -1400,12 +1400,12 @@ export function VendorFormModal({
 
             {/* Add bank account inline form */}
             {addingBank && (
-              <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/30 space-y-3">
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+              <div className="border border-primary/30 rounded-xl p-4 bg-primary/10 space-y-3">
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wider">
                   {editingBankIndex !== null ? 'Edit Bank Account' : 'New Bank Account'}
                 </p>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
                     Bank Country *
                   </label>
                   <SearchableSelect
@@ -1438,7 +1438,7 @@ export function VendorFormModal({
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Account Beneficiary *
                     </label>
                     <Input
@@ -1451,7 +1451,7 @@ export function VendorFormModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Account Number *
                     </label>
                     <Input
@@ -1464,7 +1464,7 @@ export function VendorFormModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Account Type
                     </label>
                     <Select
@@ -1487,7 +1487,7 @@ export function VendorFormModal({
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       SWIFT / BIC
                     </label>
                     <Input
@@ -1498,7 +1498,7 @@ export function VendorFormModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Bank Address
                     </label>
                     <Input
@@ -1509,7 +1509,7 @@ export function VendorFormModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
                       Currency
                     </label>
                     <SearchableSelect
@@ -1531,7 +1531,7 @@ export function VendorFormModal({
                         }
                         className="rounded"
                       />
-                      <span className="text-xs font-semibold text-gray-600">
+                      <span className="text-xs font-semibold text-foreground">
                         Set as primary account
                       </span>
                     </label>
@@ -1559,12 +1559,12 @@ export function VendorFormModal({
             )}
           </div>
 
-          <div className="flex justify-end items-center gap-6 pt-4 border-t border-gray-100">
+          <div className="flex justify-end items-center gap-6 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors disabled:opacity-50"
+              className="text-sm font-bold text-foreground hover:text-foreground transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

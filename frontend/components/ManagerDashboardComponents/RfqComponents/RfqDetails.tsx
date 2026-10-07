@@ -341,19 +341,19 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   };
 
   if (loading && !rfq) return <div className="p-8 text-center animate-pulse">Loading RFQ...</div>;
-  if (!rfq) return <div className="p-8 text-center text-red-500">RFQ Not Found</div>;
+  if (!rfq) return <div className="p-8 text-center text-destructive">RFQ Not Found</div>;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[600px]">
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col min-h-[600px]">
       {/* Header */}
-      <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="p-4 sm:p-6 border-b border-border bg-muted/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(`${basePath}/rfqs`)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-xl font-bold text-slate-800">{rfq.rfq_number}</h3>
+              <h3 className="text-xl font-medium text-foreground">{rfq.rfq_number}</h3>
               <Badge
                 variant={
                   rfq.status === RfqStatus.DRAFT
@@ -366,7 +366,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 {rfq.status.replace('_', ' ')}
               </Badge>
             </div>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Created {new Date(rfq.created_at).toLocaleDateString()}
             </p>
           </div>
@@ -386,7 +386,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                   toast.error('Failed to download Excel', { id: 'download' });
                 }
               }}
-              className="bg-white text-slate-700 border-slate-300"
+              className="bg-card text-foreground border-border"
             >
               <Download className="mr-2 h-4 w-4" />
               Download Excel
@@ -396,7 +396,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             <Button
               variant="outline"
               onClick={() => router.push(`${basePath}/rfqs/create?edit=${id}`)}
-              className="bg-white text-slate-700 border-slate-300"
+              className="bg-card text-foreground border-border"
             >
               <Pencil className="mr-2 h-4 w-4" />
               Edit
@@ -405,7 +405,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           {rfq.status === RfqStatus.DRAFT && (
             <LoadingButton
               onClick={handleSendRfq}
-              className={cn(buttonVariants(), 'bg-blue-600 hover:bg-blue-700 min-w-[120px]')}
+              className={cn(buttonVariants(), 'bg-primary hover:bg-primary/90 min-w-[120px]')}
               loading={sendLoading}
               loadingText="Sending..."
               disabled={sendLoading}
@@ -417,7 +417,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           {rfq.status === RfqStatus.AWARDED && (
             <LoadingButton
               onClick={() => handleCreateLot()}
-              className={cn(buttonVariants(), 'bg-green-600 hover:bg-green-700 min-w-[130px]')}
+              className={cn(buttonVariants(), 'bg-success hover:bg-success/90 min-w-[130px]')}
               loading={lotLoading}
               loadingText="Creating..."
               disabled={lotLoading}
@@ -430,9 +430,9 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 px-6 flex gap-6">
+      <div className="border-b border-border px-6 flex gap-6">
         <button
-          className={`py-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'items' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`py-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'items' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
           onClick={() => setActiveTab('items')}
         >
           Requested Items{' '}
@@ -441,7 +441,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           </Badge>
         </button>
         <button
-          className={`py-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'vendors' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`py-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'vendors' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
           onClick={() => setActiveTab('vendors')}
         >
           Vendors{' '}
@@ -451,7 +451,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         </button>
         {comparison && (
           <button
-            className={`py-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'comparison' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`py-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'comparison' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
             onClick={() => setActiveTab('comparison')}
           >
             Compare Quotes
@@ -460,13 +460,13 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
       </div>
 
       {/* Content */}
-      <div className="p-6 flex-1 bg-slate-50/30">
+      <div className="p-6 flex-1 bg-muted/30">
         {/* ITEMS TAB */}
         {activeTab === 'items' && (
           <div className="grid gap-4">
-            <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="bg-card border rounded-lg overflow-hidden">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 border-b text-slate-600 font-medium">
+                <thead className="bg-muted border-b text-foreground font-medium">
                   <tr>
                     <th className="px-6 py-3">Requested Item</th>
                     <th className="px-6 py-3">Brand / Model</th>
@@ -476,15 +476,15 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 </thead>
                 <tbody className="divide-y">
                   {(rfq.items as Record<string, unknown>[]).map((item: Record<string, unknown>) => (
-                    <tr key={item.id as string} className="hover:bg-slate-50/50">
+                    <tr key={item.id as string} className="hover:bg-muted/50">
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800">{getItemName(item)}</div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        <div className="font-semibold text-foreground">{getItemName(item)}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
                           {(item.model_id || item.spare_part_id || item.product_id) as string}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-slate-600">
+                        <div className="text-sm font-medium text-foreground">
                           {getBrandName(item)}
                         </div>
                       </td>
@@ -493,14 +493,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                           {item.item_type as string}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-700">
+                      <td className="px-6 py-4 text-right font-bold text-foreground">
                         {item.quantity as number}
                       </td>
                     </tr>
                   ))}
                   {(!rfq.items || rfq.items.length === 0) && (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                      <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
                         No items found
                       </td>
                     </tr>
@@ -517,23 +517,23 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             {(rfq.vendors as Record<string, unknown>[]).map((v: Record<string, unknown>) => (
               <div
                 key={v.id as string}
-                className={`p-5 rounded-xl border bg-white shadow-sm flex flex-col gap-4 relative overflow-hidden ${v.status === 'AWARDED' ? 'ring-2 ring-primary border-transparent' : ''}`}
+                className={`p-5 rounded-xl border bg-card shadow-sm flex flex-col gap-4 relative overflow-hidden ${v.status === 'AWARDED' ? 'ring-2 ring-primary border-transparent' : ''}`}
               >
                 {v.status === 'AWARDED' && (
-                  <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider">
+                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider">
                     Awarded
                   </div>
                 )}
                 <div>
-                  <h4 className="font-semibold text-slate-800 text-lg line-clamp-1">
+                  <h4 className="font-semibold text-foreground text-lg line-clamp-1">
                     {((v.vendor as Record<string, unknown>)?.name as string) || 'Unknown Vendor'}
                   </h4>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     {(v.vendor as Record<string, unknown>)?.email as string}
                   </p>
                 </div>
-                <div className="flex justify-between items-center py-3 border-y border-dashed border-slate-200">
-                  <span className="text-sm text-slate-500">Quote Status</span>
+                <div className="flex justify-between items-center py-3 border-y border-dashed border-border">
+                  <span className="text-sm text-muted-foreground">Quote Status</span>
                   <Badge
                     variant={
                       v.status === 'QUOTED' || v.status === 'AWARDED' ? 'default' : 'secondary'
@@ -544,8 +544,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 </div>
                 {!!(v as { total_quoted_amount?: number }).total_quoted_amount && (
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-slate-600">Total Quote</span>
-                    <span className="text-lg font-bold text-slate-900">
+                    <span className="text-sm font-medium text-foreground">Total Quote</span>
+                    <span className="text-lg font-bold text-foreground">
                       {formatCurrency(
                         v.total_quoted_amount as number,
                         (v.vendor as { currency?: string })?.currency || getActiveCurrency(),
@@ -564,7 +564,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                       />
                       <Button
                         variant="outline"
-                        className="w-full bg-slate-50 group-hover:bg-slate-100 border-dashed border-slate-300 group-hover:border-primary/50 group-hover:text-primary transition-all"
+                        className="w-full bg-muted group-hover:bg-muted border-dashed border-border group-hover:border-primary/50 group-hover:text-primary transition-all"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Upload Vendor Response
@@ -583,7 +583,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-full text-xs text-slate-400 hover:text-primary"
+                          className="w-full text-xs text-muted-foreground hover:text-primary"
                         >
                           Re-upload Response
                         </Button>
@@ -597,11 +597,11 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         {/* COMPARISON TAB */}
         {activeTab === 'comparison' && comparison && (
           <div className="space-y-6">
-            <div className="bg-white border rounded-xl overflow-x-auto shadow-sm">
+            <div className="bg-card border rounded-xl overflow-x-auto shadow-sm">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 border-b">
+                <thead className="bg-muted border-b">
                   <tr>
-                    <th className="px-5 py-4 font-semibold text-slate-700 min-w-[200px]">
+                    <th className="px-5 py-4 font-semibold text-foreground min-w-[200px]">
                       Requested Item
                     </th>
                     {(comparison.vendorsSummary as Record<string, unknown>[]).map(
@@ -611,13 +611,13 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                           className="px-5 py-4 font-semibold text-center min-w-[180px]"
                         >
                           <div className="flex items-center justify-center gap-2">
-                            <div className="text-slate-800 text-base">
+                            <div className="text-foreground text-base">
                               {vs.vendorName as string}
                             </div>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                               onClick={() =>
                                 handleDownloadVendorQuote(
                                   vs.vendorId as string,
@@ -629,7 +629,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </div>
-                          <div className="text-[10px] text-slate-400 font-normal uppercase tracking-wider mt-1.5">
+                          <div className="text-[10px] text-muted-foreground font-normal uppercase tracking-wider mt-1.5">
                             Quote Details
                           </div>
                         </th>
@@ -640,10 +640,10 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 <tbody className="divide-y">
                   {(comparison.items as Record<string, unknown>[]).map(
                     (item: Record<string, unknown>) => (
-                      <tr key={item.rfqItemId as string} className="hover:bg-slate-50/50">
+                      <tr key={item.rfqItemId as string} className="hover:bg-muted/50">
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-800">{getItemName(item)}</div>
-                          <div className="text-[10px] text-slate-500 gap-2 flex items-center mt-1">
+                          <div className="font-semibold text-foreground">{getItemName(item)}</div>
+                          <div className="text-[10px] text-muted-foreground gap-2 flex items-center mt-1">
                             <Badge variant="outline" className="h-4 px-1.5 text-[9px] uppercase">
                               {item.itemType as string}
                             </Badge>
@@ -665,14 +665,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                             return (
                               <td
                                 key={vs.vendorId as string}
-                                className={`px-5 py-4 text-center ${vp?.isLowest ? 'bg-green-50/30' : ''}`}
+                                className={`px-5 py-4 text-center ${vp?.isLowest ? 'bg-success/10' : ''}`}
                               >
                                 {vp && vp.stockStatus === 'OUT_OF_STOCK' ? (
                                   <div className="flex flex-col items-center gap-1">
                                     <Badge variant="destructive" className="text-[9px] h-4 px-1.5">
                                       OUT OF STOCK
                                     </Badge>
-                                    <span className="text-[10px] text-slate-400 italic">
+                                    <span className="text-[10px] text-muted-foreground italic">
                                       Not available from this vendor
                                     </span>
                                   </div>
@@ -680,7 +680,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                   <div className="flex flex-col items-center gap-1.5">
                                     <div className="flex items-center gap-1">
                                       <span
-                                        className={`text-base font-bold ${vp.isLowest ? 'text-green-700' : 'text-slate-800'}`}
+                                        className={`text-base font-bold ${vp.isLowest ? 'text-success' : 'text-foreground'}`}
                                       >
                                         {formatCurrency(
                                           vp.unitPrice as number,
@@ -689,13 +689,13 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                         )}
                                       </span>
                                       {!!(vp as { isLowest?: boolean }).isLowest && (
-                                        <CheckCircle className="h-3 w-3 text-green-600" />
+                                        <CheckCircle className="h-3 w-3 text-success" />
                                       )}
                                     </div>
                                     {vp.convertedUnitPrice != null &&
                                       !!vs.branchCurrency &&
                                       vs.branchCurrency !== vs.vendorCurrency && (
-                                        <span className="text-[10px] font-semibold text-blue-600">
+                                        <span className="text-[10px] font-semibold text-primary">
                                           ≈{' '}
                                           {formatCurrency(
                                             vp.convertedUnitPrice as number,
@@ -704,7 +704,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                         </span>
                                       )}
                                     {!!vp.estimatedShipmentDate && (
-                                      <div className="flex items-center justify-center gap-1 text-[10px] text-orange-600 font-medium bg-orange-50 px-1.5 py-0.5 rounded-md">
+                                      <div className="flex items-center justify-center gap-1 text-[10px] text-warning font-medium bg-warning/10 px-1.5 py-0.5 rounded-md">
                                         <Clock className="h-3 w-3" />
                                         <span>
                                           Ship by:{' '}
@@ -730,7 +730,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                         </Badge>
                                         {detail.available_quantity !== undefined && (
                                           <div
-                                            className={`text-[10px] font-medium ${(detail.available_quantity as number) < (item.quantity as number) ? 'text-orange-600' : 'text-slate-500'}`}
+                                            className={`text-[10px] font-medium ${(detail.available_quantity as number) < (item.quantity as number) ? 'text-warning' : 'text-muted-foreground'}`}
                                           >
                                             Avail: {detail.available_quantity as number} /{' '}
                                             {item.quantity as number}
@@ -739,13 +739,15 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                       </div>
                                     )}
                                     {(vp.percentDiff as number) > 0 && (
-                                      <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold mt-1">
+                                      <span className="text-[9px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded-full font-bold mt-1">
                                         +{(vp.percentDiff as number).toFixed(1)}%
                                       </span>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-slate-400 text-xs italic">No response</span>
+                                  <span className="text-muted-foreground text-xs italic">
+                                    No response
+                                  </span>
                                 )}
                               </td>
                             );
@@ -755,8 +757,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                     ),
                   )}
                   {/* Totals Row */}
-                  <tr className="bg-slate-100/50 font-bold border-t-2 border-slate-200">
-                    <td className="px-5 py-6 text-right text-slate-600 text-sm">
+                  <tr className="bg-muted/50 font-bold border-t-2 border-border">
+                    <td className="px-5 py-6 text-right text-foreground text-sm">
                       Grand Total Summary:
                     </td>
                     {(comparison.vendorsSummary as Record<string, unknown>[]).map(
@@ -769,7 +771,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                   <Badge variant="destructive" className="text-[10px] px-2">
                                     OUT OF STOCK
                                   </Badge>
-                                  <span className="text-[11px] text-slate-400 italic">
+                                  <span className="text-[11px] text-muted-foreground italic">
                                     All items are out of stock from this vendor
                                   </span>
                                 </div>
@@ -785,7 +787,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                             return (
                               <>
                                 <div
-                                  className={`text-xl font-black ${vs.isCheapest && (comparison.vendorsSummary as unknown[]).length > 1 ? 'text-green-600' : 'text-slate-900'}`}
+                                  className={`text-xl font-black ${vs.isCheapest && (comparison.vendorsSummary as unknown[]).length > 1 ? 'text-success' : 'text-foreground'}`}
                                 >
                                   {formatCurrency(
                                     vs.totalAmount as number,
@@ -796,14 +798,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                 </div>
                                 {showConversion && (
                                   <>
-                                    <div className="text-sm font-bold text-blue-700 mt-1">
+                                    <div className="text-sm font-bold text-primary mt-1">
                                       ≈{' '}
                                       {formatCurrency(
                                         vs.convertedAmount as number,
                                         vs.branchCurrency as string,
                                       )}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 mt-0.5 font-normal">
+                                    <div className="text-[10px] text-muted-foreground mt-0.5 font-normal">
                                       1 {vs.vendorCurrency as string} ={' '}
                                       {Number(vs.exchangeRate).toFixed(4)}{' '}
                                       {vs.branchCurrency as string}
@@ -822,15 +824,15 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                           {!vs.allOutOfStock && !!vs.hasTax && (
                             <div className="mt-2 flex flex-col items-center gap-1">
                               {vs.taxIncluded === true ? (
-                                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-2 font-semibold">
+                                <Badge className="bg-success/10 text-success hover:bg-success/10 text-[10px] px-2 font-semibold">
                                   Tax included
                                 </Badge>
                               ) : vs.taxRateMixed ? (
-                                <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
+                                <Badge className="bg-muted text-foreground hover:bg-muted text-[10px] px-2 font-semibold">
                                   Tax: mixed rates
                                 </Badge>
                               ) : vs.taxIncluded === false ? (
-                                <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
+                                <Badge className="bg-warning/10 text-warning hover:bg-warning/10 text-[10px] px-2 font-semibold">
                                   +{' '}
                                   {vs.taxRatePercent != null
                                     ? `${Number(vs.taxRatePercent)}% `
@@ -844,14 +846,14 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                    already final — so the screen promised a figure the
                                    system never charged. Saying "not declared" is the
                                    honest reading and matches what is actually computed. */
-                                <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
+                                <Badge className="bg-muted text-foreground hover:bg-muted text-[10px] px-2 font-semibold">
                                   Tax treatment not declared
                                 </Badge>
                               )}
                               {vs.taxIncluded !== true &&
                                 vs.taxInclusiveTotalAmount != null &&
                                 Number(vs.taxInclusiveTotalAmount) !== Number(vs.totalAmount) && (
-                                  <div className="text-xs font-bold text-orange-700">
+                                  <div className="text-xs font-bold text-warning">
                                     Incl. tax:{' '}
                                     {formatCurrency(
                                       vs.taxInclusiveTotalAmount as number,
@@ -865,7 +867,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                             !!(vs as { isCheapest?: boolean }).isCheapest &&
                             (comparison.vendorsSummary as unknown[]).length > 1 && (
                               <div className="mt-2 flex justify-center">
-                                <Badge className="bg-green-600 hover:bg-green-600 animate-pulse text-[10px] px-3">
+                                <Badge className="bg-success hover:bg-success/90 animate-pulse text-[10px] px-3">
                                   Cheapest Option
                                 </Badge>
                               </div>
@@ -876,8 +878,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                   </tr>
                   {/* Action Row */}
                   {['PARTIAL_QUOTED', 'FULLY_QUOTED', 'SENT'].includes(rfq.status) && (
-                    <tr className="bg-white">
-                      <td className="px-5 py-6 text-right text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                    <tr className="bg-card">
+                      <td className="px-5 py-6 text-right text-muted-foreground font-semibold uppercase tracking-wider text-xs">
                         Decision:
                       </td>
                       {(comparison.vendorsSummary as Record<string, unknown>[]).map(
@@ -925,16 +927,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         open={!!vendorToAward && !isWarehouseDialogOpen}
         onOpenChange={(open) => !open && setVendorToAward(null)}
       >
-        <AlertDialogContent className="bg-white p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+        <AlertDialogContent className="bg-card p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary to-primary"></div>
           <AlertDialogHeader className="space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50/80">
-              <AlertCircle className="h-8 w-8 text-blue-600" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <AlertCircle className="h-8 w-8 text-primary" />
             </div>
-            <AlertDialogTitle className="text-2xl font-bold text-center text-slate-800 tracking-tight">
+            <AlertDialogTitle className="text-2xl font-bold text-center text-foreground tracking-tight">
               Award Vendor
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-center text-slate-500 text-[15px] leading-relaxed px-2">
+            <AlertDialogDescription className="text-center text-muted-foreground text-[15px] leading-relaxed px-2">
               Are you sure you want to award this quotation to the selected vendor? This action is
               final and will generate a lot for the awarded items.
             </AlertDialogDescription>
@@ -957,8 +959,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 vs.branchCurrency !== vs.vendorCurrency;
 
               return (
-                <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 text-center space-y-1">
-                  <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+                <div className="rounded-xl bg-warning/10 border border-warning/30 p-4 text-center space-y-1">
+                  <div className="text-[10px] font-bold text-warning uppercase tracking-wider">
                     {vs.taxIncluded === true
                       ? 'Price Already Includes Tax'
                       : vs.taxRateMixed
@@ -969,25 +971,25 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                   </div>
                   {taxExclusive ? (
                     <>
-                      <div className="text-lg font-black text-slate-800">
+                      <div className="text-lg font-black text-foreground">
                         {formatCurrency(vs.totalAmount as number, vs.vendorCurrency as string)}{' '}
-                        <span className="text-slate-400 font-semibold">+ tax →</span>{' '}
+                        <span className="text-muted-foreground font-semibold">+ tax →</span>{' '}
                         {formatCurrency(
                           vs.taxInclusiveTotalAmount as number,
                           vs.vendorCurrency as string,
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[11px] text-muted-foreground">
                         This is what you&apos;ll actually pay this vendor, tax included.
                       </div>
                     </>
                   ) : (
-                    <div className="text-lg font-black text-slate-800">
+                    <div className="text-lg font-black text-foreground">
                       {formatCurrency(vs.totalAmount as number, vs.vendorCurrency as string)}
                     </div>
                   )}
                   {currencyDiffers && (
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-[11px] text-muted-foreground">
                       ≈{' '}
                       {formatCurrency(
                         vs.convertedTaxInclusiveTotalAmount as number,
@@ -1013,16 +1015,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 return null;
               }
               return (
-                <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center space-y-1">
-                  <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+                <div className="rounded-xl bg-primary/10 border border-primary/30 p-4 text-center space-y-1">
+                  <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
                     Currency Conversion
                   </div>
-                  <div className="text-lg font-black text-slate-800">
+                  <div className="text-lg font-black text-foreground">
                     {formatCurrency(vs.totalAmount as number, vs.vendorCurrency as string)}{' '}
-                    <span className="text-slate-400 font-semibold">→</span>{' '}
+                    <span className="text-muted-foreground font-semibold">→</span>{' '}
                     {formatCurrency(vs.convertedAmount as number, vs.branchCurrency as string)}
                   </div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[11px] text-muted-foreground">
                     1 {vs.vendorCurrency as string} = {Number(vs.exchangeRate).toFixed(4)}{' '}
                     {vs.branchCurrency as string} · a fresh live rate is snapshotted on award
                   </div>
@@ -1031,13 +1033,13 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             })()}
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3 sm:gap-2 sm:justify-center flex-col sm:flex-row w-full">
-            <AlertDialogCancel className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors">
+            <AlertDialogCancel className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-border text-foreground hover:bg-muted hover:text-foreground transition-colors">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmAward}
               disabled={awarding}
-              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all disabled:opacity-70"
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20 transition-all disabled:opacity-70"
             >
               {awarding ? (
                 <span className="inline-flex items-center gap-2">
@@ -1061,16 +1063,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           }
         }}
       >
-        <DialogContent className="bg-white p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+        <DialogContent className="bg-card p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary to-primary"></div>
           <DialogHeader className="space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50/80">
-              <WarehouseIcon className="h-8 w-8 text-blue-600" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <WarehouseIcon className="h-8 w-8 text-primary" />
             </div>
-            <DialogTitle className="text-2xl font-bold text-center text-slate-800 tracking-tight">
+            <DialogTitle className="text-2xl font-bold text-center text-foreground tracking-tight">
               Select Delivery Warehouse
             </DialogTitle>
-            <DialogDescription className="text-center text-slate-500 text-[15px] leading-relaxed px-2">
+            <DialogDescription className="text-center text-muted-foreground text-[15px] leading-relaxed px-2">
               {warehousePickerFor === 'lot'
                 ? 'This RFQ was awarded without a delivery warehouse. Pick one now so the lot can be created and inventory tracked correctly.'
                 : "This address is included in the award email so the vendor knows where to ship the items, and it's carried over automatically when the lot is created."}
@@ -1096,7 +1098,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               }))}
               placeholder="Search & Select Warehouse"
               emptyText="No warehouses found."
-              className="w-full h-12 rounded-xl border-slate-200 focus:ring-blue-500"
+              className="w-full h-12 rounded-xl border-border focus:ring-primary"
             />
           </div>
           <DialogFooter className="mt-4 gap-3 sm:gap-2 sm:justify-center flex-col sm:flex-row w-full">
@@ -1107,7 +1109,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                 if (warehousePickerFor === 'award') setVendorToAward(null);
                 setWarehousePickerFor(null);
               }}
-              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-border text-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               Cancel
             </Button>
@@ -1120,7 +1122,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               loading={lotLoading}
               loadingText="Creating..."
               disabled={!selectedWarehouseId || lotLoading}
-              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20 transition-all"
             >
               <Package className="mr-2 h-4 w-4" />
               Continue

@@ -18,9 +18,9 @@ import { Branch } from '@/lib/branch';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { countryNameFromIso } from '@/lib/countryOptions';
 
-const LABEL = 'text-[10px] font-bold text-gray-400 uppercase tracking-wider';
+const LABEL = 'text-[10px] font-bold text-muted-foreground uppercase tracking-wider';
 const CONTROL =
-  'h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400';
+  'h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30';
 
 export interface WarehouseFormValues extends Partial<Warehouse> {
   contactPersonName?: string;
@@ -236,7 +236,7 @@ export default function WarehouseFormDialog({
             <div className="space-y-2">
               <label className={LABEL}>Branch</label>
               {lockedBranchId ? (
-                <div className="h-12 rounded-xl bg-gray-100 shadow-sm flex items-center px-4 text-sm font-medium text-gray-700">
+                <div className="h-12 rounded-xl bg-muted shadow-sm flex items-center px-4 text-sm font-medium text-foreground">
                   {branchName}
                 </div>
               ) : (
@@ -312,7 +312,7 @@ export default function WarehouseFormDialog({
                   setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
                 }
               >
-                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-primary/30">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -327,7 +327,7 @@ export default function WarehouseFormDialog({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>

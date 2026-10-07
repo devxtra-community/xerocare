@@ -63,17 +63,17 @@ export function StandardTable<T>({
 
   return (
     <div
-      className="rounded-2xl border bg-card shadow-sm overflow-hidden flex flex-col w-full"
+      className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(15,23,42,0.06)] overflow-hidden flex flex-col w-full"
       suppressHydrationWarning
     >
       <div className="overflow-x-auto" suppressHydrationWarning>
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50 border-b hover:bg-muted/50">
+            <TableRow className="bg-muted border-b hover:bg-muted">
               {visibleColumns.map((col) => (
                 <TableHead
                   key={col.id}
-                  className={`text-xs font-bold text-primary whitespace-nowrap px-4 py-3 tracking-wider ${col.className || ''}`}
+                  className={`text-[11px] font-semibold text-foreground uppercase whitespace-nowrap px-4 py-3 tracking-wide ${col.className || ''}`}
                 >
                   {col.header}
                 </TableHead>
@@ -109,12 +109,12 @@ export function StandardTable<T>({
               data.map((item, rowIndex) => (
                 <TableRow
                   key={keyExtractor(item)}
-                  className={`hover:bg-blue-50/50 transition-colors ${rowIndex % 2 !== 0 ? 'bg-slate-50/30' : ''}`}
+                  className="hover:bg-primary/10 transition-colors"
                 >
                   {visibleColumns.map((col) => (
                     <TableCell
                       key={col.id}
-                      className={`px-4 py-3 text-sm font-medium text-slate-700 ${col.className || ''}`}
+                      className={`px-4 py-3 text-sm text-foreground ${col.className || ''}`}
                     >
                       {col.cell
                         ? col.cell(item, rowIndex)
@@ -130,7 +130,7 @@ export function StandardTable<T>({
 
       {/* Pagination Footer */}
       <div
-        className="p-3 sm:px-4 sm:py-3 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4"
+        className="p-3 sm:px-4 sm:py-3 border-t border-border bg-card flex flex-col sm:flex-row items-center justify-between gap-4"
         suppressHydrationWarning
       >
         <div

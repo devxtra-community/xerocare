@@ -75,10 +75,10 @@ export default function OutstandingReceivablesTable() {
   const paginatedData = data.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border border-primary/30 overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="bg-muted/50/50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="text-[11px] font-bold text-primary uppercase py-4 px-4 whitespace-nowrap">
                 Customer Name
@@ -113,12 +113,12 @@ export default function OutstandingReceivablesTable() {
             {paginatedData.map((row, i) => (
               <TableRow
                 key={i}
-                className={`hover:bg-blue-50/30 transition-colors ${i % 2 ? 'bg-blue-50/20' : 'bg-card'}`}
+                className={`hover:bg-primary/10 transition-colors ${i % 2 ? 'bg-primary/10' : 'bg-card'}`}
               >
                 <TableCell className="text-xs font-bold text-foreground px-4 whitespace-nowrap">
                   {row.customer}
                 </TableCell>
-                <TableCell className="text-xs font-medium text-blue-600 whitespace-nowrap">
+                <TableCell className="text-xs font-medium text-primary whitespace-nowrap">
                   {row.invoice}
                 </TableCell>
                 <TableCell className="text-xs font-medium text-muted-foreground whitespace-nowrap">
@@ -130,13 +130,13 @@ export default function OutstandingReceivablesTable() {
                 <TableCell className="text-xs font-bold text-foreground whitespace-nowrap">
                   {row.amount}
                 </TableCell>
-                <TableCell className="text-xs font-bold text-green-600 whitespace-nowrap">
+                <TableCell className="text-xs font-bold text-success whitespace-nowrap">
                   {row.paid}
                 </TableCell>
-                <TableCell className="text-xs font-bold text-red-600 whitespace-nowrap">
+                <TableCell className="text-xs font-bold text-destructive whitespace-nowrap">
                   {row.balance}
                 </TableCell>
-                <TableCell className="text-xs font-bold text-orange-600 whitespace-nowrap">
+                <TableCell className="text-xs font-bold text-warning whitespace-nowrap">
                   {row.aging}
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
@@ -144,10 +144,10 @@ export default function OutstandingReceivablesTable() {
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
                     ${
                       row.status === 'Overdue'
-                        ? 'bg-red-100 text-red-700'
+                        ? 'bg-destructive/10 text-destructive'
                         : row.status === 'Partial'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-yellow-100 text-yellow-700'
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-warning/10 text-warning'
                     }`}
                   >
                     {row.status}

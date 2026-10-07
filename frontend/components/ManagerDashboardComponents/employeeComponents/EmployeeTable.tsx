@@ -68,10 +68,10 @@ export default function EmployeeTable() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search employees..."
-            className="pl-10 h-10 bg-card border-blue-400/60 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none shadow-sm rounded-xl transition-all"
+            className="pl-10 h-10 bg-card border-primary/30 focus:border-primary/30 focus:ring-4 focus:ring-primary/30 outline-none shadow-sm rounded-xl transition-all"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -79,7 +79,7 @@ export default function EmployeeTable() {
 
         <div className="w-full sm:w-48">
           <Select value={role} onValueChange={setRole}>
-            <SelectTrigger className="h-10 bg-card border-blue-400/60 rounded-xl focus:ring-blue-100 shadow-sm">
+            <SelectTrigger className="h-10 bg-card border-primary/30 rounded-xl focus:ring-primary/30 shadow-sm">
               <SelectValue placeholder="Filter by Role" />
             </SelectTrigger>
             <SelectContent>
@@ -93,7 +93,7 @@ export default function EmployeeTable() {
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <StandardTable
           columns={[
             {
@@ -115,7 +115,7 @@ export default function EmployeeTable() {
                   `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || 'Unknown';
                 return (
                   <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] flex-shrink-0">
+                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] flex-shrink-0">
                       {fullName.charAt(0)}
                     </div>
                     <span className="text-[12px] font-bold text-foreground">{fullName}</span>
@@ -128,7 +128,7 @@ export default function EmployeeTable() {
               header: 'EMAIL',
               className: 'px-3 py-2 text-[10px] font-bold text-primary uppercase',
               cell: (emp: Employee) => (
-                <span className="text-[11px] text-gray-600 whitespace-nowrap">{emp.email}</span>
+                <span className="text-[11px] text-foreground whitespace-nowrap">{emp.email}</span>
               ),
             },
             {
@@ -142,12 +142,12 @@ export default function EmployeeTable() {
                     className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase
                     ${
                       role === 'Sales'
-                        ? 'bg-blue-100 text-blue-700'
+                        ? 'bg-primary/10 text-primary'
                         : role === 'Service'
-                          ? 'bg-purple-100 text-purple-700'
+                          ? 'bg-lease/10 text-lease'
                           : role === 'Inventory'
-                            ? 'bg-orange-100 text-orange-700'
-                            : 'bg-green-100 text-green-700'
+                            ? 'bg-warning/10 text-warning'
+                            : 'bg-success/10 text-success'
                     }`}
                   >
                     {role}
@@ -174,12 +174,12 @@ export default function EmployeeTable() {
                   className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold
                   ${
                     emp.status === 'ACTIVE'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-orange-100 text-orange-700'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-warning/10 text-warning'
                   }`}
                 >
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-green-600' : 'bg-orange-600'}`}
+                    className={`h-1.5 w-1.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-success' : 'bg-warning'}`}
                   />
                   {emp.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
@@ -196,7 +196,7 @@ export default function EmployeeTable() {
                     variant="ghost"
                     size="icon"
                     title="View Details"
-                    className="h-7 w-7 text-gray-400 hover:text-primary hover:bg-primary/5"
+                    className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/5"
                     onClick={() => router.push(`/manager/employees/${emp.id}`)}
                   >
                     <Search className="h-3.5 w-3.5" />
@@ -207,8 +207,8 @@ export default function EmployeeTable() {
                     title="Enable"
                     className={`h-7 w-7 transition-all ${
                       emp.status === 'ACTIVE'
-                        ? 'text-gray-200 cursor-not-allowed'
-                        : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-success hover:bg-success/10'
                     }`}
                     disabled={emp.status === 'ACTIVE'}
                     onClick={() => toggleStatus(emp.id, 'ACTIVE')}
@@ -234,8 +234,8 @@ export default function EmployeeTable() {
                     title="Disable"
                     className={`h-7 w-7 transition-all ${
                       emp.status !== 'ACTIVE'
-                        ? 'text-gray-200 cursor-not-allowed'
-                        : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
                     }`}
                     disabled={emp.status !== 'ACTIVE'}
                     onClick={() => toggleStatus(emp.id, 'INACTIVE')}
@@ -281,7 +281,7 @@ export default function EmployeeTable() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[10px] px-2 rounded-lg border-blue-200"
+            className="h-7 text-[10px] px-2 rounded-lg border-primary/30"
             disabled={page === 1 || loading}
             onClick={() => setPage(page - 1)}
           >
@@ -290,7 +290,7 @@ export default function EmployeeTable() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[10px] px-2 rounded-lg border-blue-200"
+            className="h-7 text-[10px] px-2 rounded-lg border-primary/30"
             disabled={page === totalPages || loading}
             onClick={() => setPage(page + 1)}
           >

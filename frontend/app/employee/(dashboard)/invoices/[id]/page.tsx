@@ -43,17 +43,19 @@ const fmtDate = (d?: string | null, withTime = false) => {
 
 const statusBadgeClass = (status: string) => {
   if (/APPROVED|ACTIVE|ACCEPTED|COMPLETED/.test(status))
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (/REJECTED|CANCELLED|EXPIRED/.test(status)) return 'bg-rose-50 text-rose-700 border-rose-200';
-  return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-success/10 text-success border-success/30';
+  if (/REJECTED|CANCELLED|EXPIRED/.test(status))
+    return 'bg-destructive/10 text-destructive border-destructive/30';
+  return 'bg-warning/10 text-warning border-warning/30';
 };
 
 const eventIcon = (action: string) => {
-  if (action === 'CREATED') return { Icon: PlusCircle, color: 'text-blue-600 bg-blue-50' };
-  if (action.includes('REJECTED')) return { Icon: XCircle, color: 'text-rose-600 bg-rose-50' };
+  if (action === 'CREATED') return { Icon: PlusCircle, color: 'text-primary bg-primary/10' };
+  if (action.includes('REJECTED'))
+    return { Icon: XCircle, color: 'text-destructive bg-destructive/10' };
   if (action.includes('APPROVED'))
-    return { Icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' };
-  return { Icon: Activity, color: 'text-slate-500 bg-slate-50' };
+    return { Icon: CheckCircle2, color: 'text-success bg-success/10' };
+  return { Icon: Activity, color: 'text-muted-foreground bg-muted' };
 };
 
 export default function InvoiceDetailPage() {
@@ -122,7 +124,7 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-sm text-slate-400 animate-pulse">
+      <div className="p-6 text-center text-sm text-muted-foreground animate-pulse">
         Loading invoice details...
       </div>
     );
@@ -134,7 +136,7 @@ export default function InvoiceDetailPage() {
         <Button variant="outline" onClick={() => router.back()} className="h-8 text-xs">
           <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <p className="text-sm text-slate-500">Invoice not found.</p>
+        <p className="text-sm text-muted-foreground">Invoice not found.</p>
       </div>
     );
   }
@@ -154,8 +156,8 @@ export default function InvoiceDetailPage() {
           <Button variant="outline" onClick={() => router.back()} className="h-8 text-xs">
             <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
           </Button>
-          <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
+          <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
             {invoice.invoiceNumber || 'Invoice'}
           </h1>
           {invoice.type && (
@@ -169,54 +171,60 @@ export default function InvoiceDetailPage() {
             {invoice.status.replaceAll('_', ' ')}
           </span>
         </div>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-muted-foreground">
           {invoice.saleType} · Created {fmtDate(invoice.createdAt, true)}
         </span>
       </div>
 
       {/* Summary tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
               Total Amount
             </span>
-            <span className="text-lg font-bold text-slate-800">
+            <span className="text-lg font-bold text-foreground">
               {currency} {Number(invoice.totalAmount || 0).toFixed(2)}
             </span>
             {invoice.taxAmount != null && Number(invoice.taxAmount) > 0 && (
-              <span className="block text-[10px] text-slate-400">
+              <span className="block text-[10px] text-muted-foreground">
                 incl. {invoice.taxName || 'tax'} {currency} {Number(invoice.taxAmount).toFixed(2)}
               </span>
             )}
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">Subtotal</span>
-            <span className="text-lg font-bold text-slate-800">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
+              Subtotal
+            </span>
+            <span className="text-lg font-bold text-foreground">
               {currency} {subTotal.toFixed(2)}
             </span>
             {(invoice.discountAmount || 0) > 0 && (
-              <span className="block text-[10px] text-slate-400">
+              <span className="block text-[10px] text-muted-foreground">
                 discount {currency} {Number(invoice.discountAmount).toFixed(2)}
               </span>
             )}
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">Branch</span>
-            <span className="text-sm font-bold text-slate-800">{invoice.branchName || '—'}</span>
-            <span className="block text-[10px] text-slate-400">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
+              Branch
+            </span>
+            <span className="text-sm font-bold text-foreground">{invoice.branchName || '—'}</span>
+            <span className="block text-[10px] text-muted-foreground">
               by {invoice.employeeName || '—'}
             </span>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">Validity</span>
-            <span className="text-sm font-bold text-slate-800">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
+              Validity
+            </span>
+            <span className="text-sm font-bold text-foreground">
               {invoice.effectiveFrom || invoice.startDate
                 ? `${fmtDate(invoice.effectiveFrom || invoice.startDate)} → ${fmtDate(invoice.effectiveTo || invoice.endDate)}`
                 : invoice.validityDays
@@ -229,28 +237,36 @@ export default function InvoiceDetailPage() {
 
       {/* Customer + contract info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-blue-600" /> Customer
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-primary" /> Customer
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-1">
-            <p className="font-bold text-sm text-slate-800">{invoice.customerName || 'Unknown'}</p>
-            {invoice.customerEmail && <p className="text-slate-500">{invoice.customerEmail}</p>}
-            {invoice.customerPhone && <p className="text-slate-500">{invoice.customerPhone}</p>}
-            {invoice.customerAddress && <p className="text-slate-400">{invoice.customerAddress}</p>}
-            {invoice.customerTrn && <p className="text-slate-400">TRN: {invoice.customerTrn}</p>}
+            <p className="font-bold text-sm text-foreground">{invoice.customerName || 'Unknown'}</p>
+            {invoice.customerEmail && (
+              <p className="text-muted-foreground">{invoice.customerEmail}</p>
+            )}
+            {invoice.customerPhone && (
+              <p className="text-muted-foreground">{invoice.customerPhone}</p>
+            )}
+            {invoice.customerAddress && (
+              <p className="text-muted-foreground">{invoice.customerAddress}</p>
+            )}
+            {invoice.customerTrn && (
+              <p className="text-muted-foreground">TRN: {invoice.customerTrn}</p>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-blue-600" /> Deal Terms
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" /> Deal Terms
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-xs space-y-1 text-slate-600">
+          <CardContent className="text-xs space-y-1 text-foreground">
             <p>
               Sale type: <span className="font-semibold">{invoice.saleType}</span>
               {invoice.rentType && (
@@ -300,42 +316,44 @@ export default function InvoiceDetailPage() {
                   ` · ${Number(invoice.warrantyCopyLimit).toLocaleString()} copies`}
               </p>
             )}
-            {invoice.notes && <p className="text-slate-400 pt-1">Notes: {invoice.notes}</p>}
+            {invoice.notes && <p className="text-muted-foreground pt-1">Notes: {invoice.notes}</p>}
           </CardContent>
         </Card>
       </div>
 
       {/* Line items */}
-      <Card className="shadow-sm border-slate-200/80">
+      <Card className="shadow-sm border-border/80">
         <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-            <Package className="h-3.5 w-3.5 text-blue-600" /> Line Items (
+          <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+            <Package className="h-3.5 w-3.5 text-primary" /> Line Items (
             {invoice.items?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!invoice.items || invoice.items.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">No line items.</p>
+            <p className="text-xs text-muted-foreground py-4 text-center">No line items.</p>
           ) : (
-            <div className="border border-slate-100 rounded-lg overflow-x-auto">
+            <div className="border border-border rounded-lg overflow-x-auto">
               <Table>
-                <TableHeader className="bg-slate-50/80">
+                <TableHeader className="bg-muted/80">
                   <TableRow>
-                    <TableHead className="text-[10px] font-bold text-slate-500">#</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">#</TableHead>
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">
                       Description
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Serial</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">
+                      Serial
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Qty
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Unit Price
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Discount
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Total
                     </TableHead>
                   </TableRow>
@@ -343,11 +361,13 @@ export default function InvoiceDetailPage() {
                 <TableBody>
                   {invoice.items.map((item, idx) => (
                     <TableRow key={item.id || idx}>
-                      <TableCell className="text-xs text-slate-500 py-2">{idx + 1}</TableCell>
-                      <TableCell className="text-xs font-semibold text-slate-700 py-2">
+                      <TableCell className="text-xs text-muted-foreground py-2">
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-foreground py-2">
                         {item.description}
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-slate-500 py-2">
+                      <TableCell className="text-xs font-mono text-muted-foreground py-2">
                         {item.serialNumber || item.sn || item.sku || '—'}
                       </TableCell>
                       <TableCell className="text-xs text-right font-mono py-2">
@@ -363,7 +383,7 @@ export default function InvoiceDetailPage() {
                           ? `${currency} ${Number(item.discountAmount || item.discount).toFixed(2)}`
                           : '—'}
                       </TableCell>
-                      <TableCell className="text-xs text-right font-mono font-bold text-slate-800 py-2">
+                      <TableCell className="text-xs text-right font-mono font-bold text-foreground py-2">
                         {item.totalAmount != null
                           ? `${currency} ${Number(item.totalAmount).toFixed(2)}`
                           : '—'}
@@ -379,37 +399,39 @@ export default function InvoiceDetailPage() {
 
       {/* Activity history */}
       {canViewLogs && (
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <Activity className="h-3.5 w-3.5 text-blue-600" /> Activity History ({logs.length})
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5 text-primary" /> Activity History ({logs.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {logs.length === 0 ? (
-              <p className="text-xs text-slate-400 py-4 text-center">No activity recorded.</p>
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                No activity recorded.
+              </p>
             ) : (
-              <div className="relative pl-8 space-y-6 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
+              <div className="relative pl-8 space-y-6 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-muted">
                 {logs.map((log) => {
                   const { Icon, color } = eventIcon(log.action);
                   return (
                     <div key={log.id || log.action} className="relative">
                       <div
-                        className={`absolute -left-8 top-0 p-1.5 rounded-full border border-slate-100 shadow-sm ${color}`}
+                        className={`absolute -left-8 top-0 p-1.5 rounded-full border border-border shadow-sm ${color}`}
                       >
                         <Icon className="h-3.5 w-3.5" />
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="text-xs font-extrabold text-slate-800">
+                        <span className="text-xs font-extrabold text-foreground">
                           {log.action.replaceAll('_', ' ')}
                         </span>
-                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {fmtDate(log.createdAt, true)}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 mt-0.5">{log.details || log.action}</p>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5 flex items-center gap-1">
+                      <p className="text-xs text-foreground mt-0.5">{log.details || log.action}</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold mt-0.5 flex items-center gap-1">
                         <User className="h-3 w-3" /> By: {performerName(log.performedBy)}
                       </p>
                     </div>
@@ -419,7 +441,7 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Approval snapshot */}
-            <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-500">
+            <div className="mt-4 pt-3 border-t border-border grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-muted-foreground">
               <p className="flex items-center gap-1.5">
                 <DollarSign className="h-3 w-3" />
                 Finance:{' '}

@@ -280,11 +280,11 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
 
         <div className="grid gap-4 px-6 py-4 text-sm flex-1 overflow-y-auto min-h-0">
           {/* Original Item Info */}
-          <div className="rounded-md bg-orange-50 p-3">
-            <p className="font-semibold text-orange-800">
+          <div className="rounded-md bg-warning/10 p-3">
+            <p className="font-semibold text-warning">
               {isSpare ? 'Original Spare Part' : 'Original Item'}
             </p>
-            <p className="text-orange-600">
+            <p className="text-warning">
               {isSpare
                 ? `${record?.productName} (${record?.sku || '—'}) × ${record?.quantity || 1}`
                 : `${record?.productName} (${record?.serialNumber})`}
@@ -298,13 +298,13 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
               <span className="text-xs">Checking available stock...</span>
             </div>
           ) : isOutOfStock ? (
-            <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 p-3">
-              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/30 p-3">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
               <div>
-                <p className="font-semibold text-red-700">
+                <p className="font-semibold text-destructive">
                   {isSpare ? 'No Replacement Stock Available' : 'Product Currently Out of Stock'}
                 </p>
-                <p className="text-xs text-red-500 mt-0.5">
+                <p className="text-xs text-destructive mt-0.5">
                   {isSpare
                     ? 'No spare parts meet the exchange criteria. Source externally before completing.'
                     : 'No available units of this model. You can still enter a serial manually if a unit is being sourced.'}
@@ -317,12 +317,12 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
           {isSpare && availableSpareParts.length > 0 && (
             <div className="grid gap-2">
               <Label className="flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" />
                 <span>
                   {availableSpareParts.length} SKU{availableSpareParts.length > 1 ? 's' : ''} in
                   Stock
                   {filteredSpareParts.length !== availableSpareParts.length && (
-                    <span className="text-slate-400 font-normal">
+                    <span className="text-muted-foreground font-normal">
                       {' '}
                       — showing {filteredSpareParts.length}
                     </span>
@@ -330,7 +330,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                 </span>
               </Label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <Input
                   value={stockQuery}
                   onChange={(e) => setStockQuery(e.target.value)}
@@ -341,8 +341,10 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
               <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
                 {filteredSpareParts.length === 0 ? (
                   <div className="flex flex-col items-center gap-1 py-6 text-center">
-                    <PackageSearch className="h-5 w-5 text-slate-300" />
-                    <p className="text-xs text-slate-400">No spare part matches that search.</p>
+                    <PackageSearch className="h-5 w-5 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      No spare part matches that search.
+                    </p>
                   </div>
                 ) : null}
                 {filteredSpareParts.map((p) => (
@@ -350,9 +352,9 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                     key={p.id}
                     type="button"
                     onClick={() => handleSelectSparePart(p)}
-                    className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors flex flex-col gap-0.5 ${
+                    className={`w-full text-left px-3 py-2 text-xs hover:bg-primary/10 transition-colors flex flex-col gap-0.5 ${
                       selectedSparePart?.id === p.id
-                        ? 'bg-blue-100 font-semibold text-blue-700'
+                        ? 'bg-primary/10 font-semibold text-primary'
                         : ''
                     }`}
                   >
@@ -369,7 +371,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                 ))}
               </div>
               {selectedSparePart && (
-                <p className="text-[11px] text-green-600 font-bold">
+                <p className="text-[11px] text-success font-bold">
                   ✓ Selected: {selectedSparePart.part_name} ({selectedSparePart.sku})
                 </p>
               )}
@@ -399,12 +401,12 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
               {!loadingStock && availableProducts.length > 0 && (
                 <div className="grid gap-2">
                   <Label className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
                     <span>
                       {availableProducts.length} Unit{availableProducts.length > 1 ? 's' : ''}{' '}
                       Available
                       {filteredProducts.length !== availableProducts.length && (
-                        <span className="text-slate-400 font-normal">
+                        <span className="text-muted-foreground font-normal">
                           {' '}
                           — showing {filteredProducts.length}
                         </span>
@@ -417,7 +419,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                       the customer only said what they want, not which one. */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                       <Input
                         value={stockQuery}
                         onChange={(e) => setStockQuery(e.target.value)}
@@ -448,8 +450,8 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                   <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
                     {filteredProducts.length === 0 ? (
                       <div className="flex flex-col items-center gap-1 py-6 text-center">
-                        <PackageSearch className="h-5 w-5 text-slate-300" />
-                        <p className="text-xs text-slate-400">
+                        <PackageSearch className="h-5 w-5 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">
                           No unit matches that search
                           {modelFilter !== 'ALL' ? ' in this model' : ''}.
                         </p>
@@ -460,9 +462,9 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                         key={p.id}
                         type="button"
                         onClick={() => handleSelectProduct(p)}
-                        className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors flex flex-col gap-0.5 ${
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-primary/10 transition-colors flex flex-col gap-0.5 ${
                           selectedProduct?.id === p.id
-                            ? 'bg-blue-100 font-semibold text-blue-700'
+                            ? 'bg-primary/10 font-semibold text-primary'
                             : ''
                         }`}
                       >
@@ -503,7 +505,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                   }}
                 />
                 {selectedProduct && (
-                  <div className="text-[11px] text-green-600 mt-1.5 space-y-0.5">
+                  <div className="text-[11px] text-success mt-1.5 space-y-0.5">
                     <p className="font-bold">
                       ✓ Selected: {selectedProduct.name}{' '}
                       {selectedProduct.model?.model_name
@@ -521,24 +523,24 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
           {isExchange && (
             <div className="space-y-4 pt-2 border-t mt-2">
               <div className="grid gap-2">
-                <Label className="text-orange-700">Extra Discount (if any)</Label>
+                <Label className="text-warning">Extra Discount (if any)</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
-                  className="border-orange-200 focus:ring-orange-500"
+                  className="border-warning/30 focus:ring-warning"
                 />
               </div>
 
-              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 space-y-2">
-                <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider">
+              <div className="rounded-md bg-primary/10 border border-primary/30 p-3 space-y-2">
+                <h4 className="font-bold text-primary text-xs uppercase tracking-wider">
                   Account Adjustment
                 </h4>
                 {!hasPricedReplacement ? (
                   <div className="flex items-start gap-2 py-1">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700">
+                    <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                    <p className="text-xs text-warning">
                       {isSpare
                         ? 'Select a spare part above to work out the difference.'
                         : 'Select a unit from stock above to work out the difference. A serial typed by hand carries no price, so the settlement cannot be calculated from it.'}
@@ -546,47 +548,47 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                   </div>
                 ) : (
                   <>
-                    <div className="flex justify-between text-xs text-blue-700">
+                    <div className="flex justify-between text-xs text-primary">
                       <span>{isSpare ? 'New Spare Part(s) Price:' : 'New Product Price:'}</span>
                       <span className="font-semibold">{formatCurrency(newValue, currency)}</span>
                     </div>
-                    <div className="flex justify-between text-xs text-blue-700">
+                    <div className="flex justify-between text-xs text-primary">
                       <span>Returned Credit:</span>
                       <span className="font-semibold">
                         - {formatCurrency(originalValue, currency)}
                       </span>
                     </div>
                     {discount > 0 && (
-                      <div className="flex justify-between text-xs text-green-600">
+                      <div className="flex justify-between text-xs text-success">
                         <span>Extra Discount:</span>
                         <span className="font-semibold">
                           - {formatCurrency(discount, currency)}
                         </span>
                       </div>
                     )}
-                    <div className="pt-2 border-t border-blue-200 flex justify-between text-xs text-blue-700">
+                    <div className="pt-2 border-t border-primary/30 flex justify-between text-xs text-primary">
                       <span>Net Difference:</span>
                       <span className="font-semibold">
                         {formatCurrency(Math.abs(variation), currency)}
                       </span>
                     </div>
                     {exchangeTaxPercent > 0 && (
-                      <div className="flex justify-between text-xs text-blue-700">
+                      <div className="flex justify-between text-xs text-primary">
                         <span>VAT ({exchangeTaxPercent}%):</span>
                         <span className="font-semibold">
                           {formatCurrency(exchangeVat, currency)}
                         </span>
                       </div>
                     )}
-                    <div className="pt-2 border-t border-blue-200 flex justify-between font-bold text-sm">
-                      <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                    <div className="pt-2 border-t border-primary/30 flex justify-between font-bold text-sm">
+                      <span className={variation >= 0 ? 'text-primary' : 'text-success'}>
                         {variation >= 0 ? 'Customer Pays:' : 'Refund to Customer:'}
                       </span>
-                      <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                      <span className={variation >= 0 ? 'text-primary' : 'text-success'}>
                         {formatCurrency(exchangeTotal, currency)}
                       </span>
                     </div>
-                    <p className="pt-1 text-[10px] text-blue-600">
+                    <p className="pt-1 text-[10px] text-primary">
                       Goes to Accounts for approval — no money moves until it is approved and
                       settled.
                     </p>
@@ -597,14 +599,14 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
           )}
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t bg-slate-50 shrink-0">
+        <DialogFooter className="px-6 py-4 border-t bg-muted shrink-0">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={loadingStock}
-            className="bg-orange-600 hover:bg-orange-700"
+            className="bg-warning hover:bg-warning/90"
           >
             {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Confirm and Complete

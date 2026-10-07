@@ -70,7 +70,7 @@ export function ApproveQuotationDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div
-              className={`p-2 rounded-full ${isExtension ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'}`}
+              className={`p-2 rounded-full ${isExtension ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}`}
             >
               <ShieldCheck size={20} />
             </div>
@@ -87,10 +87,10 @@ export function ApproveQuotationDialog({
 
         {/* Show date picker only for validity extension */}
         {isExtension && (
-          <div className="grid gap-2 border rounded-lg p-4 bg-amber-50/30 my-2">
+          <div className="grid gap-2 border rounded-lg p-4 bg-warning/10 my-2">
             <Label
               htmlFor="extensionDate"
-              className="text-xs font-bold text-amber-700 uppercase tracking-wider"
+              className="text-xs font-bold text-warning uppercase tracking-wider"
             >
               New Validity Date
             </Label>
@@ -99,9 +99,9 @@ export function ApproveQuotationDialog({
               type="date"
               value={extensionDate}
               onChange={(e) => setExtensionDate(e.target.value)}
-              className="border-amber-200 focus:border-amber-400"
+              className="border-warning/30 focus:border-warning/30"
             />
-            <p className="text-[10px] text-amber-600 font-medium">
+            <p className="text-[10px] text-warning font-medium">
               The employee can convert this quotation until this date.
             </p>
           </div>
@@ -119,8 +119,8 @@ export function ApproveQuotationDialog({
             className={cn(
               buttonVariants(),
               isExtension
-                ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white',
+                ? 'bg-warning hover:bg-warning/90 text-warning-foreground'
+                : 'bg-success hover:bg-success/90 text-success-foreground',
             )}
           >
             {isExtension ? 'Approve Extension' : 'Approve Quotation'}

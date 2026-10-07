@@ -102,7 +102,7 @@ export function AddModelDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">
-                Brand <span className="text-red-500">*</span>
+                Brand <span className="text-destructive">*</span>
               </label>
               <SearchableSelect
                 options={brandOptions}
@@ -117,7 +117,7 @@ export function AddModelDialog({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Model Name <span className="text-red-500">*</span>
+                Model Name <span className="text-destructive">*</span>
               </label>
               <Input {...register('model_name')} placeholder="e.g. HP LaserJet 1020" />
               {errors.model_name && (
@@ -126,7 +126,7 @@ export function AddModelDialog({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Model No <span className="text-red-500">*</span>
+                Model No <span className="text-destructive">*</span>
               </label>
               <Input {...register('model_no')} placeholder="e.g. HP-LJ-1020" />
               {errors.model_no && (

@@ -67,17 +67,17 @@ const COVERAGE_LABELS: Array<{ key: keyof ContractCoverage; label: string }> = [
 ];
 
 const getStatusBadgeClass = (status: string) => {
-  if (status === 'ACTIVE') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (status === 'EXPIRED') return 'bg-rose-50 text-rose-700 border-rose-200';
-  return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (status === 'ACTIVE') return 'bg-success/10 text-success border-success/30';
+  if (status === 'EXPIRED') return 'bg-destructive/10 text-destructive border-destructive/30';
+  return 'bg-warning/10 text-warning border-warning/30';
 };
 
 const getTicketStatusClass = (status: string) => {
   if (status === 'COMPLETED' || status === 'FREE_SERVICE')
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    return 'bg-success/10 text-success border-success/30';
   if (status === 'CANCELLED' || status.includes('REJECTED'))
-    return 'bg-rose-50 text-rose-700 border-rose-200';
-  return 'bg-blue-50 text-blue-700 border-blue-200';
+    return 'bg-destructive/10 text-destructive border-destructive/30';
+  return 'bg-primary/10 text-primary border-primary/30';
 };
 
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : '—');
@@ -280,7 +280,7 @@ export default function ServiceContractDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-sm text-slate-400 animate-pulse">
+      <div className="p-6 text-center text-sm text-muted-foreground animate-pulse">
         Loading contract details...
       </div>
     );
@@ -292,7 +292,7 @@ export default function ServiceContractDetailPage() {
         <Button variant="outline" onClick={() => router.back()} className="h-8 text-xs">
           <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <p className="text-sm text-slate-500">Service contract not found.</p>
+        <p className="text-sm text-muted-foreground">Service contract not found.</p>
       </div>
     );
   }
@@ -325,8 +325,8 @@ export default function ServiceContractDetailPage() {
           >
             <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
           </Button>
-          <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
+          <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
             {contract.contractType} Contract
           </h1>
           <span
@@ -335,7 +335,7 @@ export default function ServiceContractDetailPage() {
             {contract.status}
           </span>
         </div>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-muted-foreground">
           Created {fmtDate(contract.created_at)} · Last updated {fmtDate(contract.updated_at)}
         </span>
       </div>
@@ -344,12 +344,12 @@ export default function ServiceContractDetailPage() {
       <div
         className={`grid grid-cols-2 gap-3 ${contract.contractType === 'AMC' ? 'md:grid-cols-4' : 'md:grid-cols-5'}`}
       >
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
               {contract.contractType === 'FSMA' ? 'Per-Click Rate' : 'Contract Value'}
             </span>
-            <span className="text-lg font-bold text-slate-800">
+            <span className="text-lg font-bold text-foreground">
               {contract.contractType === 'FSMA'
                 ? contract.fsmaBillingMode === 'INDIVIDUAL'
                   ? `B&W ${Number(contract.ratePerClickBW ?? 0)} · Col ${Number(contract.ratePerClickColor ?? 0)}`
@@ -358,46 +358,46 @@ export default function ServiceContractDetailPage() {
             </span>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
               Services Done
             </span>
-            <span className="text-lg font-bold text-slate-800">{history.ticketCount}</span>
-            <span className="block text-[10px] text-slate-400">
+            <span className="text-lg font-bold text-foreground">{history.ticketCount}</span>
+            <span className="block text-[10px] text-muted-foreground">
               {history.completedCount} completed
             </span>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">
+            <span className="block text-[10px] uppercase font-bold text-muted-foreground">
               Total Service Cost
             </span>
-            <span className="text-lg font-bold text-slate-800">
+            <span className="text-lg font-bold text-foreground">
               {currency} {history.totalServiceCost.toFixed(2)}
             </span>
           </CardContent>
         </Card>
         {contract.contractType !== 'AMC' && (
-          <Card className="shadow-sm border-slate-200/80">
+          <Card className="shadow-sm border-border/80">
             <CardContent className="p-4">
-              <span className="block text-[10px] uppercase font-bold text-slate-400">
+              <span className="block text-[10px] uppercase font-bold text-muted-foreground">
                 Meter Billing To Date
               </span>
-              <span className="text-lg font-bold text-emerald-700">
+              <span className="text-lg font-bold text-success">
                 {currency} {Number(contract.totalBilled).toFixed(2)}
               </span>
-              <span className="block text-[10px] text-slate-400">
+              <span className="block text-[10px] text-muted-foreground">
                 {contract.readings.length} reading{contract.readings.length === 1 ? '' : 's'}
               </span>
             </CardContent>
           </Card>
         )}
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <span className="block text-[10px] uppercase font-bold text-slate-400">
+              <span className="block text-[10px] uppercase font-bold text-muted-foreground">
                 Invoice Status
               </span>
               <div className="flex items-center gap-1">
@@ -408,7 +408,7 @@ export default function ServiceContractDetailPage() {
                     onClick={() => openInvoice()}
                     disabled={loadingInvoice}
                     title="View / download / send invoice"
-                    className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50/50"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
                   >
                     <FileText className="h-3.5 w-3.5" />
                   </Button>
@@ -419,7 +419,7 @@ export default function ServiceContractDetailPage() {
                     size="icon"
                     onClick={openPayDialog}
                     title="Record an installment payment"
-                    className="h-6 w-6 text-slate-400 hover:text-green-600 hover:bg-green-50/50"
+                    className="h-6 w-6 text-muted-foreground hover:text-success hover:bg-success/10"
                   >
                     <DollarSign className="h-3.5 w-3.5" />
                   </Button>
@@ -427,18 +427,18 @@ export default function ServiceContractDetailPage() {
               </div>
             </div>
             {!contract.invoiceId ? (
-              <span className="text-xs font-bold text-slate-400">No invoice raised</span>
+              <span className="text-xs font-bold text-muted-foreground">No invoice raised</span>
             ) : !paymentSummary ? (
-              <span className="text-xs text-slate-400">Loading…</span>
+              <span className="text-xs text-muted-foreground">Loading…</span>
             ) : (
               <>
                 <span
                   className={`text-lg font-bold ${
                     paymentSummary.pendingBalance <= 0
-                      ? 'text-emerald-700'
+                      ? 'text-success'
                       : paymentSummary.totalPaid > 0
-                        ? 'text-amber-700'
-                        : 'text-rose-700'
+                        ? 'text-warning'
+                        : 'text-destructive'
                   }`}
                 >
                   {paymentSummary.pendingBalance <= 0
@@ -447,12 +447,12 @@ export default function ServiceContractDetailPage() {
                       ? 'PARTIAL'
                       : 'PENDING'}
                 </span>
-                <span className="block text-[10px] text-slate-400">
+                <span className="block text-[10px] text-muted-foreground">
                   Paid {currency} {paymentSummary.totalPaid.toFixed(2)} · Balance {currency}{' '}
                   {paymentSummary.pendingBalance.toFixed(2)}
                 </span>
                 {paymentSummary.pendingApprovalCount > 0 && (
-                  <span className="block text-[10px] font-semibold text-amber-700 mt-0.5">
+                  <span className="block text-[10px] font-semibold text-warning mt-0.5">
                     {paymentSummary.pendingApprovalCount === 1
                       ? '1 payment'
                       : `${paymentSummary.pendingApprovalCount} payments`}{' '}
@@ -468,44 +468,44 @@ export default function ServiceContractDetailPage() {
 
       {/* Customer / Machine / Period */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-blue-600" /> Customer
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-primary" /> Customer
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-1">
-            <p className="font-bold text-sm text-slate-800">
+            <p className="font-bold text-sm text-foreground">
               {customer?.name || 'Unknown Customer'}
             </p>
-            {customer?.email && <p className="text-slate-500">{customer.email}</p>}
-            {customer?.phone && <p className="text-slate-500">{customer.phone}</p>}
-            {customer?.address && <p className="text-slate-400">{customer.address}</p>}
+            {customer?.email && <p className="text-muted-foreground">{customer.email}</p>}
+            {customer?.phone && <p className="text-muted-foreground">{customer.phone}</p>}
+            {customer?.address && <p className="text-muted-foreground">{customer.address}</p>}
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <Printer className="h-3.5 w-3.5 text-blue-600" /> Machine
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Printer className="h-3.5 w-3.5 text-primary" /> Machine
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-1">
-            <p className="font-bold text-sm text-slate-800">
+            <p className="font-bold text-sm text-foreground">
               {contract.machine
                 ? `${contract.machine.brand} ${contract.machine.modelName}`
                 : 'Unknown Machine'}
             </p>
-            <p className="text-slate-500 font-mono">
+            <p className="text-muted-foreground font-mono">
               S/N: {contract.machine?.serialNumber || 'N/A'}
             </p>
             {contract.machine?.ownership && (
-              <p className="text-slate-400 uppercase text-[10px] font-bold">
+              <p className="text-muted-foreground uppercase text-[10px] font-bold">
                 {contract.machine.ownership}
               </p>
             )}
             {contract.machine?.meterReading != null && (
-              <p className="text-slate-500">
+              <p className="text-muted-foreground">
                 Current meter:{' '}
                 <span className="font-mono font-semibold">
                   {Number(contract.machine.meterReading).toLocaleString()}
@@ -515,20 +515,20 @@ export default function ServiceContractDetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-blue-600" /> Time Period
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" /> Time Period
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-1">
-            <p className="text-slate-500">
+            <p className="text-muted-foreground">
               From{' '}
-              <span className="font-semibold text-slate-800">{fmtDate(contract.startDate)}</span> to{' '}
-              <span className="font-semibold text-slate-800">{fmtDate(contract.endDate)}</span>
+              <span className="font-semibold text-foreground">{fmtDate(contract.startDate)}</span>{' '}
+              to <span className="font-semibold text-foreground">{fmtDate(contract.endDate)}</span>
             </p>
             {contract.status === 'ACTIVE' && (
-              <p className={`font-bold ${daysLeft <= 30 ? 'text-amber-600' : 'text-emerald-700'}`}>
+              <p className={`font-bold ${daysLeft <= 30 ? 'text-warning' : 'text-success'}`}>
                 {daysLeft > 0 ? `${daysLeft} days remaining` : 'Period ended'}
               </p>
             )}
@@ -537,10 +537,10 @@ export default function ServiceContractDetailPage() {
       </div>
 
       {/* Coverage + billing parameters */}
-      <Card className="shadow-sm border-slate-200/80">
+      <Card className="shadow-sm border-border/80">
         <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-            <DollarSign className="h-3.5 w-3.5 text-blue-600" /> Coverage & Billing
+          <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+            <DollarSign className="h-3.5 w-3.5 text-primary" /> Coverage & Billing
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -552,8 +552,8 @@ export default function ServiceContractDetailPage() {
                   key={String(key)}
                   className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${
                     covered
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-slate-50 text-slate-400 border-slate-200'
+                      ? 'bg-success/10 text-success border-success/30'
+                      : 'bg-muted text-muted-foreground border-border'
                   }`}
                 >
                   {covered ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
@@ -563,9 +563,9 @@ export default function ServiceContractDetailPage() {
               );
             })}
           </div>
-          <p className="text-xs text-slate-500">{billingSummary}</p>
+          <p className="text-xs text-muted-foreground">{billingSummary}</p>
           {contract.notes && (
-            <p className="text-xs text-slate-400 border-t border-slate-100 pt-2">
+            <p className="text-xs text-muted-foreground border-t border-border pt-2">
               Notes: {contract.notes}
             </p>
           )}
@@ -573,33 +573,41 @@ export default function ServiceContractDetailPage() {
       </Card>
 
       {/* Service history */}
-      <Card className="shadow-sm border-slate-200/80">
+      <Card className="shadow-sm border-border/80">
         <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-            <Wrench className="h-3.5 w-3.5 text-blue-600" /> Service History ({history.ticketCount})
+          <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+            <Wrench className="h-3.5 w-3.5 text-primary" /> Service History ({history.ticketCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {history.tickets.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">
+            <p className="text-xs text-muted-foreground py-4 text-center">
               No service tickets recorded under this contract yet.
             </p>
           ) : (
-            <div className="border border-slate-100 rounded-lg overflow-x-auto">
+            <div className="border border-border rounded-lg overflow-x-auto">
               <Table>
-                <TableHeader className="bg-slate-50/80">
+                <TableHeader className="bg-muted/80">
                   <TableRow>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Ticket</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Date</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Issue</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Status</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">
+                      Ticket
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">
+                      Date
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">
+                      Issue
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold text-muted-foreground">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Parts/Items
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Visit Charge
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                       Total Cost
                     </TableHead>
                   </TableRow>
@@ -607,13 +615,13 @@ export default function ServiceContractDetailPage() {
                 <TableBody>
                   {history.tickets.map((t) => (
                     <TableRow key={t.id}>
-                      <TableCell className="text-xs font-mono font-semibold text-slate-700 py-2">
+                      <TableCell className="text-xs font-mono font-semibold text-foreground py-2">
                         {t.ticketNumber}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 py-2">
+                      <TableCell className="text-xs text-muted-foreground py-2">
                         {fmtDate(t.createdAt)}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600 py-2 max-w-[240px] truncate">
+                      <TableCell className="text-xs text-foreground py-2 max-w-[240px] truncate">
                         {t.issueDescription}
                       </TableCell>
                       <TableCell className="py-2">
@@ -629,16 +637,16 @@ export default function ServiceContractDetailPage() {
                       <TableCell className="text-xs text-right font-mono py-2">
                         {currency} {t.visitChargeAmount.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-xs text-right font-mono font-bold text-slate-800 py-2">
+                      <TableCell className="text-xs text-right font-mono font-bold text-foreground py-2">
                         {currency} {t.totalCost.toFixed(2)}
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="bg-slate-50/60">
-                    <TableCell colSpan={6} className="text-xs font-bold text-slate-600 py-2">
+                  <TableRow className="bg-muted/60">
+                    <TableCell colSpan={6} className="text-xs font-bold text-foreground py-2">
                       Total service cost under this contract
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono font-bold text-slate-900 py-2">
+                    <TableCell className="text-xs text-right font-mono font-bold text-foreground py-2">
                       {currency} {history.totalServiceCost.toFixed(2)}
                     </TableCell>
                   </TableRow>
@@ -653,32 +661,36 @@ export default function ServiceContractDetailPage() {
           no page count to track at all. */}
       {contract.machine?.machineType !== 'COMPUTER' &&
         contract.machine?.machineType !== 'OTHER' && (
-          <Card className="shadow-sm border-slate-200/80">
+          <Card className="shadow-sm border-border/80">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Gauge className="h-3.5 w-3.5 text-emerald-600" /> Meter Readings (
+              <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5 text-success" /> Meter Readings (
                 {contract.readings.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               {contract.readings.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">No readings recorded yet.</p>
+                <p className="text-xs text-muted-foreground py-4 text-center">
+                  No readings recorded yet.
+                </p>
               ) : (
-                <div className="border border-slate-100 rounded-lg overflow-x-auto">
+                <div className="border border-border rounded-lg overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-slate-50/80">
+                    <TableHeader className="bg-muted/80">
                       <TableRow>
-                        <TableHead className="text-[10px] font-bold text-slate-500">Date</TableHead>
-                        <TableHead className="text-[10px] font-bold text-slate-500">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground">
+                          Date
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-muted-foreground">
                           Meter
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                           Clicks
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                           Charged
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold text-slate-500">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground">
                           Notes
                         </TableHead>
                       </TableRow>
@@ -686,7 +698,7 @@ export default function ServiceContractDetailPage() {
                     <TableBody>
                       {contract.readings.map((r) => (
                         <TableRow key={r.id}>
-                          <TableCell className="text-xs text-slate-500 py-2">
+                          <TableCell className="text-xs text-muted-foreground py-2">
                             {fmtDate(r.readingDate)}
                           </TableCell>
                           <TableCell className="text-xs font-mono py-2">
@@ -701,12 +713,12 @@ export default function ServiceContractDetailPage() {
                           </TableCell>
                           <TableCell className="text-xs text-right font-mono py-2">
                             {contract.contractType === 'AMC' ? (
-                              <span className="text-slate-400">tracking only</span>
+                              <span className="text-muted-foreground">tracking only</span>
                             ) : (
                               `${currency} ${Number(r.amountCharged || 0).toFixed(2)}`
                             )}
                           </TableCell>
-                          <TableCell className="text-xs text-slate-400 py-2 max-w-[200px] truncate">
+                          <TableCell className="text-xs text-muted-foreground py-2 max-w-[200px] truncate">
                             {r.notes || '—'}
                           </TableCell>
                         </TableRow>
@@ -722,41 +734,47 @@ export default function ServiceContractDetailPage() {
       {/* Monthly bills — FSMA only. Generated automatically once a month by
           the billing sweep; casual readings in between accrue unbilled. */}
       {contract.contractType === 'FSMA' && (
-        <Card className="shadow-sm border-slate-200/80">
+        <Card className="shadow-sm border-border/80">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5 text-blue-600" /> Monthly Bills ({bills.length})
+            <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5 text-primary" /> Monthly Bills ({bills.length})
             </CardTitle>
             {contract.nextBillingDate && (
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-muted-foreground">
                 Next bill due {fmtDate(contract.nextBillingDate)}.
               </p>
             )}
           </CardHeader>
           <CardContent>
             {loadingBills ? (
-              <p className="text-xs text-slate-400 py-4 text-center animate-pulse">
+              <p className="text-xs text-muted-foreground py-4 text-center animate-pulse">
                 Loading bills...
               </p>
             ) : bills.length === 0 ? (
-              <p className="text-xs text-slate-400 py-4 text-center">
+              <p className="text-xs text-muted-foreground py-4 text-center">
                 No bills generated yet — the monthly billing sweep raises one automatically.
               </p>
             ) : (
-              <div className="border border-slate-100 rounded-lg overflow-x-auto">
+              <div className="border border-border rounded-lg overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-slate-50/80">
+                  <TableHeader className="bg-muted/80">
                     <TableRow>
-                      <TableHead className="text-[10px] font-bold text-slate-500">
+                      <TableHead className="text-[10px] font-bold text-muted-foreground">
                         Invoice
                       </TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500">Period</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                      <TableHead className="text-[10px] font-bold text-muted-foreground">
+                        Period
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                         Amount
                       </TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500">Status</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500">Sent</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                      <TableHead className="text-[10px] font-bold text-muted-foreground">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground">
+                        Sent
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground text-right">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -767,7 +785,7 @@ export default function ServiceContractDetailPage() {
                         <TableCell className="text-xs font-mono py-2">
                           {b.invoiceNumber || '—'}
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500 py-2">
+                        <TableCell className="text-xs text-muted-foreground py-2">
                           {fmtDate(b.periodStart)} – {fmtDate(b.periodEnd)}
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-2">
@@ -782,7 +800,7 @@ export default function ServiceContractDetailPage() {
                             {b.status || 'UNKNOWN'}
                           </span>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500 py-2">
+                        <TableCell className="text-xs text-muted-foreground py-2">
                           {b.emailSentAt ? fmtDate(b.emailSentAt) : '—'}
                         </TableCell>
                         <TableCell className="text-right py-2">
@@ -797,7 +815,7 @@ export default function ServiceContractDetailPage() {
                             </Button>
                             <Button
                               size="sm"
-                              className="h-7 px-2 text-[10px] bg-blue-600 hover:bg-blue-700"
+                              className="h-7 px-2 text-[10px] bg-primary hover:bg-primary/90"
                               onClick={() => openSendBillDialog(b)}
                             >
                               <Send className="h-3 w-3 mr-1" />
@@ -817,19 +835,19 @@ export default function ServiceContractDetailPage() {
 
       {/* SEND BILL TO CUSTOMER DIALOG */}
       <Dialog open={!!sendBillTarget} onOpenChange={(open) => !open && setSendBillTarget(null)}>
-        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Send className="h-5 w-5 text-blue-600" />
+        <DialogContent className="max-w-md w-full p-0 bg-card rounded-xl shadow-2xl border border-border">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Send className="h-5 w-5 text-primary" />
               Send Bill to Customer
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               Review before sending — this emails the customer directly.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 py-4 space-y-3">
             <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1">Recipient</label>
+              <label className="text-xs font-bold text-foreground block mb-1">Recipient</label>
               <Input
                 type="email"
                 value={sendBillForm.recipient}
@@ -840,16 +858,16 @@ export default function ServiceContractDetailPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1">Subject</label>
+              <label className="text-xs font-bold text-foreground block mb-1">Subject</label>
               <Input
                 value={sendBillForm.subject}
                 onChange={(e) => setSendBillForm((prev) => ({ ...prev, subject: e.target.value }))}
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1">Message</label>
+              <label className="text-xs font-bold text-foreground block mb-1">Message</label>
               <textarea
-                className="w-full min-h-[140px] px-3 py-2 text-xs border border-slate-200 rounded-lg resize-y"
+                className="w-full min-h-[140px] px-3 py-2 text-xs border border-border rounded-lg resize-y"
                 value={sendBillForm.body}
                 onChange={(e) => setSendBillForm((prev) => ({ ...prev, body: e.target.value }))}
               />
@@ -860,7 +878,7 @@ export default function ServiceContractDetailPage() {
               Cancel
             </Button>
             <Button
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-primary hover:bg-primary/90"
               disabled={sendingBill}
               onClick={handleSendBill}
             >
@@ -872,30 +890,30 @@ export default function ServiceContractDetailPage() {
 
       {/* AMC INSTALLMENT PAYMENT DIALOG */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
-        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
+        <DialogContent className="max-w-md w-full p-0 bg-card rounded-xl shadow-2xl border border-border">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-success" />
               Record Payment
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               Recorded against the same invoice raised at signing.
             </DialogDescription>
           </DialogHeader>
 
           {paymentSummary && (
-            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex flex-col gap-2">
+            <div className="mx-6 mt-4 p-3 bg-muted border border-border rounded-xl text-xs flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">
+                <span className="text-muted-foreground">
                   Paid {currency} {paymentSummary.totalPaid.toFixed(2)} of {currency}{' '}
                   {paymentSummary.totalAmount.toFixed(2)}
                 </span>
-                <span className="font-bold text-slate-700">
+                <span className="font-bold text-foreground">
                   Balance {currency} {paymentSummary.pendingBalance.toFixed(2)}
                 </span>
               </div>
               {paymentSummary.pendingApprovalCount > 0 && (
-                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                <div className="flex items-center gap-1.5 text-warning bg-warning/10 border border-warning/30 rounded-lg px-2 py-1.5">
                   <Clock className="h-3.5 w-3.5 shrink-0" />
                   <span className="font-semibold">
                     {paymentSummary.pendingApprovalCount === 1
@@ -912,19 +930,19 @@ export default function ServiceContractDetailPage() {
           <form onSubmit={handleRecordPayment}>
             <div className="grid grid-cols-2 gap-4 px-6 py-4">
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Amount ({currency}) *</label>
+                <label className="text-xs font-bold text-foreground">Amount ({currency}) *</label>
                 <Input
                   type="number"
                   step="0.01"
                   min={0}
                   value={payForm.amount}
                   onChange={(e) => setPayForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                   placeholder="0.00"
                 />
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Payment Mode *</label>
+                <label className="text-xs font-bold text-foreground">Payment Mode *</label>
                 <select
                   value={payForm.paymentMode}
                   onChange={(e) =>
@@ -933,7 +951,7 @@ export default function ServiceContractDetailPage() {
                       paymentMode: e.target.value as typeof prev.paymentMode,
                     }))
                   }
-                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="h-10 px-3 border border-border rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-success"
                 >
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
@@ -953,41 +971,41 @@ export default function ServiceContractDetailPage() {
                 </div>
               )}
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Payment Date *</label>
+                <label className="text-xs font-bold text-foreground">Payment Date *</label>
                 <Input
                   type="date"
                   value={payForm.paymentDate}
                   onChange={(e) => setPayForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                 />
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Reference Number</label>
+                <label className="text-xs font-bold text-foreground">Reference Number</label>
                 <Input
                   value={payForm.referenceNumber}
                   onChange={(e) =>
                     setPayForm((prev) => ({ ...prev, referenceNumber: e.target.value }))
                   }
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                   placeholder="Optional"
                 />
               </div>
               <div className="col-span-2 flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Remarks</label>
+                <label className="text-xs font-bold text-foreground">Remarks</label>
                 <Input
                   value={payForm.remarks}
                   onChange={(e) => setPayForm((prev) => ({ ...prev, remarks: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  className="h-10 border-border focus-visible:ring-success"
                   placeholder="Optional"
                 />
               </div>
             </div>
-            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-white">
+            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-border bg-card">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setPayDialogOpen(false)}
-                className="h-10 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+                className="h-10 px-4 border-border text-foreground hover:bg-muted font-medium text-xs"
               >
                 Cancel
               </Button>
@@ -996,7 +1014,7 @@ export default function ServiceContractDetailPage() {
                 loading={savingPayment}
                 loadingText="Recording..."
                 disabled={savingPayment}
-                className="h-10 px-4 bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm"
+                className="h-10 px-4 bg-success hover:bg-success/90 text-success-foreground font-medium text-xs shadow-sm"
               >
                 Record Payment
               </LoadingButton>

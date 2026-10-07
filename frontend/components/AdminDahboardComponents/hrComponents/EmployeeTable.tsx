@@ -254,17 +254,17 @@ export default function EmployeeTable() {
   return (
     <div className="bg-card rounded-2xl shadow-sm border-0 overflow-hidden text-left">
       {/* Header / toolbar */}
-      <div className="p-6 border-b border-gray-100">
+      <div className="p-6 border-b border-border">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-semibold text-primary">Employee List</h3>
-            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search employees..."
                 className="pl-10 h-10 w-full md:w-[250px] bg-muted/50 border-none rounded-xl"
@@ -333,7 +333,7 @@ export default function EmployeeTable() {
               Export
             </Button>
             <Button
-              className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-white"
+              className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={handleAdd}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -345,9 +345,9 @@ export default function EmployeeTable() {
 
       {/* Table */}
       <div className="overflow-x-auto min-h-[400px]">
-        <Table className="w-full">
-          <TableHeader className="bg-muted/50/50">
-            <TableRow className="border-b border-gray-100 hover:bg-transparent">
+        <Table pagination={{ pageSize: 10 }} className="w-full">
+          <TableHeader className="bg-muted/50">
+            <TableRow className="border-b border-border hover:bg-transparent">
               <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
                 ID
               </TableHead>
@@ -419,16 +419,16 @@ export default function EmployeeTable() {
               employees.map((emp, index) => (
                 <TableRow
                   key={emp.id}
-                  className={`transition-colors h-11 border-b border-gray-50 hover:bg-primary/5 ${
-                    index % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'
+                  className={`transition-colors h-11 border-b border-border hover:bg-primary/5 ${
+                    index % 2 === 0 ? 'bg-card' : 'bg-primary/10'
                   }`}
                 >
-                  <TableCell className="px-3 py-4 text-xs font-bold text-blue-600">
+                  <TableCell className="px-3 py-4 text-xs font-bold text-primary">
                     {emp.display_id || '---'}
                   </TableCell>
                   <TableCell className="px-3 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 overflow-hidden relative border border-blue-50 shadow-sm group cursor-pointer">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0 overflow-hidden relative border border-primary/30 shadow-sm group cursor-pointer">
                         {emp.profile_image_url ? (
                           <>
                             <Image
@@ -439,10 +439,10 @@ export default function EmployeeTable() {
                               unoptimized={true}
                             />
                             <div
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                               onClick={() => setPreviewImage(emp.profile_image_url || null)}
                             >
-                              <Eye size={16} className="text-white" />
+                              <Eye size={16} className="text-primary-foreground" />
                             </div>
                           </>
                         ) : (
@@ -460,13 +460,13 @@ export default function EmployeeTable() {
                   <TableCell className="px-3 py-4">
                     <Badge
                       variant="secondary"
-                      className="bg-gray-100 text-gray-700 border-none font-medium px-2 py-0.5 text-[10px]"
+                      className="bg-muted text-foreground border-none font-medium px-2 py-0.5 text-[10px]"
                     >
                       {emp.role}
                     </Badge>
                   </TableCell>
                   <TableCell className="px-3 py-4">
-                    <span className="text-xs font-medium text-gray-700">
+                    <span className="text-xs font-medium text-foreground">
                       {emp.role === 'HR'
                         ? 'HR'
                         : emp.role === 'MANAGER'
@@ -479,9 +479,9 @@ export default function EmployeeTable() {
                     </span>
                   </TableCell>
                   <TableCell className="px-3 py-4">
-                    <span className="text-xs text-gray-600">{emp.branch?.name || '---'}</span>
+                    <span className="text-xs text-foreground">{emp.branch?.name || '---'}</span>
                   </TableCell>
-                  <TableCell className="px-3 py-4 text-sm font-semibold text-blue-700 tabular-nums">
+                  <TableCell className="px-3 py-4 text-sm font-semibold text-primary tabular-nums">
                     {formatCurrency(emp.salary || 0, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-4">
@@ -489,10 +489,10 @@ export default function EmployeeTable() {
                       variant="outline"
                       className={`text-[10px] font-bold border-none px-2 py-0.5 ${
                         emp.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-success/10 text-success'
                           : emp.status === 'INACTIVE'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-red-100 text-red-700'
+                            ? 'bg-warning/10 text-warning'
+                            : 'bg-destructive/10 text-destructive'
                       }`}
                     >
                       {emp.status}
@@ -510,7 +510,7 @@ export default function EmployeeTable() {
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
-                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
                         onClick={() => {
                           if (emp.id) {
                             router.push(`/admin/human-resource/${emp.id}`);
@@ -536,7 +536,7 @@ export default function EmployeeTable() {
                             <UserCog className="h-3.5 w-3.5" /> Edit Details
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className={`gap-2 cursor-pointer text-xs ${emp.status === 'ACTIVE' ? 'text-red-600 focus:text-red-600' : 'text-green-600 focus:text-green-600'}`}
+                            className={`gap-2 cursor-pointer text-xs ${emp.status === 'ACTIVE' ? 'text-destructive focus:text-destructive' : 'text-success focus:text-success'}`}
                             onClick={() => handleDeleteTrigger(emp)}
                           >
                             {emp.status === 'ACTIVE' ? (
@@ -576,7 +576,7 @@ export default function EmployeeTable() {
       />
 
       {/* Pagination */}
-      <div className="p-6 border-t border-gray-100 flex items-center justify-between">
+      <div className="p-6 border-t border-border flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Showing {employees.length} of {pagination.total} employees
         </p>
@@ -596,7 +596,7 @@ export default function EmployeeTable() {
                 key={i + 1}
                 variant={pagination.page === i + 1 ? 'default' : 'outline'}
                 size="sm"
-                className={`w-8 h-8 p-0 rounded-lg ${pagination.page === i + 1 ? 'bg-primary text-white' : ''}`}
+                className={`w-8 h-8 p-0 rounded-lg ${pagination.page === i + 1 ? 'bg-primary text-primary-foreground' : ''}`}
                 onClick={() => fetchEmployees(i + 1)}
               >
                 {i + 1}
@@ -621,7 +621,7 @@ export default function EmployeeTable() {
           <DialogHeader className="sr-only">
             <DialogTitle>Profile Image Preview</DialogTitle>
           </DialogHeader>
-          <div className="relative w-full aspect-square flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg">
+          <div className="relative w-full aspect-square flex items-center justify-center bg-foreground backdrop-blur-sm rounded-lg">
             {previewImage && (
               <Image
                 src={previewImage}

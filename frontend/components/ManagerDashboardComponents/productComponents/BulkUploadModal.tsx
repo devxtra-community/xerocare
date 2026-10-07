@@ -152,36 +152,36 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
       <div className="bg-card rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto flex flex-col">
         <div className="flex justify-between mb-4">
-          <h2 className="text-xl font-semibold text-blue-900">Bulk Upload Products</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
+          <h2 className="text-xl font-semibold text-primary">Bulk Upload Products</h2>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
             <X size={20} />
           </button>
         </div>
 
         <div className="space-y-6 flex-1">
           {!file ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-muted/50 transition relative">
+            <div className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-muted/50 transition relative">
               <input
                 type="file"
                 accept=".xlsx, .xls"
                 onChange={handleFileChange}
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
-              <FileSpreadsheet className="h-12 w-12 text-gray-400 mb-3" />
-              <p className="font-medium text-gray-700">Click or drag Excel file here</p>
+              <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-3" />
+              <p className="font-medium text-foreground">Click or drag Excel file here</p>
               <p className="text-sm text-muted-foreground mt-1">Supports .xlsx and .xls</p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/30">
                 <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="text-blue-600" />
+                  <FileSpreadsheet className="text-primary" />
                   <div>
-                    <p className="font-medium text-blue-900">{file.name}</p>
-                    <p className="text-xs text-blue-700 text-opacity-80">
+                    <p className="font-medium text-primary">{file.name}</p>
+                    <p className="text-xs text-primary text-opacity-80">
                       {(file.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
@@ -192,7 +192,7 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
                     setPreviewData([]);
                     setError(null);
                   }}
-                  className="text-muted-foreground hover:text-red-500"
+                  className="text-muted-foreground hover:text-destructive"
                 >
                   <X size={18} />
                 </button>
@@ -235,7 +235,7 @@ export function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
               )}
 
               {error && (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm">
+                <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg text-sm">
                   <AlertCircle size={16} />
                   {error}
                 </div>

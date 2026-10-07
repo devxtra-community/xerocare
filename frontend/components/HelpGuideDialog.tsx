@@ -36,7 +36,7 @@ export function HelpGuideDialog({ open, onOpenChange }: HelpGuideDialogProps) {
           {/* Overview Section */}
           <section className="mb-8">
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-              <LayoutDashboard className="h-5 w-5 text-blue-500" />
+              <LayoutDashboard className="h-5 w-5 text-primary" />
               1. System Overview & Purpose
             </h3>
             <div className="text-sm text-muted-foreground space-y-3 pl-7">
@@ -58,7 +58,7 @@ export function HelpGuideDialog({ open, onOpenChange }: HelpGuideDialogProps) {
           {/* Roles & Permissions */}
           <section className="mb-8">
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-              <Shield className="h-5 w-5 text-green-500" />
+              <Shield className="h-5 w-5 text-success" />
               2. Roles & Permissions
             </h3>
             <div className="text-sm text-muted-foreground space-y-4 pl-7">
@@ -91,7 +91,7 @@ export function HelpGuideDialog({ open, onOpenChange }: HelpGuideDialogProps) {
           {/* Core Workflows - Lots & Products */}
           <section className="mb-8">
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-              <Package className="h-5 w-5 text-orange-500" />
+              <Package className="h-5 w-5 text-warning" />
               3. Managing Inventory (Lots & Products)
             </h3>
             <div className="text-sm text-muted-foreground space-y-3 pl-7">
@@ -124,7 +124,7 @@ export function HelpGuideDialog({ open, onOpenChange }: HelpGuideDialogProps) {
           {/* Settings & Notifications */}
           <section className="mb-8">
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-              <Settings className="h-5 w-5 text-purple-500" />
+              <Settings className="h-5 w-5 text-lease" />
               4. Notifications & Settings
             </h3>
             <div className="text-sm text-muted-foreground space-y-3 pl-7">

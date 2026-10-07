@@ -15,20 +15,20 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 
 export const CHEQUE_STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  DEPOSITED: 'bg-blue-50 text-blue-700 border-blue-200',
-  CLEARED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  BOUNCED: 'bg-red-50 text-red-700 border-red-200',
-  CANCELLED: 'bg-gray-100 text-gray-600 border-gray-200',
-  ISSUED: 'bg-purple-50 text-purple-700 border-purple-200',
+  PENDING: 'bg-warning/10 text-warning border-warning/30',
+  DEPOSITED: 'bg-primary/10 text-primary border-primary/30',
+  CLEARED: 'bg-success/10 text-success border-success/30',
+  BOUNCED: 'bg-destructive/10 text-destructive border-destructive/30',
+  CANCELLED: 'bg-muted text-foreground border-border',
+  ISSUED: 'bg-lease/10 text-lease border-lease/30',
 };
 
 const APPROVAL_STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  SUBMITTED: 'bg-blue-50 text-blue-700 border-blue-200',
-  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  REJECTED: 'bg-red-50 text-red-700 border-red-200',
-  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  PENDING: 'bg-warning/10 text-warning border-warning/30',
+  SUBMITTED: 'bg-primary/10 text-primary border-primary/30',
+  APPROVED: 'bg-success/10 text-success border-success/30',
+  REJECTED: 'bg-destructive/10 text-destructive border-destructive/30',
+  PAID: 'bg-success/10 text-success border-success/30',
 };
 
 export function ModalShell({
@@ -43,14 +43,14 @@ export function ModalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="font-bold text-slate-800">{title}</h2>
+            <h2 className="font-bold text-foreground">{title}</h2>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -72,7 +72,7 @@ export function DetailField({ label, value }: { label: string; value?: string | 
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="text-sm text-slate-800">{value}</p>
+      <p className="text-sm text-foreground">{value}</p>
     </div>
   );
 }
@@ -92,7 +92,7 @@ export function ChequeList({ cheques }: { cheques: RowChequeInfo[] }) {
           <span className="text-muted-foreground">Due {c.dueDate?.slice(0, 10)}</span>
           <span className="font-medium">{formatCurrency(c.amount, undefined)}</span>
           <span
-            className={`px-2 py-0.5 rounded-md font-semibold border ${CHEQUE_STATUS_COLORS[c.status] ?? 'bg-gray-100 text-gray-700 border-gray-200'}`}
+            className={`px-2 py-0.5 rounded-md font-semibold border ${CHEQUE_STATUS_COLORS[c.status] ?? 'bg-muted text-foreground border-border'}`}
           >
             {c.status}
           </span>
@@ -128,14 +128,14 @@ export function PaymentHistoryTable({
             <tr key={p.id}>
               <td className="px-3 py-2 text-xs text-muted-foreground">{p.date?.slice(0, 10)}</td>
               <td className="px-3 py-2">
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary/10 text-primary border border-primary/30">
                   {p.mode ?? '—'}
                 </span>
               </td>
               <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                 {p.referenceNumber ?? '—'}
               </td>
-              <td className="px-3 py-2 text-right font-semibold text-emerald-700">
+              <td className="px-3 py-2 text-right font-semibold text-success">
                 {formatCurrency(p.amount, currency)}
               </td>
             </tr>
@@ -154,7 +154,7 @@ export function SectionHeading({
   children: React.ReactNode;
 }) {
   return (
-    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600 mb-2">
+    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-foreground mb-2">
       <Icon className="h-3.5 w-3.5" /> {children}
     </h3>
   );
@@ -323,7 +323,7 @@ export function PayableDetailBody({ data }: { data: PayableRowDetail }) {
                     iban?: string;
                   }[]
                 ).map((b, i) => (
-                  <p key={i} className="text-xs text-slate-700">
+                  <p key={i} className="text-xs text-foreground">
                     {b.bankName} — {b.accountHolderName} — A/C {b.accountNumber}
                     {b.iban ? ` — IBAN/IFSC ${b.iban}` : ''}
                   </p>
@@ -373,7 +373,7 @@ export function PayableDetailBody({ data }: { data: PayableRowDetail }) {
               >
                 <span className="font-mono">{a.requestNo}</span>
                 <span
-                  className={`px-2 py-0.5 rounded-md font-semibold border ${APPROVAL_STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-700 border-gray-200'}`}
+                  className={`px-2 py-0.5 rounded-md font-semibold border ${APPROVAL_STATUS_COLORS[a.status] ?? 'bg-muted text-foreground border-border'}`}
                 >
                   {a.status}
                 </span>
@@ -388,7 +388,7 @@ export function PayableDetailBody({ data }: { data: PayableRowDetail }) {
                   </span>
                 )}
                 {a.rejectionReason && (
-                  <span className="text-red-600">· Rejected: {a.rejectionReason}</span>
+                  <span className="text-destructive">· Rejected: {a.rejectionReason}</span>
                 )}
               </div>
             ))}

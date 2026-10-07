@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { salesService } from '@/services/salesService';
+import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { ERP_CHART_SERIES } from '@/lib/chartTheme';
 
 import { getActiveCurrency } from '@/lib/currency';
-const COLORS = ['#2563eb', '#3b82f6', '#93c5fd'];
 
 export default function RevenuePieChart({ selectedYear }: { selectedYear: number | 'all' }) {
   const [isClient, setIsClient] = useState(false);
@@ -30,13 +31,13 @@ export default function RevenuePieChart({ selectedYear }: { selectedYear: number
     fetchData();
   }, [selectedYear]);
 
-  if (!isClient) return <div className="h-[320px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[320px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm border border-primary/30 flex flex-col p-4">
       <div className="pb-2">
-        <h4 className="text-sm font-semibold text-gray-800">Revenue Distribution</h4>
-        <p className="text-[10px] text-gray-500">Breakdown by sales type</p>
+        <h4 className="text-sm font-semibold text-foreground">Revenue Distribution</h4>
+        <p className="text-[10px] text-muted-foreground">Breakdown by sales type</p>
       </div>
       <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -51,24 +52,20 @@ export default function RevenuePieChart({ selectedYear }: { selectedYear: number
               dataKey="value"
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={ERP_CHART_SERIES[index % ERP_CHART_SERIES.length]}
+                />
               ))}
             </Pie>
             <Tooltip
-              content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const item = payload[0];
-                  return (
-                    <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-50">
-                      <p className="text-xs font-bold text-gray-700">{item.name}</p>
-                      <p className="text-xs text-primary font-medium">
-                        {getActiveCurrency()} {(item.value ?? 0).toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
-              }}
+              content={
+                <ChartTooltipContent
+                  valueFormatter={(value) =>
+                    `${getActiveCurrency()} ${Number(value).toLocaleString()}`
+                  }
+                />
+              }
             />
             <Legend
               verticalAlign="bottom"
@@ -78,7 +75,7 @@ export default function RevenuePieChart({ selectedYear }: { selectedYear: number
               wrapperStyle={{
                 fontSize: '10px',
                 fontWeight: 500,
-                color: '#64748b',
+                color: 'var(--chart-slate-dark)',
                 paddingTop: '10px',
               }}
             />

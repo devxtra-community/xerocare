@@ -536,12 +536,12 @@ export function BulkProductDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <div className="bg-card rounded-xl w-full max-w-[95vw] h-[95vh] flex flex-col shadow-2xl">
         {/* Header carries the sheet actions too — keeps a full extra toolbar row
             of vertical space for the product list. */}
         <div className="p-4 border-b flex flex-wrap gap-3 justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2 shrink-0">
+          <h2 className="text-xl font-medium flex items-center gap-2 shrink-0">
             <Upload size={20} /> Bulk Product Upload
           </h2>
           <div className="flex gap-3 items-center ml-auto">
@@ -560,7 +560,7 @@ export function BulkProductDialog({
               />
               <label
                 htmlFor="excel-upload"
-                className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-success text-success-foreground rounded-md hover:bg-success/90 transition-colors text-sm"
               >
                 <FileSpreadsheet size={16} />
                 Upload Excel
@@ -576,16 +576,16 @@ export function BulkProductDialog({
               <Download size={16} />
               Download Sample
             </Button>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
+            <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
               <X size={20} />
             </button>
           </div>
         </div>
 
         {rows.length > 1 && (
-          <div className="p-4 bg-blue-50/60 border-b">
+          <div className="p-4 bg-primary/10 border-b">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <p className="text-xs font-bold text-blue-900">
+              <p className="text-xs font-bold text-primary">
                 {selectedRows.size > 0
                   ? `Bulk Fill — type here and it fills the ${selectedRows.size} selected row${selectedRows.size > 1 ? 's' : ''} below live.`
                   : `Bulk Fill — type here and it fills all ${rows.length} rows below live (tick rows below to target only some).`}{' '}
@@ -596,7 +596,7 @@ export function BulkProductDialog({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-[11px] text-blue-700"
+                  className="h-6 px-2 text-[11px] text-primary"
                   onClick={() => setSelectedRows(new Set(rows.map((_, idx) => idx)))}
                 >
                   Select all
@@ -605,7 +605,7 @@ export function BulkProductDialog({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-[11px] text-blue-700"
+                  className="h-6 px-2 text-[11px] text-primary"
                   disabled={selectedRows.size === 0}
                   onClick={() => setSelectedRows(new Set())}
                 >
@@ -803,14 +803,14 @@ export function BulkProductDialog({
                           setBulkFill((p) => ({ ...p, imageUrl: '' }));
                           applyBulkField('imageUrl', '');
                         }}
-                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                        className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-primary-foreground"
                         title="Remove image from selected rows"
                       >
                         <X size={12} />
                       </button>
                     </div>
                   ) : (
-                    <div className="h-6 w-6 rounded border flex items-center justify-center text-[8px] text-gray-400 bg-slate-50 shrink-0">
+                    <div className="h-6 w-6 rounded border flex items-center justify-center text-[8px] text-muted-foreground bg-muted shrink-0">
                       {bulkImageUploading ? '...' : 'No'}
                     </div>
                   )}
@@ -841,7 +841,7 @@ export function BulkProductDialog({
                         input.value = '';
                       }
                     }}
-                    className="w-44 h-6 border-0 shadow-none p-0 text-[10px] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                    className="w-44 h-6 border-0 shadow-none p-0 text-[10px] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                   />
                 </div>
               </BulkFillField>
@@ -877,14 +877,14 @@ export function BulkProductDialog({
                   key={i}
                   className={`border rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md ${
                     selectedRows.has(i)
-                      ? 'border-blue-400 ring-1 ring-blue-300'
-                      : 'border-slate-200'
+                      ? 'border-primary/30 ring-1 ring-primary/30'
+                      : 'border-border'
                   }`}
                 >
                   {/* Header / Summary */}
                   <div
                     onClick={() => toggleRowExpanded(i)}
-                    className="p-4 bg-slate-50 border-b flex justify-between items-center cursor-pointer select-none"
+                    className="p-4 bg-muted border-b flex justify-between items-center cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-3">
                       <span onClick={(e) => e.stopPropagation()} className="flex items-center">
@@ -897,21 +897,21 @@ export function BulkProductDialog({
                       </span>
                       {isValid ? (
                         <span
-                          className="h-2.5 w-2.5 rounded-full bg-green-500 shrink-0"
+                          className="h-2.5 w-2.5 rounded-full bg-success shrink-0"
                           title="Valid Product"
                         />
                       ) : (
                         <span
-                          className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"
+                          className="h-2.5 w-2.5 rounded-full bg-warning animate-pulse shrink-0"
                           title="Missing required fields"
                         />
                       )}
                       <div className="text-left">
-                        <h4 className="font-bold text-sm text-slate-800">
+                        <h4 className="font-bold text-sm text-foreground">
                           Product #{i + 1}:{' '}
                           <span className="text-primary">{row.name || 'Unnamed Product'}</span>
                         </h4>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {row.brand ? `${row.brand}` : 'No Brand'} • Model:{' '}
                           {row.model_id
                             ? models.find((m) => m.id === row.model_id)?.model_name || 'Selected'
@@ -924,7 +924,7 @@ export function BulkProductDialog({
                       <button
                         type="button"
                         onClick={() => handleRemoveRow(i)}
-                        className="text-red-500 hover:text-red-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-destructive hover:text-destructive p-1.5 hover:bg-muted rounded-lg transition-colors"
                         title="Delete Product"
                       >
                         <Trash2 size={16} />
@@ -932,7 +932,7 @@ export function BulkProductDialog({
                       <button
                         type="button"
                         onClick={() => toggleRowExpanded(i)}
-                        className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-muted rounded-lg transition-colors"
                       >
                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </button>
@@ -941,7 +941,7 @@ export function BulkProductDialog({
 
                   {/* Body (Form layout) */}
                   {isExpanded && (
-                    <div className="p-6 bg-white space-y-6 text-left border-t">
+                    <div className="p-6 bg-card space-y-6 text-left border-t">
                       {/* Main Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Left Column */}
@@ -1273,14 +1273,14 @@ export function BulkProductDialog({
                                   <button
                                     type="button"
                                     onClick={() => updateRow(i, 'imageUrl', '')}
-                                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                                    className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-primary-foreground"
                                     title="Remove Image"
                                   >
                                     <X size={16} />
                                   </button>
                                 </div>
                               ) : (
-                                <div className="h-12 w-12 rounded border flex items-center justify-center text-[10px] text-gray-400 bg-slate-50 shrink-0">
+                                <div className="h-12 w-12 rounded border flex items-center justify-center text-[10px] text-muted-foreground bg-muted shrink-0">
                                   No Image
                                 </div>
                               )}
@@ -1304,7 +1304,7 @@ export function BulkProductDialog({
                                     }
                                   }
                                 }}
-                                className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                                className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                               />
                             </div>
                           </Field>
@@ -1313,14 +1313,14 @@ export function BulkProductDialog({
 
                       {/* Description Section */}
                       <div className="pt-4 border-t">
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                        <label className="block text-xs font-bold text-foreground uppercase tracking-wide mb-2">
                           Product Description
                         </label>
                         <Textarea
                           value={row.description || ''}
                           onChange={(e) => updateRow(i, 'description', e.target.value)}
                           placeholder="Paste product description and details here"
-                          className="resize-y min-h-[120px] text-sm leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0 border-slate-200 focus:border-slate-300"
+                          className="resize-y min-h-[120px] text-sm leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0 border-border focus:border-border"
                           rows={4}
                         />
                       </div>
@@ -1328,7 +1328,7 @@ export function BulkProductDialog({
                       {/* Replacement Consumables */}
                       <div className="pt-4 border-t">
                         <div className="flex justify-between items-center mb-4">
-                          <label className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                          <label className="text-sm font-bold text-foreground uppercase tracking-wide">
                             Replacement Consumables
                           </label>
                           <Button
@@ -1351,7 +1351,7 @@ export function BulkProductDialog({
                         {(row.consumables || []).map((consumable, idx) => (
                           <div
                             key={idx}
-                            className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-200 relative group shadow-sm"
+                            className="bg-muted p-4 rounded-lg mb-4 border border-border relative group shadow-sm"
                           >
                             <button
                               type="button"
@@ -1360,13 +1360,13 @@ export function BulkProductDialog({
                                 newC.splice(idx, 1);
                                 updateRow(i, 'consumables', newC);
                               }}
-                              className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                              className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors p-1"
                             >
                               <X size={16} />
                             </button>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                               <div>
-                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                                   Part Number
                                 </label>
                                 <Input
@@ -1381,7 +1381,7 @@ export function BulkProductDialog({
                                 />
                               </div>
                               <div>
-                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                                   Description
                                 </label>
                                 <Input
@@ -1396,7 +1396,7 @@ export function BulkProductDialog({
                                 />
                               </div>
                               <div>
-                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                                   Yield
                                 </label>
                                 <Input
@@ -1411,7 +1411,7 @@ export function BulkProductDialog({
                                 />
                               </div>
                               <div>
-                                <label className="text-[11px] font-semibold text-slate-500 uppercase mb-1 block">
+                                <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">
                                   Price
                                 </label>
                                 <Input
@@ -1431,8 +1431,8 @@ export function BulkProductDialog({
                           </div>
                         ))}
                         {(!row.consumables || row.consumables.length === 0) && (
-                          <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg">
-                            <p className="text-xs text-slate-400">
+                          <div className="text-center py-6 border-2 border-dashed border-border rounded-lg">
+                            <p className="text-xs text-muted-foreground">
                               No replacement consumables added yet.
                             </p>
                           </div>
@@ -1442,7 +1442,7 @@ export function BulkProductDialog({
                       {/* Key Features */}
                       <div className="pt-4 border-t">
                         <div className="flex justify-between items-center mb-4">
-                          <label className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                          <label className="text-sm font-bold text-foreground uppercase tracking-wide">
                             Key Features
                           </label>
                           <Button
@@ -1456,7 +1456,7 @@ export function BulkProductDialog({
                                 { subHeading: '', description: '' },
                               ]);
                             }}
-                            className="h-8 text-xs px-3 border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+                            className="h-8 text-xs px-3 border-success text-success hover:bg-success/10"
                           >
                             <Plus size={14} className="mr-1.5" /> Add Feature
                           </Button>
@@ -1465,7 +1465,7 @@ export function BulkProductDialog({
                         {(row.features || []).map((feature, idx) => (
                           <div
                             key={idx}
-                            className="bg-emerald-50/30 p-4 rounded-lg mb-4 border border-emerald-100 relative group shadow-sm"
+                            className="bg-success/10 p-4 rounded-lg mb-4 border border-success/30 relative group shadow-sm"
                           >
                             <button
                               type="button"
@@ -1474,13 +1474,13 @@ export function BulkProductDialog({
                                 newF.splice(idx, 1);
                                 updateRow(i, 'features', newF);
                               }}
-                              className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                              className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors p-1"
                             >
                               <X size={16} />
                             </button>
                             <div className="space-y-3">
                               <div>
-                                <label className="text-[11px] font-semibold text-emerald-700 uppercase mb-1 block">
+                                <label className="text-[11px] font-semibold text-success uppercase mb-1 block">
                                   Sub Heading
                                 </label>
                                 <Input
@@ -1491,11 +1491,11 @@ export function BulkProductDialog({
                                     updateRow(i, 'features', newF);
                                   }}
                                   placeholder="e.g. Speed"
-                                  className="h-9 focus:border-emerald-500"
+                                  className="h-9 focus:border-success"
                                 />
                               </div>
                               <div>
-                                <label className="text-[11px] font-semibold text-emerald-700 uppercase mb-1 block">
+                                <label className="text-[11px] font-semibold text-success uppercase mb-1 block">
                                   Description
                                 </label>
                                 <Textarea
@@ -1506,17 +1506,15 @@ export function BulkProductDialog({
                                     updateRow(i, 'features', newF);
                                   }}
                                   placeholder="e.g. 30 ppm print speed for high productivity"
-                                  className="resize-none min-h-[60px] text-sm focus:border-emerald-500"
+                                  className="resize-none min-h-[60px] text-sm focus:border-success"
                                 />
                               </div>
                             </div>
                           </div>
                         ))}
                         {(!row.features || row.features.length === 0) && (
-                          <div className="text-center py-6 border-2 border-dashed border-emerald-100 rounded-lg">
-                            <p className="text-xs text-emerald-400">
-                              No special features added yet.
-                            </p>
+                          <div className="text-center py-6 border-2 border-dashed border-success/30 rounded-lg">
+                            <p className="text-xs text-success">No special features added yet.</p>
                           </div>
                         )}
                       </div>
@@ -1526,7 +1524,7 @@ export function BulkProductDialog({
               );
             })
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-12">
               <Upload size={48} className="mb-4 opacity-20" />
               <p>Upload an Excel file to view and edit products here</p>
               <p className="text-sm">or click &quot;Add Row&quot; to start manually</p>
@@ -1545,7 +1543,7 @@ export function BulkProductDialog({
             <Button
               onClick={handleSubmit}
               disabled={rows.length === 0 || isSubmitting}
-              className="gap-2 bg-primary text-white min-w-[110px]"
+              className="gap-2 bg-primary text-primary-foreground min-w-[110px]"
             >
               {isSubmitting ? (
                 <>
@@ -1583,7 +1581,7 @@ export function BulkProductDialog({
 function BulkFillField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-blue-700 mb-1">{label}</label>
+      <label className="block text-[10px] font-bold text-primary mb-1">{label}</label>
       {children}
     </div>
   );
@@ -1592,7 +1590,7 @@ function BulkFillField({ label, children }: { label: string; children: React.Rea
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-700 mb-1">{label}</label>
+      <label className="block text-xs font-bold text-foreground mb-1">{label}</label>
       {children}
     </div>
   );

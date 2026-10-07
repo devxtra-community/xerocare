@@ -69,9 +69,9 @@ const PURPOSE_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  RECEIVED: 'bg-blue-100 text-blue-700 border-blue-200',
-  RETURNED: 'bg-gray-100 text-gray-600 border-gray-200',
-  DEPOSITED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  RECEIVED: 'bg-primary/10 text-primary border-primary/30',
+  RETURNED: 'bg-muted text-foreground border-border',
+  DEPOSITED: 'bg-success/10 text-success border-success/30',
 };
 
 function GuaranteeModal({
@@ -177,21 +177,21 @@ function GuaranteeModal({
     customerId && chequeNumber && Number(amount) > 0 && bankName && receivedDate && chequeDate;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="font-bold text-slate-800 text-lg">
+          <h2 className="font-bold text-foreground text-lg">
             {isEdit ? 'Edit Guarantee Cheque' : 'Add Guarantee Cheque'}
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {isEdit && (
           <div className="px-6 pt-3">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="flex items-center gap-2 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
               Status:{' '}
               <span
                 className={`ml-1 px-2 py-0.5 rounded-md text-xs font-semibold border ${STATUS_BADGE[cheque!.status]}`}
@@ -368,15 +368,15 @@ function ReturnDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: (
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <RotateCcw className="h-5 w-5 text-emerald-600" />
+            <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
+              <RotateCcw className="h-5 w-5 text-success" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800">Mark as Returned</h3>
+              <h3 className="font-bold text-foreground">Mark as Returned</h3>
               <p className="text-xs text-muted-foreground">
                 {cheque.chequeNumber} · {cheque.customerName}
               </p>
@@ -420,7 +420,7 @@ function ReturnDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: (
           <Button
             onClick={() => returnMut.mutate()}
             disabled={!returnedDate || returnMut.isPending}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="flex-1 bg-success hover:bg-success/90 text-success-foreground"
           >
             {returnMut.isPending ? 'Processing…' : 'Confirm Return'}
           </Button>
@@ -460,15 +460,15 @@ function DepositDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: 
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <Landmark className="h-5 w-5 text-emerald-600" />
+            <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
+              <Landmark className="h-5 w-5 text-success" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800">Deposit to Bank</h3>
+              <h3 className="font-bold text-foreground">Deposit to Bank</h3>
               <p className="text-xs text-muted-foreground">
                 {cheque.chequeNumber} · {cheque.customerName}
               </p>
@@ -550,7 +550,7 @@ function DepositDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: 
           <Button
             onClick={() => depositMut.mutate()}
             disabled={!depositDate || !bankAccountId || depositMut.isPending}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="flex-1 bg-success hover:bg-success/90 text-success-foreground"
           >
             {depositMut.isPending ? 'Processing…' : 'Confirm Deposit'}
           </Button>
@@ -680,7 +680,7 @@ function GuaranteeChequesContent() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {!isSingleBranch && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700">
+        <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-2.5 text-sm text-warning">
           Write actions are disabled when viewing multiple branches. Select a single branch to add,
           edit, or delete guarantee cheques.
         </div>
@@ -736,7 +736,7 @@ function GuaranteeChequesContent() {
         )}
 
         {stats && stats.currencyWarnings && stats.currencyWarnings.length > 0 && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 text-sm">
+          <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               {stats.currencyWarnings.map((w) => (
@@ -747,7 +747,7 @@ function GuaranteeChequesContent() {
         )}
 
         {stats && stats.pendingReturnCount > 0 && (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 text-sm">
+          <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-warning text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
               <strong>{stats.pendingReturnCount}</strong> cheque
@@ -757,7 +757,7 @@ function GuaranteeChequesContent() {
           </div>
         )}
 
-        <div className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
+        <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -793,7 +793,7 @@ function GuaranteeChequesContent() {
               </Select>
               <button
                 onClick={() => setShowFilters((o) => !o)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-slate-700 px-2 py-1 rounded-lg border border-border bg-card"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg border border-border bg-card"
               >
                 Date Range{' '}
                 <ChevronDown
@@ -824,7 +824,7 @@ function GuaranteeChequesContent() {
                     setDateFrom('');
                     setDateTo('');
                   }}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  className="text-xs text-destructive hover:text-destructive"
                 >
                   Clear
                 </button>
@@ -833,13 +833,13 @@ function GuaranteeChequesContent() {
           )}
         </div>
 
-        <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <Table>
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader className="bg-muted/40">
                 <TableRow>
                   {[
@@ -874,23 +874,23 @@ function GuaranteeChequesContent() {
                   </TableRow>
                 ) : (
                   cheques.map((c) => (
-                    <TableRow key={c.id} className="hover:bg-blue-50/50 transition-colors">
+                    <TableRow key={c.id} className="hover:bg-primary/10 transition-colors">
                       <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
                         {c.receivedDate?.slice(0, 10)}
                       </TableCell>
                       <TableCell>
                         <p className="text-sm font-medium">{c.customerName}</p>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                      <TableCell className="font-mono text-xs text-primary font-bold">
                         {c.chequeNumber}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{c.bankName}</TableCell>
                       <TableCell className="text-xs">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">
+                        <span className="px-2 py-0.5 rounded-md bg-muted text-foreground text-[11px] font-medium">
                           {PURPOSE_LABELS[c.purpose] ?? c.purpose}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-bold text-slate-700">
+                      <TableCell className="text-right font-bold text-foreground">
                         {formatCurrency(Number(c.amount), c.currencyCode)}
                         {c.currencyCode !== currency &&
                           (() => {
@@ -912,7 +912,7 @@ function GuaranteeChequesContent() {
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[c.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}
+                          className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[c.status] ?? 'bg-muted text-foreground border-border'}`}
                         >
                           {c.status === 'RETURNED' ? (
                             <CheckCircle2 className="h-3 w-3" />
@@ -931,14 +931,14 @@ function GuaranteeChequesContent() {
                               <>
                                 <button
                                   onClick={() => setDepositing(c)}
-                                  className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                  className="p-1.5 rounded-md hover:bg-success/10 text-success"
                                   title="Deposit to Bank"
                                 >
                                   <Landmark className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   onClick={() => setReturning(c)}
-                                  className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
                                   title="Mark as Returned"
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" />
@@ -950,7 +950,7 @@ function GuaranteeChequesContent() {
                                 setEditing(c);
                                 setShowModal(true);
                               }}
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                              className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                               title="Edit"
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -960,14 +960,16 @@ function GuaranteeChequesContent() {
                                 if (confirm('Delete this guarantee cheque? This cannot be undone.'))
                                   deleteMut.mutate(c.id);
                               }}
-                              className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                              className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                               title="Delete"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         )}
-                        {!isSingleBranch && <span className="text-xs text-gray-400">—</span>}
+                        {!isSingleBranch && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1007,10 +1009,12 @@ function GuaranteeChequesContent() {
 
 export default function AdminGuaranteeChequesPage() {
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Guarantee Cheques</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Guarantee Cheques
+          </h3>
           <p className="text-muted-foreground text-sm">
             Security &amp; performance cheques — across branches
           </p>

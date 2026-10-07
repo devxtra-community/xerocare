@@ -5,8 +5,7 @@ import { PieChart, Pie, Cell } from 'recharts';
 
 import { getAllProducts, Product } from '@/lib/product';
 import { getWarehouses, Warehouse } from '@/lib/warehouse';
-
-const COLORS = ['#FF6B35', '#004E89', '#00A8E8', '#F7B500', '#E040FB', '#2E7D32'];
+import { ERP_CHART_SERIES } from '@/lib/chartTheme';
 
 /**
  * Pie chart component displaying product distribution by brand.
@@ -67,7 +66,7 @@ export default function CategoryPieChart({
         const chartData = Object.keys(brandCounts).map((brand, index) => ({
           name: brand,
           value: total > 0 ? Math.round((brandCounts[brand] / total) * 100) : 0, // Percentage
-          color: COLORS[index % COLORS.length],
+          color: ERP_CHART_SERIES[index % ERP_CHART_SERIES.length],
         }));
 
         setData(chartData);
@@ -99,7 +98,7 @@ export default function CategoryPieChart({
                 startAngle={90}
                 endAngle={-270}
                 paddingAngle={3}
-                stroke="#ffffff"
+                stroke="var(--card)"
                 strokeWidth={3}
                 isAnimationActive={false}
               >

@@ -109,9 +109,9 @@ export default function ReturnsManagement() {
   const selectedItem = selectedInvoice?.items?.find((i) => i.id === selectedItemId);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Process Returns</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Process Returns</h3>
       </div>
 
       <div className="rounded-2xl bg-card p-4 shadow-sm space-y-4">
@@ -151,17 +151,17 @@ export default function ReturnsManagement() {
               <tbody>
                 {filteredInvoices.length > 0 ? (
                   filteredInvoices.map((inv, index) => (
-                    <tr key={inv.id} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}>
+                    <tr key={inv.id} className={index % 2 === 1 ? 'bg-primary/10' : 'bg-card'}>
                       <td className="py-3 px-2 text-xs font-medium text-foreground">
                         {inv.invoiceNumber}
                       </td>
-                      <td className="py-3 px-2 text-xs text-gray-700">
+                      <td className="py-3 px-2 text-xs text-foreground">
                         {inv.customerName || 'No Customer Assigned'}
                       </td>
-                      <td className="py-3 px-2 text-xs text-gray-700">
+                      <td className="py-3 px-2 text-xs text-foreground">
                         {new Date(inv.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-2 text-xs font-bold text-gray-700">
+                      <td className="py-3 px-2 text-xs font-bold text-foreground">
                         {formatCurrency(inv.totalAmount, currency)}
                       </td>
                       <td className="py-3 px-2 text-xs">
@@ -209,7 +209,7 @@ export default function ReturnsManagement() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Select Item
               </label>
               <Select value={selectedItemId} onValueChange={setSelectedItemId}>
@@ -228,7 +228,7 @@ export default function ReturnsManagement() {
 
             {selectedItem && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Return Credit Amount
                 </label>
                 <Input
@@ -245,7 +245,7 @@ export default function ReturnsManagement() {
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Return Note / Reason
               </label>
               <Textarea

@@ -52,18 +52,18 @@ export default function ManualJournalDialog({ account, onClose, onPosted }: Prop
     !Number.isNaN(parsedAmount) && parsedAmount !== 0 && description.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">
+          <h2 className="font-bold text-foreground">
             Post Journal Entry — {account.accountNumber} {account.accountName}
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+          <p className="text-xs text-muted-foreground bg-primary/10 border border-primary/30 rounded-lg px-3 py-2">
             Positive amount increases this account&apos;s balance, negative decreases it. This is a
             single-sided posting (same as Equity Entries) — post an offsetting entry elsewhere if
             this needs to keep the books balanced.

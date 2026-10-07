@@ -43,14 +43,14 @@ const safeFormatDate = (val?: string) => {
 function StatusPill({ contract }: { contract: OngoingContractSummary }) {
   if (contract.isPastEnd) {
     return (
-      <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100">
+      <Badge className="bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/10">
         Past End Date ({Math.abs(contract.daysRemaining)}d overdue)
       </Badge>
     );
   }
   if (contract.isFullyBilled) {
     return (
-      <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100">
+      <Badge className="bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/10">
         All {contract.periodsTotal} periods billed
       </Badge>
     );
@@ -60,7 +60,7 @@ function StatusPill({ contract }: { contract: OngoingContractSummary }) {
     // its calendar reads as "Final Period" while still showing a year of days left —
     // reporting the days would look like a mistake, so report the periods instead.
     return (
-      <Badge className="bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-100">
+      <Badge className="bg-warning/10 text-warning border border-warning/30 hover:bg-warning/10">
         {contract.lastPeriodReason === 'BILLING'
           ? `Final Period — ${contract.periodsRemaining} period${
               contract.periodsRemaining === 1 ? '' : 's'
@@ -70,7 +70,7 @@ function StatusPill({ contract }: { contract: OngoingContractSummary }) {
     );
   }
   return (
-    <Badge variant="outline" className="text-slate-500">
+    <Badge variant="outline" className="text-muted-foreground">
       {contract.daysRemaining}d remaining
     </Badge>
   );
@@ -131,10 +131,10 @@ export default function ContractRenewalsPage() {
   const undecidedCount = lastPeriodContracts.filter((c) => !c.renewalDecision).length;
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Renewals &amp; Replacements
           </h3>
           <p className="text-muted-foreground">
@@ -150,7 +150,7 @@ export default function ContractRenewalsPage() {
       </div>
 
       {/* Tabs — the renewals table is unchanged; replacements is its own queue. */}
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 border-b border-border">
         {(
           [
             ['renewals', 'Renewals'],
@@ -163,7 +163,7 @@ export default function ContractRenewalsPage() {
             className={`px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${
               tab === key
                 ? 'border-primary text-primary'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {label}
@@ -174,9 +174,9 @@ export default function ContractRenewalsPage() {
       {tab === 'replacements' && <FinanceReplacementsTab />}
 
       {tab === 'renewals' && undecidedCount > 0 && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <AlertTriangle size={20} className="text-amber-600 shrink-0" />
-          <p className="text-sm font-semibold text-amber-800">
+        <div className="flex items-center gap-3 bg-warning/10 border border-warning/30 rounded-xl px-4 py-3">
+          <AlertTriangle size={20} className="text-warning shrink-0" />
+          <p className="text-sm font-semibold text-warning">
             {undecidedCount} contract{undecidedCount === 1 ? ' is' : 's are'} in{' '}
             {undecidedCount === 1 ? 'its' : 'their'} final billing period and still need
             {undecidedCount === 1 ? 's' : ''} a renewal decision.
@@ -185,9 +185,9 @@ export default function ContractRenewalsPage() {
       )}
 
       {tab === 'renewals' && (
-        <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
                   <TableHead>Contract</TableHead>
@@ -221,11 +221,11 @@ export default function ContractRenewalsPage() {
                       key={c.id}
                       className={
                         c.isLastPeriod && !c.renewalDecision
-                          ? 'bg-amber-50/60 hover:bg-amber-50'
+                          ? 'bg-warning/10 hover:bg-warning/10'
                           : ''
                       }
                     >
-                      <TableCell className="font-bold text-slate-800">{c.invoiceNumber}</TableCell>
+                      <TableCell className="font-bold text-foreground">{c.invoiceNumber}</TableCell>
                       <TableCell>{c.customerName || '—'}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="uppercase text-[10px]">
@@ -233,7 +233,7 @@ export default function ContractRenewalsPage() {
                           {c.saleType === 'LEASE' && c.leaseType ? ` (${c.leaseType})` : ''}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 font-mono">
+                      <TableCell className="text-xs text-muted-foreground font-mono">
                         {c.machineDescriptions.length > 0 ? c.machineDescriptions.join(', ') : '—'}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
@@ -241,7 +241,7 @@ export default function ContractRenewalsPage() {
                       </TableCell>
                       <TableCell>
                         <div>{safeFormatDate(c.effectiveTo)}</div>
-                        <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                        <div className="text-[11px] text-muted-foreground font-semibold mt-0.5">
                           {c.periodsBilled} of {c.periodsTotal} periods billed
                         </div>
                       </TableCell>
@@ -250,13 +250,13 @@ export default function ContractRenewalsPage() {
                       </TableCell>
                       <TableCell>
                         {!c.isLastPeriod ? (
-                          <span className="text-xs text-slate-300">—</span>
+                          <span className="text-xs text-muted-foreground">—</span>
                         ) : c.renewalDecision === 'RENEWAL_APPROVED' ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
+                          <Badge className="bg-success/10 text-success border border-success/30 hover:bg-success/10">
                             Customer Approved Renewal
                           </Badge>
                         ) : c.renewalDecision === 'CONTRACT_ENDED' ? (
-                          <Badge className="bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-100">
+                          <Badge className="bg-muted text-foreground border border-border hover:bg-muted">
                             Contract Ended
                           </Badge>
                         ) : (

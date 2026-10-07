@@ -76,31 +76,34 @@ const DEPARTMENT_LABELS: Record<string, string> = {
 const BILL_STATUS_META: Record<string, { label: string; className: string }> = {
   PENDING_APPROVAL: {
     label: 'Pending Approval',
-    className: 'bg-amber-50 text-amber-700 border-amber-100',
+    className: 'bg-warning/10 text-warning border-warning/30',
   },
   CUSTOMER_APPROVED: {
     label: 'Customer Approved',
-    className: 'bg-green-50 text-green-700 border-green-100',
+    className: 'bg-success/10 text-success border-success/30',
   },
-  CUSTOMER_REJECTED: { label: 'Disputed', className: 'bg-red-50 text-red-700 border-red-100' },
+  CUSTOMER_REJECTED: {
+    label: 'Disputed',
+    className: 'bg-destructive/10 text-destructive border-destructive/30',
+  },
 };
 
 function DepartmentBadge({ role }: { role?: string }) {
-  if (!role) return <span className="text-[10px] text-slate-300">—</span>;
+  if (!role) return <span className="text-[10px] text-muted-foreground">—</span>;
   return (
-    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-100">
+    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-primary/10 text-primary border-primary/30">
       {DEPARTMENT_LABELS[role] ?? role}
     </span>
   );
 }
 
 function CreatedAtCell({ date }: { date?: string }) {
-  if (!date) return <span className="text-[10px] text-slate-300">—</span>;
+  if (!date) return <span className="text-[10px] text-muted-foreground">—</span>;
   const d = new Date(date);
   return (
-    <div className="text-xs text-slate-400 leading-tight">
+    <div className="text-xs text-muted-foreground leading-tight">
       <div>{d.toLocaleDateString()}</div>
-      <div className="text-[10px] text-slate-300">
+      <div className="text-[10px] text-muted-foreground">
         {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </div>
     </div>
@@ -116,17 +119,17 @@ const PAYMENT_CONTEXT_LABELS: Record<string, string> = {
 };
 
 const SALE_TYPE_COLORS: Record<string, string> = {
-  PRODUCT_SALE: 'bg-blue-50 text-blue-700 border-blue-100',
-  RENTAL: 'bg-green-50 text-green-700 border-green-100',
-  LEASE: 'bg-purple-50 text-purple-700 border-purple-100',
-  SPAREPART_SALE: 'bg-amber-50 text-amber-700 border-amber-100',
-  SERVICE: 'bg-slate-50 text-slate-700 border-slate-100',
+  PRODUCT_SALE: 'bg-primary/10 text-primary border-primary/30',
+  RENTAL: 'bg-success/10 text-success border-success/30',
+  LEASE: 'bg-lease/10 text-lease border-lease/30',
+  SPAREPART_SALE: 'bg-warning/10 text-warning border-warning/30',
+  SERVICE: 'bg-muted text-foreground border-border',
 };
 
 const SIG_STATUS_COLORS: Record<string, string> = {
-  FULLY_SIGNED: 'bg-green-50 text-green-700 border-green-100',
-  EMPLOYEE_SIGNED: 'bg-amber-50 text-amber-700 border-amber-100',
-  UNSIGNED: 'bg-slate-50 text-slate-500 border-slate-100',
+  FULLY_SIGNED: 'bg-success/10 text-success border-success/30',
+  EMPLOYEE_SIGNED: 'bg-warning/10 text-warning border-warning/30',
+  UNSIGNED: 'bg-muted text-muted-foreground border-border',
 };
 
 function statusBadgeClass(status: string): string {
@@ -134,27 +137,27 @@ function statusBadgeClass(status: string): string {
     case 'ACTIVE_CONTRACT':
     case 'APPROVED':
     case 'ACTIVE':
-      return 'bg-green-50 text-green-700 border-green-100';
+      return 'bg-success/10 text-success border-success/30';
     case 'PENDING':
     case 'PENDING_APPROVAL':
     case 'WAITING_FINANCE_APPROVAL':
-      return 'bg-amber-50 text-amber-700 border-amber-100';
+      return 'bg-warning/10 text-warning border-warning/30';
     case 'REJECTED':
     case 'CANCELLED':
     case 'EXPIRED':
-      return 'bg-red-50 text-red-700 border-red-100';
+      return 'bg-destructive/10 text-destructive border-destructive/30';
     case 'COMPLETED':
     case 'PAID':
-      return 'bg-slate-50 text-slate-700 border-slate-100';
+      return 'bg-muted text-foreground border-border';
     default:
-      return 'bg-slate-50 text-slate-600 border-slate-100';
+      return 'bg-muted text-foreground border-border';
   }
 }
 
 function PaymentStatusIcon({ status }: { status: string }) {
-  if (status === 'APPROVED') return <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />;
-  if (status === 'REJECTED') return <XCircle className="h-3.5 w-3.5 text-red-500" />;
-  return <Clock className="h-3.5 w-3.5 text-amber-500" />;
+  if (status === 'APPROVED') return <CheckCircle2 className="h-3.5 w-3.5 text-success" />;
+  if (status === 'REJECTED') return <XCircle className="h-3.5 w-3.5 text-destructive" />;
+  return <Clock className="h-3.5 w-3.5 text-warning" />;
 }
 
 interface Props {
@@ -242,50 +245,50 @@ export default function Customer360View({
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-muted p-4 md:p-6 space-y-6">
       {/* Back + Title */}
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push(backHref)}
-          className="gap-1.5 text-slate-600 hover:text-slate-900"
+          className="gap-1.5 text-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Customer 360° Profile</h1>
-          <p className="text-xs text-slate-500">Complete view of all customer touchpoints</p>
+          <h1 className="text-xl font-medium text-foreground">Customer 360° Profile</h1>
+          <p className="text-xs text-muted-foreground">Complete view of all customer touchpoints</p>
         </div>
       </div>
 
       {/* Customer Header Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+      <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
         <div className="flex flex-col md:flex-row gap-5">
           {/* Avatar + Name */}
           <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-              <User className="h-7 w-7 text-indigo-500" />
+            <div className="h-14 w-14 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+              <User className="h-7 w-7 text-primary" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
+                <h2 className="text-lg font-bold text-foreground">{customer.name}</h2>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     customer.isActive
-                      ? 'bg-green-50 text-green-700 border-green-100'
-                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                      ? 'bg-success/10 text-success border-success/30'
+                      : 'bg-muted text-muted-foreground border-border'
                   }`}
                 >
                   {customer.isActive ? 'ACTIVE' : 'INACTIVE'}
                 </span>
                 {customer.customerType && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-100">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/30">
                     {customer.customerType}
                   </span>
                 )}
               </div>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {customer.email && (
                   <span className="flex items-center gap-1">
                     <Mail className="h-3 w-3" /> {customer.email}
@@ -308,19 +311,19 @@ export default function Customer360View({
                 )}
                 {/* Created-by employee — shown when resolved */}
                 {createdByName && (
-                  <span className="flex items-center gap-1 text-indigo-600 font-medium">
+                  <span className="flex items-center gap-1 text-primary font-medium">
                     <UserCheck className="h-3 w-3" /> Created by: {createdByName}
                     {createdByRole && (
-                      <span className="text-slate-400 font-normal">({createdByRole})</span>
+                      <span className="text-muted-foreground font-normal">({createdByRole})</span>
                     )}
                   </span>
                 )}
               </div>
               {lead && (
-                <div className="mt-1.5 text-xs text-slate-400 flex items-center gap-1">
+                <div className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1">
                   <ExternalLink className="h-3 w-3" /> Converted from lead:{' '}
-                  <span className="font-medium text-slate-600">{lead.name}</span>
-                  {lead.source && <span className="text-slate-400">({lead.source})</span>}
+                  <span className="font-medium text-foreground">{lead.name}</span>
+                  {lead.source && <span className="text-muted-foreground">({lead.source})</span>}
                 </div>
               )}
             </div>
@@ -328,41 +331,41 @@ export default function Customer360View({
 
           {/* Summary Stats */}
           <div className="md:ml-auto grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2 md:mt-0">
-            <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+            <div className="bg-muted rounded-xl border border-border px-4 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                 Contracts
               </p>
-              <p className="text-xl font-bold text-slate-800 mt-0.5">{summary.contractCount}</p>
+              <p className="text-xl font-bold text-foreground mt-0.5">{summary.contractCount}</p>
             </div>
-            <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+            <div className="bg-muted rounded-xl border border-border px-4 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                 Invoiced
               </p>
-              <p className="text-lg font-bold text-slate-800 mt-0.5">
+              <p className="text-lg font-bold text-foreground mt-0.5">
                 {currency} {summary.totalInvoiced.toLocaleString()}
               </p>
             </div>
-            <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+            <div className="bg-muted rounded-xl border border-border px-4 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                 Paid
               </p>
-              <p className="text-lg font-bold text-green-700 mt-0.5">
+              <p className="text-lg font-bold text-success mt-0.5">
                 {currency} {summary.totalPaid.toLocaleString()}
               </p>
             </div>
             <div
               className={`rounded-xl border px-4 py-3 text-center ${
                 summary.totalOutstanding > 0
-                  ? 'bg-red-50 border-red-100'
-                  : 'bg-slate-50 border-slate-200'
+                  ? 'bg-destructive/10 border-destructive/30'
+                  : 'bg-muted border-border'
               }`}
             >
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                 Outstanding
               </p>
               <p
                 className={`text-lg font-bold mt-0.5 ${
-                  summary.totalOutstanding > 0 ? 'text-red-700' : 'text-slate-800'
+                  summary.totalOutstanding > 0 ? 'text-destructive' : 'text-foreground'
                 }`}
               >
                 {currency} {summary.totalOutstanding.toLocaleString()}
@@ -371,43 +374,43 @@ export default function Customer360View({
                   be clamped to 0, which hid a real overpayment and disagreed with
                   Receivables. */}
               {summary.totalOutstanding < 0 && (
-                <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                <p className="text-[10px] text-success font-semibold mt-0.5">
                   Overpaid by {currency} {Math.abs(summary.totalOutstanding).toLocaleString()}
                 </p>
               )}
               {summary.manualOutstanding > 0 && (
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   incl. {currency} {summary.manualOutstanding.toLocaleString()} non-invoice
                 </p>
               )}
             </div>
             {summary.totalDepositsHeld > 0 && (
-              <div className="bg-indigo-50 rounded-xl border border-indigo-100 px-4 py-3 text-center">
-                <p className="text-[10px] uppercase tracking-wide text-indigo-400 font-semibold">
+              <div className="bg-primary/10 rounded-xl border border-primary/30 px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">
                   Deposits Held
                 </p>
-                <p className="text-lg font-bold text-indigo-700 mt-0.5">
+                <p className="text-lg font-bold text-primary mt-0.5">
                   {currency} {summary.totalDepositsHeld.toLocaleString()}
                 </p>
-                <p className="text-[10px] text-indigo-400 mt-0.5">refundable — not income</p>
+                <p className="text-[10px] text-primary mt-0.5">refundable — not income</p>
               </div>
             )}
             {summary.guaranteeChequeValue > 0 && (
-              <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+              <div className="bg-muted rounded-xl border border-border px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                   Guarantee Cheques
                 </p>
-                <p className="text-lg font-bold text-slate-800 mt-0.5">
+                <p className="text-lg font-bold text-foreground mt-0.5">
                   {currency} {summary.guaranteeChequeValue.toLocaleString()}
                 </p>
               </div>
             )}
             {summary.creditNoteValue > 0 && (
-              <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+              <div className="bg-muted rounded-xl border border-border px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                   Returns
                 </p>
-                <p className="text-lg font-bold text-slate-800 mt-0.5">
+                <p className="text-lg font-bold text-foreground mt-0.5">
                   {currency} {summary.creditNoteValue.toLocaleString()}
                 </p>
               </div>
@@ -417,7 +420,7 @@ export default function Customer360View({
 
         {/* Bank / VAT */}
         {(customer.bankName || customer.bankAccountNumber || customer.vatNumber) && (
-          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 text-xs text-slate-500">
+          <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-4 text-xs text-muted-foreground">
             {customer.bankName && (
               <span className="flex items-center gap-1">
                 <Building className="h-3 w-3" /> {customer.bankName}
@@ -438,23 +441,23 @@ export default function Customer360View({
       </div>
 
       {scopeNotice && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs text-amber-700 font-medium">
+        <div className="bg-warning/10 border border-warning/30 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs text-warning font-medium">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           {scopeNotice}
         </div>
       )}
 
       {/* Tabs */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 flex overflow-x-auto">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="border-b border-border flex overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50/30'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               {tab.label}
@@ -462,8 +465,8 @@ export default function Customer360View({
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                     activeTab === tab.id
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-slate-100 text-slate-500'
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   {tab.count}
@@ -548,7 +551,7 @@ export default function Customer360View({
 
 function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message: string }) {
   return (
-    <div className="py-12 flex flex-col items-center gap-2 text-slate-400">
+    <div className="py-12 flex flex-col items-center gap-2 text-muted-foreground">
       <Icon className="h-8 w-8" />
       <p className="text-sm font-medium">{message}</p>
     </div>
@@ -571,22 +574,30 @@ function ContractsTab({
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Invoice #
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Period</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Type
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Status
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Amount
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Period
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Agreement
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Created Date/Time
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Department
           </TableHead>
         </TableRow>
@@ -595,14 +606,14 @@ function ContractsTab({
         {invoices.map((inv) => {
           const agreement = agreementByInvoiceId.get(inv.id);
           return (
-            <TableRow key={inv.id} className="hover:bg-slate-50/50">
-              <TableCell className="font-mono text-xs font-semibold text-slate-800">
+            <TableRow key={inv.id} className="hover:bg-muted/50">
+              <TableCell className="font-mono text-xs font-semibold text-foreground">
                 {inv.invoiceNumber}
               </TableCell>
               <TableCell>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                    SALE_TYPE_COLORS[inv.saleType] ?? 'bg-slate-50 text-slate-600 border-slate-100'
+                    SALE_TYPE_COLORS[inv.saleType] ?? 'bg-muted text-foreground border-border'
                   }`}
                 >
                   {inv.saleType?.replace('_', ' ')}
@@ -617,10 +628,10 @@ function ContractsTab({
                   {inv.contractStatus ?? inv.status}
                 </span>
               </TableCell>
-              <TableCell className="font-semibold text-xs text-slate-700 font-mono">
+              <TableCell className="font-semibold text-xs text-foreground font-mono">
                 {currency} {Number(inv.totalAmount).toLocaleString()}
               </TableCell>
-              <TableCell className="text-xs text-slate-500">
+              <TableCell className="text-xs text-muted-foreground">
                 {inv.effectiveFrom
                   ? `${new Date(inv.effectiveFrom).toLocaleDateString()} → ${
                       inv.effectiveTo ? new Date(inv.effectiveTo).toLocaleDateString() : '…'
@@ -633,21 +644,21 @@ function ContractsTab({
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => onViewAgreement(inv)}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary hover:underline"
                     >
                       <FileSignature className="h-3.5 w-3.5" /> View Agreement
                     </button>
                     <span
                       className={`text-[10px] font-bold px-1.5 py-0.5 rounded border w-fit ${
                         SIG_STATUS_COLORS[agreement.signatureStatus] ??
-                        'bg-slate-50 text-slate-500 border-slate-100'
+                        'bg-muted text-muted-foreground border-border'
                       }`}
                     >
                       {agreement.signatureStatus?.replace('_', ' ')}
                     </span>
                   </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                     <AlertCircle className="h-3 w-3" /> Not yet created
                   </span>
                 )}
@@ -678,35 +689,41 @@ function QuotationsTab({
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Quotation #
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Type
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Status
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Amount
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Created Date/Time
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Department
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Converted
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {invoices.map((inv) => (
-          <TableRow key={inv.id} className="hover:bg-slate-50/50">
-            <TableCell className="font-mono text-xs font-semibold text-slate-800">
+          <TableRow key={inv.id} className="hover:bg-muted/50">
+            <TableCell className="font-mono text-xs font-semibold text-foreground">
               {inv.invoiceNumber}
             </TableCell>
             <TableCell>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                  SALE_TYPE_COLORS[inv.saleType] ?? 'bg-slate-50 text-slate-600 border-slate-100'
+                  SALE_TYPE_COLORS[inv.saleType] ?? 'bg-muted text-foreground border-border'
                 }`}
               >
                 {inv.saleType?.replace('_', ' ')}
@@ -719,7 +736,7 @@ function QuotationsTab({
                 {inv.status}
               </span>
             </TableCell>
-            <TableCell className="font-semibold text-xs text-slate-700 font-mono">
+            <TableCell className="font-semibold text-xs text-foreground font-mono">
               {currency} {Number(inv.totalAmount).toLocaleString()}
             </TableCell>
             <TableCell>
@@ -730,11 +747,11 @@ function QuotationsTab({
             </TableCell>
             <TableCell className="text-xs">
               {inv.isConverted ? (
-                <span className="flex items-center gap-1 text-green-600 font-medium">
+                <span className="flex items-center gap-1 text-success font-medium">
                   <CheckCircle2 className="h-3 w-3" /> Yes
                 </span>
               ) : (
-                <span className="text-slate-400">No</span>
+                <span className="text-muted-foreground">No</span>
               )}
             </TableCell>
           </TableRow>
@@ -758,19 +775,27 @@ function BillsTab({
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Period</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Type
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Period
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Status
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Amount
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Bill Document
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Created Date/Time
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Department
           </TableHead>
         </TableRow>
@@ -779,23 +804,23 @@ function BillsTab({
         {bills.map((b) => {
           const statusMeta = BILL_STATUS_META[b.billStatus] ?? {
             label: b.billStatus,
-            className: 'bg-slate-50 text-slate-500 border-slate-100',
+            className: 'bg-muted text-muted-foreground border-border',
           };
           const isAdvance = b.billType === 'ADVANCE';
           return (
-            <TableRow key={b.id} className="hover:bg-slate-50/50">
+            <TableRow key={b.id} className="hover:bg-muted/50">
               <TableCell>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                     isAdvance
-                      ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                      : 'bg-slate-50 text-slate-600 border-slate-100'
+                      ? 'bg-primary/10 text-primary border-primary/30'
+                      : 'bg-muted text-foreground border-border'
                   }`}
                 >
                   {isAdvance ? 'Advance' : 'Usage'}
                 </span>
               </TableCell>
-              <TableCell className="text-xs text-slate-600">
+              <TableCell className="text-xs text-foreground">
                 {isAdvance
                   ? new Date(b.billingPeriodStart).toLocaleDateString()
                   : `${new Date(b.billingPeriodStart).toLocaleDateString()} → ${new Date(b.billingPeriodEnd).toLocaleDateString()}`}
@@ -808,20 +833,20 @@ function BillsTab({
                 </span>
                 {b.billStatus === 'CUSTOMER_REJECTED' && b.customerRejectionReason && (
                   <p
-                    className="text-[10px] text-red-500 mt-0.5 max-w-48 truncate"
+                    className="text-[10px] text-destructive mt-0.5 max-w-48 truncate"
                     title={b.customerRejectionReason}
                   >
                     {b.customerRejectionReason}
                   </p>
                 )}
               </TableCell>
-              <TableCell className="font-semibold text-xs text-slate-700 font-mono">
+              <TableCell className="font-semibold text-xs text-foreground font-mono">
                 {currency} {Number(b.totalCharge).toLocaleString()}
               </TableCell>
               <TableCell>
                 <button
                   onClick={() => onViewBill(b.id)}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary hover:underline"
                 >
                   <FileText className="h-3.5 w-3.5" /> View Bill
                 </button>
@@ -846,48 +871,66 @@ function PaymentsTab({ payments }: { payments: SalePaymentRequest[] }) {
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Ref #</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Invoice</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Context</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Mode</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Date</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Receipt</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Ref #
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Invoice
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Context
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Mode
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Amount
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Date
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Status
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Receipt
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Recorded By
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Created Date/Time
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Department
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {payments.map((p) => (
-          <TableRow key={p.id} className="hover:bg-slate-50/50">
-            <TableCell className="font-mono text-xs font-semibold text-slate-700">
+          <TableRow key={p.id} className="hover:bg-muted/50">
+            <TableCell className="font-mono text-xs font-semibold text-foreground">
               {p.requestNo}
             </TableCell>
-            <TableCell className="font-mono text-xs text-slate-500">{p.invoiceNumber}</TableCell>
-            <TableCell className="text-xs text-slate-600">
+            <TableCell className="font-mono text-xs text-muted-foreground">
+              {p.invoiceNumber}
+            </TableCell>
+            <TableCell className="text-xs text-foreground">
               {p.paymentContext
                 ? (PAYMENT_CONTEXT_LABELS[p.paymentContext] ?? p.paymentContext)
                 : '—'}
             </TableCell>
             <TableCell className="text-xs">
-              <span className="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 font-medium text-[10px]">
+              <span className="bg-muted border border-border rounded px-1.5 py-0.5 text-foreground font-medium text-[10px]">
                 {p.paymentMode.replace('_', ' ')}
               </span>
             </TableCell>
-            <TableCell className="font-semibold text-xs text-slate-700 font-mono">
+            <TableCell className="font-semibold text-xs text-foreground font-mono">
               {p.currency} {Number(p.amount).toLocaleString()}
             </TableCell>
-            <TableCell className="text-xs text-slate-400">
+            <TableCell className="text-xs text-muted-foreground">
               {new Date(p.paymentDate).toLocaleDateString()}
             </TableCell>
             <TableCell>
@@ -908,19 +951,19 @@ function PaymentsTab({ payments }: { payments: SalePaymentRequest[] }) {
                   href={p.receiptUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-800 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-success hover:text-success hover:underline"
                 >
                   <Receipt className="h-3.5 w-3.5" /> View Receipt
                 </a>
               ) : p.status === 'PENDING' ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-amber-500">
+                <span className="inline-flex items-center gap-1 text-[10px] text-warning">
                   <Clock className="h-3 w-3" /> Pending approval
                 </span>
               ) : (
-                <span className="text-[10px] text-slate-300">—</span>
+                <span className="text-[10px] text-muted-foreground">—</span>
               )}
             </TableCell>
-            <TableCell className="text-xs text-slate-600">{p.recordedByEmployeeName}</TableCell>
+            <TableCell className="text-xs text-foreground">{p.recordedByEmployeeName}</TableCell>
             <TableCell>
               <CreatedAtCell date={p.createdAt} />
             </TableCell>
@@ -960,11 +1003,11 @@ function DepositsTab({
     <div className="space-y-6">
       {deposits.length > 0 && (
         <div>
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Cash / Bank Deposits
           </h4>
           <Table>
-            <TableHeader className="bg-slate-50">
+            <TableHeader className="bg-muted">
               <TableRow>
                 <TableHead>Reference</TableHead>
                 <TableHead>Against</TableHead>
@@ -976,17 +1019,17 @@ function DepositsTab({
             <TableBody>
               {deposits.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-mono text-xs text-slate-700">{d.requestNo}</TableCell>
-                  <TableCell className="font-mono text-xs text-slate-500">
+                  <TableCell className="font-mono text-xs text-foreground">{d.requestNo}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     {d.invoiceNumber}
                   </TableCell>
-                  <TableCell className="text-xs text-slate-600">
+                  <TableCell className="text-xs text-foreground">
                     {d.paymentMode?.replace(/_/g, ' ')}
                   </TableCell>
-                  <TableCell className="text-xs text-slate-600">
+                  <TableCell className="text-xs text-foreground">
                     {d.paymentDate ? new Date(d.paymentDate).toLocaleDateString() : '—'}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-slate-800">
+                  <TableCell className="text-right font-bold text-foreground">
                     {currency} {Number(d.amount).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -997,11 +1040,11 @@ function DepositsTab({
       )}
       {cheques.length > 0 && (
         <div>
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Guarantee Cheques
           </h4>
           <Table>
-            <TableHeader className="bg-slate-50">
+            <TableHeader className="bg-muted">
               <TableRow>
                 <TableHead>Cheque #</TableHead>
                 <TableHead>Bank</TableHead>
@@ -1014,22 +1057,22 @@ function DepositsTab({
             <TableBody>
               {cheques.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-mono text-xs text-slate-700">
+                  <TableCell className="font-mono text-xs text-foreground">
                     {c.chequeNumber}
                   </TableCell>
-                  <TableCell className="text-xs text-slate-600">{c.bankName ?? '—'}</TableCell>
-                  <TableCell className="font-mono text-xs text-slate-500">
+                  <TableCell className="text-xs text-foreground">{c.bankName ?? '—'}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     {c.contractReference ?? '—'}
                   </TableCell>
-                  <TableCell className="text-xs text-slate-600">
+                  <TableCell className="text-xs text-foreground">
                     {c.receivedDate ? new Date(c.receivedDate).toLocaleDateString() : '—'}
                   </TableCell>
                   <TableCell>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-100">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-muted text-foreground border-border">
                       {c.status ?? '—'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right font-bold text-slate-800">
+                  <TableCell className="text-right font-bold text-foreground">
                     {c.currencyCode ?? currency} {Number(c.amount).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -1056,7 +1099,7 @@ function AgreementsTab({
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
           <TableHead>Agreement #</TableHead>
           <TableHead>Contract</TableHead>
@@ -1069,28 +1112,28 @@ function AgreementsTab({
       <TableBody>
         {agreements.map((a) => (
           <TableRow key={a.id}>
-            <TableCell className="font-mono text-xs text-slate-700">{a.agreementNumber}</TableCell>
-            <TableCell className="font-mono text-xs text-slate-500">
+            <TableCell className="font-mono text-xs text-foreground">{a.agreementNumber}</TableCell>
+            <TableCell className="font-mono text-xs text-muted-foreground">
               {invoiceNumberById.get(a.invoiceId) ?? '—'}
             </TableCell>
             <TableCell>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                   a.customerSignedAt
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                    : 'bg-amber-50 text-amber-700 border-amber-100'
+                    ? 'bg-success/10 text-success border-success/30'
+                    : 'bg-warning/10 text-warning border-warning/30'
                 }`}
               >
                 {a.signatureStatus?.replace(/_/g, ' ') ?? '—'}
               </span>
             </TableCell>
-            <TableCell className="text-xs text-slate-600">
+            <TableCell className="text-xs text-foreground">
               {a.employeeSignedAt ? new Date(a.employeeSignedAt).toLocaleDateString() : '—'}
             </TableCell>
-            <TableCell className="text-xs text-slate-600">
+            <TableCell className="text-xs text-foreground">
               {a.customerSignedAt ? new Date(a.customerSignedAt).toLocaleDateString() : '—'}
             </TableCell>
-            <TableCell className="text-xs text-slate-600">
+            <TableCell className="text-xs text-foreground">
               {a.createdByEmployeeName ?? '—'}
             </TableCell>
           </TableRow>
@@ -1114,7 +1157,7 @@ function ReceivablesTab({
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
           <TableHead>Reference</TableHead>
           <TableHead>Type</TableHead>
@@ -1131,27 +1174,32 @@ function ReceivablesTab({
           const outstanding = Number(r.outstanding ?? Number(r.amount) - Number(r.amountPaid ?? 0));
           return (
             <TableRow key={r.id}>
-              <TableCell className="font-mono text-xs text-slate-700">{r.referenceNo}</TableCell>
-              <TableCell className="text-xs text-slate-600">{r.type?.replace(/_/g, ' ')}</TableCell>
-              <TableCell className="text-xs text-slate-600 max-w-64 truncate" title={r.description}>
+              <TableCell className="font-mono text-xs text-foreground">{r.referenceNo}</TableCell>
+              <TableCell className="text-xs text-foreground">
+                {r.type?.replace(/_/g, ' ')}
+              </TableCell>
+              <TableCell
+                className="text-xs text-foreground max-w-64 truncate"
+                title={r.description}
+              >
                 {r.description ?? '—'}
               </TableCell>
-              <TableCell className="text-xs text-slate-600">
+              <TableCell className="text-xs text-foreground">
                 {r.issueDate ? new Date(r.issueDate).toLocaleDateString() : '—'}
               </TableCell>
-              <TableCell className="text-right text-xs text-slate-700">
+              <TableCell className="text-right text-xs text-foreground">
                 {currency} {Number(r.amount).toLocaleString()}
               </TableCell>
-              <TableCell className="text-right text-xs text-emerald-700">
+              <TableCell className="text-right text-xs text-success">
                 {currency} {Number(r.amountPaid ?? 0).toLocaleString()}
               </TableCell>
               <TableCell
-                className={`text-right font-bold ${outstanding > 0 ? 'text-red-700' : 'text-slate-800'}`}
+                className={`text-right font-bold ${outstanding > 0 ? 'text-destructive' : 'text-foreground'}`}
               >
                 {currency} {outstanding.toLocaleString()}
               </TableCell>
               <TableCell>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-100">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-muted text-foreground border-border">
                   {r.status}
                 </span>
               </TableCell>
@@ -1183,21 +1231,31 @@ function ReturnsTab({
 
   return (
     <Table>
-      <TableHeader className="bg-slate-50">
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Credit Note #
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Invoice</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Product</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Invoice
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Product
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Type
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Amount
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
+            Status
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-muted-foreground">
             Created Date/Time
           </TableHead>
           <TableHead
-            className="text-[11px] font-bold uppercase text-slate-500"
+            className="text-[11px] font-bold uppercase text-muted-foreground"
             title="Credit notes don't record a creator/department in this system"
           >
             Department
@@ -1206,28 +1264,32 @@ function ReturnsTab({
       </TableHeader>
       <TableBody>
         {creditNotes.map((cn) => (
-          <TableRow key={cn.id} className="hover:bg-slate-50/50">
+          <TableRow key={cn.id} className="hover:bg-muted/50">
             <TableCell className="font-mono text-xs font-semibold">
               <button
                 onClick={() => onView(cn)}
-                className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                className="text-primary hover:text-primary hover:underline"
               >
                 {cn.creditNoteNo}
               </button>
             </TableCell>
-            <TableCell className="font-mono text-xs text-slate-500">{cn.invoiceNumber}</TableCell>
-            <TableCell className="text-xs text-slate-700">
+            <TableCell className="font-mono text-xs text-muted-foreground">
+              {cn.invoiceNumber}
+            </TableCell>
+            <TableCell className="text-xs text-foreground">
               {cn.productName ?? '—'}
               {/* Serial identifies the exact unit returned; modelName is not selected by
                   the credit-note query this tab now reads from. */}
-              {cn.serialNumber && <span className="text-slate-400 ml-1">({cn.serialNumber})</span>}
+              {cn.serialNumber && (
+                <span className="text-muted-foreground ml-1">({cn.serialNumber})</span>
+              )}
             </TableCell>
             <TableCell>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-100">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-muted text-foreground border-border">
                 {cn.type?.replace('_', ' ')}
               </span>
             </TableCell>
-            <TableCell className="font-semibold text-xs text-slate-700 font-mono">
+            <TableCell className="font-semibold text-xs text-foreground font-mono">
               {currency} {Number(cn.productAmount).toLocaleString()}
             </TableCell>
             <TableCell>
@@ -1240,7 +1302,10 @@ function ReturnsTab({
             <TableCell>
               <CreatedAtCell date={cn.createdAt} />
             </TableCell>
-            <TableCell className="text-[10px] text-slate-300" title="Not tracked for credit notes">
+            <TableCell
+              className="text-[10px] text-muted-foreground"
+              title="Not tracked for credit notes"
+            >
               —
             </TableCell>
           </TableRow>

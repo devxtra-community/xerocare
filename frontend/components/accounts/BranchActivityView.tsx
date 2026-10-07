@@ -51,43 +51,47 @@ const TYPE_CONFIG: Record<
   QUOTATION: {
     label: 'Quotation',
     icon: FileSignature,
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
+    color: 'bg-primary/10 text-primary border-primary/30',
   },
   INVOICE: {
     label: 'Invoice',
     icon: FileText,
-    color: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    color: 'bg-primary/10 text-primary border-primary/30',
   },
   PURCHASE: {
     label: 'Purchase',
     icon: Truck,
-    color: 'bg-orange-50 text-orange-700 border-orange-200',
+    color: 'bg-warning/10 text-warning border-warning/30',
   },
   SERVICE_TICKET: {
     label: 'Service Ticket',
     icon: Wrench,
-    color: 'bg-purple-50 text-purple-700 border-purple-200',
+    color: 'bg-lease/10 text-lease border-lease/30',
   },
   STOCK_TRANSFER: {
     label: 'Stock Transfer',
     icon: ArrowRightLeft,
-    color: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    color: 'bg-info/10 text-info border-info/30',
   },
   CHEQUE: {
     label: 'Cheque',
     icon: ScrollText,
-    color: 'bg-amber-50 text-amber-700 border-amber-200',
+    color: 'bg-warning/10 text-warning border-warning/30',
   },
-  EXPENSE: { label: 'Expense', icon: Receipt, color: 'bg-red-50 text-red-700 border-red-200' },
+  EXPENSE: {
+    label: 'Expense',
+    icon: Receipt,
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
+  },
   EXPENSE_REQUEST: {
     label: 'Expense Request',
     icon: ClipboardList,
-    color: 'bg-rose-50 text-rose-700 border-rose-200',
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
   },
   CREDIT_NOTE: {
     label: 'Return',
     icon: RotateCcw,
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    color: 'bg-success/10 text-success border-success/30',
   },
 };
 
@@ -172,7 +176,7 @@ export function BranchActivityView({ branchId }: { branchId?: string }) {
           <Button
             onClick={exportExcel}
             disabled={events.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            className="bg-success hover:bg-success/90 text-success-foreground gap-2"
           >
             <Download className="h-4 w-4" /> Export Excel
           </Button>
@@ -184,28 +188,28 @@ export function BranchActivityView({ branchId }: { branchId?: string }) {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center space-y-3">
-          <p className="text-red-700 font-medium">Failed to load branch activity.</p>
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center space-y-3">
+          <p className="text-destructive font-medium">Failed to load branch activity.</p>
           <button
             onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
           >
             Retry
           </button>
         </div>
       ) : events.length === 0 ? (
-        <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-12 text-center">
+        <div className="rounded-2xl bg-card shadow-sm border border-border p-12 text-center">
           <p className="text-muted-foreground">No activity recorded for this date.</p>
         </div>
       ) : (
-        <div className="rounded-2xl bg-card shadow-sm border border-slate-100 divide-y divide-border overflow-hidden">
+        <div className="rounded-2xl bg-card shadow-sm border border-border divide-y divide-border overflow-hidden">
           {events.map((e) => {
             const cfg = TYPE_CONFIG[e.type];
             const Icon = cfg.icon;
             return (
               <div
                 key={e.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50/60 transition-colors"
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 hover:bg-muted/60 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <span
@@ -214,7 +218,7 @@ export function BranchActivityView({ branchId }: { branchId?: string }) {
                     <Icon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{e.title}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{e.title}</p>
                     {e.description && (
                       <p className="text-xs text-muted-foreground truncate">{e.description}</p>
                     )}
@@ -225,14 +229,14 @@ export function BranchActivityView({ branchId }: { branchId?: string }) {
                     {e.time?.slice(11, 16)}
                   </span>
                   {e.amount != null && (
-                    <span className="text-sm font-semibold tabular-nums text-slate-800">
+                    <span className="text-sm font-semibold tabular-nums text-foreground">
                       {formatCurrency(e.amount, e.currency)}
                     </span>
                   )}
                   <button
                     onClick={() => openView(e)}
                     disabled={loadingChequeId === e.id}
-                    className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 disabled:opacity-50"
+                    className="p-1.5 rounded-md hover:bg-primary/10 text-primary disabled:opacity-50"
                     title="View full details"
                   >
                     <Eye className="h-3.5 w-3.5" />

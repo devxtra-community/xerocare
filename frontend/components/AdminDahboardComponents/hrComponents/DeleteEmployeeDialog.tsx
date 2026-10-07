@@ -36,16 +36,16 @@ export default function DeleteEmployeeDialog({
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <div
-            className={`flex items-center gap-4 mb-4 ${isEnabling ? 'text-blue-600' : 'text-red-600'}`}
+            className={`flex items-center gap-4 mb-4 ${isEnabling ? 'text-primary' : 'text-destructive'}`}
           >
             <div
-              className={`h-12 w-12 rounded-2xl flex items-center justify-center shadow-sm ${isEnabling ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}
+              className={`h-12 w-12 rounded-2xl flex items-center justify-center shadow-sm ${isEnabling ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}
             >
               <AlertCircle className="h-6 w-6" />
             </div>
             <DialogTitle>{isEnabling ? 'Enable Employee Access' : 'Confirm Action'}</DialogTitle>
           </div>
-          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+          <DialogDescription className="text-base text-foreground leading-relaxed">
             {isEnabling ? (
               <>
                 Are you sure you want to enable access for <strong>{employeeName}</strong>? They
@@ -63,7 +63,7 @@ export default function DeleteEmployeeDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>

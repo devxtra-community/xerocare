@@ -36,12 +36,12 @@ export default function CashFlowMiniChart() {
             <span className="text-xl font-bold text-foreground">
               {formatCurrency(netPosition, currency)}
             </span>
-            <span className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+            <span className="flex items-center text-xs font-medium text-success bg-success/10 px-1.5 py-0.5 rounded">
               <ArrowUpRight className="w-3 h-3 mr-0.5" /> +12%
             </span>
           </div>
         </div>
-        <TrendingUp className="w-5 h-5 text-slate-300 mr-3" />
+        <TrendingUp className="w-5 h-5 text-muted-foreground mr-3" />
       </div>
 
       <div className="w-full h-[180px]">
@@ -53,18 +53,18 @@ export default function CashFlowMiniChart() {
                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorOutflow" x1="0" y1="0" x2="2" y2="1">
-                <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-soft)" stopOpacity={0.1} />
+                <stop offset="95%" stopColor="var(--chart-blue-soft)" stopOpacity={0} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--muted)" />
 
             <XAxis
               dataKey="month"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 11 }}
               dy={10}
             />
 
@@ -92,7 +92,7 @@ export default function CashFlowMiniChart() {
             <Area
               type="monotone"
               dataKey="outflow"
-              stroke="#60a5fa"
+              stroke="var(--chart-blue-soft)"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorOutflow)"

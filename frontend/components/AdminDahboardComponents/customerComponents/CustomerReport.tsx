@@ -218,25 +218,25 @@ export default function CustomerReport() {
 
   if (loading) {
     return (
-      <div className="bg-slate-50 min-h-screen p-6 flex flex-col items-center justify-center space-y-4">
+      <div className="bg-muted min-h-screen p-6 flex flex-col items-center justify-center space-y-4">
         <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-slate-500 font-medium">Loading customers directory...</p>
+        <p className="text-muted-foreground font-medium">Loading customers directory...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen p-4 md:p-6 space-y-6">
+    <div className="bg-muted min-h-screen p-4 md:p-6 space-y-6">
       {/* Title Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Customers Directory</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-xl sm:text-2xl font-medium text-foreground">Customers Directory</h2>
+          <p className="text-sm text-muted-foreground">
             View, search, and monitor customer installations and payment statuses across all
             branches
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} className="border-slate-200">
+        <Button variant="outline" size="sm" onClick={fetchData} className="border-border">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh Data
         </Button>
@@ -267,12 +267,12 @@ export default function CustomerReport() {
       </div>
 
       {/* Filter Block */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
+      <div className="bg-card rounded-2xl border border-border p-4 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:max-w-2xl">
             {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search name, email, phone..."
                 value={search}
@@ -299,10 +299,10 @@ export default function CustomerReport() {
           </div>
 
           {/* Toggle Switch for Pending Cash Customers */}
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-100/50 transition-colors w-full sm:w-auto shrink-0 justify-between sm:justify-start">
+          <div className="flex items-center gap-3 bg-muted border border-border rounded-xl px-4 py-2 hover:bg-muted/50 transition-colors w-full sm:w-auto shrink-0 justify-between sm:justify-start">
             <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-amber-500" />
-              <span className="text-xs font-semibold text-slate-700">Pending Cash Customers</span>
+              <Wallet className="h-4 w-4 text-warning" />
+              <span className="text-xs font-semibold text-foreground">Pending Cash Customers</span>
             </div>
             <button
               onClick={() => {
@@ -310,11 +310,11 @@ export default function CustomerReport() {
                 setPage(1);
               }}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                showPendingCashOnly ? 'bg-amber-500' : 'bg-slate-300'
+                showPendingCashOnly ? 'bg-warning' : 'bg-muted'
               }`}
             >
               <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${
                   showPendingCashOnly ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
@@ -324,27 +324,27 @@ export default function CustomerReport() {
       </div>
 
       {/* Main Table Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-slate-50/70 border-b border-slate-200">
+            <TableHeader className="bg-muted/70 border-b border-border">
               <TableRow>
-                <TableHead className="text-[11px] font-bold text-slate-500 uppercase py-4 px-4">
+                <TableHead className="text-[11px] font-bold text-muted-foreground uppercase py-4 px-4">
                   Customer Details
                 </TableHead>
-                <TableHead className="text-[11px] font-bold text-slate-500 uppercase">
+                <TableHead className="text-[11px] font-bold text-muted-foreground uppercase">
                   Contact Information
                 </TableHead>
-                <TableHead className="text-[11px] font-bold text-slate-500 uppercase">
+                <TableHead className="text-[11px] font-bold text-muted-foreground uppercase">
                   Branch & Location
                 </TableHead>
-                <TableHead className="text-[11px] font-bold text-slate-500 uppercase">
+                <TableHead className="text-[11px] font-bold text-muted-foreground uppercase">
                   Products / Brands
                 </TableHead>
-                <TableHead className="text-[11px] font-bold text-slate-500 uppercase text-center">
+                <TableHead className="text-[11px] font-bold text-muted-foreground uppercase text-center">
                   Status
                 </TableHead>
-                <TableHead className="text-[11px] font-bold text-slate-500 uppercase text-right py-4 px-4">
+                <TableHead className="text-[11px] font-bold text-muted-foreground uppercase text-right py-4 px-4">
                   Actions
                 </TableHead>
               </TableRow>
@@ -352,7 +352,10 @@ export default function CustomerReport() {
             <TableBody>
               {paginatedCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-slate-500 font-medium">
+                  <TableCell
+                    colSpan={6}
+                    className="text-center py-12 text-muted-foreground font-medium"
+                  >
                     No customers found matching the search and filter criteria.
                   </TableCell>
                 </TableRow>
@@ -365,13 +368,13 @@ export default function CustomerReport() {
                   return (
                     <TableRow
                       key={cust.id}
-                      className={`hover:bg-slate-50/50 transition-colors ${idx % 2 ? 'bg-slate-50/20' : 'bg-white'}`}
+                      className={`hover:bg-muted/50 transition-colors ${idx % 2 ? 'bg-muted/20' : 'bg-card'}`}
                     >
                       {/* Name Details */}
                       <TableCell className="py-4 px-4">
                         <div className="flex flex-col gap-1">
-                          <span className="font-bold text-slate-900 text-sm">{cust.name}</span>
-                          <span className="text-[10px] text-slate-400">
+                          <span className="font-bold text-foreground text-sm">{cust.name}</span>
+                          <span className="text-[10px] text-muted-foreground">
                             Registered: {new Date(cust.createdAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -381,14 +384,14 @@ export default function CustomerReport() {
                       <TableCell>
                         <div className="flex flex-col gap-1 text-xs">
                           {cust.email && (
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                              <Mail className="h-3.5 w-3.5 text-slate-400" />
+                            <div className="flex items-center gap-1.5 text-foreground">
+                              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                               <span>{cust.email}</span>
                             </div>
                           )}
                           {cust.phone && (
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                              <Smartphone className="h-3.5 w-3.5 text-slate-400" />
+                            <div className="flex items-center gap-1.5 text-foreground">
+                              <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
                               <span>{cust.phone}</span>
                             </div>
                           )}
@@ -398,13 +401,13 @@ export default function CustomerReport() {
                       {/* Branch & Location */}
                       <TableCell>
                         <div className="flex flex-col gap-1 text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                          <div className="flex items-center gap-1.5 text-foreground font-medium">
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                             <span>{getBranchName(cust.branch_id)}</span>
                           </div>
                           {(cust.location || cust.address) && (
-                            <div className="flex items-center gap-1.5 text-slate-500 truncate max-w-[200px]">
-                              <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <div className="flex items-center gap-1.5 text-muted-foreground truncate max-w-[200px]">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                               <span>{cust.location || cust.address}</span>
                             </div>
                           )}
@@ -416,14 +419,14 @@ export default function CustomerReport() {
                         <div className="flex flex-col gap-1.5">
                           {custProducts.length > 0 ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-xs font-bold text-slate-700">
+                              <span className="text-xs font-bold text-foreground">
                                 {custProducts.length} Product(s):
                               </span>
                               <div className="flex flex-wrap gap-1">
                                 {custBrands.map((brand) => (
                                   <span
                                     key={brand}
-                                    className="text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 rounded px-1.5 py-0.5"
+                                    className="text-[10px] font-semibold bg-primary/10 text-primary border border-primary/30 rounded px-1.5 py-0.5"
                                   >
                                     {brand}
                                   </span>
@@ -431,7 +434,7 @@ export default function CustomerReport() {
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-400 italic">
+                            <span className="text-xs text-muted-foreground italic">
                               No products allocated
                             </span>
                           )}
@@ -444,19 +447,19 @@ export default function CustomerReport() {
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               cust.isActive
-                                ? 'bg-green-50 text-green-700 border border-green-100'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-success/10 text-success border border-success/30'
+                                : 'bg-muted text-foreground'
                             }`}
                           >
                             {cust.isActive ? 'ACTIVE' : 'INACTIVE'}
                           </span>
                           {hasPendingCash && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-1 animate-pulse">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-warning/10 text-warning border border-warning/30 flex items-center gap-1 animate-pulse">
                               <Wallet className="h-2.5 w-2.5" /> PENDING CASH
                             </span>
                           )}
                           {getCustomerOutstandingMigratedBalance(cust.id) > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100 flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-lease/10 text-lease border border-lease/30 flex items-center gap-1">
                               OB: {getActiveCurrency()}{' '}
                               {getCustomerOutstandingMigratedBalance(cust.id).toLocaleString()}
                             </span>
@@ -471,16 +474,16 @@ export default function CustomerReport() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenDetail(cust)}
-                            className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-slate-50 border-slate-200"
+                            className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-muted border-border"
                           >
-                            <Eye className="h-3.5 w-3.5 text-slate-500" />
+                            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
                             Details
                           </Button>
                           <Link href={`/admin/customers/${cust.id}`}>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-indigo-50 border-indigo-200 text-indigo-700"
+                              className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-primary/10 border-primary/30 text-primary"
                             >
                               <LayoutList className="h-3.5 w-3.5" />
                               360°
@@ -497,7 +500,7 @@ export default function CustomerReport() {
         </div>
 
         {totalPages > 1 && (
-          <div className="border-t border-slate-200">
+          <div className="border-t border-border">
             <Pagination
               page={page}
               totalPages={totalPages}
@@ -514,16 +517,16 @@ export default function CustomerReport() {
         <Dialog open={isDetailOpen} onOpenChange={(val) => !val && setIsDetailOpen(false)}>
           <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl shadow-xl">
             {/* Header info */}
-            <DialogHeader className="p-6 border-b flex flex-row items-center justify-between shrink-0 bg-slate-50/50">
+            <DialogHeader className="p-6 border-b flex flex-row items-center justify-between shrink-0 bg-muted/50">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 shadow-sm">
+                <div className="p-2.5 bg-primary/10 text-primary rounded-2xl border border-primary/30 shadow-sm">
                   <Users className="h-6 w-6" />
                 </div>
                 <div>
-                  <DialogTitle className="text-xl font-bold text-slate-900">
+                  <DialogTitle className="text-xl font-bold text-foreground">
                     {selectedCustomer.name}
                   </DialogTitle>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Customer Account Dashboard • Branch: {getBranchName(selectedCustomer.branch_id)}
                   </p>
                 </div>
@@ -532,14 +535,14 @@ export default function CustomerReport() {
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-bold ${
                     selectedCustomer.isActive
-                      ? 'bg-green-50 text-green-700 border border-green-200'
-                      : 'bg-slate-100 text-slate-600'
+                      ? 'bg-success/10 text-success border border-success/30'
+                      : 'bg-muted text-foreground'
                   }`}
                 >
                   {selectedCustomer.isActive ? 'Active Account' : 'Inactive'}
                 </span>
                 {isPendingCashCustomer(selectedCustomer.id) && (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-warning/10 text-warning border border-warning/30 flex items-center gap-1.5">
                     <Wallet className="h-3 w-3" /> Pending Cash
                   </span>
                 )}
@@ -547,15 +550,15 @@ export default function CustomerReport() {
             </DialogHeader>
 
             {/* Navigation Tabs */}
-            <div className="flex border-b px-6 shrink-0 bg-white">
+            <div className="flex border-b px-6 shrink-0 bg-card">
               {(['overview', 'products', 'invoices', 'opening-balances'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setDetailTab(tab)}
                   className={`py-3 px-4 text-sm font-semibold capitalize border-b-2 transition-all ${
                     detailTab === tab
-                      ? 'border-blue-600 text-blue-600 font-bold'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                      ? 'border-primary text-primary font-bold'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {tab === 'opening-balances' ? 'Opening Balances' : tab}
@@ -564,49 +567,49 @@ export default function CustomerReport() {
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-auto p-6 bg-slate-50/50 space-y-6">
+            <div className="flex-1 overflow-auto p-6 bg-muted/50 space-y-6">
               {/* Tab 1: Overview */}
               {detailTab === 'overview' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Account profile details */}
-                  <div className="bg-white rounded-2xl p-5 border shadow-sm space-y-4">
-                    <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider border-b pb-2">
+                  <div className="bg-card rounded-2xl p-5 border shadow-sm space-y-4">
+                    <h3 className="font-bold text-foreground text-sm uppercase tracking-wider border-b pb-2">
                       Profile Details
                     </h3>
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 text-sm">
-                        <span className="text-slate-400 font-medium">Email:</span>
-                        <span className="col-span-2 text-slate-700 font-semibold">
+                        <span className="text-muted-foreground font-medium">Email:</span>
+                        <span className="col-span-2 text-foreground font-semibold">
                           {selectedCustomer.email || 'N/A'}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 text-sm">
-                        <span className="text-slate-400 font-medium">Phone:</span>
-                        <span className="col-span-2 text-slate-700 font-semibold">
+                        <span className="text-muted-foreground font-medium">Phone:</span>
+                        <span className="col-span-2 text-foreground font-semibold">
                           {selectedCustomer.phone || 'N/A'}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 text-sm">
-                        <span className="text-slate-400 font-medium">Location:</span>
-                        <span className="col-span-2 text-slate-700 font-semibold">
+                        <span className="text-muted-foreground font-medium">Location:</span>
+                        <span className="col-span-2 text-foreground font-semibold">
                           {selectedCustomer.location || 'N/A'}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 text-sm">
-                        <span className="text-slate-400 font-medium">Address:</span>
-                        <span className="col-span-2 text-slate-700 text-xs font-semibold">
+                        <span className="text-muted-foreground font-medium">Address:</span>
+                        <span className="col-span-2 text-foreground text-xs font-semibold">
                           {selectedCustomer.address || 'N/A'}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 text-sm">
-                        <span className="text-slate-400 font-medium">VAT Status:</span>
-                        <span className="col-span-2 text-slate-700 font-semibold">
+                        <span className="text-muted-foreground font-medium">VAT Status:</span>
+                        <span className="col-span-2 text-foreground font-semibold">
                           {selectedCustomer.vatStatus
                             ? CUSTOMER_VAT_STATUS_LABELS[selectedCustomer.vatStatus]
                             : CUSTOMER_VAT_STATUS_LABELS.UNREGISTERED_STANDARD}
                           {selectedCustomer.vatStatus === 'REGISTERED' &&
                             selectedCustomer.vatNumber && (
-                              <span className="text-slate-400 font-normal">
+                              <span className="text-muted-foreground font-normal">
                                 {' '}
                                 ({selectedCustomer.vatNumber})
                               </span>
@@ -616,12 +619,14 @@ export default function CustomerReport() {
                       {/* Internal-only — never shown on customer-facing documents. */}
                       {selectedCustomer.vatStatus === 'EXEMPT' && (
                         <div className="grid grid-cols-3 text-sm">
-                          <span className="text-slate-400 font-medium">Exemption Reason:</span>
-                          <span className="col-span-2 text-amber-700 font-semibold">
+                          <span className="text-muted-foreground font-medium">
+                            Exemption Reason:
+                          </span>
+                          <span className="col-span-2 text-warning font-semibold">
                             {selectedCustomer.exemptionReason
                               ? CUSTOMER_EXEMPTION_REASON_LABELS[selectedCustomer.exemptionReason]
                               : 'Not specified'}
-                            <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
+                            <span className="block text-[10px] text-muted-foreground font-normal mt-0.5">
                               Internal use only — not shown to the customer
                             </span>
                           </span>
@@ -631,36 +636,36 @@ export default function CustomerReport() {
                   </div>
 
                   {/* Summary Counters */}
-                  <div className="bg-white rounded-2xl p-5 border shadow-sm space-y-4">
-                    <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider border-b pb-2">
+                  <div className="bg-card rounded-2xl p-5 border shadow-sm space-y-4">
+                    <h3 className="font-bold text-foreground text-sm uppercase tracking-wider border-b pb-2">
                       Account Summary
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
+                      <div className="bg-muted p-4 rounded-xl border border-border flex flex-col items-center justify-center">
                         <span className="text-2xl font-bold text-primary">
                           {getCustomerProducts(selectedCustomer.id).length}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase mt-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase mt-1">
                           Products
                         </span>
                       </div>
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
+                      <div className="bg-muted p-4 rounded-xl border border-border flex flex-col items-center justify-center">
                         <span className="text-2xl font-bold text-primary">
                           {getCustomerInvoices(selectedCustomer.id).length}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase mt-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase mt-1">
                           Invoices
                         </span>
                       </div>
                     </div>
                     {isPendingCashCustomer(selectedCustomer.id) && (
-                      <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 flex gap-2.5 items-start">
-                        <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 flex gap-2.5 items-start">
+                        <AlertCircle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs font-bold text-amber-800">
+                          <p className="text-xs font-bold text-warning">
                             Pending Collection Action Required
                           </p>
-                          <p className="text-[10px] text-amber-600 mt-0.5">
+                          <p className="text-[10px] text-warning mt-0.5">
                             This customer has cash-settled contracts/invoices that are currently
                             unpaid. Please follow up.
                           </p>
@@ -673,9 +678,9 @@ export default function CustomerReport() {
 
               {/* Tab 2: Allocated Products */}
               {detailTab === 'products' && (
-                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
                   <Table>
-                    <TableHeader className="bg-slate-50">
+                    <TableHeader className="bg-muted">
                       <TableRow>
                         <TableHead>Serial Number</TableHead>
                         <TableHead>Brand</TableHead>
@@ -688,32 +693,35 @@ export default function CustomerReport() {
                     <TableBody>
                       {getCustomerProducts(selectedCustomer.id).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6 text-slate-400 italic">
+                          <TableCell
+                            colSpan={6}
+                            className="text-center py-6 text-muted-foreground italic"
+                          >
                             No products allocated to this customer.
                           </TableCell>
                         </TableRow>
                       ) : (
                         getCustomerProducts(selectedCustomer.id).map((prod) => (
-                          <TableRow key={prod.id} className="hover:bg-slate-50/40">
-                            <TableCell className="font-bold text-slate-800">
+                          <TableRow key={prod.id} className="hover:bg-muted/40">
+                            <TableCell className="font-bold text-foreground">
                               {prod.serial_no}
                             </TableCell>
                             <TableCell>
-                              <span className="text-xs font-semibold bg-slate-100 text-slate-800 px-2 py-0.5 rounded">
+                              <span className="text-xs font-semibold bg-muted text-foreground px-2 py-0.5 rounded">
                                 {prod.brand}
                               </span>
                             </TableCell>
                             <TableCell className="text-xs">
                               <div>
-                                <div className="font-medium text-slate-800">{prod.name}</div>
-                                <div className="text-slate-400">
+                                <div className="font-medium text-foreground">{prod.name}</div>
+                                <div className="text-muted-foreground">
                                   {prod.model?.model_name ||
                                     prod.model?.model_no ||
                                     'Model ID: ' + (prod.model || 'N/A')}
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-xs font-semibold text-slate-600">
+                            <TableCell className="text-xs font-semibold text-foreground">
                               {prod.ownership || 'N/A'}
                             </TableCell>
                             <TableCell className="text-right font-medium">
@@ -729,8 +737,8 @@ export default function CustomerReport() {
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   prod.product_status === 'RENTED' || prod.product_status === 'SOLD'
-                                    ? 'bg-blue-50 text-blue-700'
-                                    : 'bg-green-50 text-green-700'
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'bg-success/10 text-success'
                                 }`}
                               >
                                 {prod.product_status}
@@ -746,9 +754,9 @@ export default function CustomerReport() {
 
               {/* Tab 3: Invoice History */}
               {detailTab === 'invoices' && (
-                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
                   <Table>
-                    <TableHeader className="bg-slate-50">
+                    <TableHeader className="bg-muted">
                       <TableRow>
                         <TableHead>Invoice #</TableHead>
                         <TableHead>Sale Type</TableHead>
@@ -761,7 +769,10 @@ export default function CustomerReport() {
                     <TableBody>
                       {getCustomerInvoices(selectedCustomer.id).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6 text-slate-400 italic">
+                          <TableCell
+                            colSpan={6}
+                            className="text-center py-6 text-muted-foreground italic"
+                          >
                             No invoices generated for this customer.
                           </TableCell>
                         </TableRow>
@@ -789,15 +800,15 @@ export default function CustomerReport() {
                           return (
                             <TableRow
                               key={inv.id}
-                              className={`hover:bg-slate-50/40 ${isCashInvoice && isUnpaid ? 'bg-amber-50/10' : ''}`}
+                              className={`hover:bg-muted/40 ${isCashInvoice && isUnpaid ? 'bg-warning/10' : ''}`}
                             >
-                              <TableCell className="font-bold text-blue-600">
+                              <TableCell className="font-bold text-primary">
                                 {inv.invoiceNumber}
                               </TableCell>
-                              <TableCell className="text-xs font-semibold text-slate-600">
+                              <TableCell className="text-xs font-semibold text-foreground">
                                 {inv.saleType || 'SERVICE'}
                               </TableCell>
-                              <TableCell className="text-xs text-slate-500">
+                              <TableCell className="text-xs text-muted-foreground">
                                 {inv.effectiveFrom && inv.effectiveTo ? (
                                   <span>
                                     {new Date(inv.effectiveFrom).toLocaleDateString()} -{' '}
@@ -807,15 +818,15 @@ export default function CustomerReport() {
                                   <span>{new Date(inv.createdAt).toLocaleDateString()}</span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right font-bold text-slate-800">
+                              <TableCell className="text-right font-bold text-foreground">
                                 {formatCurrency(inv.totalAmount || inv.grossAmount || 0, currency)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <span
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                     inv.securityDepositMode === 'CASH'
-                                      ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                                      : 'bg-slate-100 text-slate-600'
+                                      ? 'bg-warning/10 text-warning border border-warning/30'
+                                      : 'bg-muted text-foreground'
                                   }`}
                                 >
                                   {inv.securityDepositMode || 'N/A'}
@@ -826,16 +837,16 @@ export default function CustomerReport() {
                                   <span
                                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                       inv.status === 'PAID'
-                                        ? 'bg-green-50 text-green-700'
+                                        ? 'bg-success/10 text-success'
                                         : isUnpaid
-                                          ? 'bg-orange-50 text-orange-700 border border-orange-100'
-                                          : 'bg-slate-100 text-slate-600'
+                                          ? 'bg-warning/10 text-warning border border-warning/30'
+                                          : 'bg-muted text-foreground'
                                     }`}
                                   >
                                     {inv.status}
                                   </span>
                                   {isCashInvoice && isUnpaid && (
-                                    <span className="text-[8px] font-black text-amber-700 uppercase tracking-tighter">
+                                    <span className="text-[8px] font-black text-warning uppercase tracking-tighter">
                                       Pending Cash Payment
                                     </span>
                                   )}
@@ -852,9 +863,9 @@ export default function CustomerReport() {
 
               {/* Tab 4: Opening Balances */}
               {detailTab === 'opening-balances' && (
-                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
                   <Table>
-                    <TableHeader className="bg-slate-50">
+                    <TableHeader className="bg-muted">
                       <TableRow>
                         <TableHead>Entry #</TableHead>
                         <TableHead>Type</TableHead>
@@ -866,35 +877,38 @@ export default function CustomerReport() {
                     <TableBody>
                       {getCustomerOpeningBalances(selectedCustomer.id).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-slate-400 italic">
+                          <TableCell
+                            colSpan={5}
+                            className="text-center py-6 text-muted-foreground italic"
+                          >
                             No migrated opening balances found for this customer.
                           </TableCell>
                         </TableRow>
                       ) : (
                         getCustomerOpeningBalances(selectedCustomer.id).map((ob) => (
-                          <TableRow key={ob.id} className="hover:bg-slate-50/40">
-                            <TableCell className="font-bold text-slate-850">
+                          <TableRow key={ob.id} className="hover:bg-muted/40">
+                            <TableCell className="font-bold text-foreground">
                               <div>{ob.entryNumber}</div>
-                              <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                              <div className="text-[10px] text-muted-foreground font-normal mt-0.5">
                                 Migrated: {new Date(ob.migratedAt).toLocaleDateString()}
                               </div>
                             </TableCell>
-                            <TableCell className="text-xs font-semibold text-slate-650">
+                            <TableCell className="text-xs font-semibold text-foreground">
                               {ob.balanceType.replace(/_/g, ' ')}
                             </TableCell>
                             <TableCell className="text-right font-medium">
                               {getActiveCurrency()}{' '}
                               {Number(ob.originalTotalAmount).toLocaleString()}
                             </TableCell>
-                            <TableCell className="text-right font-bold text-slate-800">
+                            <TableCell className="text-right font-bold text-foreground">
                               {getActiveCurrency()} {Number(ob.remainingBalance).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-center">
                               <span
                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                                   ob.isFullySettled
-                                    ? 'bg-green-50 text-green-700'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                    ? 'bg-success/10 text-success'
+                                    : 'bg-warning/10 text-warning border border-warning/30'
                                 }`}
                               >
                                 {ob.isFullySettled ? 'Settled' : 'Outstanding'}
@@ -910,7 +924,7 @@ export default function CustomerReport() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t bg-white flex justify-end shrink-0">
+            <div className="p-4 border-t bg-card flex justify-end shrink-0">
               <Button onClick={() => setIsDetailOpen(false)}>Close Details</Button>
             </div>
           </DialogContent>

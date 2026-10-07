@@ -28,7 +28,7 @@ interface CommonModalProps {
 const otherIncomeColumns: DrilldownColumn<OtherIncomeRow>[] = [
   {
     header: 'Income #',
-    render: (r) => <span className="font-mono text-xs text-blue-600 font-bold">{r.incomeNo}</span>,
+    render: (r) => <span className="font-mono text-xs text-primary font-bold">{r.incomeNo}</span>,
   },
   {
     header: 'Category',
@@ -49,7 +49,7 @@ const otherIncomeColumns: DrilldownColumn<OtherIncomeRow>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(r.amount, r.currencyCode)}
       </span>
     ),
@@ -92,7 +92,7 @@ const accessoriesRevenueColumns: DrilldownColumn<AccessoriesRevenueRow>[] = [
   {
     header: 'Invoice #',
     render: (r) => (
-      <span className="font-mono text-xs text-blue-600 font-bold">{r.invoiceNumber}</span>
+      <span className="font-mono text-xs text-primary font-bold">{r.invoiceNumber}</span>
     ),
   },
   { header: 'Customer', render: (r) => <span className="text-sm">{r.customerName}</span> },
@@ -110,7 +110,7 @@ const accessoriesRevenueColumns: DrilldownColumn<AccessoriesRevenueRow>[] = [
   {
     header: 'Sold On',
     render: (r) => (
-      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-muted text-foreground border border-border">
         {r.saleType?.replace(/_/g, ' ')}
       </span>
     ),
@@ -134,7 +134,7 @@ const accessoriesRevenueColumns: DrilldownColumn<AccessoriesRevenueRow>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(r.amount, r.currencyCode)}
       </span>
     ),
@@ -180,14 +180,14 @@ const usageRevenueColumns: DrilldownColumn<UsageRevenueRow>[] = [
   {
     header: 'Contract #',
     render: (r) => (
-      <span className="font-mono text-xs text-blue-600 font-bold">{r.invoiceNumber}</span>
+      <span className="font-mono text-xs text-primary font-bold">{r.invoiceNumber}</span>
     ),
   },
   { header: 'Customer', render: (r) => <span className="text-sm">{r.customerName}</span> },
   {
     header: 'Type',
     render: (r) => (
-      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-muted text-foreground border border-border">
         {r.saleType?.replace(/_/g, ' ')}
       </span>
     ),
@@ -216,7 +216,7 @@ const usageRevenueColumns: DrilldownColumn<UsageRevenueRow>[] = [
     header: 'Copies Over Limit',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-amber-700">
+      <span className="font-bold tabular-nums text-warning">
         {r.exceededCopies.toLocaleString()}
       </span>
     ),
@@ -225,7 +225,7 @@ const usageRevenueColumns: DrilldownColumn<UsageRevenueRow>[] = [
     header: 'Excess Charge',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(r.amount, r.currencyCode)}
       </span>
     ),

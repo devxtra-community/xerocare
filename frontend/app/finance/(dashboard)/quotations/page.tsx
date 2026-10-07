@@ -7,9 +7,9 @@ export default function FinanceQuotationsPage() {
     // generous spacing) — this used to be a bare max-w-7xl main with no heading at all,
     // so the Finance side read as a loose table dropped onto the dashboard rather than a
     // page of its own.
-    <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+    <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
       <div className="flex flex-col space-y-1">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
           Quotation Management
         </h3>
         <p className="text-sm text-muted-foreground font-medium">

@@ -6,9 +6,9 @@ import EmployeeQuotationTable from '@/components/employeeComponents/EmployeeQuot
 export default function EmployeeQuotationsPage() {
   return (
     <ProtectedRoute requiredModules={['sales', 'rent', 'lease']}>
-      <div className="bg-blue-100 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+      <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
         <div className="flex flex-col space-y-1">
-          <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Quotation Management
           </h3>
           <p className="text-sm text-muted-foreground font-medium">

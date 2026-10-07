@@ -70,11 +70,11 @@ export default function EditAccountDialog({ account, onClose, onUpdated }: Props
   const canSubmit = accountName.trim().length > 0 && isDirty;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Edit Account</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <h2 className="font-bold text-foreground">Edit Account</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -107,7 +107,7 @@ export default function EditAccountDialog({ account, onClose, onUpdated }: Props
             {account.category && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Category</span>
-                <span className="font-medium text-slate-700">
+                <span className="font-medium text-foreground">
                   {CATEGORY_LABELS[account.category] ?? account.category}
                 </span>
               </div>
@@ -115,14 +115,14 @@ export default function EditAccountDialog({ account, onClose, onUpdated }: Props
             {account.accountGroup && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Type</span>
-                <span className="font-medium text-slate-700">
+                <span className="font-medium text-foreground">
                   {GROUP_LABELS[account.accountGroup] ?? account.accountGroup}
                 </span>
               </div>
             )}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Balance Source</span>
-              <span className="font-medium text-slate-700">
+              <span className="font-medium text-foreground">
                 {SOURCE_LABELS[account.sourceType] ?? account.sourceType}
               </span>
             </div>

@@ -10,8 +10,8 @@ const data = [
 
 const COLORS = [
   'var(--primary)', // In Stock - Red
-  '#93c5fd', // Low Stock - Light Blue
-  '#ef4444', // Out of Stock - Red
+  'var(--chart-blue-light)', // Low Stock - Light Blue
+  'var(--destructive)', // Out of Stock - Red
 ];
 
 /**
@@ -50,7 +50,7 @@ export default function StockStatusDonut() {
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
                 fontSize: '11px',
               }}
             />
@@ -58,7 +58,11 @@ export default function StockStatusDonut() {
               verticalAlign="bottom"
               height={36}
               iconType="circle"
-              wrapperStyle={{ fontSize: '10px', color: '#64748B', paddingTop: '10px' }}
+              wrapperStyle={{
+                fontSize: '10px',
+                color: 'var(--chart-slate-dark)',
+                paddingTop: '10px',
+              }}
             />
           </PieChart>
         </ResponsiveContainer>

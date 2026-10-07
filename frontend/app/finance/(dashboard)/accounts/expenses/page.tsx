@@ -83,27 +83,27 @@ const EXPENSE_CATEGORIES = [
 // categorically distinct from LABOUR (5002, service-ticket Technician Labour) — same reason
 // the account codes are split: blending them would misrepresent both numbers.
 const CATEGORY_COLORS: Record<string, string> = {
-  SALARY: '#6366f1',
-  TRAVEL: '#f59e0b',
-  RENT: '#3b82f6',
-  UTILITIES: '#10b981',
-  SPARE_PARTS: '#ef4444',
-  LABOUR: '#8b5cf6',
-  VENDOR_PURCHASE: '#ec4899',
-  SHIPPING_HANDLING: '#0ea5e9',
-  IMPORT_LABOUR: '#a855f7',
-  CUSTOMS_DUTY: '#d97706',
-  MARKETING: '#14b8a6',
-  MAINTENANCE: '#f97316',
-  INSURANCE: '#06b6d4',
-  OTHER: '#94a3b8',
+  SALARY: 'var(--chart-indigo)',
+  TRAVEL: 'var(--chart-expense)',
+  RENT: 'var(--chart-blue-mid)',
+  UTILITIES: 'var(--chart-profit)',
+  SPARE_PARTS: 'var(--destructive)',
+  LABOUR: 'var(--lease)',
+  VENDOR_PURCHASE: 'var(--danger)',
+  SHIPPING_HANDLING: 'var(--info)',
+  IMPORT_LABOUR: 'var(--lease)',
+  CUSTOMS_DUTY: 'var(--warning)',
+  MARKETING: 'var(--success)',
+  MAINTENANCE: 'var(--rent)',
+  INSURANCE: 'var(--info)',
+  OTHER: 'var(--chart-slate)',
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  APPROVED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  PAID: 'bg-blue-100 text-blue-700 border-blue-200',
-  REJECTED: 'bg-red-100 text-red-700 border-red-200',
+  PENDING: 'bg-warning/10 text-warning border-warning/30',
+  APPROVED: 'bg-success/10 text-success border-success/30',
+  PAID: 'bg-primary/10 text-primary border-primary/30',
+  REJECTED: 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
 const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'Cheque', 'Card'];
@@ -242,11 +242,11 @@ function ExpenseModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">{expense ? 'Edit Expense' : 'Add Expense'}</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
+          <h2 className="font-bold text-foreground">{expense ? 'Edit Expense' : 'Add Expense'}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -325,8 +325,8 @@ function ExpenseModal({
                 </label>
               </div>
               {form.isPrepayment && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
-                  <p className="text-xs text-blue-700">
+                <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 space-y-2">
+                  <p className="text-xs text-primary">
                     Held as a Prepaid Expenses asset (1005) until the covered period ends, then it
                     becomes a real expense — zero P&amp;L impact when paid.
                   </p>
@@ -432,7 +432,7 @@ function ExpenseModal({
                       Paid From Account
                     </label>
                     {matchingAccounts.length === 0 ? (
-                      <p className="text-xs font-medium text-red-600 mt-1">
+                      <p className="text-xs font-medium text-destructive mt-1">
                         No{' '}
                         {accountTypeForPaymentMode(form.paymentMode) === 'CASH'
                           ? 'Cash in Hand'
@@ -457,7 +457,7 @@ function ExpenseModal({
                       </Select>
                     )}
                     {balanceError && (
-                      <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+                      <p className="text-xs font-medium text-destructive mt-1">{balanceError}</p>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -609,23 +609,23 @@ function PayExpenseModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h3 className="font-bold text-slate-800">Mark Expense Paid</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-slate-700">
+          <h3 className="font-bold text-foreground">Mark Expense Paid</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="space-y-4 px-6 py-5">
           <p className="text-sm text-muted-foreground">
             {expense.expenseNo} · {expense.category.replace(/_/g, ' ')} ·{' '}
-            <span className="font-semibold text-red-600">
+            <span className="font-semibold text-destructive">
               {formatCurrency(Number(expense.netAmount), expense.currency)}
             </span>
           </p>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600">Payment Mode</label>
+            <label className="text-xs font-semibold text-foreground">Payment Mode</label>
             <Select value={paymentMode} onValueChange={setPaymentMode}>
               <SelectTrigger>
                 <SelectValue />
@@ -641,7 +641,7 @@ function PayExpenseModal({
           </div>
           {!isCheque && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-600">
+              <label className="text-xs font-semibold text-foreground">
                 Paid From Account{' '}
                 <span className="font-normal text-muted-foreground">(optional)</span>
               </label>
@@ -660,11 +660,13 @@ function PayExpenseModal({
                   ))}
                 </SelectContent>
               </Select>
-              {balanceError && <p className="text-xs font-medium text-red-600">{balanceError}</p>}
+              {balanceError && (
+                <p className="text-xs font-medium text-destructive">{balanceError}</p>
+              )}
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600">Payment Date</label>
+            <label className="text-xs font-semibold text-foreground">Payment Date</label>
             <input
               type="date"
               className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
@@ -673,34 +675,34 @@ function PayExpenseModal({
             />
           </div>
           {isCheque && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
-              <p className="text-xs font-bold text-amber-700">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 space-y-3">
+              <p className="text-xs font-bold text-warning">
                 Cheque Details — creates a PENDING issued cheque. Cash at Bank decreases only when
                 Finance marks it Cleared in Accounts → Cheques.
               </p>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">Cheque Number *</label>
+                <label className="text-xs font-semibold text-foreground">Cheque Number *</label>
                 <input
                   required
                   value={chequeNumber}
                   onChange={(e) => setChequeNumber(e.target.value)}
                   placeholder="e.g. CHQ-001234"
-                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Our Bank *</label>
+                  <label className="text-xs font-semibold text-foreground">Our Bank *</label>
                   <input
                     required
                     value={chequeBankName}
                     onChange={(e) => setChequeBankName(e.target.value)}
                     placeholder="e.g. Emirates NBD"
-                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-600">
+                  <label className="text-xs font-semibold text-foreground">
                     Cheque Date *{' '}
                     <span className="font-normal">(earliest date it can be presented)</span>
                   </label>
@@ -709,7 +711,7 @@ function PayExpenseModal({
                     required
                     value={chequeDueDate}
                     onChange={(e) => setChequeDueDate(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
                   />
                 </div>
               </div>
@@ -721,7 +723,7 @@ function PayExpenseModal({
             Cancel
           </Button>
           <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
             disabled={
               payMut.isPending ||
               !!balanceError ||
@@ -740,21 +742,21 @@ function PayExpenseModal({
 // ─── Expense / Purchase Detail Modal (complete details + payment proof) ───────
 function ProofSection({ url }: { url?: string | null }) {
   const isImage = !!url && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
-  if (!url) return <p className="text-sm text-slate-400">No proof uploaded.</p>;
+  if (!url) return <p className="text-sm text-muted-foreground">No proof uploaded.</p>;
   return (
     <div className="space-y-2">
       {isImage && (
         <img
           src={url}
           alt="Payment proof"
-          className="w-full max-h-64 object-contain rounded-lg border bg-slate-50"
+          className="w-full max-h-64 object-contain rounded-lg border bg-muted"
         />
       )}
       <a
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
       >
         <FileText className="h-4 w-4" /> View Full Proof
       </a>
@@ -766,7 +768,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <dt className="text-muted-foreground whitespace-nowrap">{label}</dt>
-      <dd className="font-medium text-slate-800 text-right break-words min-w-0">{value}</dd>
+      <dd className="font-medium text-foreground text-right break-words min-w-0">{value}</dd>
     </div>
   );
 }
@@ -796,13 +798,13 @@ function ExpenseDetailModal({
   const origin = po?.purchaseOrigin;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-card z-10">
+          <h2 className="text-lg font-semibold text-foreground">
             {row.isPurchase ? 'Purchase Expense Details' : 'Expense Details'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -822,8 +824,8 @@ function ExpenseDetailModal({
                   <span
                     className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide ${
                       origin === 'DOMESTIC'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-indigo-100 text-indigo-700'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-primary/10 text-primary'
                     }`}
                   >
                     {origin === 'DOMESTIC' ? 'LOCAL PURCHASE' : 'INTERNATIONAL PURCHASE'}
@@ -892,20 +894,20 @@ function ExpenseDetailModal({
                 Payment Transactions
               </p>
               {loadingPurchase ? (
-                <p className="text-sm text-slate-400">Loading payments…</p>
+                <p className="text-sm text-muted-foreground">Loading payments…</p>
               ) : (fullPurchase?.payments?.length ?? 0) === 0 ? (
-                <p className="text-sm text-slate-400">No payments recorded yet.</p>
+                <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
               ) : (
                 <div className="space-y-2">
                   {fullPurchase!.payments!.map((p) => (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border bg-slate-50/60 px-3 py-2 text-sm"
+                      className="flex items-center justify-between gap-3 rounded-lg border bg-muted/60 px-3 py-2 text-sm"
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-800">
+                        <p className="font-semibold text-foreground">
                           {formatCurrency(Number(p.amount), row.currency)}
-                          <span className="ml-2 text-[10px] font-bold text-slate-500 bg-slate-200/60 px-1.5 py-0.5 rounded">
+                          <span className="ml-2 text-[10px] font-bold text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                             {p.paymentMethod}
                           </span>
                         </p>
@@ -919,12 +921,12 @@ function ExpenseDetailModal({
                           href={p.attachmentUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                         >
                           <FileText className="h-3.5 w-3.5" /> Proof
                         </a>
                       ) : (
-                        <span className="shrink-0 text-[10px] text-slate-400">No proof</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">No proof</span>
                       )}
                     </div>
                   ))}
@@ -1252,15 +1254,15 @@ export default function ExpenseManagementPage() {
   };
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Tab switcher */}
-      <div className="flex gap-1 bg-card border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
+      <div className="flex gap-1 bg-card border border-border rounded-xl p-1 w-fit shadow-sm">
         <button
           onClick={() => setActiveTab('expenses')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'expenses'
               ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-slate-700'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           Expense Management
@@ -1270,7 +1272,7 @@ export default function ExpenseManagementPage() {
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
             activeTab === 'requests'
               ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-slate-700'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           Employee Requests
@@ -1287,11 +1289,11 @@ export default function ExpenseManagementPage() {
             </div>
           )}
           {isError && (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-8 text-center space-y-3 max-w-sm w-full mx-auto">
-              <p className="text-red-700 font-medium">Failed to load expenses. Please retry.</p>
+            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-8 text-center space-y-3 max-w-sm w-full mx-auto">
+              <p className="text-destructive font-medium">Failed to load expenses. Please retry.</p>
               <button
                 onClick={() => refetch()}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
+                className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold"
               >
                 Retry
               </button>
@@ -1302,7 +1304,7 @@ export default function ExpenseManagementPage() {
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">
+                  <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
                     Expense Management
                   </h3>
                   <p className="text-muted-foreground">
@@ -1368,25 +1370,25 @@ export default function ExpenseManagementPage() {
                 </div>
 
                 {/* Charts section */}
-                <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+                <div className="rounded-2xl bg-card shadow-sm border border-border">
                   <button
                     onClick={() => setChartsOpen((o) => !o)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-2xl"
                   >
-                    <span className="flex items-center gap-2 font-semibold text-gray-800">
-                      <BarChart2 className="h-4 w-4 text-blue-500" />
+                    <span className="flex items-center gap-2 font-semibold text-foreground">
+                      <BarChart2 className="h-4 w-4 text-primary" />
                       Analytics & Charts
                     </span>
                     {chartsOpen ? (
-                      <ChevronUp className="h-4 w-4 text-gray-400" />
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     )}
                   </button>
                   {chartsOpen && (
                     <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                           Monthly Trend (Stacked)
                         </h4>
                         <StackedBarChart
@@ -1397,7 +1399,7 @@ export default function ExpenseManagementPage() {
                         />
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                           Expense Breakdown
                         </h4>
                         <ResponsiveContainer width="100%" height={220}>
@@ -1415,7 +1417,7 @@ export default function ExpenseManagementPage() {
                               {donutData.map((entry) => (
                                 <Cell
                                   key={entry.name}
-                                  fill={CATEGORY_COLORS[entry.name] ?? '#94a3b8'}
+                                  fill={CATEGORY_COLORS[entry.name] ?? 'var(--chart-slate)'}
                                 />
                               ))}
                             </Pie>
@@ -1432,25 +1434,25 @@ export default function ExpenseManagementPage() {
                         </ResponsiveContainer>
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                           Status Distribution
                         </h4>
                         <SimpleBarChart
                           data={chartData?.statusDistribution ?? []}
                           xKey="name"
-                          bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
+                          bars={[{ key: 'value', color: 'var(--chart-blue-mid)', label: 'Amount' }]}
                           height={200}
                           currency={currency}
                         />
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                           Top 6 Months by Spend
                         </h4>
                         <SimpleBarChart
                           data={chartData?.topMonths ?? []}
                           xKey="month"
-                          bars={[{ key: 'total', color: '#10b981', label: 'Total' }]}
+                          bars={[{ key: 'total', color: 'var(--chart-profit)', label: 'Total' }]}
                           height={200}
                           currency={currency}
                         />
@@ -1460,7 +1462,7 @@ export default function ExpenseManagementPage() {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+                <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1500,8 +1502,8 @@ export default function ExpenseManagementPage() {
                 </div>
 
                 {/* Table */}
-                <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-                  <Table>
+                <div className="bg-card rounded-xl shadow-sm border border-border p-1">
+                  <Table pagination={{ pageSize: 10 }}>
                     <TableHeader className="bg-muted/40">
                       <TableRow>
                         <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -1545,19 +1547,19 @@ export default function ExpenseManagementPage() {
                         </TableRow>
                       ) : (
                         filtered.map((row) => (
-                          <TableRow key={row.id} className="hover:bg-blue-50/50 transition-colors">
+                          <TableRow key={row.id} className="hover:bg-primary/10 transition-colors">
                             <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
                               {row.date?.slice(0, 10)}
                             </TableCell>
-                            <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                            <TableCell className="font-mono text-xs text-primary font-bold">
                               {row.expenseNo}
                             </TableCell>
                             <TableCell>
                               <span
                                 className="px-2 py-0.5 rounded-md text-xs font-semibold"
                                 style={{
-                                  background: `${CATEGORY_COLORS[row.category] ?? '#94a3b8'}20`,
-                                  color: CATEGORY_COLORS[row.category] ?? '#94a3b8',
+                                  background: `${CATEGORY_COLORS[row.category] ?? 'var(--chart-slate)'}20`,
+                                  color: CATEGORY_COLORS[row.category] ?? 'var(--chart-slate)',
                                 }}
                               >
                                 {row.category.replace(/_/g, ' ')}
@@ -1570,14 +1572,14 @@ export default function ExpenseManagementPage() {
                               <span
                                 className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
                                   row.source === 'Purchase'
-                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                    ? 'bg-lease/10 text-lease border-lease/30'
+                                    : 'bg-muted text-foreground border-border'
                                 }`}
                               >
                                 {row.source}
                               </span>
                             </TableCell>
-                            <TableCell className="text-right font-bold text-red-600">
+                            <TableCell className="text-right font-bold text-destructive">
                               {formatCurrency(row.amount, row.currency)}
                             </TableCell>
                             <TableCell className="text-right">
@@ -1587,18 +1589,18 @@ export default function ExpenseManagementPage() {
                                     <span
                                       className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide ${
                                         row.taxLabel.toLowerCase().includes('input')
-                                          ? 'bg-green-100 text-green-700'
+                                          ? 'bg-success/10 text-success'
                                           : row.taxLabel.toLowerCase().includes('rc') ||
                                               row.taxLabel.toLowerCase().includes('reverse')
-                                            ? 'bg-orange-100 text-orange-700'
-                                            : 'bg-blue-50 text-blue-600'
+                                            ? 'bg-warning/10 text-warning'
+                                            : 'bg-primary/10 text-primary'
                                       }`}
                                     >
                                       {row.taxLabel}
                                       {row.taxPercent ? ` ${row.taxPercent}%` : ''}
                                     </span>
                                   )}
-                                  <span className="text-xs font-semibold text-slate-700">
+                                  <span className="text-xs font-semibold text-foreground">
                                     {formatCurrency(row.taxAmount, row.currency)}
                                   </span>
                                 </div>
@@ -1618,7 +1620,7 @@ export default function ExpenseManagementPage() {
                                 <button
                                   onClick={() => setViewing(row)}
                                   title="View details & payment proof"
-                                  className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
                                 </button>
@@ -1626,7 +1628,7 @@ export default function ExpenseManagementPage() {
                                   <button
                                     onClick={() => approveMut.mutate(row._entry!.id)}
                                     title="Approve"
-                                    className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                    className="p-1.5 rounded-md hover:bg-success/10 text-success"
                                   >
                                     <CheckCircle className="h-3.5 w-3.5" />
                                   </button>
@@ -1638,7 +1640,7 @@ export default function ExpenseManagementPage() {
                                     <button
                                       onClick={() => setPaying(row._entry!)}
                                       title="Mark Paid"
-                                      className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                      className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                     >
                                       <Wallet className="h-3.5 w-3.5" />
                                     </button>
@@ -1650,7 +1652,7 @@ export default function ExpenseManagementPage() {
                                         setEditing(row._entry!);
                                         setShowModal(true);
                                       }}
-                                      className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                      className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                                       title="Edit"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
@@ -1660,7 +1662,7 @@ export default function ExpenseManagementPage() {
                                         if (confirm('Delete this expense?'))
                                           deleteMut.mutate(row._entry!.id);
                                       }}
-                                      className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                      className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
                                       title="Delete"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />

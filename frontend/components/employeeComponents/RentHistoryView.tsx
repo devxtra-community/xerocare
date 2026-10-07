@@ -115,22 +115,22 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-50/50 border-none shadow-2xl">
-          <DialogHeader className="p-6 bg-white border-b border-slate-100 shrink-0">
+        <DialogContent className="sm:max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden bg-muted/50 border-none shadow-2xl">
+          <DialogHeader className="p-6 bg-card border-b border-border shrink-0">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+              <div className="h-12 w-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center shadow-sm">
                 <HistoryIcon size={24} />
               </div>
               <div className="space-y-1">
-                <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
+                <DialogTitle className="text-xl font-bold text-foreground tracking-tight">
                   Rent Contract History
                 </DialogTitle>
                 <div className="text-xs text-muted-foreground font-medium flex gap-2 items-center">
-                  <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                  <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-foreground">
                     #{contract?.invoiceNumber}
                   </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="font-bold text-slate-500 uppercase">
+                  <span className="text-muted-foreground">•</span>
+                  <span className="font-bold text-muted-foreground uppercase">
                     {contract?.customerName}
                   </span>
                 </div>
@@ -141,15 +141,15 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-200">
             {loading ? (
               <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : contract ? (
               <>
                 {/* Contract Overview Card */}
-                <Card className="shadow-sm border-slate-200 bg-white">
-                  <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
-                    <CardTitle className="text-xs font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                      <FileText size={14} className="text-blue-500" /> Contract Terms
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-3 bg-muted/50 border-b border-border">
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <FileText size={14} className="text-primary" /> Contract Terms
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -157,8 +157,8 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Customer
                       </p>
-                      <div className="font-bold text-slate-700 flex items-center gap-2 text-sm">
-                        <User size={14} className="text-slate-400" />
+                      <div className="font-bold text-foreground flex items-center gap-2 text-sm">
+                        <User size={14} className="text-muted-foreground" />
                         {contract.customerName}
                       </div>
                     </div>
@@ -166,13 +166,13 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Duration
                       </p>
-                      <div className="font-bold text-slate-700 flex items-center gap-2 text-sm">
-                        <Calendar size={14} className="text-slate-400" />
+                      <div className="font-bold text-foreground flex items-center gap-2 text-sm">
+                        <Calendar size={14} className="text-muted-foreground" />
                         <span>
                           {contract.effectiveFrom &&
                             format(new Date(contract.effectiveFrom), 'dd MMM yyyy')}
                         </span>
-                        <span className="text-slate-300">→</span>
+                        <span className="text-muted-foreground">→</span>
                         <span>
                           {contract.effectiveTo
                             ? format(new Date(contract.effectiveTo), 'dd MMM yyyy')
@@ -187,7 +187,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                       <div className="flex flex-col gap-1 items-start">
                         <Badge
                           variant="secondary"
-                          className="bg-blue-50 text-blue-700 hover:bg-blue-50 border border-blue-100 font-bold text-[10px] uppercase tracking-wider"
+                          className="bg-primary/10 text-primary hover:bg-primary/10 border border-primary/30 font-bold text-[10px] uppercase tracking-wider"
                         >
                           {contract.rentPeriod}
                           {contract.rentPeriod === 'CUSTOM' &&
@@ -200,7 +200,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Monthly Rent
                       </p>
-                      <div className="font-bold text-slate-800 text-lg flex items-baseline gap-1">
+                      <div className="font-bold text-foreground text-lg flex items-baseline gap-1">
                         {getActiveCurrency()} {contract.monthlyRent?.toLocaleString() || '0'}
                       </div>
                     </div>
@@ -208,9 +208,9 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                 </Card>
 
                 {/* Management Actions (Finance Only for managing usage) */}
-                <Card className="shadow-sm border-slate-200 bg-white">
-                  <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
-                    <CardTitle className="text-xs font-bold uppercase text-slate-500 tracking-widest">
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-3 bg-muted/50 border-b border-border">
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-widest">
                       Management Actions
                     </CardTitle>
                   </CardHeader>
@@ -218,7 +218,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                     {contract.contractStatus !== 'COMPLETED' ? (
                       <>
                         <Button
-                          className="bg-blue-600 hover:bg-blue-700 font-bold text-xs rounded-xl h-10 px-6 gap-2 text-white"
+                          className="bg-primary hover:bg-primary/90 font-bold text-xs rounded-xl h-10 px-6 gap-2 text-primary-foreground"
                           onClick={() => setIsUsageModalOpen(true)}
                         >
                           <PlusCircle size={16} />
@@ -235,7 +235,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                         </Button>
                       </>
                     ) : (
-                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 px-4 py-2 text-sm">
+                      <Badge className="bg-success/10 text-success hover:bg-success/10 px-4 py-2 text-sm">
                         ✓ Contract Completed
                       </Badge>
                     )}
@@ -243,44 +243,44 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                 </Card>
 
                 {/* Invoices History Table */}
-                <Card className="shadow-sm border-slate-200 overflow-hidden bg-white">
-                  <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100 flex flex-row items-center justify-between">
-                    <CardTitle className="text-xs font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                      <Printer size={14} className="text-purple-500" /> Monthly Usage & Invoices
+                <Card className="shadow-sm border-border overflow-hidden bg-card">
+                  <CardHeader className="pb-3 bg-muted/50 border-b border-border flex flex-row items-center justify-between">
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <Printer size={14} className="text-lease" /> Monthly Usage & Invoices
                     </CardTitle>
                     <Badge
                       variant="outline"
-                      className="bg-white text-slate-500 border-slate-200 font-mono text-[10px]"
+                      className="bg-card text-muted-foreground border-border font-mono text-[10px]"
                     >
                       {usageRecords.length} RECORDS
                     </Badge>
                   </CardHeader>
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader className="bg-slate-50/50">
-                        <TableRow className="border-slate-100">
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10">
+                      <TableHeader className="bg-muted/50">
+                        <TableRow className="border-border">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10">
                             Period
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-right">
                             Monthly Rent
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-center">
                             Total Usage (Norm)
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-center">
                             Exceeded
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-right">
                             Exceeded Charge
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-right">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-right">
                             Total Charge
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-center">
                             Meter Image
                           </TableHead>
-                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-500 h-10 text-center">
+                          <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground h-10 text-center">
                             Status
                           </TableHead>
                         </TableRow>
@@ -290,7 +290,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                           <TableRow>
                             <TableCell
                               colSpan={7}
-                              className="text-center py-12 text-muted-foreground text-xs font-medium bg-slate-50/20"
+                              className="text-center py-12 text-muted-foreground text-xs font-medium bg-muted/20"
                             >
                               No usage records yet. Click &quot;Create New Usage&quot; to add one.
                             </TableCell>
@@ -306,9 +306,9 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                             return (
                               <TableRow
                                 key={usage.id}
-                                className="hover:bg-blue-50/30 border-slate-50 transition-colors"
+                                className="hover:bg-primary/10 border-border transition-colors"
                               >
-                                <TableCell className="text-[11px] font-medium text-slate-600">
+                                <TableCell className="text-[11px] font-medium text-foreground">
                                   {usage.periodStart
                                     ? format(new Date(usage.periodStart), 'd MMM')
                                     : '-'}
@@ -317,7 +317,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                                     ? format(new Date(usage.periodEnd), 'd MMM yyyy')
                                     : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-mono text-[11px] text-slate-600">
+                                <TableCell className="text-right font-mono text-[11px] text-foreground">
                                   {usage.monthlyRent
                                     ? `${getActiveCurrency()} ${Number(usage.monthlyRent).toLocaleString()}`
                                     : `${getActiveCurrency()} 0`}
@@ -325,15 +325,15 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                                 <TableCell className="text-center font-mono text-[11px]">
                                   {totalUsage.toLocaleString()}
                                 </TableCell>
-                                <TableCell className="text-center font-mono text-[11px] text-orange-600">
+                                <TableCell className="text-center font-mono text-[11px] text-warning">
                                   {usage.exceededTotal ? usage.exceededTotal.toLocaleString() : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-mono text-[11px] text-slate-600">
+                                <TableCell className="text-right font-mono text-[11px] text-foreground">
                                   {usage.exceededCharge
                                     ? `${getActiveCurrency()} ${Number(usage.exceededCharge).toLocaleString()}`
                                     : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-bold text-slate-800 text-xs">
+                                <TableCell className="text-right font-bold text-foreground text-xs">
                                   {usage.totalCharge
                                     ? `${getActiveCurrency()} ${Number(usage.totalCharge).toLocaleString()}`
                                     : `${getActiveCurrency()} ${(Number(usage.monthlyRent || 0) + Number(usage.exceededCharge || 0)).toLocaleString()}`}
@@ -344,12 +344,12 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                                       href={usage.meterImageUrl}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-blue-500 hover:underline text-[10px]"
+                                      className="text-primary hover:underline text-[10px]"
                                     >
                                       View Image
                                     </a>
                                   ) : (
-                                    <span className="text-slate-300 text-[10px]">-</span>
+                                    <span className="text-muted-foreground text-[10px]">-</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-center">
@@ -357,8 +357,8 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
                                     variant="outline"
                                     className={`text-[9px] px-2 py-0.5 ${
                                       isBilled
-                                        ? 'bg-green-50 text-green-700 border-green-200'
-                                        : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                        ? 'bg-success/10 text-success border-success/30'
+                                        : 'bg-warning/10 text-warning border-warning/30'
                                     }`}
                                   >
                                     {isBilled ? 'BILLED' : 'PENDING'}
@@ -380,7 +380,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
               </>
             ) : (
               <div className="text-center py-10 text-muted-foreground flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 <span className="text-sm font-medium">Loading Contract Details...</span>
               </div>
             )}

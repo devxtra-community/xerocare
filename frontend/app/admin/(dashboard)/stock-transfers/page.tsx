@@ -22,6 +22,8 @@ import {
 } from '@/lib/stockTransfer';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 export default function StockTransfersPage() {
   const router = useRouter();
@@ -59,14 +61,19 @@ export default function StockTransfersPage() {
       t.destination_branch?.name?.toLowerCase().includes(s)
     );
   });
+  const transferPaging = useTablePagination(
+    filtered,
+    `${search}|${statusFilter}|${typeFilter}`,
+    10,
+  );
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-primary">Stock Transfers</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">Stock Transfers</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Move stock between warehouses and branches
           </p>
         </div>
@@ -80,7 +87,7 @@ export default function StockTransfersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100 flex flex-wrap gap-3 items-center">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-primary/30 flex flex-wrap gap-3 items-center">
         <Input
           placeholder="Search by transfer no. or branch..."
           value={search}
@@ -120,14 +127,14 @@ export default function StockTransfersPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-primary/30 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-48 text-slate-400">
+          <div className="flex items-center justify-center h-48 text-muted-foreground">
             <RefreshCw className="h-5 w-5 animate-spin mr-2" />
             Loading transfers...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
+          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2">
             <ArrowRightLeft className="h-8 w-8" />
             <p className="text-sm">No transfers found</p>
           </div>
@@ -135,21 +142,23 @@ export default function StockTransfersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-blue-50 bg-blue-50/50">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Transfer No.</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Type</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Route</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Items</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Date</th>
+                <tr className="border-b border-primary/30 bg-primary/10">
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">
+                    Transfer No.
+                  </th>
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">Type</th>
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">Route</th>
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">Status</th>
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">Items</th>
+                  <th className="text-left px-4 py-3 font-semibold text-foreground">Date</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
+                {transferPaging.pageRows.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => router.push(`/admin/stock-transfers/${t.id}`)}
-                    className="border-b border-slate-50 hover:bg-blue-50/40 cursor-pointer transition-colors"
+                    className="border-b border-border hover:bg-primary/10 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono font-semibold text-primary">
                       {t.transfer_number}
@@ -158,8 +167,8 @@ export default function StockTransfersPage() {
                       <Badge
                         className={
                           t.transfer_type === 'INTER_BRANCH'
-                            ? 'bg-violet-100 text-violet-700 border-0'
-                            : 'bg-blue-100 text-blue-700 border-0'
+                            ? 'bg-lease/10 text-lease border-0'
+                            : 'bg-primary/10 text-primary border-0'
                         }
                       >
                         {t.transfer_type === 'INTER_BRANCH' ? (
@@ -173,11 +182,11 @@ export default function StockTransfersPage() {
                         )}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-foreground">
                       <span className="font-medium">{t.source_branch?.name ?? '—'}</span>
                       {' → '}
                       <span className="font-medium">{t.destination_branch?.name ?? '—'}</span>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-muted-foreground">
                         {t.source_warehouse?.warehouseName} →{' '}
                         {t.destination_warehouse?.warehouseName}
                       </div>
@@ -187,8 +196,8 @@ export default function StockTransfersPage() {
                         {STATUS_LABELS[t.status]}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{t.items?.length ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">
+                    <td className="px-4 py-3 text-muted-foreground">{t.items?.length ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {format(new Date(t.created_at), 'dd MMM yyyy')}
@@ -198,6 +207,15 @@ export default function StockTransfersPage() {
                 ))}
               </tbody>
             </table>
+            {transferPaging.total > transferPaging.pageSize && (
+              <Pagination
+                page={transferPaging.page}
+                totalPages={transferPaging.totalPages}
+                total={transferPaging.total}
+                limit={transferPaging.pageSize}
+                onPageChange={transferPaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>

@@ -20,12 +20,12 @@ export function StandardChartCard({
   actions,
 }: StandardChartCardProps) {
   return (
-    <Card className="h-full flex flex-col shadow-sm border-gray-100 dark:border-gray-800">
+    <Card className="h-full flex flex-col shadow-sm border-border">
       {(title || description || actions) && (
-        <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-gray-50/50">
+        <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-border/50">
           <div className="space-y-1">
             {title && (
-              <CardTitle className="text-base font-semibold text-primary">{title}</CardTitle>
+              <CardTitle className="text-base font-semibold text-foreground">{title}</CardTitle>
             )}
             {description && <CardDescription className="text-xs">{description}</CardDescription>}
           </div>

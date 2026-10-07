@@ -412,11 +412,13 @@ export default function GeneralLedgerPage() {
       : 'Generate Statement';
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">General Ledger</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            General Ledger
+          </h3>
           <p className="text-muted-foreground">
             All financial transactions with double-entry records
           </p>
@@ -424,7 +426,7 @@ export default function GeneralLedgerPage() {
         <Button
           onClick={handleGenerateStatement}
           disabled={generatingStatement}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+          className="bg-success hover:bg-success/90 text-success-foreground gap-2"
         >
           <FileText className="h-4 w-4" />{' '}
           {generatingStatement ? 'Generating…' : statementButtonLabel}
@@ -451,7 +453,7 @@ export default function GeneralLedgerPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+      <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[260px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -524,11 +526,11 @@ export default function GeneralLedgerPage() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center space-y-3">
-          <p className="text-red-700 font-medium">Failed to load ledger data.</p>
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center space-y-3">
+          <p className="text-destructive font-medium">Failed to load ledger data.</p>
           <button
             onClick={refetchAll}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            className="px-4 py-2 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-semibold transition-colors"
           >
             Retry
           </button>
@@ -537,8 +539,8 @@ export default function GeneralLedgerPage() {
 
       {/* Table */}
       {!isLoading && !isError && (
-        <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-          <Table>
+        <div className="bg-card rounded-xl shadow-sm border border-border p-1">
+          <Table pagination={{ pageSize: 10 }}>
             <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead className="pl-4 w-24 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -577,7 +579,7 @@ export default function GeneralLedgerPage() {
                 </TableRow>
               ) : (
                 withBalance.map((e, i) => (
-                  <TableRow key={i} className="hover:bg-blue-50/50 transition-colors">
+                  <TableRow key={i} className="hover:bg-primary/10 transition-colors">
                     <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
                       {e.date}
                     </TableCell>
@@ -587,19 +589,19 @@ export default function GeneralLedgerPage() {
                     </TableCell>
                     <TableCell>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold ${SOURCE_COLORS[e.source] ?? 'bg-slate-100 text-slate-600'}`}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold ${SOURCE_COLORS[e.source] ?? 'bg-muted text-foreground'}`}
                       >
                         {e.source}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right text-blue-600 font-semibold text-sm">
+                    <TableCell className="text-right text-primary font-semibold text-sm">
                       {e.debit > 0 ? formatCurrency(e.debit, e.currency) : '—'}
                     </TableCell>
-                    <TableCell className="text-right text-emerald-600 font-semibold text-sm">
+                    <TableCell className="text-right text-success font-semibold text-sm">
                       {e.credit > 0 ? formatCurrency(e.credit, e.currency) : '—'}
                     </TableCell>
                     <TableCell
-                      className={`text-right font-bold text-sm ${e.runningBalance < 0 ? 'text-red-600' : 'text-slate-800'}`}
+                      className={`text-right font-bold text-sm ${e.runningBalance < 0 ? 'text-destructive' : 'text-foreground'}`}
                     >
                       {formatCurrency(Math.abs(e.runningBalance), currency)}
                       {e.runningBalance < 0 ? ' Cr' : ' Dr'}
@@ -608,7 +610,7 @@ export default function GeneralLedgerPage() {
                       <button
                         onClick={() => setViewingGroup({ source: e.source, sourceId: e.sourceId })}
                         title="View full transaction"
-                        className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                        className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
@@ -623,13 +625,13 @@ export default function GeneralLedgerPage() {
               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex-1">
                 Totals
               </span>
-              <span className="text-sm font-black text-blue-600 w-28 text-right">
+              <span className="text-sm font-black text-primary w-28 text-right">
                 {formatCurrency(totalDebit, currency)}
               </span>
-              <span className="text-sm font-black text-emerald-600 w-28 text-right">
+              <span className="text-sm font-black text-success w-28 text-right">
                 {formatCurrency(totalCredit, currency)}
               </span>
-              <span className="text-sm font-black text-slate-800 w-32 text-right pr-4">
+              <span className="text-sm font-black text-foreground w-32 text-right pr-4">
                 {formatCurrency(Math.abs(totalDebit - totalCredit), currency)}
               </span>
             </div>

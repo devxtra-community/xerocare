@@ -82,33 +82,33 @@ export default function RemoteBillApprovalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-50 p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-success to-muted p-4 sm:p-8">
       <div className="w-full max-w-2xl mx-auto">
         <div className="text-center mb-6">
-          <div className="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <FileText size={24} className="text-white" />
+          <div className="h-12 w-12 bg-success rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <FileText size={24} className="text-primary-foreground" />
           </div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
             Bill Approval Portal
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+        <div className="bg-card rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
           {state === 'loading' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 size={28} className="animate-spin text-emerald-500" />
-              <p className="text-sm font-bold text-slate-500">Loading your bill...</p>
+              <Loader2 size={28} className="animate-spin text-success" />
+              <p className="text-sm font-bold text-muted-foreground">Loading your bill...</p>
             </div>
           )}
 
           {state === 'error' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle size={24} className="text-red-500" />
+              <div className="h-12 w-12 bg-destructive/10 rounded-full flex items-center justify-center">
+                <AlertTriangle size={24} className="text-destructive" />
               </div>
-              <p className="text-sm font-black text-slate-800">Unable to Load Bill</p>
-              <p className="text-xs text-slate-500">{errorMsg}</p>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-sm font-black text-foreground">Unable to Load Bill</p>
+              <p className="text-xs text-muted-foreground">{errorMsg}</p>
+              <p className="text-xs text-muted-foreground mt-2">
                 This link may have expired or already been used. Please contact the dealer for a new
                 link.
               </p>
@@ -117,14 +117,14 @@ export default function RemoteBillApprovalPage() {
 
           {state === 'approved' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-14 w-14 bg-emerald-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 size={28} className="text-emerald-500" />
+              <div className="h-14 w-14 bg-success/10 rounded-full flex items-center justify-center">
+                <CheckCircle2 size={28} className="text-success" />
               </div>
-              <p className="text-lg font-black text-slate-800">Bill Approved!</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-lg font-black text-foreground">Bill Approved!</p>
+              <p className="text-xs text-muted-foreground">
                 Approved on {doneAt ? new Date(doneAt).toLocaleString() : ''}
               </p>
-              <p className="text-xs text-slate-400 mt-3 max-w-sm leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 max-w-sm leading-relaxed">
                 Thank you for reviewing this bill. You may close this tab.
               </p>
             </div>
@@ -132,14 +132,14 @@ export default function RemoteBillApprovalPage() {
 
           {state === 'disputed' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="h-14 w-14 bg-amber-100 rounded-full flex items-center justify-center">
-                <ThumbsDown size={28} className="text-amber-500" />
+              <div className="h-14 w-14 bg-warning/10 rounded-full flex items-center justify-center">
+                <ThumbsDown size={28} className="text-warning" />
               </div>
-              <p className="text-lg font-black text-slate-800">Dispute Submitted</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-lg font-black text-foreground">Dispute Submitted</p>
+              <p className="text-xs text-muted-foreground">
                 Submitted on {doneAt ? new Date(doneAt).toLocaleString() : ''}
               </p>
-              <p className="text-xs text-slate-400 mt-3 max-w-sm leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 max-w-sm leading-relaxed">
                 Our finance team will review this bill and send you a corrected version. You may
                 close this tab.
               </p>
@@ -149,7 +149,7 @@ export default function RemoteBillApprovalPage() {
           {(state === 'ready' || state === 'disputing') && bill && (
             <>
               {bill.invoice ? (
-                <div className="border border-slate-200 rounded-2xl p-4 sm:p-6 overflow-x-auto">
+                <div className="border border-border rounded-2xl p-4 sm:p-6 overflow-x-auto">
                   <BillDocumentBody
                     invoice={bill.invoice}
                     bill={bill.usage}
@@ -160,7 +160,7 @@ export default function RemoteBillApprovalPage() {
                   />
                 </div>
               ) : (
-                <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-center text-xs text-amber-700 font-bold">
+                <div className="p-4 bg-warning/10 rounded-xl border border-warning/30 text-center text-xs text-warning font-bold">
                   Bill details could not be fully loaded — please contact the dealer if this
                   persists.
                 </div>
@@ -169,14 +169,14 @@ export default function RemoteBillApprovalPage() {
               {state === 'ready' && (
                 <>
                   <div>
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                       Your Full Name *
                     </Label>
                     <Input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Enter your full name"
-                      className="h-10 font-bold border-slate-200"
+                      className="h-10 font-bold border-border"
                     />
                   </div>
 
@@ -184,7 +184,7 @@ export default function RemoteBillApprovalPage() {
                     <Button
                       onClick={handleApprove}
                       disabled={!customerName.trim() || isSaving}
-                      className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-100 disabled:opacity-40"
+                      className="flex-1 h-12 bg-success hover:bg-success/90 text-success-foreground font-black text-sm rounded-xl shadow-lg shadow-success/10 disabled:opacity-40"
                     >
                       {isSaving ? (
                         <Loader2 size={18} className="animate-spin" />
@@ -199,7 +199,7 @@ export default function RemoteBillApprovalPage() {
                       variant="outline"
                       onClick={() => setState('disputing')}
                       disabled={isSaving}
-                      className="flex-1 h-12 border-red-200 text-red-600 hover:bg-red-50 font-black text-sm rounded-xl"
+                      className="flex-1 h-12 border-destructive/30 text-destructive hover:bg-destructive/10 font-black text-sm rounded-xl"
                     >
                       <ThumbsDown size={18} className="mr-2" />
                       Dispute This Bill
@@ -211,14 +211,14 @@ export default function RemoteBillApprovalPage() {
               {state === 'disputing' && (
                 <>
                   <div>
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">
                       What looks incorrect? *
                     </Label>
                     <Textarea
                       value={disputeReason}
                       onChange={(e) => setDisputeReason(e.target.value)}
                       placeholder="e.g. The meter reading looks higher than expected"
-                      className="min-h-24 text-sm border-slate-200"
+                      className="min-h-24 text-sm border-border"
                     />
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -233,7 +233,7 @@ export default function RemoteBillApprovalPage() {
                     <Button
                       onClick={handleDispute}
                       disabled={!disputeReason.trim() || isSaving}
-                      className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl disabled:opacity-40"
+                      className="flex-1 h-12 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-black text-sm rounded-xl disabled:opacity-40"
                     >
                       {isSaving ? <Loader2 size={18} className="animate-spin" /> : 'Submit Dispute'}
                     </Button>
@@ -244,7 +244,7 @@ export default function RemoteBillApprovalPage() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-slate-400 mt-4">
+        <p className="text-center text-[10px] text-muted-foreground mt-4">
           Secured by Xerocare • This link is for one-time use only
         </p>
       </div>

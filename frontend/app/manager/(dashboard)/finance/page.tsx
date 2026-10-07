@@ -13,11 +13,11 @@ export default function ManagerFinancePage() {
   const [selectedYear, setSelectedYear] = React.useState<number | 'all'>(new Date().getFullYear());
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
       {/* HEADER SECTION */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Financial Overview
           </h2>
           <p className="text-sm text-muted-foreground font-medium">

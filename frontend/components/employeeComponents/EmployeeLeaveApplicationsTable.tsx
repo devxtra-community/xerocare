@@ -122,19 +122,19 @@ export default function EmployeeLeaveApplicationsTable() {
     > = {
       [LeaveStatus.PENDING]: {
         variant: 'outline',
-        className: 'bg-yellow-50 text-yellow-700 border-yellow-300',
+        className: 'bg-warning/10 text-warning border-warning/30',
       },
       [LeaveStatus.APPROVED]: {
         variant: 'default',
-        className: 'bg-green-100 text-green-700 border-green-300',
+        className: 'bg-success/10 text-success border-success/30',
       },
       [LeaveStatus.REJECTED]: {
         variant: 'destructive',
-        className: 'bg-red-100 text-red-700 border-red-300',
+        className: 'bg-destructive/10 text-destructive border-destructive/30',
       },
       [LeaveStatus.CANCELLED]: {
         variant: 'secondary',
-        className: 'bg-gray-100 text-gray-700 border-gray-300',
+        className: 'bg-muted text-foreground border-border',
       },
     };
 
@@ -166,7 +166,7 @@ export default function EmployeeLeaveApplicationsTable() {
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
         <div className="overflow-x-auto mb-4">
           <Table>
-            <TableHeader className="bg-muted/50/50">
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="px-3 py-2 font-bold text-xs uppercase tracking-wider text-primary">
                   Date Range
@@ -192,7 +192,7 @@ export default function EmployeeLeaveApplicationsTable() {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : paginatedApplications.length === 0 ? (
@@ -203,7 +203,7 @@ export default function EmployeeLeaveApplicationsTable() {
                 </TableRow>
               ) : (
                 paginatedApplications.map((leave) => (
-                  <TableRow key={leave.id} className="hover:bg-muted/50/50 transition-colors">
+                  <TableRow key={leave.id} className="hover:bg-muted/50 transition-colors">
                     <TableCell className="px-3 py-2 font-medium">
                       {formatDate(leave.start_date)} - {formatDate(leave.end_date)}
                       <span className="text-xs text-muted-foreground block">
@@ -222,7 +222,7 @@ export default function EmployeeLeaveApplicationsTable() {
                       {getStatusBadge(leave.status)}
                       {leave.status === LeaveStatus.REJECTED && leave.rejection_reason && (
                         <p
-                          className="text-xs text-red-600 mt-1 truncate max-w-[100px]"
+                          className="text-xs text-destructive mt-1 truncate max-w-[100px]"
                           title={leave.rejection_reason}
                         >
                           {leave.rejection_reason}
@@ -237,7 +237,7 @@ export default function EmployeeLeaveApplicationsTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                           onClick={() => handleViewClick(leave)}
                           title="View Details"
                         >
@@ -247,7 +247,7 @@ export default function EmployeeLeaveApplicationsTable() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleCancelClick(leave.id)}
                             title="Cancel Application"
                           >
@@ -292,7 +292,7 @@ export default function EmployeeLeaveApplicationsTable() {
       </AlertDialog>
 
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl bg-white p-8">
+        <DialogContent className="max-w-2xl bg-card p-8">
           <DialogHeader>
             <DialogTitle className="text-center text-xl font-bold uppercase underline mb-4">
               Leave Application
@@ -302,18 +302,18 @@ export default function EmployeeLeaveApplicationsTable() {
             </DialogDescription>
           </DialogHeader>
           {selectedLeave && (
-            <div className="relative space-y-6 text-sm md:text-base text-gray-800 leading-relaxed font-serif">
+            <div className="relative space-y-6 text-sm md:text-base text-foreground leading-relaxed font-serif">
               {/* Watermark / Stamp */}
               <div
                 className={`absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-[6px] border-double rounded-lg px-8 py-2 text-6xl font-black uppercase tracking-widest opacity-20 pointer-events-none rotate-[-15deg] select-none
                   ${
                     selectedLeave.status === LeaveStatus.APPROVED
-                      ? 'text-green-600 border-green-600'
+                      ? 'text-success border-success'
                       : selectedLeave.status === LeaveStatus.REJECTED
-                        ? 'text-red-600 border-red-600'
+                        ? 'text-destructive border-destructive'
                         : selectedLeave.status === LeaveStatus.CANCELLED
-                          ? 'text-gray-600 border-gray-600'
-                          : 'text-yellow-600 border-yellow-600'
+                          ? 'text-foreground border-border'
+                          : 'text-warning border-warning'
                   }`}
               >
                 {selectedLeave.status}
@@ -370,13 +370,15 @@ export default function EmployeeLeaveApplicationsTable() {
                 <p className="font-bold">
                   {selectedLeave.employee?.first_name} {selectedLeave.employee?.last_name}
                 </p>
-                <p className="text-xs text-gray-500">{selectedLeave.employee?.email}</p>
-                <p className="text-xs text-gray-500">{selectedLeave.employee?.display_id}</p>
+                <p className="text-xs text-muted-foreground">{selectedLeave.employee?.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedLeave.employee?.display_id}
+                </p>
               </div>
 
               {/* Rejection Note */}
               {selectedLeave.status === LeaveStatus.REJECTED && selectedLeave.rejection_reason && (
-                <div className="mt-8 border border-red-200 bg-red-50 p-4 rounded-md text-red-800 text-sm">
+                <div className="mt-8 border border-destructive/30 bg-destructive/10 p-4 rounded-md text-destructive text-sm">
                   <p className="font-bold mb-1">Manager&apos;s Note:</p>
                   <p>{selectedLeave.rejection_reason}</p>
                 </div>

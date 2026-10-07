@@ -471,10 +471,10 @@ export default function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r-0 border-none !border-r-0">
       <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">
-            <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-accent">
+            <LayoutDashboard className="h-5 w-5 text-primary" />
           </div>
-          <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
+          <span className="text-base font-semibold text-foreground group-data-[collapsible=icon]:hidden">
             Xerocare
           </span>
         </div>
@@ -498,8 +498,8 @@ export default function AppSidebar() {
                           disabled={item.disabled}
                           className={`
                             py-2.5 rounded-md w-full justify-between
-                            !text-white hover:bg-transparent
-                            [&_svg]:!text-white
+                            !text-sidebar-accent-foreground hover:bg-sidebar-accent
+                            [&_svg]:!text-sidebar-accent-foreground
                             ${
                               item.subItems?.some((sub) => pathname === sub.href) ? 'font-bold' : ''
                             }
@@ -661,8 +661,8 @@ export default function AppSidebar() {
                 py-3
                 text-sidebar-accent-foreground
                 [&_svg]:text-sidebar-accent-foreground
-                hover:bg-red-500/20
-                hover:text-red-300
+                hover:bg-destructive/20
+                hover:text-destructive
               "
             >
               <button className="flex items-center gap-3 px-3" onClick={handleLogOut}>

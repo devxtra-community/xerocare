@@ -62,6 +62,8 @@ import type { BranchInfo } from '@/components/shared/documentTemplate';
 import OwnerSelect from '@/components/finance/OwnerSelect';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { useBranchNameMap } from '@/hooks/useBranchNameMap';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 import { getActiveCurrency } from '@/lib/currency';
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -121,8 +123,8 @@ const WITHDRAW_PURPOSES = [
 ];
 
 const TXN_COLOR: Record<string, string> = {
-  RECEIPT: 'text-emerald-600',
-  PAYMENT: 'text-red-600',
+  RECEIPT: 'text-success',
+  PAYMENT: 'text-destructive',
 };
 
 function fmtMoney(amount: number, currency = getActiveCurrency()) {
@@ -141,7 +143,8 @@ function BalanceText({
   branchCurrency?: string;
   rates?: Map<string, number>;
 }) {
-  const cls = amount < 0 ? 'text-red-600' : amount === 0 ? 'text-slate-400' : 'text-slate-900';
+  const cls =
+    amount < 0 ? 'text-destructive' : amount === 0 ? 'text-muted-foreground' : 'text-foreground';
   const converted =
     branchCurrency && rates && currency !== branchCurrency
       ? convertAmount(amount, currency, branchCurrency, rates)
@@ -150,7 +153,7 @@ function BalanceText({
     <div>
       <span className={`font-semibold tabular-nums ${cls}`}>{fmtMoney(amount, currency)}</span>
       {converted !== null && (
-        <div className="text-[10px] text-slate-400 font-normal tabular-nums">
+        <div className="text-[10px] text-muted-foreground font-normal tabular-nums">
           ≈ {fmtMoney(converted, branchCurrency)}
         </div>
       )}
@@ -317,14 +320,14 @@ function AccountModal({
           <BranchIdentityChip branchId={currentUser?.branchId} role={currentUser?.role} />
           {!isEdit && (
             <div>
-              <label className="text-sm font-medium text-slate-700">Account Type *</label>
+              <label className="text-sm font-medium text-foreground">Account Type *</label>
               <div className="flex gap-3 mt-1.5">
                 {(['CASH', 'BANK'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => set('type', t)}
                     className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors
-                      ${form.type === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400'}`}
+                      ${form.type === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:border-primary/30'}`}
                   >
                     {t === 'CASH' ? '💵 Cash in Hand' : '🏦 Cash at Bank'}
                   </button>
@@ -334,7 +337,7 @@ function AccountModal({
           )}
 
           <div>
-            <label className="text-sm font-medium text-slate-700">Account Name *</label>
+            <label className="text-sm font-medium text-foreground">Account Name *</label>
             <Input
               className="mt-1"
               value={form.name}
@@ -348,12 +351,12 @@ function AccountModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-700">Currency *</label>
+            <label className="text-sm font-medium text-foreground">Currency *</label>
             {isEdit ? (
               <>
-                <div className="mt-1 flex items-center gap-2 px-3 py-2 border rounded-lg bg-slate-50">
-                  <span className="font-semibold text-slate-800">{form.currency}</span>
-                  <span className="text-xs text-slate-400">— {account?.currency}</span>
+                <div className="mt-1 flex items-center gap-2 px-3 py-2 border rounded-lg bg-muted">
+                  <span className="font-semibold text-foreground">{form.currency}</span>
+                  <span className="text-xs text-muted-foreground">— {account?.currency}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">Cannot change after creation</p>
               </>
@@ -361,24 +364,24 @@ function AccountModal({
               <>
                 <div
                   className={`mt-1 flex items-center gap-2 px-3 py-2 border rounded-lg ${
-                    loadingBranch ? 'bg-slate-50 animate-pulse' : 'bg-blue-50 border-blue-200'
+                    loadingBranch ? 'bg-muted animate-pulse' : 'bg-primary/10 border-primary/30'
                   }`}
                 >
                   {loadingBranch ? (
-                    <span className="text-sm text-slate-400">Fetching branch currency…</span>
+                    <span className="text-sm text-muted-foreground">Fetching branch currency…</span>
                   ) : (
                     <>
-                      <span className="font-semibold text-blue-800">{form.currency}</span>
+                      <span className="font-semibold text-primary">{form.currency}</span>
                       {branchInfo?.name && (
-                        <span className="text-xs text-blue-500 ml-1">— {branchInfo.name}</span>
+                        <span className="text-xs text-primary ml-1">— {branchInfo.name}</span>
                       )}
-                      <span className="ml-auto text-xs text-blue-400 flex items-center gap-1">
+                      <span className="ml-auto text-xs text-primary flex items-center gap-1">
                         🔒 Branch currency
                       </span>
                     </>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Auto-set from your branch configuration
                 </p>
               </>
@@ -389,7 +392,7 @@ function AccountModal({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Name of the Bank *</label>
+                  <label className="text-sm font-medium text-foreground">Name of the Bank *</label>
                   <Input
                     className="mt-1"
                     value={form.bankName}
@@ -400,7 +403,7 @@ function AccountModal({
                   {isEdit && <p className="text-xs text-muted-foreground mt-0.5">🔒 Locked</p>}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Account Number *</label>
+                  <label className="text-sm font-medium text-foreground">Account Number *</label>
                   <Input
                     className="mt-1"
                     value={form.accountNumber}
@@ -413,7 +416,7 @@ function AccountModal({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-slate-700">IBAN</label>
+                  <label className="text-sm font-medium text-foreground">IBAN</label>
                   <Input
                     className="mt-1"
                     value={form.iban}
@@ -422,7 +425,7 @@ function AccountModal({
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Account Type</label>
+                  <label className="text-sm font-medium text-foreground">Account Type</label>
                   <Select value={form.accountType} onValueChange={(v) => set('accountType', v)}>
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -436,7 +439,9 @@ function AccountModal({
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Contact Person at Bank</label>
+                <label className="text-sm font-medium text-foreground">
+                  Contact Person at Bank
+                </label>
                 <Input
                   className="mt-1"
                   value={form.contactPerson}
@@ -450,7 +455,7 @@ function AccountModal({
           {!isEdit && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium text-slate-700">Opening Balance *</label>
+                <label className="text-sm font-medium text-foreground">Opening Balance *</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -461,7 +466,7 @@ function AccountModal({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Opening Date *</label>
+                <label className="text-sm font-medium text-foreground">Opening Date *</label>
                 <Input
                   type="date"
                   className="mt-1"
@@ -472,7 +477,7 @@ function AccountModal({
             </div>
           )}
           {isEdit && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700">
+            <div className="rounded-lg bg-warning/10 border border-warning/30 px-4 py-2.5 text-sm text-warning">
               Opening Balance:{' '}
               <strong>{fmtMoney(account!.openingBalance, account!.currency)}</strong> — Use
               Add/Withdraw to change current balance.
@@ -482,7 +487,7 @@ function AccountModal({
           {needsOpeningBalanceSource && (
             <>
               <div>
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-foreground">
                   Opening Balance Source *
                 </label>
                 <Select
@@ -512,7 +517,7 @@ function AccountModal({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   A non-zero opening balance needs a documented origin — this creates a matching
                   Equity entry for the same amount.
                 </p>
@@ -531,7 +536,9 @@ function AccountModal({
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium text-slate-700">Number of Shares</label>
+                      <label className="text-sm font-medium text-foreground">
+                        Number of Shares
+                      </label>
                       <Input
                         type="number"
                         min="0"
@@ -542,7 +549,7 @@ function AccountModal({
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-slate-700">Price per Share</label>
+                      <label className="text-sm font-medium text-foreground">Price per Share</label>
                       <Input
                         type="number"
                         min="0"
@@ -554,9 +561,9 @@ function AccountModal({
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-700">
+                    <label className="text-sm font-medium text-foreground">
                       Document Reference{' '}
-                      <span className="text-slate-400 font-normal">
+                      <span className="text-muted-foreground font-normal">
                         (e.g. certificate link, optional)
                       </span>
                     </label>
@@ -572,10 +579,10 @@ function AccountModal({
           )}
 
           <div>
-            <label className="text-sm font-medium text-slate-700">Notes</label>
+            <label className="text-sm font-medium text-foreground">Notes</label>
             <textarea
               rows={2}
-              className="w-full mt-1 px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full mt-1 px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
               placeholder="Purpose, notes..."
@@ -587,7 +594,7 @@ function AccountModal({
               Cancel
             </Button>
             <Button
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={!valid || mut.isPending}
               onClick={() => mut.mutate()}
             >
@@ -685,14 +692,14 @@ function CashActionModal({
         </DialogHeader>
         <div className="text-sm text-muted-foreground -mt-1 mb-3">
           Current Balance:{' '}
-          <strong className="text-slate-800">
+          <strong className="text-foreground">
             {fmtMoney(Number(account.currentBalance), account.currency)}
           </strong>
         </div>
         <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-slate-700">Date *</label>
+              <label className="text-sm font-medium text-foreground">Date *</label>
               <Input
                 type="date"
                 className="mt-1"
@@ -701,7 +708,7 @@ function CashActionModal({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Amount *</label>
+              <label className="text-sm font-medium text-foreground">Amount *</label>
               <Input
                 type="number"
                 step="0.01"
@@ -715,14 +722,14 @@ function CashActionModal({
           </div>
 
           {!isAdd && form.amount && parseFloat(form.amount) > Number(account.currentBalance) && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+            <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
               Insufficient cash. Available:{' '}
               {fmtMoney(Number(account.currentBalance), account.currency)}
             </div>
           )}
 
           <div>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               {isAdd ? 'Source *' : 'Purpose *'}
             </label>
             <Select value={form.category} onValueChange={(v) => set('category', v)}>
@@ -741,7 +748,7 @@ function CashActionModal({
 
           {isBankDeposit && (
             <div>
-              <label className="text-sm font-medium text-slate-700">Deposit to Bank Account</label>
+              <label className="text-sm font-medium text-foreground">Deposit to Bank Account</label>
               <Select value={form.linkedAccountId} onValueChange={(v) => set('linkedAccountId', v)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select bank account..." />
@@ -760,7 +767,7 @@ function CashActionModal({
           )}
 
           <div>
-            <label className="text-sm font-medium text-slate-700">Reference # (optional)</label>
+            <label className="text-sm font-medium text-foreground">Reference # (optional)</label>
             <Input
               className="mt-1"
               value={form.referenceNo}
@@ -769,7 +776,7 @@ function CashActionModal({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Description *</label>
+            <label className="text-sm font-medium text-foreground">Description *</label>
             <Input
               className="mt-1"
               value={form.description}
@@ -778,7 +785,7 @@ function CashActionModal({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Notes (optional)</label>
+            <label className="text-sm font-medium text-foreground">Notes (optional)</label>
             <textarea
               rows={2}
               className="w-full mt-1 px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none"
@@ -792,7 +799,7 @@ function CashActionModal({
               Cancel
             </Button>
             <Button
-              className={`flex-1 text-white ${isAdd ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+              className={`flex-1 text-success-foreground ${isAdd ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'}`}
               disabled={!form.amount || !form.category || mut.isPending}
               onClick={() => mut.mutate()}
             >
@@ -919,7 +926,7 @@ function BankActionModal({
         </DialogHeader>
         <div className="text-sm text-muted-foreground -mt-1 mb-3">
           Bank Balance:{' '}
-          <strong className="text-slate-800">
+          <strong className="text-foreground">
             {fmtMoney(Number(account.currentBalance), account.currency)}
           </strong>
           {account.bankName && (
@@ -931,7 +938,7 @@ function BankActionModal({
         <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-slate-700">Date *</label>
+              <label className="text-sm font-medium text-foreground">Date *</label>
               <Input
                 type="date"
                 className="mt-1"
@@ -940,7 +947,7 @@ function BankActionModal({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Amount *</label>
+              <label className="text-sm font-medium text-foreground">Amount *</label>
               <Input
                 type="number"
                 step="0.01"
@@ -956,14 +963,14 @@ function BankActionModal({
           {!isDeposit &&
             form.amount &&
             parseFloat(form.amount) > Number(account.currentBalance) && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
                 Insufficient balance. Available:{' '}
                 {fmtMoney(Number(account.currentBalance), account.currency)}
               </div>
             )}
 
           <div>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               {isDeposit ? 'Deposit Source *' : 'Withdrawal Purpose *'}
             </label>
             <Select value={form.category} onValueChange={(v) => set('category', v)}>
@@ -982,9 +989,9 @@ function BankActionModal({
 
           {(isCashDeposit || isCashWithdrawal) && (
             <div>
-              <label className="text-sm font-medium text-slate-700">
+              <label className="text-sm font-medium text-foreground">
                 {isCashDeposit ? 'From Cash Account' : 'To Cash Account'}
-                <span className="text-xs text-slate-400 ml-1">(optional)</span>
+                <span className="text-xs text-muted-foreground ml-1">(optional)</span>
               </label>
               <Select
                 value={form.linkedCashAccountId}
@@ -1004,7 +1011,7 @@ function BankActionModal({
                 </SelectContent>
               </Select>
               {linkedCashInsufficient && (
-                <div className="mt-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                <div className="mt-1.5 rounded-lg bg-warning/10 border border-warning/30 px-3 py-2 text-xs text-warning">
                   ⚠️ Cash account has insufficient balance (
                   {fmtMoney(linkedCashBalance ?? 0, account.currency)} available). Leave this field
                   empty to record the bank deposit without deducting cash.
@@ -1015,7 +1022,7 @@ function BankActionModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-slate-700">Reference / Txn #</label>
+              <label className="text-sm font-medium text-foreground">Reference / Txn #</label>
               <Input
                 className="mt-1"
                 value={form.referenceNo}
@@ -1025,7 +1032,7 @@ function BankActionModal({
             </div>
             {!isDeposit && (
               <div>
-                <label className="text-sm font-medium text-slate-700">Cheque #</label>
+                <label className="text-sm font-medium text-foreground">Cheque #</label>
                 <Input
                   className="mt-1"
                   value={form.chequeNo}
@@ -1036,7 +1043,7 @@ function BankActionModal({
             )}
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Description *</label>
+            <label className="text-sm font-medium text-foreground">Description *</label>
             <Input
               className="mt-1"
               value={form.description}
@@ -1045,7 +1052,7 @@ function BankActionModal({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Notes</label>
+            <label className="text-sm font-medium text-foreground">Notes</label>
             <textarea
               rows={2}
               className="w-full mt-1 px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none"
@@ -1059,7 +1066,7 @@ function BankActionModal({
               Cancel
             </Button>
             <Button
-              className={`flex-1 text-white ${isDeposit ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+              className={`flex-1 text-success-foreground ${isDeposit ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'}`}
               disabled={!form.amount || !form.category || mut.isPending || !!linkedCashInsufficient}
               onClick={() => mut.mutate()}
             >
@@ -1147,7 +1154,7 @@ function TransferModal({
         </DialogHeader>
         <div className="space-y-3.5 pt-1">
           <div>
-            <label className="text-sm font-medium text-slate-700">From Account *</label>
+            <label className="text-sm font-medium text-foreground">From Account *</label>
             <Select value={form.fromId} onValueChange={(v) => set('fromId', v)}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select source account..." />
@@ -1171,7 +1178,7 @@ function TransferModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-700">To Account *</label>
+            <label className="text-sm font-medium text-foreground">To Account *</label>
             <Select value={form.toId} onValueChange={(v) => set('toId', v)}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select destination account..." />
@@ -1189,7 +1196,7 @@ function TransferModal({
           </div>
 
           {differentCurrency && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+            <div className="rounded-lg bg-warning/10 border border-warning/30 px-3 py-2 text-xs text-warning">
               ⚠️ Different currencies detected ({fromAcc?.currency} → {toAcc?.currency}). Enter
               exchange rate below.
             </div>
@@ -1197,7 +1204,7 @@ function TransferModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-slate-700">Date *</label>
+              <label className="text-sm font-medium text-foreground">Date *</label>
               <Input
                 type="date"
                 className="mt-1"
@@ -1206,7 +1213,7 @@ function TransferModal({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Amount *</label>
+              <label className="text-sm font-medium text-foreground">Amount *</label>
               <Input
                 type="number"
                 step="0.01"
@@ -1221,7 +1228,7 @@ function TransferModal({
 
           {differentCurrency && (
             <div>
-              <label className="text-sm font-medium text-slate-700">
+              <label className="text-sm font-medium text-foreground">
                 Exchange Rate ({fromAcc?.currency} to {toAcc?.currency})
               </label>
               <Input
@@ -1236,7 +1243,7 @@ function TransferModal({
           )}
 
           <div>
-            <label className="text-sm font-medium text-slate-700">Reference # (optional)</label>
+            <label className="text-sm font-medium text-foreground">Reference # (optional)</label>
             <Input
               className="mt-1"
               value={form.referenceNo}
@@ -1244,7 +1251,7 @@ function TransferModal({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Description *</label>
+            <label className="text-sm font-medium text-foreground">Description *</label>
             <Input
               className="mt-1"
               value={form.description}
@@ -1254,7 +1261,7 @@ function TransferModal({
           </div>
 
           {form.amount && fromAcc && parseFloat(form.amount) > Number(fromAcc.currentBalance) && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+            <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
               Insufficient balance in {fromAcc.name}
             </div>
           )}
@@ -1264,7 +1271,7 @@ function TransferModal({
               Cancel
             </Button>
             <Button
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={!form.fromId || !form.toId || !form.amount || mut.isPending}
               onClick={() => mut.mutate()}
             >
@@ -1297,18 +1304,26 @@ function HistoryDrawer({
 
   const { data, isLoading } = useQuery({
     queryKey: ['cb-txns', account.id, fromDate, toDate, typeFilter, page],
-    queryFn: () =>
-      getCashBankTransactions(account.id, {
+    queryFn: async () => {
+      const filters = {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         entryType: typeFilter === 'ALL' ? undefined : typeFilter,
-        page,
         limit: 50,
-      }),
+      };
+      // The API keeps chronological ordering to calculate accurate running
+      // balances. Fetch its first page for the total page count, then map the
+      // drawer's newest-first page number onto the corresponding API page.
+      const firstPage = await getCashBankTransactions(account.id, { ...filters, page: 1 });
+      const apiPage = Math.max(1, firstPage.pages - page + 1);
+      return apiPage === 1
+        ? firstPage
+        : getCashBankTransactions(account.id, { ...filters, page: apiPage });
+    },
     staleTime: 30_000,
   });
 
-  const entries: CashBankTransactionEntry[] = data?.entries ?? [];
+  const entries: CashBankTransactionEntry[] = [...(data?.entries ?? [])].reverse();
 
   const generateStatement = async () => {
     setGeneratingStatement(true);
@@ -1331,7 +1346,7 @@ function HistoryDrawer({
           <div className="text-sm text-muted-foreground mt-1 flex items-center gap-4">
             <span>
               Current Balance:{' '}
-              <strong className="text-slate-800">
+              <strong className="text-foreground">
                 {fmtMoney(Number(account.currentBalance), account.currency)}
               </strong>
             </span>
@@ -1351,7 +1366,7 @@ function HistoryDrawer({
               setPage(1);
             }}
           />
-          <span className="text-sm text-slate-400">to</span>
+          <span className="text-sm text-muted-foreground">to</span>
           <input
             type="date"
             className="px-3 py-1.5 text-sm border rounded-lg focus:outline-none"
@@ -1391,14 +1406,14 @@ function HistoryDrawer({
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="p-8 text-center text-slate-400">Loading…</div>
+            <div className="p-8 text-center text-muted-foreground">Loading…</div>
           ) : entries.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">
+            <div className="p-8 text-center text-muted-foreground">
               No transactions found for this filter.
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500">
+              <thead className="bg-muted sticky top-0 text-xs uppercase text-muted-foreground">
                 <tr>
                   {['Date', 'Ref', 'Type', 'Description', 'Debit (−)', 'Credit (+)', 'Balance'].map(
                     (h) => (
@@ -1411,11 +1426,11 @@ function HistoryDrawer({
               </thead>
               <tbody className="divide-y">
                 {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
+                  <tr key={e.id} className="hover:bg-muted">
+                    <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
                       {String(e.date).slice(0, 10)}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {e.referenceNo}
                     </td>
                     <td className="px-4 py-2.5">
@@ -1424,22 +1439,22 @@ function HistoryDrawer({
                       </span>
                     </td>
                     <td
-                      className="px-4 py-2.5 max-w-[200px] truncate text-slate-700"
+                      className="px-4 py-2.5 max-w-[200px] truncate text-foreground"
                       title={e.description}
                     >
                       {e.description || e.category}
                     </td>
-                    <td className="px-4 py-2.5 tabular-nums text-red-600">
+                    <td className="px-4 py-2.5 tabular-nums text-destructive">
                       {e.entryType === 'PAYMENT'
                         ? fmtMoney(Number(e.amount), account.currency)
                         : '—'}
                     </td>
-                    <td className="px-4 py-2.5 tabular-nums text-emerald-600">
+                    <td className="px-4 py-2.5 tabular-nums text-success">
                       {e.entryType === 'RECEIPT'
                         ? fmtMoney(Number(e.amount), account.currency)
                         : '—'}
                     </td>
-                    <td className="px-4 py-2.5 tabular-nums font-semibold text-slate-800">
+                    <td className="px-4 py-2.5 tabular-nums font-semibold text-foreground">
                       {fmtMoney(e.runningBalance, account.currency)}
                     </td>
                   </tr>
@@ -1450,9 +1465,9 @@ function HistoryDrawer({
         </div>
 
         {data && data.pages > 1 && (
-          <div className="px-6 py-3 border-t shrink-0 flex items-center justify-between text-sm text-slate-600">
+          <div className="px-6 py-3 border-t shrink-0 flex items-center justify-between text-sm text-foreground">
             <span>
-              {data.total} entries · Page {data.page} of {data.pages}
+              {data.total} entries · Page {page} of {data.pages} · newest first
             </span>
             <div className="flex gap-2">
               <Button
@@ -1461,7 +1476,7 @@ function HistoryDrawer({
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Prev
+                Newer
               </Button>
               <Button
                 variant="outline"
@@ -1469,7 +1484,7 @@ function HistoryDrawer({
                 disabled={page >= data.pages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                Older
               </Button>
             </div>
           </div>
@@ -1580,13 +1595,13 @@ function ReconcileModal({
         <div className="space-y-4 pt-1">
           <div className="rounded-xl border p-4 space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Book Balance (system)</span>
+              <span className="text-sm text-foreground">Book Balance (system)</span>
               <span className="font-semibold">{fmtMoney(bookBalance, account.currency)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Statement Balance</span>
+              <span className="text-sm text-foreground">Statement Balance</span>
               <span
-                className={`font-semibold ${form.statementBalance ? 'text-slate-800' : 'text-slate-400'}`}
+                className={`font-semibold ${form.statementBalance ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 {form.statementBalance ? fmtMoney(stmtBalance, account.currency) : '—'}
               </span>
@@ -1595,12 +1610,12 @@ function ReconcileModal({
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Difference</span>
               <div className="flex items-center gap-2">
-                <span className={`font-bold ${isBalanced ? 'text-emerald-600' : 'text-amber-600'}`}>
+                <span className={`font-bold ${isBalanced ? 'text-success' : 'text-warning'}`}>
                   {form.statementBalance ? fmtMoney(difference, account.currency) : '—'}
                 </span>
                 {form.statementBalance && (
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${isBalanced ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${isBalanced ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}
                   >
                     {isBalanced ? '✅ BALANCED' : '⚠️ DIFFERENCE'}
                   </span>
@@ -1655,18 +1670,18 @@ function ReconcileModal({
 
           {history.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase mb-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-1.5">
                 Past Reconciliations
               </p>
               <div className="space-y-1.5 max-h-32 overflow-y-auto">
                 {history.slice(0, 5).map((r) => (
                   <div
                     key={r.id}
-                    className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 rounded px-3 py-1.5"
+                    className="flex items-center justify-between text-xs text-foreground bg-muted rounded px-3 py-1.5"
                   >
                     <span>{String(r.reconciliationDate).slice(0, 10)}</span>
                     <span>{fmtMoney(r.statementBalance, account.currency)}</span>
-                    <span className={r.isBalanced ? 'text-emerald-600' : 'text-amber-600'}>
+                    <span className={r.isBalanced ? 'text-success' : 'text-warning'}>
                       {r.isBalanced
                         ? '✅ Balanced'
                         : `⚠️ Diff: ${fmtMoney(r.difference, account.currency)}`}
@@ -1682,7 +1697,7 @@ function ReconcileModal({
               Cancel
             </Button>
             <Button
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={!form.statementBalance || mut.isPending}
               onClick={() => mut.mutate()}
             >
@@ -1714,10 +1729,10 @@ function SelectAccountModal({
 }) {
   const [chosen, setChosen] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bold text-slate-800">Select Account</h2>
+          <h2 className="font-bold text-foreground">Select Account</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -1880,6 +1895,8 @@ export default function CashBankPage() {
       ),
     [bankAccounts, search],
   );
+  const cashPaging = useTablePagination(filteredCash, search, 10);
+  const bankPaging = useTablePagination(filteredBank, search, 10);
 
   const filteredCashbook = useMemo(
     () =>
@@ -1896,6 +1913,8 @@ export default function CashBankPage() {
     () => cashbookEntries.filter((e) => e.category === 'TRANSFER'),
     [cashbookEntries],
   );
+  const cashbookPaging = useTablePagination(filteredCashbook, search, 10);
+  const transferPaging = useTablePagination(transferHistory, 'transfers', 10);
 
   const [pickerAccounts, setPickerAccounts] = useState<CashBankAccount[]>([]);
 
@@ -1928,16 +1947,18 @@ export default function CashBankPage() {
   ];
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-5">
+    <div className="bg-primary/10 min-h-full p-6 space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Cash & Bank Accounts</h1>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Cash & Bank Accounts
+          </h1>
           <p className="text-muted-foreground text-sm">
             {activeAccounts.length} active accounts ·{' '}
             {formatCurrency(totalCash + totalBank, currency)} total
             {unconvertedCash + unconvertedBank > 0 && (
-              <span className="text-amber-600">
+              <span className="text-warning">
                 {' '}
                 (excludes {unconvertedCash + unconvertedBank} account
                 {unconvertedCash + unconvertedBank !== 1 ? 's' : ''} with no exchange rate on file)
@@ -1951,7 +1972,7 @@ export default function CashBankPage() {
           </Button>
           <Button
             size="sm"
-            className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+            className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
             onClick={() =>
               setModal({ kind: 'add-account', defaultType: tab === 'bank' ? 'BANK' : 'CASH' })
             }
@@ -1972,7 +1993,7 @@ export default function CashBankPage() {
                 setSearch('');
               }}
               className={`flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors
-                ${tab === t.id ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                ${tab === t.id ? 'border-b-2 border-primary text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
             >
               {t.icon}
               {t.label}
@@ -1981,9 +2002,9 @@ export default function CashBankPage() {
         </div>
 
         {/* Search bar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b bg-white">
+        <div className="flex items-center gap-3 px-4 py-3 border-b bg-card">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9 h-8 text-sm"
               value={search}
@@ -1993,7 +2014,7 @@ export default function CashBankPage() {
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -2038,7 +2059,7 @@ export default function CashBankPage() {
           {tab === 'transfer' && (
             <Button
               size="sm"
-              className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={() => setModal({ kind: 'transfer' })}
             >
               <ArrowLeftRight className="h-3.5 w-3.5" /> New Transfer
@@ -2047,33 +2068,33 @@ export default function CashBankPage() {
         </div>
 
         {/* Tab content */}
-        <div className="bg-white">
+        <div className="bg-card">
           {/* ── Cash in Hand ── */}
           {tab === 'cash' && (
             <div id="cash-accounts-pdf">
-              <div className="px-4 py-3 bg-emerald-50 border-b flex items-center justify-between">
+              <div className="px-4 py-3 bg-success/10 border-b flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">
+                  <p className="text-xs text-success font-semibold uppercase tracking-wide">
                     Total Cash in Hand
                   </p>
-                  <p className="text-2xl font-bold text-emerald-800 mt-0.5">
+                  <p className="text-2xl font-bold text-success mt-0.5">
                     {formatCurrency(totalCash, currency)}
                   </p>
-                  <p className="text-xs text-emerald-600 mt-0.5">{cashAccounts.length} accounts</p>
+                  <p className="text-xs text-success mt-0.5">{cashAccounts.length} accounts</p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                  className="border-success/30 text-success hover:bg-success/10"
                   onClick={() => setModal({ kind: 'add-account', defaultType: 'CASH' })}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Cash Account
                 </Button>
               </div>
               {isLoading ? (
-                <div className="p-8 text-center text-slate-400">Loading…</div>
+                <div className="p-8 text-center text-muted-foreground">Loading…</div>
               ) : filteredCash.length === 0 ? (
-                <div className="p-12 text-center text-slate-400">
+                <div className="p-12 text-center text-muted-foreground">
                   <Banknote className="h-10 w-10 mx-auto mb-3 opacity-30" />
                   <p className="font-medium">No cash accounts yet</p>
                   <p className="text-sm mt-1">Add your first cash account to track petty cash</p>
@@ -2081,7 +2102,7 @@ export default function CashBankPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <thead className="bg-muted text-xs uppercase text-muted-foreground">
                       <tr>
                         {[
                           'Account Name',
@@ -2098,18 +2119,18 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredCash.map((a) => (
-                        <tr key={a.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
-                          <td className="px-4 py-3 text-slate-600 text-xs font-medium">
+                      {cashPaging.pageRows.map((a) => (
+                        <tr key={a.id} className="hover:bg-muted">
+                          <td className="px-4 py-3 font-medium text-foreground">{a.name}</td>
+                          <td className="px-4 py-3 text-foreground text-xs font-medium">
                             {getBranchName(a.branchId)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="px-2 py-0.5 rounded text-xs bg-slate-100">
+                            <span className="px-2 py-0.5 rounded text-xs bg-muted">
                               {a.currency}
                             </span>
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-slate-500">
+                          <td className="px-4 py-3 tabular-nums text-muted-foreground">
                             {fmtMoney(Number(a.openingBalance), a.currency)}
                           </td>
                           <td className="px-4 py-3">
@@ -2126,7 +2147,7 @@ export default function CashBankPage() {
                                 onClick={() =>
                                   setModal({ kind: 'cash-action', account: a, action: 'add' })
                                 }
-                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium"
+                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-success/10 text-success hover:bg-success/10 font-medium"
                               >
                                 <ArrowDownLeft className="h-3 w-3" /> Add
                               </button>
@@ -2134,20 +2155,20 @@ export default function CashBankPage() {
                                 onClick={() =>
                                   setModal({ kind: 'cash-action', account: a, action: 'withdraw' })
                                 }
-                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 font-medium"
+                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-destructive/10 text-destructive hover:bg-destructive/10 font-medium"
                               >
                                 <ArrowUpRight className="h-3 w-3" /> Withdraw
                               </button>
                               <button
                                 onClick={() => setModal({ kind: 'history', account: a })}
-                                className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+                                className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                                 title="History"
                               >
                                 <History className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => setModal({ kind: 'edit-account', account: a })}
-                                className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+                                className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                                 title="Edit"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -2163,7 +2184,7 @@ export default function CashBankPage() {
                                   if (confirm(`Deactivate "${a.name}"?`))
                                     deactivateMut.mutate(a.id);
                                 }}
-                                className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600"
+                                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                                 title="Deactivate"
                               >
                                 <PowerOff className="h-3.5 w-3.5" />
@@ -2174,6 +2195,15 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
+                  {cashPaging.total > cashPaging.pageSize && (
+                    <Pagination
+                      page={cashPaging.page}
+                      totalPages={cashPaging.totalPages}
+                      total={cashPaging.total}
+                      limit={cashPaging.pageSize}
+                      onPageChange={cashPaging.setPage}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -2182,31 +2212,29 @@ export default function CashBankPage() {
           {/* ── Cash at Bank ── */}
           {tab === 'bank' && (
             <div id="bank-accounts-pdf">
-              <div className="px-4 py-3 bg-blue-50 border-b flex items-center justify-between">
+              <div className="px-4 py-3 bg-primary/10 border-b flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide">
+                  <p className="text-xs text-primary font-semibold uppercase tracking-wide">
                     Total Cash at Bank
                   </p>
-                  <p className="text-2xl font-bold text-blue-800 mt-0.5">
+                  <p className="text-2xl font-bold text-primary mt-0.5">
                     {formatCurrency(totalBank, currency)}
                   </p>
-                  <p className="text-xs text-blue-600 mt-0.5">
-                    {bankAccounts.length} bank accounts
-                  </p>
+                  <p className="text-xs text-primary mt-0.5">{bankAccounts.length} bank accounts</p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                  className="border-primary/30 text-primary hover:bg-primary/10"
                   onClick={() => setModal({ kind: 'add-account', defaultType: 'BANK' })}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Bank Account
                 </Button>
               </div>
               {isLoading ? (
-                <div className="p-8 text-center text-slate-400">Loading…</div>
+                <div className="p-8 text-center text-muted-foreground">Loading…</div>
               ) : filteredBank.length === 0 ? (
-                <div className="p-12 text-center text-slate-400">
+                <div className="p-12 text-center text-muted-foreground">
                   <Building2 className="h-10 w-10 mx-auto mb-3 opacity-30" />
                   <p className="font-medium">No bank accounts yet</p>
                   <p className="text-sm mt-1">Add your first bank account to track balances</p>
@@ -2214,7 +2242,7 @@ export default function CashBankPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <thead className="bg-muted text-xs uppercase text-muted-foreground">
                       <tr>
                         {[
                           'Account Name',
@@ -2232,19 +2260,19 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredBank.map((a) => (
-                        <tr key={a.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
-                          <td className="px-4 py-3 text-slate-600">{a.bankName ?? '—'}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                      {bankPaging.pageRows.map((a) => (
+                        <tr key={a.id} className="hover:bg-muted">
+                          <td className="px-4 py-3 font-medium text-foreground">{a.name}</td>
+                          <td className="px-4 py-3 text-foreground">{a.bankName ?? '—'}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                             {a.accountNumber ? `****${a.accountNumber.slice(-4)}` : '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="px-2 py-0.5 rounded text-xs bg-slate-100">
+                            <span className="px-2 py-0.5 rounded text-xs bg-muted">
                               {a.currency}
                             </span>
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-slate-500">
+                          <td className="px-4 py-3 tabular-nums text-muted-foreground">
                             {fmtMoney(Number(a.openingBalance), a.currency)}
                           </td>
                           <td className="px-4 py-3">
@@ -2261,7 +2289,7 @@ export default function CashBankPage() {
                                 onClick={() =>
                                   setModal({ kind: 'bank-action', account: a, action: 'deposit' })
                                 }
-                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium"
+                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-success/10 text-success hover:bg-success/10 font-medium"
                               >
                                 <ArrowDownLeft className="h-3 w-3" /> Deposit
                               </button>
@@ -2269,27 +2297,27 @@ export default function CashBankPage() {
                                 onClick={() =>
                                   setModal({ kind: 'bank-action', account: a, action: 'withdraw' })
                                 }
-                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 font-medium"
+                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-destructive/10 text-destructive hover:bg-destructive/10 font-medium"
                               >
                                 <ArrowUpRight className="h-3 w-3" /> Withdraw
                               </button>
                               <button
                                 onClick={() => setModal({ kind: 'history', account: a })}
-                                className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+                                className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                                 title="Statement"
                               >
                                 <History className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => setModal({ kind: 'reconcile', account: a })}
-                                className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+                                className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                                 title="Reconcile"
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => setModal({ kind: 'edit-account', account: a })}
-                                className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+                                className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                                 title="Edit"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -2305,7 +2333,7 @@ export default function CashBankPage() {
                                   if (confirm(`Deactivate "${a.name}"?`))
                                     deactivateMut.mutate(a.id);
                                 }}
-                                className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600"
+                                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                                 title="Deactivate"
                               >
                                 <PowerOff className="h-3.5 w-3.5" />
@@ -2316,6 +2344,15 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
+                  {bankPaging.total > bankPaging.pageSize && (
+                    <Pagination
+                      page={bankPaging.page}
+                      totalPages={bankPaging.totalPages}
+                      total={bankPaging.total}
+                      limit={bankPaging.pageSize}
+                      onPageChange={bankPaging.setPage}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -2324,7 +2361,7 @@ export default function CashBankPage() {
           {/* ── Cashbook ── */}
           {tab === 'cashbook' && (
             <div id="cashbook-pdf">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b bg-slate-50">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b bg-muted">
                 <StatCard
                   title="Total Receipts"
                   value={formatCurrency(
@@ -2357,13 +2394,13 @@ export default function CashBankPage() {
                 />
               </div>
               {loadingCashbook ? (
-                <div className="p-8 text-center text-slate-400">Loading…</div>
+                <div className="p-8 text-center text-muted-foreground">Loading…</div>
               ) : filteredCashbook.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">No transactions found</div>
+                <div className="p-8 text-center text-muted-foreground">No transactions found</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500 sticky top-0">
+                    <thead className="bg-muted text-xs uppercase text-muted-foreground sticky top-0">
                       <tr>
                         {[
                           'Date',
@@ -2382,15 +2419,15 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredCashbook.slice(0, 200).map((e) => (
-                        <tr key={e.id} className="hover:bg-slate-50">
+                      {cashbookPaging.pageRows.map((e) => (
+                        <tr key={e.id} className="hover:bg-muted">
                           <td className="px-4 py-2.5 whitespace-nowrap">
                             {String(e.date).slice(0, 10)}
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                          <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                             {e.referenceNo}
                           </td>
-                          <td className="px-4 py-2.5 text-slate-600 text-xs">
+                          <td className="px-4 py-2.5 text-foreground text-xs">
                             {e.account?.name ?? '—'}
                           </td>
                           <td className="px-4 py-2.5">
@@ -2398,9 +2435,9 @@ export default function CashBankPage() {
                               {e.entryType}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-slate-500">
+                          <td className="px-4 py-2.5 text-xs text-muted-foreground">
                             {e.category === 'GUARANTEE_CHEQUE' ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-[10px]">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-success/10 text-success font-semibold border border-success/30 text-[10px]">
                                 Guarantee Cheque
                               </span>
                             ) : (
@@ -2408,17 +2445,17 @@ export default function CashBankPage() {
                             )}
                           </td>
                           <td
-                            className="px-4 py-2.5 max-w-[200px] truncate text-slate-700"
+                            className="px-4 py-2.5 max-w-[200px] truncate text-foreground"
                             title={e.description}
                           >
                             {e.description}
                           </td>
-                          <td className="px-4 py-2.5 tabular-nums text-red-600 text-right">
+                          <td className="px-4 py-2.5 tabular-nums text-destructive text-right">
                             {e.entryType === 'PAYMENT'
                               ? formatCurrency(Number(e.amount), currency)
                               : '—'}
                           </td>
-                          <td className="px-4 py-2.5 tabular-nums text-emerald-600 text-right">
+                          <td className="px-4 py-2.5 tabular-nums text-success text-right">
                             {e.entryType === 'RECEIPT'
                               ? formatCurrency(Number(e.amount), currency)
                               : '—'}
@@ -2427,11 +2464,14 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
-                  {filteredCashbook.length > 200 && (
-                    <p className="px-4 py-2.5 text-xs text-slate-400 border-t">
-                      Showing 200 of {filteredCashbook.length} entries. Use date range filters on
-                      individual account history for full view.
-                    </p>
+                  {cashbookPaging.total > cashbookPaging.pageSize && (
+                    <Pagination
+                      page={cashbookPaging.page}
+                      totalPages={cashbookPaging.totalPages}
+                      total={cashbookPaging.total}
+                      limit={cashbookPaging.pageSize}
+                      onPageChange={cashbookPaging.setPage}
+                    />
                   )}
                 </div>
               )}
@@ -2441,22 +2481,22 @@ export default function CashBankPage() {
           {/* ── Transfers ── */}
           {tab === 'transfer' && (
             <>
-              <div className="p-4 border-b bg-indigo-50">
+              <div className="p-4 border-b bg-primary/10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-indigo-800">
+                    <p className="text-sm font-medium text-primary">
                       Transfer between cash & bank accounts
                     </p>
-                    <p className="text-xs text-indigo-600 mt-0.5">
+                    <p className="text-xs text-primary mt-0.5">
                       All transfers are atomic — both accounts update simultaneously
                     </p>
                   </div>
                 </div>
               </div>
               {loadingCashbook ? (
-                <div className="p-8 text-center text-slate-400">Loading…</div>
+                <div className="p-8 text-center text-muted-foreground">Loading…</div>
               ) : transferHistory.length === 0 ? (
-                <div className="p-12 text-center text-slate-400">
+                <div className="p-12 text-center text-muted-foreground">
                   <ArrowLeftRight className="h-10 w-10 mx-auto mb-3 opacity-30" />
                   <p className="font-medium">No transfers yet</p>
                   <p className="text-sm mt-1">
@@ -2466,7 +2506,7 @@ export default function CashBankPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <thead className="bg-muted text-xs uppercase text-muted-foreground">
                       <tr>
                         {['Date', 'Reference', 'Account', 'Type', 'Amount', 'Description'].map(
                           (h) => (
@@ -2478,15 +2518,15 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {transferHistory.map((e) => (
-                        <tr key={e.id} className="hover:bg-slate-50">
+                      {transferPaging.pageRows.map((e) => (
+                        <tr key={e.id} className="hover:bg-muted">
                           <td className="px-4 py-3 whitespace-nowrap">
                             {String(e.date).slice(0, 10)}
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                             {e.referenceNo}
                           </td>
-                          <td className="px-4 py-3 text-slate-600 text-xs">
+                          <td className="px-4 py-3 text-foreground text-xs">
                             {e.account?.name ?? '—'}
                           </td>
                           <td className="px-4 py-3">
@@ -2500,11 +2540,20 @@ export default function CashBankPage() {
                             {e.entryType === 'PAYMENT' ? '−' : '+'}
                             {formatCurrency(Number(e.amount), currency)}
                           </td>
-                          <td className="px-4 py-3 text-slate-700">{e.description}</td>
+                          <td className="px-4 py-3 text-foreground">{e.description}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  {transferPaging.total > transferPaging.pageSize && (
+                    <Pagination
+                      page={transferPaging.page}
+                      totalPages={transferPaging.totalPages}
+                      total={transferPaging.total}
+                      limit={transferPaging.pageSize}
+                      onPageChange={transferPaging.setPage}
+                    />
+                  )}
                 </div>
               )}
             </>

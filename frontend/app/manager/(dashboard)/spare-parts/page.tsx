@@ -144,13 +144,13 @@ function SparePartsContent() {
         </div>
       }
     >
-      <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
+      <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
         <div className="flex flex-wrap justify-between items-center gap-3">
-          <h3 className="text-xl sm:text-2xl font-bold text-primary">Spare Parts Inventory</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground">Spare Parts Inventory</h3>
           {isAdmin && <BranchFilterBar />}
           <div className="flex gap-2">
             <Button
-              className="bg-primary text-white gap-2"
+              className="bg-primary text-primary-foreground gap-2"
               onClick={() => {
                 if (isAdmin && !branchId) {
                   toast.error('Pick a branch in the filter above before adding a spare part');
@@ -178,7 +178,7 @@ function SparePartsContent() {
 
         <div className="flex items-center justify-between">
           <div className="relative w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by code, name or brand..."
               value={search}
@@ -205,7 +205,7 @@ function SparePartsContent() {
                 cell: (item: SparePartInventoryItem) => (
                   <button
                     onClick={() => handleOpenDetail(item)}
-                    className="hover:text-blue-600 hover:underline transition-colors text-left font-bold"
+                    className="hover:text-primary hover:underline transition-colors text-left font-bold"
                   >
                     {item.part_name}
                   </button>
@@ -217,7 +217,7 @@ function SparePartsContent() {
                 accessorKey: 'sku' as keyof SparePartInventoryItem,
                 className: 'font-semibold text-[11px] text-primary uppercase',
                 cell: (item: SparePartInventoryItem) => (
-                  <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  <span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded border border-border">
                     {item.sku || '-'}
                   </span>
                 ),
@@ -236,7 +236,7 @@ function SparePartsContent() {
                         navigator.clipboard.writeText(item.lotNumber);
                         toast.success('Copied to clipboard');
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                       title="Copy Lot ID"
                     >
                       <Copy size={12} />
@@ -294,7 +294,7 @@ function SparePartsContent() {
                       }}
                       className="hover:opacity-70 transition-opacity"
                     >
-                      <Trash2 size={18} className="text-red-500" />
+                      <Trash2 size={18} className="text-destructive" />
                     </button>
                   </div>
                 ),
@@ -377,7 +377,7 @@ export default function SparePartsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-blue-100">
+        <div className="flex items-center justify-center min-h-screen bg-card">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
       }

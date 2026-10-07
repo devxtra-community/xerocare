@@ -7,7 +7,7 @@ export default function EmployeeDashboardPage() {
   return (
     <DashboardPage>
       <div className="flex flex-col space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Employee Report</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Employee Report</h3>
         <EmployeeStatsCards />
 
         <EmployeeDashboardGraphs />

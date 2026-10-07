@@ -11,11 +11,11 @@ const data = [
 ];
 
 const COLORS = [
-  '#10b981', // Available - Green
+  'var(--chart-profit)', // Available - Green
   'var(--primary)', // Rented - Primary Red
-  '#7c3aed', // Leased - Primary Purple-ish
-  '#6b7280', // Sold - Gray
-  '#ef4444', // Under Service - Red
+  'var(--lease)', // Leased - Primary Purple-ish
+  'var(--muted-foreground)', // Sold - Gray
+  'var(--destructive)', // Under Service - Red
 ];
 
 /**
@@ -58,7 +58,7 @@ export default function PrinterStatusDonut() {
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
               }}
             />
             <Legend

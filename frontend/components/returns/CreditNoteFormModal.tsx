@@ -104,24 +104,24 @@ const RETURN_TYPES = [
     label: 'Direct Refund',
     sub: 'Cash back',
     Icon: Banknote,
-    base: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400',
-    active: 'border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-200',
+    base: 'border-success/30 bg-success/10 text-success hover:border-success/30',
+    active: 'border-success bg-success text-success-foreground shadow-md shadow-success/10',
   },
   {
     value: 'REPLACEMENT',
     label: 'Replacement',
     sub: 'Swap item',
     Icon: RefreshCw,
-    base: 'border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-400',
-    active: 'border-blue-500 bg-blue-500 text-white shadow-md shadow-blue-200',
+    base: 'border-primary/30 bg-primary/10 text-primary hover:border-primary/30',
+    active: 'border-primary bg-primary text-primary-foreground shadow-md shadow-primary/10',
   },
   {
     value: 'CREDIT_EXCHANGE',
     label: 'Credit',
     sub: 'Store credit',
     Icon: CreditCard,
-    base: 'border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-400',
-    active: 'border-violet-500 bg-violet-500 text-white shadow-md shadow-violet-200',
+    base: 'border-lease/30 bg-lease/10 text-lease hover:border-lease/30',
+    active: 'border-lease bg-lease text-lease-foreground shadow-md shadow-lease/10',
   },
 ] as const;
 
@@ -519,18 +519,20 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
           <div className="flex flex-col" style={{ maxHeight: '90vh' }}>
             {/* ══ HEADER ══ */}
             <div
-              className="flex items-center justify-between px-6 py-4 border-b border-slate-100"
-              style={{ background: 'linear-gradient(135deg,#f8faff 0%,#f0f4ff 100%)' }}
+              className="flex items-center justify-between px-6 py-4 border-b border-border"
+              style={{
+                background: 'linear-gradient(135deg, var(--background) 0%, var(--accent) 100%)',
+              }}
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-                  <RotateCcw className="h-4 w-4 text-white" />
+                  <RotateCcw className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-slate-800 leading-none">
+                  <h2 className="text-sm font-bold text-foreground leading-none">
                     {record ? 'Update Credit Note' : 'Create Credit Note'}
                   </h2>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     {record
                       ? 'Modify existing return details'
                       : 'Select customer and invoice to auto-fill'}
@@ -552,8 +554,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                     key={i}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all ${
                       s.done
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-slate-400 border-slate-200'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-card text-muted-foreground border-border'
                     }`}
                   >
                     {s.done ? <CheckCircle2 className="h-2.5 w-2.5" /> : <span>{i + 1}</span>}
@@ -564,7 +566,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
               <button
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -577,7 +579,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                 <div className="p-6 space-y-5 flex-1">
                   {/* 0. Item Category Toggle */}
                   <section className="space-y-2">
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                       Item Category
                     </label>
                     <div className="flex gap-2">
@@ -590,8 +592,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                         disabled={!!record}
                         className={`flex items-center gap-2 flex-1 rounded-xl border-2 py-2.5 px-4 text-xs font-semibold transition-all ${
                           itemCategory === 'PRODUCT'
-                            ? 'border-primary bg-primary text-white shadow-sm'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                            ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                            : 'border-border bg-card text-muted-foreground hover:border-border'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         <Box className="h-4 w-4" />
@@ -606,8 +608,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                         disabled={!!record}
                         className={`flex items-center gap-2 flex-1 rounded-xl border-2 py-2.5 px-4 text-xs font-semibold transition-all ${
                           itemCategory === 'SPARE_PART'
-                            ? 'border-orange-500 bg-orange-500 text-white shadow-sm'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                            ? 'border-warning bg-warning text-warning-foreground shadow-sm'
+                            : 'border-border bg-card text-muted-foreground hover:border-border'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         <Wrench className="h-4 w-4" />
@@ -618,8 +620,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
                   {/* 1. Customer */}
                   <section className="space-y-2">
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center font-bold">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
                         1
                       </span>
                       Customer
@@ -630,30 +632,30 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                       onValueChange={setSelectedCustomer}
                       placeholder="Select a customer…"
                       emptyText="No customer matches that search."
-                      className="h-9 rounded-lg border-slate-200 bg-white text-sm"
+                      className="h-9 rounded-lg border-border bg-card text-sm"
                     />
 
                     {selectedCustomer && (
-                      <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5">
+                      <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2.5">
                         {loadingCustomer ? (
-                          <span className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Loader2 className="h-3 w-3 animate-spin" /> Loading…
                           </span>
                         ) : customerDetails ? (
                           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                            <div className="col-span-2 flex items-center gap-1.5 text-slate-700 font-semibold">
-                              <User className="h-3 w-3 text-blue-400 shrink-0" />
+                            <div className="col-span-2 flex items-center gap-1.5 text-foreground font-semibold">
+                              <User className="h-3 w-3 text-primary shrink-0" />
                               {customerDetails.name}
                             </div>
                             {customerDetails.email && (
-                              <div className="flex items-center gap-1.5 text-slate-500 truncate">
-                                <Mail className="h-3 w-3 text-blue-400 shrink-0" />
+                              <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+                                <Mail className="h-3 w-3 text-primary shrink-0" />
                                 <span className="truncate">{customerDetails.email}</span>
                               </div>
                             )}
                             {customerDetails.phone && (
-                              <div className="flex items-center gap-1.5 text-slate-500">
-                                <Phone className="h-3 w-3 text-blue-400 shrink-0" />
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Phone className="h-3 w-3 text-primary shrink-0" />
                                 {customerDetails.phone}
                               </div>
                             )}
@@ -665,8 +667,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
                   {/* 2. Invoice */}
                   <section className="space-y-2">
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center font-bold">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
                         2
                       </span>
                       Invoice Reference
@@ -685,29 +687,29 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                           ? 'Loading invoices…'
                           : 'This customer has no invoices to return against.'
                       }
-                      className="h-9 rounded-lg border-slate-200 bg-white text-sm"
+                      className="h-9 rounded-lg border-border bg-card text-sm"
                     />
 
                     {selectedInvoice && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                      <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <FileText className="h-3.5 w-3.5 text-slate-400" />
-                            <span className="text-xs font-bold text-slate-700">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-xs font-bold text-foreground">
                               {invoiceNumber}
                             </span>
-                            <Badge className="h-4 px-1.5 text-[9px] bg-emerald-100 text-emerald-700 border-0 rounded-full font-bold">
+                            <Badge className="h-4 px-1.5 text-[9px] bg-success/10 text-success border-0 rounded-full font-bold">
                               {selectedInvoice.status}
                             </Badge>
                           </div>
                           <button
                             onClick={() => setViewQuotation(true)}
-                            className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 font-medium transition-colors"
+                            className="flex items-center gap-1 text-[10px] text-primary hover:text-primary font-medium transition-colors"
                           >
                             <ExternalLink className="h-3 w-3" /> View
                           </button>
                         </div>
-                        <div className="mt-1.5 flex items-center gap-4 text-[11px] text-slate-400">
+                        <div className="mt-1.5 flex items-center gap-4 text-[11px] text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {soldDate}
@@ -719,7 +721,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                         </div>
                         {/* Spare part count badge */}
                         {sparePartInvoiceItems.length > 0 && (
-                          <div className="mt-1.5 flex items-center gap-1 text-[10px] text-orange-600">
+                          <div className="mt-1.5 flex items-center gap-1 text-[10px] text-warning">
                             <Wrench className="h-3 w-3" />
                             {sparePartInvoiceItems.length} spare part line item
                             {sparePartInvoiceItems.length > 1 ? 's' : ''}
@@ -731,8 +733,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
                   {/* 3. Item selection */}
                   <section className="space-y-2">
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center font-bold">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
                         3
                       </span>
                       {itemCategory === 'SPARE_PART' ? 'Spare Part' : 'Product'}
@@ -746,7 +748,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                           onValueChange={handleSparePartChange}
                           disabled={!selectedInvoice || sparePartInvoiceItems.length === 0}
                         >
-                          <SelectTrigger className="h-9 rounded-lg border-orange-200 bg-white text-sm focus:ring-2 focus:ring-orange-200">
+                          <SelectTrigger className="h-9 rounded-lg border-warning/30 bg-card text-sm focus:ring-2 focus:ring-warning/30">
                             <SelectValue
                               placeholder={
                                 selectedInvoice && sparePartInvoiceItems.length === 0
@@ -764,14 +766,16 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                                   value={item.sparePartId || item.id}
                                 >
                                   <div className="flex flex-col py-0.5">
-                                    <span className="text-xs font-medium text-slate-700">
+                                    <span className="text-xs font-medium text-foreground">
                                       {short}
                                     </span>
                                     {sub && (
-                                      <span className="text-[10px] text-slate-400">{sub}</span>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {sub}
+                                      </span>
                                     )}
                                     {item.sku && (
-                                      <span className="text-[10px] text-orange-500 font-mono">
+                                      <span className="text-[10px] text-warning font-mono">
                                         SKU: {item.sku}
                                       </span>
                                     )}
@@ -784,7 +788,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
                         {selectedSparePart && (
                           <div className="grid gap-2 pt-1">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                               Quantity to Return
                             </label>
                             <div className="flex items-center gap-3">
@@ -796,9 +800,9 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                                 onChange={(e) =>
                                   setReturnQuantity(Math.max(1, Number(e.target.value)))
                                 }
-                                className="h-9 w-28 rounded-lg border-orange-200 text-sm focus:ring-2 focus:ring-orange-200"
+                                className="h-9 w-28 rounded-lg border-warning/30 text-sm focus:ring-2 focus:ring-warning/30"
                               />
-                              <span className="text-[11px] text-slate-400">
+                              <span className="text-[11px] text-muted-foreground">
                                 of {selectedSparePart.quantity} purchased
                               </span>
                             </div>
@@ -812,7 +816,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                         onValueChange={handleProductChange}
                         disabled={!selectedInvoice || productInvoiceItems.length === 0}
                       >
-                        <SelectTrigger className="h-9 rounded-lg border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary/20">
+                        <SelectTrigger className="h-9 rounded-lg border-border bg-card text-sm focus:ring-2 focus:ring-primary/20">
                           <SelectValue
                             placeholder={
                               selectedInvoice && productInvoiceItems.length === 0
@@ -830,10 +834,12 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                                 value={item.productId || item.id || String(idx)}
                               >
                                 <div className="flex flex-col py-0.5">
-                                  <span className="text-xs font-medium text-slate-700">
+                                  <span className="text-xs font-medium text-foreground">
                                     {short}
                                   </span>
-                                  {sub && <span className="text-[10px] text-slate-400">{sub}</span>}
+                                  {sub && (
+                                    <span className="text-[10px] text-muted-foreground">{sub}</span>
+                                  )}
                                 </div>
                               </SelectItem>
                             );
@@ -845,8 +851,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
                   {/* 4. Return Type */}
                   <section className="space-y-2">
-                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center font-bold">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
                         4
                       </span>
                       Return Type
@@ -865,10 +871,12 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                               isActive ? active : base
                             }`}
                           >
-                            <Icon className={`h-5 w-5 ${isActive ? 'text-white' : ''}`} />
+                            <Icon
+                              className={`h-5 w-5 ${isActive ? 'text-primary-foreground' : ''}`}
+                            />
                             <span className="text-[11px] font-bold leading-tight">{label}</span>
                             <span
-                              className={`text-[9px] leading-tight ${isActive ? 'text-white/80' : 'opacity-60'}`}
+                              className={`text-[9px] leading-tight ${isActive ? 'text-primary-foreground' : 'opacity-60'}`}
                             >
                               {sub}
                             </span>
@@ -880,26 +888,26 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
                   {/* 5. Notes */}
                   <section className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                       Notes <span className="normal-case font-normal">(optional)</span>
                     </label>
                     <Textarea
                       placeholder="Add internal notes or reason for return…"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      className="rounded-lg resize-none bg-white border-slate-200 text-sm focus:ring-2 focus:ring-primary/20"
+                      className="rounded-lg resize-none bg-card border-border text-sm focus:ring-2 focus:ring-primary/20"
                       rows={3}
                     />
                   </section>
                 </div>
 
                 {/* Sticky footer */}
-                <div className="sticky bottom-0 flex items-center justify-end gap-2 px-6 py-3 bg-white border-t border-slate-100">
+                <div className="sticky bottom-0 flex items-center justify-end gap-2 px-6 py-3 bg-card border-t border-border">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={onClose}
-                    className="rounded-lg px-4 border-slate-200 text-slate-600 hover:bg-slate-50"
+                    className="rounded-lg px-4 border-border text-foreground hover:bg-muted"
                   >
                     Cancel
                   </Button>
@@ -907,7 +915,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                     size="sm"
                     onClick={handleSubmit}
                     disabled={!canSubmit}
-                    className="rounded-lg px-5 bg-primary text-white gap-1.5 shadow-sm hover:shadow-md transition-all disabled:opacity-40"
+                    className="rounded-lg px-5 bg-primary text-primary-foreground gap-1.5 shadow-sm hover:shadow-md transition-all disabled:opacity-40"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {record ? 'Update Record' : 'Save as Draft'}
@@ -922,19 +930,19 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                   minWidth: 260,
                   display: 'flex',
                   flexDirection: 'column',
-                  borderLeft: '1px solid #f1f5f9',
-                  background: 'linear-gradient(180deg,#f8faff 0%,#f4f6ff 100%)',
+                  borderLeft: '1px solid var(--border)',
+                  background: 'linear-gradient(180deg, var(--background) 0%, var(--accent) 100%)',
                 }}
               >
                 <div className="p-4 flex-1 flex flex-col overflow-y-auto">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
                     {itemCategory === 'SPARE_PART' ? 'Spare Part Preview' : 'Product Preview'}
                   </p>
 
                   {/* ── Spare part preview ── */}
                   {itemCategory === 'SPARE_PART' && selectedSparePart ? (
                     <div className="flex flex-col gap-3">
-                      <div className="rounded-xl overflow-hidden bg-white border border-slate-200 aspect-square flex items-center justify-center shadow-sm">
+                      <div className="rounded-xl overflow-hidden bg-card border border-border aspect-square flex items-center justify-center shadow-sm">
                         {spareImageUrl ? (
                           <img
                             src={spareImageUrl}
@@ -942,18 +950,18 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                             className="object-contain w-full h-full p-3"
                           />
                         ) : (
-                          <div className="flex flex-col items-center gap-1.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
                             <Wrench className="h-10 w-10" />
-                            <span className="text-[10px] text-slate-400">No image</span>
+                            <span className="text-[10px] text-muted-foreground">No image</span>
                           </div>
                         )}
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">
+                        <p className="text-xs font-bold text-foreground leading-snug line-clamp-2">
                           {sparePartMeta?.part_name || selectedSparePart.description}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white border border-slate-100 divide-y divide-slate-50 overflow-hidden text-xs">
+                      <div className="rounded-lg bg-card border border-border divide-y divide-border overflow-hidden text-xs">
                         {[
                           { Icon: Tag, label: 'Brand', val: spareBrand },
                           { Icon: Building2, label: 'SKU', val: spareSku, mono: true },
@@ -1003,12 +1011,12 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                               key={label}
                               className="flex items-center justify-between px-3 py-2"
                             >
-                              <span className="flex items-center gap-1.5 text-slate-400 font-medium text-[10px]">
+                              <span className="flex items-center gap-1.5 text-muted-foreground font-medium text-[10px]">
                                 <Icon className="h-3 w-3" />
                                 {label}
                               </span>
                               <span
-                                className={`block truncate font-semibold text-[10px] max-w-[120px] ${accent ? 'text-emerald-600' : 'text-slate-700'} ${mono ? 'font-mono' : ''}`}
+                                className={`block truncate font-semibold text-[10px] max-w-[120px] ${accent ? 'text-success' : 'text-foreground'} ${mono ? 'font-mono' : ''}`}
                               >
                                 {val}
                               </span>
@@ -1020,12 +1028,12 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                   ) : itemCategory === 'PRODUCT' && loadingProduct ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-2">
                       <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
-                      <span className="text-[10px] text-slate-400">Loading…</span>
+                      <span className="text-[10px] text-muted-foreground">Loading…</span>
                     </div>
                   ) : itemCategory === 'PRODUCT' && selectedProduct && productMeta ? (
                     /* Product preview */
                     <div className="flex flex-col gap-3">
-                      <div className="rounded-xl overflow-hidden bg-white border border-slate-200 aspect-square flex items-center justify-center shadow-sm">
+                      <div className="rounded-xl overflow-hidden bg-card border border-border aspect-square flex items-center justify-center shadow-sm">
                         {productImageUrl ? (
                           <img
                             src={productImageUrl}
@@ -1033,18 +1041,18 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                             className="object-contain w-full h-full p-3"
                           />
                         ) : (
-                          <div className="flex flex-col items-center gap-1.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
                             <ImageIcon className="h-10 w-10" />
-                            <span className="text-[10px] text-slate-400">No image</span>
+                            <span className="text-[10px] text-muted-foreground">No image</span>
                           </div>
                         )}
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">
+                        <p className="text-xs font-bold text-foreground leading-snug line-clamp-2">
                           {productMeta.name || selectedProduct.description}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white border border-slate-100 divide-y divide-slate-50 overflow-hidden text-xs">
+                      <div className="rounded-lg bg-card border border-border divide-y divide-border overflow-hidden text-xs">
                         {[
                           { Icon: Tag, label: 'Brand', val: productBrand },
                           { Icon: Package, label: 'Model', val: productModel, sub: productModelNo },
@@ -1081,18 +1089,20 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                               key={label}
                               className="flex items-center justify-between px-3 py-2"
                             >
-                              <span className="flex items-center gap-1.5 text-slate-400 font-medium text-[10px]">
+                              <span className="flex items-center gap-1.5 text-muted-foreground font-medium text-[10px]">
                                 <Icon className="h-3 w-3" />
                                 {label}
                               </span>
                               <div className="text-right max-w-[120px]">
                                 <span
-                                  className={`block truncate font-semibold text-[10px] ${accent ? 'text-emerald-600' : 'text-slate-700'} ${mono ? 'font-mono' : ''}`}
+                                  className={`block truncate font-semibold text-[10px] ${accent ? 'text-success' : 'text-foreground'} ${mono ? 'font-mono' : ''}`}
                                 >
                                   {val}
                                 </span>
                                 {sub && (
-                                  <span className="text-[9px] text-slate-400 font-mono">{sub}</span>
+                                  <span className="text-[9px] text-muted-foreground font-mono">
+                                    {sub}
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -1101,7 +1111,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                       </div>
                       <button
                         onClick={() => setViewQuotation(true)}
-                        className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors py-2 text-xs font-semibold"
+                        className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 transition-colors py-2 text-xs font-semibold"
                       >
                         <ExternalLink className="h-3 w-3" />
                         View Invoice / Quotation
@@ -1109,14 +1119,14 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                     </div>
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-6">
-                      <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-xl bg-card border border-border flex items-center justify-center">
                         {itemCategory === 'SPARE_PART' ? (
-                          <Wrench className="h-5 w-5 text-slate-200" />
+                          <Wrench className="h-5 w-5 text-muted-foreground" />
                         ) : (
-                          <Package className="h-5 w-5 text-slate-200" />
+                          <Package className="h-5 w-5 text-muted-foreground" />
                         )}
                       </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed max-w-[160px]">
+                      <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[160px]">
                         {selectedInvoice
                           ? `Select a ${itemCategory === 'SPARE_PART' ? 'spare part' : 'product'} to preview`
                           : 'Complete the steps to preview details here'}

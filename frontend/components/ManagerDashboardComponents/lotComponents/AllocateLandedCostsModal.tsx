@@ -137,7 +137,7 @@ export default function AllocateLandedCostsModal({
         </DialogHeader>
 
         {!canAllocate && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
             {lot.status !== 'RECEIVED'
               ? 'Allocation can only be applied once this lot has been marked RECEIVED.'
               : 'Add at least one additional cost to this lot before allocating.'}
@@ -145,7 +145,7 @@ export default function AllocateLandedCostsModal({
         )}
 
         {needsReallocation && (
-          <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs font-semibold text-orange-800">
+          <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs font-semibold text-warning">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             Costs have changed since last allocation — please re-allocate.
           </div>
@@ -153,18 +153,20 @@ export default function AllocateLandedCostsModal({
 
         {canAllocate && (
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Additional costs on this lot
             </p>
             <div className="space-y-2">
               {costs.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">{c.costType}</p>
-                    <p className="text-xs text-slate-500">{formatCurrency(c.amount, currency)}</p>
+                    <p className="text-sm font-semibold text-foreground">{c.costType}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(c.amount, currency)}
+                    </p>
                   </div>
                   <Select
                     value={methods[c.id] || 'BY_VALUE'}
@@ -191,7 +193,7 @@ export default function AllocateLandedCostsModal({
 
         {breakdown && (
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Allocation breakdown
             </p>
             <div className="rounded-lg border overflow-x-auto">
@@ -212,13 +214,13 @@ export default function AllocateLandedCostsModal({
                         <TableCell className="text-xs font-medium">
                           {item ? itemLabel(item) : row.lotItemId}
                         </TableCell>
-                        <TableCell className="text-xs text-right text-slate-500">
+                        <TableCell className="text-xs text-right text-muted-foreground">
                           {formatCurrency(row.originalUnitPrice, currency)}
                         </TableCell>
-                        <TableCell className="text-xs text-right text-slate-500">
+                        <TableCell className="text-xs text-right text-muted-foreground">
                           {formatCurrency(row.landedCostAllocated / row.quantity, currency)}
                         </TableCell>
-                        <TableCell className="text-xs text-right font-bold text-slate-900">
+                        <TableCell className="text-xs text-right font-bold text-foreground">
                           {formatCurrency(row.landedCostUnitCost, currency)}
                         </TableCell>
                       </TableRow>
@@ -235,7 +237,7 @@ export default function AllocateLandedCostsModal({
             type="button"
             className={cn(
               buttonVariants({ variant: 'outline' }),
-              'h-9 text-xs border-red-200 text-red-600 hover:bg-red-50',
+              'h-9 text-xs border-destructive/30 text-destructive hover:bg-destructive/10',
             )}
             loading={resetting}
             loadingText="Resetting..."
@@ -265,7 +267,7 @@ export default function AllocateLandedCostsModal({
             </LoadingButton>
           </div>
         </div>
-        <p className="text-[10px] text-slate-400 text-center">
+        <p className="text-[10px] text-muted-foreground text-center">
           Applies immediately — use Reset to undo.
         </p>
       </DialogContent>

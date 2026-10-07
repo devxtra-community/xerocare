@@ -110,7 +110,7 @@ export default function OnlinePaymentFields({
       label: (
         <span className="flex flex-col">
           <span className="font-medium">{o.issuerBank}</span>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-muted-foreground">
             {countryName(o.country)} · {o.networks.map((n) => CARD_NETWORK_LABEL[n]).join(' / ')}
           </span>
         </span>
@@ -238,15 +238,15 @@ export default function OnlinePaymentFields({
       : '/finance/accounts/card-fees';
 
   return (
-    <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
-      <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+    <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/10 p-4">
+      <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
         <CreditCard size={14} />
         Online Payment Details
       </h4>
 
       {/* Level 2: Debit or Credit — chosen first, because it filters the bank list. */}
       <div>
-        <label className="mb-1 block text-xs font-semibold text-slate-600">Payment Type *</label>
+        <label className="mb-1 block text-xs font-semibold text-foreground">Payment Type *</label>
         <div className="flex gap-2">
           {(['DEBIT', 'CREDIT'] as CardType[]).map((t) => (
             <button
@@ -265,8 +265,8 @@ export default function OnlinePaymentFields({
               }
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
                 value.cardType === t
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-600 hover:border-indigo-400'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-foreground hover:border-primary/30'
               }`}
             >
               {t === 'DEBIT' ? 'Debit Card' : 'Credit Card'}
@@ -278,7 +278,7 @@ export default function OnlinePaymentFields({
       {value.cardType && (
         <>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
+            <label className="mb-1 block text-xs font-semibold text-foreground">
               Issuing Bank / Card *
             </label>
             <SearchableSelect
@@ -302,7 +302,7 @@ export default function OnlinePaymentFields({
 
           {availableNetworks.length > 1 && (
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-foreground">
                 Card Network *
               </label>
               <Select
@@ -310,7 +310,7 @@ export default function OnlinePaymentFields({
                 value={value.cardNetwork || undefined}
                 onValueChange={(v) => set({ cardNetwork: v as CardNetwork })}
               >
-                <SelectTrigger className="bg-white text-sm">
+                <SelectTrigger className="bg-card text-sm">
                   <SelectValue placeholder="Select network…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -336,9 +336,11 @@ export default function OnlinePaymentFields({
                 warned at as a failed checksum. Asking only for what is stored removes the
                 exposure and the false warning together.
               */}
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-foreground">
                 Card Number *
-                <span className="ml-1 font-normal text-slate-400">(only last 4 are kept)</span>
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (only last 4 are kept)
+                </span>
               </label>
               <input
                 type="text"
@@ -349,31 +351,31 @@ export default function OnlinePaymentFields({
                 data-lpignore="true"
                 data-1p-ignore="true"
                 disabled={disabled}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm tracking-wider"
+                className="w-full rounded-lg border border-border px-3 py-2 font-mono text-sm tracking-wider"
                 value={maskedPan}
                 onChange={(e) => handlePanChange(e.target.value)}
                 placeholder="•••• •••• •••• 1234"
               />
               {value.cardLast4 ? (
-                <p className="mt-1 flex items-center gap-1 text-[11px] text-emerald-700">
+                <p className="mt-1 flex items-center gap-1 text-[11px] text-success">
                   <ShieldCheck size={11} /> Stored as ••••{value.cardLast4} — the full number never
                   leaves this screen.
                 </p>
               ) : (
-                <p className="mt-1 text-[11px] text-slate-400">
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   Type the card number — all but the last four digits are hidden as you go.
                 </p>
               )}
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-semibold text-foreground">
                 Card Holder Name *
               </label>
               <input
                 type="text"
                 disabled={disabled}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm uppercase"
                 value={value.cardHolderName}
                 onChange={(e) => set({ cardHolderName: e.target.value })}
                 placeholder="As printed on the card"
@@ -382,13 +384,13 @@ export default function OnlinePaymentFields({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
+            <label className="mb-1 block text-xs font-semibold text-foreground">
               Transaction / Approval Reference
             </label>
             <input
               type="text"
               disabled={disabled}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
               value={value.transactionReference}
               onChange={(e) => set({ transactionReference: e.target.value })}
               placeholder="POS approval code or gateway reference"
@@ -397,16 +399,16 @@ export default function OnlinePaymentFields({
 
           {/* Says why there is no fee yet, rather than showing an empty space. */}
           {complete && !(amount > 0) && (
-            <p className="rounded-lg border border-dashed border-slate-300 bg-white p-2.5 text-[11px] text-slate-500">
+            <p className="rounded-lg border border-dashed border-border bg-card p-2.5 text-[11px] text-muted-foreground">
               Enter the amount being charged above to see the processing fee and the net settlement.
             </p>
           )}
 
           {/* Settlement preview — quoted by the server, shown read-only. */}
           {(quoting || quote || quoteError) && (
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+            <div className="rounded-lg border border-border bg-card p-3 text-sm">
               {quoting && (
-                <p className="flex items-center gap-2 text-slate-500">
+                <p className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 size={13} className="animate-spin" /> Checking the processing fee…
                 </p>
               )}
@@ -415,8 +417,8 @@ export default function OnlinePaymentFields({
                   salesperson has no way of knowing would strand a card that has already
                   been swiped. */}
               {!quoting && quoteError && (
-                <div className="flex items-start gap-2 text-slate-600">
-                  <Info size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                <div className="flex items-start gap-2 text-foreground">
+                  <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                   <div>
                     <span>
                       The bank&apos;s commission for this card is not on file yet, so it will be
@@ -428,7 +430,7 @@ export default function OnlinePaymentFields({
                         href={ratesHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-1.5 block font-semibold text-indigo-600 underline underline-offset-2"
+                        className="mt-1.5 block font-semibold text-primary underline underline-offset-2"
                       >
                         Set this bank&apos;s rate now →
                       </a>
@@ -438,30 +440,32 @@ export default function OnlinePaymentFields({
               )}
               {!quoting && quote && (
                 <div className="space-y-1">
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-foreground">
                     <span>Customer pays (gross)</span>
                     <span className="font-medium">{fmt(amount)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-foreground">
                     <span>
                       Processing fee ({quote.ratePercentApplied}%
                       {quote.fixedFeeApplied ? ` + ${fmt(quote.fixedFeeApplied)}` : ''})
                       {quote.cappedBy === 'MAXIMUM' && (
-                        <span className="ml-1 text-[11px] text-slate-400">(capped)</span>
+                        <span className="ml-1 text-[11px] text-muted-foreground">(capped)</span>
                       )}
                       {quote.cappedBy === 'MINIMUM' && (
-                        <span className="ml-1 text-[11px] text-slate-400">(minimum applied)</span>
+                        <span className="ml-1 text-[11px] text-muted-foreground">
+                          (minimum applied)
+                        </span>
                       )}
                     </span>
-                    <span className="font-medium text-red-600">
+                    <span className="font-medium text-destructive">
                       − {fmt(quote.commissionAmount)}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t border-dashed border-slate-200 pt-1 font-semibold text-slate-800">
+                  <div className="flex justify-between border-t border-dashed border-border pt-1 font-semibold text-foreground">
                     <span>Net settlement to bank</span>
-                    <span className="text-emerald-700">{fmt(quote.netSettlementAmount)}</span>
+                    <span className="text-success">{fmt(quote.netSettlementAmount)}</span>
                   </div>
-                  <p className="pt-1 text-[11px] text-slate-400">
+                  <p className="pt-1 text-[11px] text-muted-foreground">
                     The customer is billed {fmt(amount)}. The fee is the merchant&apos;s cost and is
                     not added to the invoice.
                   </p>

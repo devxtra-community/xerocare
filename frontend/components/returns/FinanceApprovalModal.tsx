@@ -70,12 +70,12 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
         </DialogHeader>
 
         <div className="grid gap-4 py-4 text-sm">
-          <div className="rounded-md bg-blue-50 p-3">
-            <p className="font-semibold text-blue-800">{record?.creditNoteNo}</p>
-            <p className="text-blue-600">
+          <div className="rounded-md bg-primary/10 p-3">
+            <p className="font-semibold text-primary">{record?.creditNoteNo}</p>
+            <p className="text-primary">
               {record?.productName} - {record?.modelName}
             </p>
-            <p className="font-bold text-blue-900 mt-1">
+            <p className="font-bold text-primary mt-1">
               Amount: {formatCurrency(record?.productAmount ?? 0, currency)}
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
               !paymentMode ||
               (needsMachineDisposition && !returnedMachineDisposition)
             }
-            className="bg-green-600 hover:bg-green-700"
+            className="bg-success hover:bg-success/90"
           >
             Approve Return
           </Button>

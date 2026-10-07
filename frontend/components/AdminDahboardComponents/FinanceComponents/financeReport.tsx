@@ -211,10 +211,10 @@ export default function FinanceReport() {
   const paginatedFinance = filteredFinance.slice((currentPage - 1) * limit, currentPage * limit);
 
   return (
-    <div className="bg-blue-100 min-h-screen p-4 space-y-8 sm:space-y-10">
+    <div className="bg-card min-h-screen p-4 space-y-8 sm:space-y-10">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Financial Report</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Financial Report</h3>
         <YearSelector selectedYear={selectedYear} onYearChange={setSelectedYear} />
       </div>
 
@@ -245,7 +245,7 @@ export default function FinanceReport() {
       {/* Monthly Performance Charts */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Income vs Expense Chart */}
-        <div className="flex-1 bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[400px]">
+        <div className="flex-1 bg-card rounded-2xl shadow-sm border border-primary/30 p-4 h-full min-h-[400px]">
           <h4 className="text-sm font-bold text-primary uppercase mb-6">Income vs Expenses</h4>
           <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -258,12 +258,12 @@ export default function FinanceReport() {
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                  tick={{ fill: 'var(--chart-slate)', fontSize: 10, fontWeight: 600 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                  tick={{ fill: 'var(--chart-slate)', fontSize: 10, fontWeight: 600 }}
                   tickFormatter={(v) => `${formatCompactNumber(v)}`}
                 />
                 <Tooltip
@@ -273,7 +273,8 @@ export default function FinanceReport() {
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    boxShadow:
+                      '0 10px 15px -3px color-mix(in srgb, var(--foreground) 10%, transparent)',
                   }}
                   itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
                 />
@@ -285,28 +286,28 @@ export default function FinanceReport() {
                   dataKey="income"
                   name="Income"
                   barSize={20}
-                  fill="#1d4ed8"
+                  fill="var(--chart-blue-dark)"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="purchaseExpense"
                   name="Purchase Expense"
                   barSize={20}
-                  fill="#93c5fd"
+                  fill="var(--chart-blue-light)"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="salaryExpense"
                   name="Salary Expense"
                   barSize={20}
-                  fill="#60a5fa"
+                  fill="var(--chart-blue-soft)"
                   radius={[4, 4, 0, 0]}
                 />
                 <Line
                   type="monotone"
                   dataKey="income"
                   name="Trend"
-                  stroke="#1d4ed8"
+                  stroke="var(--chart-blue-dark)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -316,7 +317,7 @@ export default function FinanceReport() {
         </div>
 
         {/* Profit Trend Chart */}
-        <div className="flex-1 bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[400px]">
+        <div className="flex-1 bg-card rounded-2xl shadow-sm border border-primary/30 p-4 h-full min-h-[400px]">
           <h4 className="text-sm font-bold text-primary uppercase mb-6">Profit Trend</h4>
           <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -329,12 +330,12 @@ export default function FinanceReport() {
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                  tick={{ fill: 'var(--chart-slate)', fontSize: 10, fontWeight: 600 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                  tick={{ fill: 'var(--chart-slate)', fontSize: 10, fontWeight: 600 }}
                   tickFormatter={(val) => `${formatCompactNumber(val)}`}
                 />
                 <Tooltip
@@ -345,14 +346,19 @@ export default function FinanceReport() {
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    boxShadow:
+                      '0 10px 15px -3px color-mix(in srgb, var(--foreground) 10%, transparent)',
                   }}
-                  itemStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#1d4ed8' }}
+                  itemStyle={{
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    color: 'var(--chart-blue-dark)',
+                  }}
                 />
                 <Bar
                   dataKey="profit"
                   name="Net Profit"
-                  fill="#1d4ed8"
+                  fill="var(--chart-blue-dark)"
                   radius={[4, 4, 0, 0]}
                   barSize={30}
                 />
@@ -363,31 +369,31 @@ export default function FinanceReport() {
       </div>
 
       {/* Filters Section */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Report
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search report..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs rounded-lg border-gray-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                className="pl-9 h-9 text-xs rounded-lg border-border focus:border-primary/30 focus:ring-4 focus:ring-primary/30"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Month
             </label>
             <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200 rounded-lg">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border rounded-lg">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="All Months" />
                 </div>
               </SelectTrigger>
@@ -403,13 +409,13 @@ export default function FinanceReport() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Branch
             </label>
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200 rounded-lg">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border rounded-lg">
                 <div className="flex items-center gap-2">
-                  <Building className="h-3.5 w-3.5 text-slate-400" />
+                  <Building className="h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="All Branches" />
                 </div>
               </SelectTrigger>
@@ -425,16 +431,16 @@ export default function FinanceReport() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Source
             </label>
             <Select
               value={sourceFilter}
               onValueChange={(val) => setSourceFilter(val as 'All' | 'SALE' | 'LEASE' | 'RENT')}
             >
-              <SelectTrigger className="h-9 text-xs w-full bg-background border-gray-200 rounded-lg">
+              <SelectTrigger className="h-9 text-xs w-full bg-background border-border rounded-lg">
                 <div className="flex items-center gap-2">
-                  <Layers className="h-3.5 w-3.5 text-slate-400" />
+                  <Layers className="h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="All Sources" />
                 </div>
               </SelectTrigger>
@@ -458,7 +464,7 @@ export default function FinanceReport() {
               setBranchFilter('All');
               setSourceFilter('All');
             }}
-            className="h-9 text-gray-500 border-gray-200 hover:bg-gray-50 text-xs px-3 rounded-lg"
+            className="h-9 text-muted-foreground border-border hover:bg-muted text-xs px-3 rounded-lg"
             title="Clear Filters"
           >
             <FilterX className="h-4 w-4" />
@@ -467,14 +473,14 @@ export default function FinanceReport() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-blue-50">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-primary/30">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
               {['MONTH', 'BRANCH', 'SOURCE', 'INCOME', 'EXPENSE', 'PROFIT', 'STATUS'].map((h) => (
                 <TableHead
                   key={h}
-                  className="text-[11px] font-bold text-slate-600 uppercase px-6 py-4"
+                  className="text-[11px] font-bold text-foreground uppercase px-6 py-4"
                 >
                   {h}
                 </TableHead>
@@ -485,21 +491,21 @@ export default function FinanceReport() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10 text-slate-400">
+                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                   Loading financial data...
                 </TableCell>
               </TableRow>
             ) : (
               paginatedFinance.map((f, i) => (
-                <TableRow key={f.id} className={i % 2 ? 'bg-blue-50/10' : 'bg-card'}>
-                  <TableCell className="px-6 py-4 font-medium text-slate-800">{f.month}</TableCell>
+                <TableRow key={f.id} className={i % 2 ? 'bg-primary/10' : 'bg-card'}>
+                  <TableCell className="px-6 py-4 font-medium text-foreground">{f.month}</TableCell>
                   <TableCell className="px-6 py-4">
-                    <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-lg text-slate-600">
+                    <span className="text-xs font-semibold px-2 py-1 bg-muted rounded-lg text-foreground">
                       {f.branchName || 'N/A'}
                     </span>
                   </TableCell>
-                  <TableCell className="px-6 py-4 text-slate-600">{f.source}</TableCell>
-                  <TableCell className="px-6 py-4 font-medium text-blue-600">
+                  <TableCell className="px-6 py-4 text-foreground">{f.source}</TableCell>
+                  <TableCell className="px-6 py-4 font-medium text-primary">
                     {formatCurrency(f.income, currency)}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-muted-foreground">
@@ -512,8 +518,8 @@ export default function FinanceReport() {
                     <span
                       className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         f.profitStatus === 'profit'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-destructive/10 text-destructive'
                       }`}
                     >
                       {f.profitStatus}
@@ -535,7 +541,9 @@ export default function FinanceReport() {
           />
         )}
         {!loading && filteredFinance.length === 0 && (
-          <div className="p-8 text-center text-slate-400 italic">No matching records found.</div>
+          <div className="p-8 text-center text-muted-foreground italic">
+            No matching records found.
+          </div>
         )}
       </div>
     </div>

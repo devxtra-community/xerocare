@@ -18,12 +18,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  APPROVED: 'bg-emerald-100 text-emerald-700',
-  RECEIVED: 'bg-blue-100 text-blue-700',
-  REJECTED: 'bg-red-100 text-red-700',
+  PENDING: 'bg-warning/10 text-warning',
+  APPROVED: 'bg-success/10 text-success',
+  RECEIVED: 'bg-primary/10 text-primary',
+  REJECTED: 'bg-destructive/10 text-destructive',
 };
 
 function IncomeContent() {
@@ -49,6 +51,7 @@ function IncomeContent() {
     const matchSearch = !search || e.description?.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+  const incomePaging = useTablePagination(filtered, `${search}|${catFilter}`, 10);
 
   const total = filtered.reduce((s, e) => s + Number(e.netAmount), 0);
   const pending = filtered.filter((e) => e.status === 'PENDING').length;
@@ -70,15 +73,15 @@ function IncomeContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Income — Consolidated</h1>
-          <p className="text-sm text-gray-500">All branches</p>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">Income — Consolidated</h1>
+          <p className="text-sm text-muted-foreground">All branches</p>
         </div>
         <button
           onClick={exportExcel}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
         >
           <Download className="h-4 w-4" /> Export
         </button>
@@ -97,19 +100,19 @@ function IncomeContent() {
         <StatCard title="All Income" value={entries.length.toString()} subtitle="Total records" />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <div className="flex items-center gap-3 p-4 border-b">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search income..."
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger className="border-orange-200 text-sm">
+            <SelectTrigger className="border-warning/30 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -123,11 +126,11 @@ function IncomeContent() {
           </Select>
         </div>
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400">Loading…</div>
+          <div className="p-8 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   {['Income #', 'Date', 'Category', 'Description', 'Amount', 'Status', ''].map(
                     (h) => (
@@ -141,14 +144,16 @@ function IncomeContent() {
               <tbody className="divide-y">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-400">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       No income entries found
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.incomeNo}</td>
+                  incomePaging.pageRows.map((e) => (
+                    <tr key={e.id} className="hover:bg-muted">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {e.incomeNo}
+                      </td>
                       <td className="px-4 py-3">{e.date?.slice(0, 10)}</td>
                       <td className="px-4 py-3">{e.category.replace(/_/g, ' ')}</td>
                       <td className="px-4 py-3 max-w-[200px] truncate">{e.description}</td>
@@ -157,7 +162,7 @@ function IncomeContent() {
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[e.status] ?? 'bg-gray-100 text-gray-700'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[e.status] ?? 'bg-muted text-foreground'}`}
                         >
                           {e.status}
                         </span>
@@ -165,7 +170,7 @@ function IncomeContent() {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setViewingId(e.id)}
-                          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                           title="View full details"
                         >
                           <Eye className="h-3.5 w-3.5" />
@@ -176,6 +181,15 @@ function IncomeContent() {
                 )}
               </tbody>
             </table>
+            {incomePaging.total > incomePaging.pageSize && (
+              <Pagination
+                page={incomePaging.page}
+                totalPages={incomePaging.totalPages}
+                total={incomePaging.total}
+                limit={incomePaging.pageSize}
+                onPageChange={incomePaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>
@@ -186,7 +200,7 @@ function IncomeContent() {
 
 export default function AdminIncomePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <IncomeContent />
     </Suspense>
   );

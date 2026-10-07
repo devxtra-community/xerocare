@@ -94,7 +94,7 @@ export function CashInHandModal({
       header: 'Current Balance',
       align: 'right',
       render: (a) => (
-        <span className="font-bold tabular-nums text-slate-800">
+        <span className="font-bold tabular-nums text-foreground">
           {formatCurrency(Number(a.currentBalance), a.currency)}
         </span>
       ),
@@ -115,7 +115,7 @@ export function CashInHandModal({
       header: 'Status',
       render: (a) => (
         <span
-          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${a.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}
+          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${a.isActive ? 'bg-success/10 text-success' : 'bg-muted text-foreground'}`}
         >
           {a.isActive ? 'Active' : 'Inactive'}
         </span>
@@ -126,7 +126,7 @@ export function CashInHandModal({
       render: () => (
         <Link
           href={cashBankPagePath}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
         >
           <ExternalLink className="h-3 w-3" /> Daybook
         </Link>
@@ -195,7 +195,7 @@ export function CashAtBankModal({
       header: 'Current Balance',
       align: 'right',
       render: (a) => (
-        <span className="font-bold tabular-nums text-slate-800">
+        <span className="font-bold tabular-nums text-foreground">
           {formatCurrency(Number(a.currentBalance), a.currency)}
         </span>
       ),
@@ -208,7 +208,7 @@ export function CashAtBankModal({
       header: 'Status',
       render: (a) => (
         <span
-          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${a.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}
+          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${a.isActive ? 'bg-success/10 text-success' : 'bg-muted text-foreground'}`}
         >
           {a.isActive ? 'Active' : 'Inactive'}
         </span>
@@ -219,7 +219,7 @@ export function CashAtBankModal({
       render: () => (
         <Link
           href={cashBankPagePath}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
         >
           <ExternalLink className="h-3 w-3" /> Daybook
         </Link>
@@ -266,7 +266,7 @@ const arColumns: DrilldownColumn<ReceivableRow>[] = [
   },
   {
     header: 'Invoice #',
-    render: (r) => <span className="font-mono text-xs text-blue-600">{r.invoiceNumber}</span>,
+    render: (r) => <span className="font-mono text-xs text-primary">{r.invoiceNumber}</span>,
   },
   { header: 'Sale Type', render: (r) => <span className="text-xs">{r.saleType}</span> },
   {
@@ -286,7 +286,7 @@ const arColumns: DrilldownColumn<ReceivableRow>[] = [
     header: 'Outstanding',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(r.amount, r.currencyCode)}
       </span>
     ),
@@ -295,7 +295,7 @@ const arColumns: DrilldownColumn<ReceivableRow>[] = [
     header: 'Aging',
     render: (r) => (
       <span
-        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${r.aging === 'Current' ? 'bg-emerald-50 text-emerald-700' : r.aging === '90+ days' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}
+        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${r.aging === 'Current' ? 'bg-success/10 text-success' : r.aging === '90+ days' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}
       >
         {r.aging}
       </span>
@@ -345,11 +345,11 @@ const depositColumns: DrilldownColumn<DepositDisplayRow>[] = [
     header: 'Type',
     render: (d) =>
       d.kind === 'DEPOSIT' ? (
-        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700">
+        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-success/10 text-success">
           Cash Deposit
         </span>
       ) : (
-        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700">
+        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-warning/10 text-warning">
           Guarantee Cheque (not in total)
         </span>
       ),
@@ -365,7 +365,7 @@ const depositColumns: DrilldownColumn<DepositDisplayRow>[] = [
   {
     header: 'Contract Ref',
     render: (d) => (
-      <span className="font-mono text-xs text-blue-600">
+      <span className="font-mono text-xs text-primary">
         {d.kind === 'DEPOSIT' ? d.row.referenceNo : (d.row.contractReference ?? d.row.chequeNumber)}
       </span>
     ),
@@ -389,7 +389,7 @@ const depositColumns: DrilldownColumn<DepositDisplayRow>[] = [
     align: 'right',
     render: (d) => (
       <span
-        className={`font-bold tabular-nums ${d.kind === 'DEPOSIT' ? 'text-slate-800' : 'text-muted-foreground'}`}
+        className={`font-bold tabular-nums ${d.kind === 'DEPOSIT' ? 'text-foreground' : 'text-muted-foreground'}`}
       >
         {formatCurrency(
           Number(d.kind === 'DEPOSIT' ? d.row.outstanding : d.row.amount),
@@ -495,7 +495,7 @@ const prepaidColumns: DrilldownColumn<ExpenseEntry>[] = [
     header: 'Amount',
     align: 'right',
     render: (r) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(r.netAmount), r.currency)}
       </span>
     ),
@@ -569,7 +569,7 @@ const sparePartColumns: DrilldownColumn<RawSparePartRow>[] = [
   },
   {
     header: 'SKU',
-    render: (p) => <span className="font-mono text-xs text-blue-600">{p.item_code}</span>,
+    render: (p) => <span className="font-mono text-xs text-primary">{p.item_code}</span>,
   },
   { header: 'Brand', render: (p) => <span className="text-xs">{p.brand ?? '—'}</span> },
   {
@@ -590,7 +590,7 @@ const sparePartColumns: DrilldownColumn<RawSparePartRow>[] = [
     header: 'Total Value',
     align: 'right',
     render: (p) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(p.purchase_price) * Number(p.quantity), 'AED')}
       </span>
     ),
@@ -671,7 +671,7 @@ interface RawProductRow {
 const productColumns: DrilldownColumn<RawProductRow>[] = [
   {
     header: 'Serial #',
-    render: (p) => <span className="font-mono text-xs text-blue-600">{p.serial_no}</span>,
+    render: (p) => <span className="font-mono text-xs text-primary">{p.serial_no}</span>,
   },
   {
     header: 'Model',
@@ -692,7 +692,7 @@ const productColumns: DrilldownColumn<RawProductRow>[] = [
     header: 'Purchase Price',
     align: 'right',
     render: (p) => (
-      <span className="font-bold tabular-nums text-slate-800">
+      <span className="font-bold tabular-nums text-foreground">
         {formatCurrency(Number(p.purchase_price ?? 0), 'AED')}
       </span>
     ),
@@ -760,9 +760,9 @@ export function EquipmentAssetsLinkOut({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 className="font-bold text-slate-800">Equipment Assets</h2>
+        <h2 className="font-bold text-foreground">Equipment Assets</h2>
         <p className="text-sm text-muted-foreground">
           Per-asset Gross Cost, Accumulated Depreciation, and Net Book Value already have a full
           dedicated view on the Assets &amp; Depreciation page — opening that instead of a duplicate

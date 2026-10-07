@@ -288,7 +288,7 @@ export default function BranchReport() {
   return (
     <div className="bg-bg-muted min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       <div className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Branches</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Branches</h3>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
@@ -311,7 +311,7 @@ export default function BranchReport() {
 
         <div className="flex items-center justify-between pt-2">
           <div className="relative w-[260px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search branch"
               value={search}
@@ -322,7 +322,7 @@ export default function BranchReport() {
 
           {isAdmin && (
             <Button
-              className="bg-primary text-white gap-2"
+              className="bg-primary text-primary-foreground gap-2"
               onClick={() => {
                 setEditingBranch(null);
                 setWizardOpen(true);
@@ -360,7 +360,7 @@ export default function BranchReport() {
 
             <TableBody>
               {paginatedFiltered.map((b, i) => (
-                <TableRow key={b.id} className={i % 2 ? 'bg-blue-50/20' : 'bg-card'}>
+                <TableRow key={b.id} className={i % 2 ? 'bg-primary/10' : 'bg-card'}>
                   <TableCell className="px-4 py-3 font-medium">
                     <button
                       className="text-primary hover:underline text-left font-medium"
@@ -377,14 +377,14 @@ export default function BranchReport() {
                         {b.currency_code}
                       </span>
                     ) : (
-                      <span className="text-slate-400 text-xs">—</span>
+                      <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-3">
                     <span
                       className={
                         getManagerName(b.manager_id) === 'Unassigned'
-                          ? 'text-slate-400'
+                          ? 'text-muted-foreground'
                           : 'text-foreground'
                       }
                     >
@@ -394,11 +394,11 @@ export default function BranchReport() {
                   <TableCell className="px-4 py-3">{formatDate(b.started_date)}</TableCell>
                   <TableCell className="px-4 py-3">
                     {b.has_tax ? (
-                      <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-full">
                         {b.tax_name || 'Tax'} {b.tax_percent}%
                       </span>
                     ) : (
-                      <span className="text-slate-400 text-xs">No tax</span>
+                      <span className="text-muted-foreground text-xs">No tax</span>
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-3">
@@ -425,7 +425,7 @@ export default function BranchReport() {
                           Edit
                         </button>
                         <button
-                          className="text-red-600 hover:underline"
+                          className="text-destructive hover:underline"
                           onClick={() => setBranchToDelete(b)}
                         >
                           Delete
@@ -545,15 +545,15 @@ function BranchWizard({
               <div
                 className={`flex-1 text-center text-[10px] font-bold uppercase tracking-wider py-1.5 rounded-lg transition-colors ${
                   i === step
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : i < step
                       ? 'bg-success/20 text-success'
-                      : 'bg-slate-100 text-slate-400'
+                      : 'bg-muted text-muted-foreground'
                 }`}
               >
                 {i + 1}. {label}
               </div>
-              {i < 2 && <div className="w-2 h-0.5 bg-slate-200 shrink-0" />}
+              {i < 2 && <div className="w-2 h-0.5 bg-muted shrink-0" />}
             </div>
           ))}
         </div>
@@ -665,7 +665,7 @@ function Step0({
           {search && (
             <div className="absolute z-50 mt-1 w-full bg-card border rounded-xl shadow-lg max-h-52 overflow-y-auto">
               {filtered.length === 0 && (
-                <p className="px-3 py-2 text-sm text-slate-400">No countries found</p>
+                <p className="px-3 py-2 text-sm text-muted-foreground">No countries found</p>
               )}
               {filtered.map((option) => (
                 <button
@@ -675,8 +675,8 @@ function Step0({
                   onClick={() => handleSelect(option)}
                 >
                   <span>
-                    <span className="font-semibold text-slate-700">{option.name}</span>
-                    <span className="text-slate-400 ml-1 text-xs">({option.code})</span>
+                    <span className="font-semibold text-foreground">{option.name}</span>
+                    <span className="text-muted-foreground ml-1 text-xs">({option.code})</span>
                   </span>
                   <span className="text-xs text-primary font-mono">{option.currencyCode}</span>
                 </button>
@@ -688,9 +688,9 @@ function Step0({
 
       {form.country_code && (
         <>
-          <div className="rounded-xl bg-blue-50 border border-blue-100 p-3 flex items-center justify-between">
+          <div className="rounded-xl bg-primary/10 border border-primary/30 p-3 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-wider">
                 Currency Preview
               </p>
               <p className="text-sm font-semibold text-primary mt-0.5">
@@ -710,7 +710,7 @@ function Step0({
               maxLength={3}
               className="h-11 rounded-xl bg-card border shadow-sm font-mono uppercase"
             />
-            <p className="text-[10px] text-slate-400 mt-1">
+            <p className="text-[10px] text-muted-foreground mt-1">
               Leave as-is unless this country uses a different currency.
             </p>
           </Field>
@@ -818,7 +818,7 @@ function Step1({
               <SelectItem
                 key={manager.id}
                 value={manager.id}
-                className="focus:bg-primary focus:text-white"
+                className="focus:bg-primary focus:text-primary-foreground"
               >
                 {manager.first_name} {manager.last_name}
               </SelectItem>
@@ -839,10 +839,13 @@ function Step1({
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ACTIVE" className="focus:bg-primary focus:text-white">
+              <SelectItem value="ACTIVE" className="focus:bg-primary focus:text-primary-foreground">
                 Active
               </SelectItem>
-              <SelectItem value="INACTIVE" className="focus:bg-primary focus:text-white">
+              <SelectItem
+                value="INACTIVE"
+                className="focus:bg-primary focus:text-primary-foreground"
+              >
                 Inactive
               </SelectItem>
             </SelectContent>
@@ -867,17 +870,19 @@ function Step2({
       <div className="flex items-center justify-between rounded-xl border p-4 bg-card">
         <div>
           <p className="text-sm font-semibold text-foreground">Does this branch charge tax?</p>
-          <p className="text-xs text-slate-400 mt-0.5">Enable to configure VAT or other tax</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Enable to configure VAT or other tax
+          </p>
         </div>
         <button
           type="button"
           onClick={() => setForm((p) => ({ ...p, has_tax: !p.has_tax }))}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            form.has_tax ? 'bg-primary' : 'bg-slate-200'
+            form.has_tax ? 'bg-primary' : 'bg-muted'
           }`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+            className={`inline-block h-4 w-4 transform rounded-full bg-card shadow-sm transition-transform ${
               form.has_tax ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
@@ -915,22 +920,22 @@ function Step2({
               onChange={(e) => setForm((p) => ({ ...p, tax_registration_number: e.target.value }))}
               className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
-            <p className="text-[10px] text-slate-400 mt-1">
+            <p className="text-[10px] text-muted-foreground mt-1">
               Required for UAE VAT legal compliance — printed on all invoices.
             </p>
           </Field>
 
           {form.currency_code && form.tax_percent && (
-            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
-              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+            <div className="rounded-xl bg-warning/10 border border-warning/30 p-3">
+              <p className="text-[10px] font-bold text-warning uppercase tracking-wider">
                 Tax Preview
               </p>
               <div className="mt-1.5 space-y-0.5 text-sm font-mono">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Subtotal</span>
+                  <span className="text-muted-foreground">Subtotal</span>
                   <span>{form.currency_code} 10,000.00</span>
                 </div>
-                <div className="flex justify-between text-amber-700">
+                <div className="flex justify-between text-warning">
                   <span>
                     {form.tax_name || 'Tax'} ({form.tax_percent}%)
                   </span>
@@ -941,7 +946,7 @@ function Step2({
                       .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                   </span>
                 </div>
-                <div className="flex justify-between font-bold border-t border-amber-200 pt-0.5 mt-0.5">
+                <div className="flex justify-between font-bold border-t border-warning/30 pt-0.5 mt-0.5">
                   <span>Total</span>
                   <span>
                     {form.currency_code}{' '}
@@ -957,7 +962,7 @@ function Step2({
       )}
 
       {!form.has_tax && (
-        <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-center text-slate-400 text-sm">
+        <div className="rounded-xl bg-muted border border-border p-4 text-center text-muted-foreground text-sm">
           No tax will be applied to transactions from this branch.
         </div>
       )}
@@ -988,7 +993,7 @@ function ConfirmDeleteModal({
             </div>
             <DialogTitle>Delete Branch</DialogTitle>
           </div>
-          <DialogDescription className="text-base text-gray-600 leading-relaxed">
+          <DialogDescription className="text-base text-foreground leading-relaxed">
             Are you sure you want to delete <strong>{name}</strong>?
           </DialogDescription>
         </DialogHeader>
@@ -996,7 +1001,7 @@ function ConfirmDeleteModal({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
+            className="text-sm font-bold text-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>
@@ -1045,18 +1050,18 @@ function BranchDetailModal({
             </div>
             <div>
               <DialogTitle>{branch.name}</DialogTitle>
-              <p className="text-xs text-slate-400 mt-0.5">Branch Details</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Branch Details</p>
             </div>
           </div>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+          <div className="rounded-xl bg-muted border border-border p-3">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
               Branch ID
             </p>
             <div className="flex items-center gap-2">
-              <code className="text-xs font-mono text-slate-700 flex-1 truncate">{branch.id}</code>
+              <code className="text-xs font-mono text-foreground flex-1 truncate">{branch.id}</code>
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
@@ -1129,7 +1134,7 @@ function BranchDetailModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-xs font-semibold text-slate-500 uppercase tracking-tight">
+      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">
         {label}
       </label>
       {children}
@@ -1148,7 +1153,9 @@ function DetailField({
 }) {
   return (
     <div className={fullWidth ? 'col-span-2' : ''}>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+        {label}
+      </p>
       <p className="text-sm text-foreground font-medium">{value}</p>
     </div>
   );

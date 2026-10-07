@@ -52,14 +52,16 @@ export default function ServiceImpactTable() {
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
-            <TableHead className="font-semibold text-gray-700">Printer Model</TableHead>
-            <TableHead className="font-semibold text-gray-700">Vendor</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center">Service Count</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center">
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="font-semibold text-foreground">Printer Model</TableHead>
+            <TableHead className="font-semibold text-foreground">Vendor</TableHead>
+            <TableHead className="font-semibold text-foreground text-center">
+              Service Count
+            </TableHead>
+            <TableHead className="font-semibold text-foreground text-center">
               Total Downtime
             </TableHead>
-            <TableHead className="font-semibold text-gray-700 text-right">
+            <TableHead className="font-semibold text-foreground text-right">
               Avg Repair Cost
             </TableHead>
           </TableRow>
@@ -68,12 +70,12 @@ export default function ServiceImpactTable() {
           {currentData.map((item, idx) => (
             <TableRow
               key={idx}
-              className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
+              className={`hover:bg-muted/50 ${idx % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}`}
             >
               <TableCell className="font-medium text-foreground">{item.model}</TableCell>
-              <TableCell className="text-gray-600">{item.vendor}</TableCell>
+              <TableCell className="text-foreground">{item.vendor}</TableCell>
               <TableCell className="text-center">{item.count}</TableCell>
-              <TableCell className="text-center text-red-600 font-medium">
+              <TableCell className="text-center text-destructive font-medium">
                 {item.downtime} Days
               </TableCell>
               <TableCell className="text-right font-medium">{item.cost}</TableCell>

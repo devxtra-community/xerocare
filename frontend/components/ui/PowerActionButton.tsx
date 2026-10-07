@@ -15,9 +15,18 @@ import { Loader2, Power } from 'lucide-react';
  * and the aria-label.
  */
 const TONES = {
-  green: { ring: 'from-green-400 via-green-500 to-green-600', glow: 'rgba(34,197,94,0.45)' },
-  red: { ring: 'from-rose-400 via-red-500 to-red-600', glow: 'rgba(239,68,68,0.45)' },
-  amber: { ring: 'from-amber-300 via-amber-400 to-amber-500', glow: 'rgba(245,158,11,0.45)' },
+  green: {
+    ring: 'from-success via-success to-success',
+    glow: 'color-mix(in srgb, var(--success) 45%, transparent)',
+  },
+  red: {
+    ring: 'from-destructive via-destructive to-destructive',
+    glow: 'color-mix(in srgb, var(--destructive) 45%, transparent)',
+  },
+  amber: {
+    ring: 'from-warning via-warning to-warning',
+    glow: 'color-mix(in srgb, var(--warning) 45%, transparent)',
+  },
 } as const;
 
 export function PowerActionButton({
@@ -56,19 +65,19 @@ export function PowerActionButton({
         height: size,
         padding: ring,
         // Outer glow plus a grounding shadow — what separates a lit ring from a flat circle.
-        boxShadow: `0 0 0 1px rgba(0,0,0,0.04), 0 2px 6px ${t.glow}`,
+        boxShadow: `0 0 0 1px color-mix(in srgb, var(--foreground) 4%, transparent), 0 2px 6px ${t.glow}`,
       }}
     >
       {/* Dished face: the light gradient runs top-left to bottom-right so the glyph sits
           in a subtle well rather than on a flat white disc. */}
-      <span className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-white to-slate-100 shadow-[inset_0_1px_2px_rgba(0,0,0,0.12)]">
+      <span className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-card to-muted shadow-[inset_0_1px_2px_color-mix(in_srgb,var(--foreground)_12%,transparent)]">
         {loading ? (
-          <Loader2 size={Math.round(size * 0.42)} className="animate-spin text-slate-500" />
+          <Loader2 size={Math.round(size * 0.42)} className="animate-spin text-muted-foreground" />
         ) : (
           <Power
             size={Math.round(size * 0.46)}
             strokeWidth={2.4}
-            className="text-slate-500"
+            className="text-muted-foreground"
             aria-hidden="true"
           />
         )}

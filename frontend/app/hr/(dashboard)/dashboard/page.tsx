@@ -15,7 +15,9 @@ export default function HrDashboard() {
       <div className="flex flex-col space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">HR Report</h3>
+            <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+              HR Report
+            </h3>
             <p className="text-sm text-muted-foreground font-medium">
               Employee statistics, attendance trends, and department metrics
             </p>

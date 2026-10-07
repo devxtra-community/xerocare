@@ -19,7 +19,7 @@ export default function FinanceDashboard() {
       {/* HEADER */}
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Finance Dashboard
           </h1>
           <p className="text-sm text-muted-foreground font-medium">
@@ -141,7 +141,7 @@ function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
           className="rounded-2xl min-h-[70px] sm:h-[80px] bg-card shadow-sm p-3 flex flex-col justify-center items-center gap-1 text-center"
         >
           <p className="text-xs font-medium text-muted-foreground uppercase">{s.label}</p>
-          <p className="text-xl sm:text-2xl font-bold text-primary">{s.value}</p>
+          <p className="text-xl sm:text-2xl font-medium text-foreground">{s.value}</p>
         </div>
       ))}
     </div>

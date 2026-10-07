@@ -385,10 +385,10 @@ export default function EmployeeRentTable({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-primary">Rent Management</h2>
+        <h2 className="text-xl font-medium text-primary">Rent Management</h2>
         {mode === 'EMPLOYEE' && (
           <Button
-            className="bg-primary text-white gap-2 shadow-md hover:shadow-lg transition-all"
+            className="bg-primary text-primary-foreground gap-2 shadow-md hover:shadow-lg transition-all"
             onClick={fetchPendingQuotations}
           >
             <Plus size={16} /> New Rent
@@ -396,14 +396,14 @@ export default function EmployeeRentTable({
         )}
       </div>
 
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Agreements
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by customer or invoice..."
                 value={search}
@@ -413,13 +413,13 @@ export default function EmployeeRentTable({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Actions
             </label>
             <Button
               variant="outline"
               onClick={fetchInvoices}
-              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+              className="h-9 text-xs w-full justify-center gap-2 border-border hover:bg-muted"
             >
               Refresh Data
             </Button>
@@ -427,10 +427,10 @@ export default function EmployeeRentTable({
         </div>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
+      <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-border p-4">
         <div className="overflow-x-auto mb-4">
           <Table className="min-w-[800px] sm:min-w-full">
-            <TableHeader className="bg-muted/50/50">
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">INV NUMBER</TableHead>
                 <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
@@ -460,13 +460,13 @@ export default function EmployeeRentTable({
                 </TableRow>
               ) : (
                 paginatedInvoices.map((inv) => (
-                  <TableRow key={inv.id} className="hover:bg-muted/50/50">
-                    <TableCell className="font-medium text-slate-700">
+                  <TableRow key={inv.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium text-foreground">
                       {inv.invoiceNumber}
                     </TableCell>
                     <TableCell className="font-medium">{inv.customerName}</TableCell>
                     <TableCell className="max-w-[200px]">
-                      <div className="text-xs font-medium text-slate-700 truncate">
+                      <div className="text-xs font-medium text-foreground truncate">
                         {inv.items
                           ?.map((item) => getCleanProductName(item.description))
                           .join(', ') || 'No items'}
@@ -476,7 +476,7 @@ export default function EmployeeRentTable({
                       {safeFormatDate(inv.startDate, 'MMM dd, yyyy')} -{' '}
                       {safeFormatDate(inv.endDate, 'MMM dd, yyyy')}
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-slate-600">
+                    <TableCell className="text-xs font-bold text-foreground">
                       {inv.leaseTenureMonths
                         ? `${inv.leaseTenureMonths} Mo`
                         : inv.startDate && inv.endDate
@@ -494,7 +494,7 @@ export default function EmployeeRentTable({
                             })()
                           : 'N/A'}
                     </TableCell>
-                    <TableCell className="font-bold text-slate-700">
+                    <TableCell className="font-bold text-foreground">
                       {formatCurrency(
                         inv.displayAmount ||
                           (inv.type === 'PROFORMA'
@@ -509,21 +509,21 @@ export default function EmployeeRentTable({
                       {inv.contractStatus === 'COMPLETED' ? (
                         <Badge
                           variant="secondary"
-                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-slate-100 text-slate-700 hover:bg-slate-100"
+                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-muted text-foreground hover:bg-muted"
                         >
                           CONTRACT CLOSED
                         </Badge>
                       ) : inv.contractStatus === 'ACTIVE' ? (
                         <Badge
                           variant="secondary"
-                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-blue-100 text-blue-700 hover:bg-blue-100"
+                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-primary/10 text-primary hover:bg-primary/10"
                         >
                           CONTRACT ONGOING
                         </Badge>
                       ) : inv.contractStatus === 'PENDING_CONFIRMATION' ? (
                         <Badge
                           variant="secondary"
-                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-amber-100 text-amber-700 hover:bg-amber-100"
+                          className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider shadow-none bg-warning/10 text-warning hover:bg-warning/10"
                         >
                           SETUP NEEDED
                         </Badge>
@@ -536,16 +536,16 @@ export default function EmployeeRentTable({
                                 inv.status === 'APPROVED' ||
                                 inv.status === 'FINANCE_APPROVED' ||
                                 inv.status === 'ISSUED'
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                  ? 'bg-success/10 text-success hover:bg-success/10'
                                   : inv.status === 'SENT' ||
                                       inv.status === 'TRANSACTION_COMPLETED' ||
                                       inv.status === 'EMPLOYEE_APPROVED'
-                                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                                    ? 'bg-primary/10 text-primary hover:bg-primary/10'
                                     : inv.status === 'REJECTED' ||
                                         inv.status === 'FINANCE_REJECTED' ||
                                         inv.status === 'CANCELLED'
-                                      ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-100'
+                                      ? 'bg-destructive/10 text-destructive hover:bg-destructive/10'
+                                      : 'bg-muted text-foreground hover:bg-muted'
                               }
                             `}
                         >
@@ -891,10 +891,10 @@ function QuotationConverterDialog({
 
         <div className="px-6 pb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search quotation number or customer..."
-              className="pl-9 h-10 bg-slate-50 border-slate-100 rounded-xl font-bold text-xs"
+              className="pl-9 h-10 bg-muted border-border rounded-xl font-bold text-xs"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -907,9 +907,9 @@ function QuotationConverterDialog({
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="text-center py-12 text-muted-foreground bg-muted/50 rounded-2xl border-2 border-dashed border-border">
               <FileText className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p className="font-bold text-slate-900 text-sm">
+              <p className="font-bold text-foreground text-sm">
                 {search ? 'No matching quotations found.' : 'No pending quotations found.'}
               </p>
               <p className="text-[11px] mt-1">
@@ -933,36 +933,36 @@ function QuotationConverterDialog({
               {filtered.map((q) => (
                 <div
                   key={q.id}
-                  className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all group cursor-pointer active:scale-95"
+                  className="flex items-center justify-between p-4 bg-card border border-border rounded-2xl hover:border-primary hover:shadow-xl transition-all group cursor-pointer active:scale-95"
                   onClick={() => onSelect(q.id)}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-black text-slate-900 tracking-tight text-sm group-hover:text-blue-600">
+                      <span className="font-black text-foreground tracking-tight text-sm group-hover:text-primary">
                         {q.invoiceNumber}
                       </span>
                       <Badge
                         variant="secondary"
-                        className="text-[9px] uppercase font-black px-2 py-0 bg-slate-100 text-slate-600 shadow-none border-none"
+                        className="text-[9px] uppercase font-black px-2 py-0 bg-muted text-foreground shadow-none border-none"
                       >
                         {q.saleType}
                       </Badge>
                     </div>
-                    <p className="text-xs font-bold text-slate-500">
+                    <p className="text-xs font-bold text-muted-foreground">
                       {q.customerName || 'Walk-in'}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
                       {safeFormatDate(q.createdAt, 'MMM dd, yyyy')}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-slate-900 text-sm tracking-tight mb-2">
+                    <p className="font-black text-foreground text-sm tracking-tight mb-2">
                       {formatCurrency(q.totalAmount || 0, currency)}
                     </p>
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="h-7 px-3 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 border-none hover:bg-blue-600 hover:text-white transition-colors"
+                      className="h-7 px-3 text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 border-none hover:bg-primary/90 hover:text-primary-foreground transition-colors"
                     >
                       Convert
                     </Button>
@@ -973,12 +973,12 @@ function QuotationConverterDialog({
           )}
         </div>
 
-        <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-end items-center">
+        <div className="p-4 bg-muted/50 border-t border-border flex justify-end items-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="font-black text-[10px] uppercase tracking-widest text-slate-500"
+            className="font-black text-[10px] uppercase tracking-widest text-muted-foreground"
           >
             Cancel
           </Button>

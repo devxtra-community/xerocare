@@ -50,7 +50,7 @@ export default function ManagerAccountsLayout({ children }: { children: React.Re
 
   return (
     <div className="relative">
-      <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] font-semibold text-amber-800">
+      <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-1.5 text-[11px] font-semibold text-warning">
         <Eye className="h-3.5 w-3.5 shrink-0" />
         View only — branch managers can read every accounts page. Contact your Finance Manager to
         make changes.

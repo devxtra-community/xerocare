@@ -147,9 +147,9 @@ export default function ManagerProduct() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4" suppressHydrationWarning>
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-4" suppressHydrationWarning>
       <div className="flex flex-wrap justify-between items-center gap-3" suppressHydrationWarning>
-        <h3 className="text-xl sm:text-2xl font-bold text-primary">Products</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground">Products</h3>
         {isAdmin && <BranchFilterBar />}
       </div>
 
@@ -162,7 +162,7 @@ export default function ManagerProduct() {
 
       <div className="flex items-center justify-between">
         <div className="relative w-[260px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, brand, serial..."
             value={search}
@@ -173,7 +173,7 @@ export default function ManagerProduct() {
 
         <div>
           <Button
-            className="bg-primary text-white gap-2"
+            className="bg-primary text-primary-foreground gap-2"
             onClick={() => {
               setEditing(null);
               setFormOpen(true);
@@ -182,7 +182,7 @@ export default function ManagerProduct() {
             <Plus size={16} /> Add Product
           </Button>
           <Button
-            className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-2"
+            className="bg-success hover:bg-success/90 text-success-foreground gap-2 ml-2"
             onClick={() => setBulkDialogOpen(true)}
           >
             <Plus size={16} /> Bulk Add
@@ -206,14 +206,14 @@ export default function ManagerProduct() {
                     unoptimized={true}
                   />
                   <div
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    className="absolute inset-0 bg-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     onClick={() => setPreviewImage(p.imageUrl || null)}
                   >
-                    <Eye size={14} className="text-white" />
+                    <Eye size={14} className="text-primary-foreground" />
                   </div>
                 </div>
               ) : (
-                <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
                   N/A
                 </div>
               ),
@@ -239,7 +239,7 @@ export default function ManagerProduct() {
                       navigator.clipboard.writeText(p.lot?.lotNumber || '');
                       toast.success('Copied to clipboard');
                     }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                     title="Copy Lot ID"
                   >
                     <Copy size={12} />
@@ -261,7 +261,7 @@ export default function ManagerProduct() {
                       navigator.clipboard.writeText(p.serial_no);
                       toast.success('Copied to clipboard');
                     }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                     title="Copy Serial No"
                   >
                     <Copy size={12} />
@@ -282,8 +282,8 @@ export default function ManagerProduct() {
               <span
                 className={`px-2 py-1 rounded-full text-xs ${
                   p.product_status === 'AVAILABLE'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-yellow-100 text-yellow-700'
+                    ? 'bg-success/10 text-success'
+                    : 'bg-warning/10 text-warning'
                 }`}
               >
                 {p.product_status}
@@ -296,7 +296,7 @@ export default function ManagerProduct() {
             cell: (p: Product) => (
               <div className="flex gap-3 text-sm">
                 <button
-                  className="text-blue-500 hover:text-blue-700 transition-colors"
+                  className="text-primary hover:text-primary transition-colors"
                   onClick={() => router.push(`/manager/products/${p.id}`)}
                   title="View Details"
                 >
@@ -311,7 +311,7 @@ export default function ManagerProduct() {
                 >
                   Update
                 </button>
-                <button className="text-red-600 hover:underline" onClick={() => setDeleting(p)}>
+                <button className="text-destructive hover:underline" onClick={() => setDeleting(p)}>
                   Delete
                 </button>
               </div>
@@ -368,7 +368,7 @@ export default function ManagerProduct() {
           <DialogHeader className="sr-only">
             <DialogTitle>Image Preview</DialogTitle>
           </DialogHeader>
-          <div className="relative w-full aspect-square md:aspect-video flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg">
+          <div className="relative w-full aspect-square md:aspect-video flex items-center justify-center bg-foreground backdrop-blur-sm rounded-lg">
             {previewImage && (
               <Image
                 src={previewImage}

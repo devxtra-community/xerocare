@@ -113,24 +113,24 @@ export default function ProfitChart({ selectedYear }: ProfitChartProps) {
                 ]}
                 contentStyle={{
                   borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  background: '#ffffff',
-                  boxShadow: '0 6px 20px rgba(15,23,42,0.10)',
+                  border: '1px solid var(--chart-grid)',
+                  background: 'var(--card)',
+                  boxShadow: '0 6px 20px color-mix(in srgb, var(--foreground) 10%, transparent)',
                   padding: '8px 10px',
                 }}
                 labelStyle={{
-                  color: '#0f172a',
+                  color: 'var(--foreground)',
                   fontWeight: 700,
                   fontSize: '11px',
                   marginBottom: 4,
                 }}
                 itemStyle={{
                   fontSize: '11px',
-                  color: '#475569',
+                  color: 'var(--muted-foreground)',
                   fontWeight: 600,
                   padding: 0,
                 }}
-                cursor={{ fill: 'rgba(15,23,42,0.04)' }}
+                cursor={{ fill: 'color-mix(in srgb, var(--foreground) 4%, transparent)' }}
               />
               {/* Profit carries the palette's green — the same green the Accounts module
                   uses for anything that lands, so the two charts agree with each other. */}

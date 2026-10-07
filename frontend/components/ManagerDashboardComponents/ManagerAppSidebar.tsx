@@ -430,10 +430,10 @@ export default function ManagerSidebar() {
     <Sidebar collapsible="icon" className="border-none !border-r-0">
       <SidebarHeader className="bg-sidebar">
         <div className="flex items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">
-            <LayoutDashboard className="h-5 w-5 text-sidebar-accent-foreground" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-accent">
+            <LayoutDashboard className="h-5 w-5 text-primary" />
           </div>
-          <span className="text-base font-semibold text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
+          <span className="text-base font-semibold text-foreground group-data-[collapsible=icon]:hidden">
             Xerocare
           </span>
         </div>
@@ -454,7 +454,7 @@ export default function ManagerSidebar() {
                       <>
                         <SidebarMenuButton
                           onClick={() => toggleGroup(item.title)}
-                          className={`py-2.5 rounded-md w-full justify-between !text-white hover:bg-transparent
+                          className={`py-2.5 rounded-md w-full justify-between !text-sidebar-accent-foreground hover:bg-sidebar-accent
                             ${
                               item.subItems?.some((sub) => pathname === sub.href) ? 'font-bold' : ''
                             }`}
@@ -475,7 +475,7 @@ export default function ManagerSidebar() {
                               )}
                             />
                             {item.title === 'Sales Desk' && expiryCount > 0 && (
-                              <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse ml-2">
+                              <span className="bg-destructive text-destructive-foreground text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse ml-2">
                                 {expiryCount}
                               </span>
                             )}
@@ -521,7 +521,7 @@ export default function ManagerSidebar() {
                                       )}
                                     />
                                     {sub.title === 'Overview' && expiryCount > 0 && (
-                                      <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                                      <span className="bg-destructive text-destructive-foreground text-[10px] font-black px-1.5 py-0.5 rounded-full">
                                         {expiryCount}
                                       </span>
                                     )}
@@ -613,7 +613,10 @@ export default function ManagerSidebar() {
       <SidebarFooter className="bg-sidebar">
         <SidebarMenu className="px-2">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="py-3 hover:bg-red-500/20 hover:text-red-300">
+            <SidebarMenuButton
+              asChild
+              className="py-3 hover:bg-destructive/20 hover:text-destructive"
+            >
               <button className="flex items-center gap-3 px-3" onClick={handleLogout}>
                 Logout
               </button>

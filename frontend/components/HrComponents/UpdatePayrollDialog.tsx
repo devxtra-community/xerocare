@@ -78,7 +78,7 @@ export default function UpdatePayrollDialog({
           <div className="space-y-4">
             <div className="opacity-70 pointer-events-none bg-muted/50 p-2 rounded-lg text-center">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Employee Name
                 </label>
                 <div className="text-sm font-medium capitalize">{record?.name}</div>
@@ -88,7 +88,7 @@ export default function UpdatePayrollDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="opacity-70 pointer-events-none bg-muted/50 p-2 rounded-lg text-center">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Branch
                   </label>
                   <div className="text-[10px] font-bold uppercase">{record?.branchName}</div>
@@ -96,7 +96,7 @@ export default function UpdatePayrollDialog({
               </div>
               <div className="opacity-70 pointer-events-none bg-muted/50 p-2 rounded-lg text-center">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Role
                   </label>
                   <div className="text-[10px] font-bold uppercase">{record?.role}</div>
@@ -106,7 +106,7 @@ export default function UpdatePayrollDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Salary / Month
             </label>
             <Input
@@ -119,7 +119,7 @@ export default function UpdatePayrollDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Leave Days
             </label>
             <Input
@@ -134,7 +134,7 @@ export default function UpdatePayrollDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Status
               </label>
               <Select
@@ -151,7 +151,7 @@ export default function UpdatePayrollDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Paid Date
               </label>
               <Input
@@ -169,7 +169,7 @@ export default function UpdatePayrollDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="font-bold text-gray-600"
+              className="font-bold text-foreground"
             >
               Cancel
             </Button>

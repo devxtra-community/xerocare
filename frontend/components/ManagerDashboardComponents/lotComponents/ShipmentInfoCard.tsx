@@ -35,15 +35,14 @@ import {
 
 const SHIPMENT_STATUS_COLORS: Record<ShipmentStatus, string> = {
   [ShipmentStatus.PENDING_DISPATCH]:
-    'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400',
+    'bg-muted text-foreground border-border dark:bg-foreground/30 dark:text-muted-foreground',
   [ShipmentStatus.IN_TRANSIT]:
-    'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
+    'bg-primary/10 text-primary border-primary/30 dark:bg-primary/30 dark:text-primary',
   [ShipmentStatus.CUSTOMS_CLEARANCE]:
-    'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
-  [ShipmentStatus.ARRIVED]:
-    'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400',
+    'bg-warning/10 text-warning border-warning/30 dark:bg-warning/30 dark:text-warning',
+  [ShipmentStatus.ARRIVED]: 'bg-info/10 text-info border-info/30 dark:bg-info/30 dark:text-info',
   [ShipmentStatus.RELEASED]:
-    'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400',
+    'bg-success/10 text-success border-success/30 dark:bg-success/30 dark:text-success',
 };
 
 interface ShipmentInfoCardProps {

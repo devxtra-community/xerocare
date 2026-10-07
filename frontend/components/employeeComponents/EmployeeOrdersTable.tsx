@@ -212,11 +212,11 @@ export default function EmployeeOrdersTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
-        <h2 className="text-xl font-bold text-primary">Orders Overview</h2>
+      <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-border shadow-sm">
+        <h2 className="text-xl font-medium text-primary">Orders Overview</h2>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-1">
               Total Amount
             </p>
             <p className="text-xl font-black text-primary tracking-tight">
@@ -227,20 +227,20 @@ export default function EmployeeOrdersTable({
               })}
             </p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
             <Coins size={20} />
           </div>
         </div>
       </div>
 
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Orders
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by ID, customer..."
                 value={search}
@@ -250,13 +250,13 @@ export default function EmployeeOrdersTable({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Actions
             </label>
             <Button
               variant="outline"
               onClick={() => window.location.reload()}
-              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+              className="h-9 text-xs w-full justify-center gap-2 border-border hover:bg-muted"
             >
               Refresh Data
             </Button>
@@ -301,9 +301,9 @@ export default function EmployeeOrdersTable({
                 paginatedInvoices.map((invoice, index) => (
                   <TableRow
                     key={invoice.id}
-                    className={index % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}
+                    className={index % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}
                   >
-                    <TableCell className="text-blue-600 font-medium whitespace-nowrap">
+                    <TableCell className="text-primary font-medium whitespace-nowrap">
                       {invoice.invoiceNumber}
                     </TableCell>
                     <TableCell className="font-bold text-primary whitespace-nowrap">
@@ -330,10 +330,10 @@ export default function EmployeeOrdersTable({
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                         ${
                           invoice.status === 'APPROVED'
-                            ? 'bg-green-100 text-green-600'
+                            ? 'bg-success/10 text-success'
                             : invoice.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-600'
-                              : 'bg-red-100 text-red-600'
+                              ? 'bg-warning/10 text-warning'
+                              : 'bg-destructive/10 text-destructive'
                         }`}
                       >
                         {invoice.status}
@@ -344,12 +344,12 @@ export default function EmployeeOrdersTable({
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                         ${
                           invoice.status === 'APPROVED'
-                            ? 'bg-green-100 text-green-600'
+                            ? 'bg-success/10 text-success'
                             : invoice.status === 'PENDING'
-                              ? 'bg-blue-100 text-blue-600'
+                              ? 'bg-primary/10 text-primary'
                               : invoice.status === 'REJECTED'
-                                ? 'bg-red-100 text-red-600'
-                                : 'bg-yellow-100 text-yellow-600'
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-warning/10 text-warning'
                         }`}
                       >
                         {invoice.status}
@@ -360,10 +360,10 @@ export default function EmployeeOrdersTable({
                         className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
                         ${
                           invoice.saleType === 'SALE'
-                            ? 'bg-blue-100 text-blue-600'
+                            ? 'bg-primary/10 text-primary'
                             : invoice.saleType === 'RENT'
-                              ? 'bg-orange-100 text-orange-600'
-                              : 'bg-purple-100 text-purple-600'
+                              ? 'bg-warning/10 text-warning'
+                              : 'bg-lease/10 text-lease'
                         }`}
                       >
                         {invoice.saleType}
@@ -373,7 +373,7 @@ export default function EmployeeOrdersTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                         onClick={() => handleViewDetails(invoice.id)}
                         title="View Details"
                       >
@@ -445,7 +445,7 @@ export default function EmployeeOrdersTable({
 
       <Modal isOpen={rejectOpen} onClose={() => setRejectOpen(false)} title="Reject Order">
         <div className="space-y-4">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             Please enter a reason for rejecting this order. The sales representative will see this
             reason.
           </p>

@@ -32,10 +32,10 @@ function nextTierNudge(row: TargetWithAchievement): string | null {
 }
 
 function rankBadgeClass(rank: number): string {
-  if (rank === 1) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-  if (rank === 2) return 'bg-slate-200 text-slate-800 border-slate-300';
-  if (rank === 3) return 'bg-orange-100 text-orange-800 border-orange-300';
-  return 'bg-blue-50 text-blue-700 border-blue-200';
+  if (rank === 1) return 'bg-warning/10 text-warning border-warning/30';
+  if (rank === 2) return 'bg-muted text-foreground border-border';
+  if (rank === 3) return 'bg-warning/10 text-warning border-warning/30';
+  return 'bg-primary/10 text-primary border-primary/30';
 }
 
 export default function MyAchievementsPage() {
@@ -68,7 +68,7 @@ export default function MyAchievementsPage() {
   if (!currentRow && historyRows.length === 0) {
     return (
       <div className="p-6">
-        <div className="rounded-xl border bg-white dark:bg-slate-900 p-8 text-center text-muted-foreground">
+        <div className="rounded-xl border border-border bg-card text-card-foreground p-8 text-center text-muted-foreground">
           <Award className="h-8 w-8 mx-auto mb-2 opacity-50" />
           No target has been assigned to you yet.
         </div>
@@ -82,14 +82,16 @@ export default function MyAchievementsPage() {
   return (
     <div className="min-h-full p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-medium text-foreground flex items-center gap-2">
           <Award className="h-6 w-6 text-primary" /> My Achievements
         </h1>
-        <p className="text-sm text-gray-500">Track your monthly target progress and incentives</p>
+        <p className="text-sm text-muted-foreground">
+          Track your monthly target progress and incentives
+        </p>
       </div>
 
       {currentRow && (
-        <div className="rounded-xl border bg-white dark:bg-slate-900 p-6 space-y-4">
+        <div className="rounded-xl border border-border bg-card text-card-foreground p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="font-semibold text-lg">{currentRow.target.targetMonth}</h2>
             {currentRow.rank && (
@@ -119,7 +121,7 @@ export default function MyAchievementsPage() {
                 {Number(currentRow.achievement.achievementPercent).toFixed(1)}%
               </span>
             </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
               <div
                 className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${percent}%` }}
@@ -127,11 +129,11 @@ export default function MyAchievementsPage() {
             </div>
           </div>
 
-          {nudge && <p className="text-sm text-amber-600 font-medium">{nudge}</p>}
+          {nudge && <p className="text-sm text-warning font-medium">{nudge}</p>}
 
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="rounded-lg bg-muted/30 p-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Current Tier
               </p>
               <p className="text-lg font-bold">
@@ -139,10 +141,10 @@ export default function MyAchievementsPage() {
               </p>
             </div>
             <div className="rounded-lg bg-muted/30 p-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Estimated Incentive
               </p>
-              <p className="text-lg font-bold text-emerald-600">
+              <p className="text-lg font-bold text-success">
                 {formatCurrency(
                   currentRow.achievement.incentiveAmount,
                   currentRow.target.currencyCode,
@@ -153,7 +155,7 @@ export default function MyAchievementsPage() {
 
           {currentRow.records.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
                 Deals counted this month ({currentRow.achievement.dealCount})
               </p>
               <div className="max-h-64 overflow-y-auto rounded-lg border divide-y">
@@ -177,11 +179,11 @@ export default function MyAchievementsPage() {
       )}
 
       {historyRows.length > 0 && (
-        <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden">
+        <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
           <div className="p-4 border-b">
             <h3 className="font-semibold">Monthly History</h3>
           </div>
-          <Table>
+          <Table pagination={{ pageSize: 10 }}>
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>
@@ -203,7 +205,7 @@ export default function MyAchievementsPage() {
                     {formatCurrency(r.achievement.achievedAmount, r.target.currencyCode)}
                   </TableCell>
                   <TableCell>{Number(r.achievement.achievementPercent).toFixed(1)}%</TableCell>
-                  <TableCell className="font-semibold text-emerald-600">
+                  <TableCell className="font-semibold text-success">
                     {formatCurrency(r.achievement.incentiveAmount, r.target.currencyCode)}
                   </TableCell>
                   <TableCell>

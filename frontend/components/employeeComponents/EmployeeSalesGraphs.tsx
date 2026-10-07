@@ -41,7 +41,7 @@ const ChartContainer = ({
 }) => {
   const currency = useBranchCurrency();
   return (
-    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
       <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
         {title}
       </h4>
@@ -59,21 +59,21 @@ const ChartContainer = ({
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               dy={10}
               interval={0}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               tickFormatter={(val) =>
                 `${currency} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
               }
@@ -84,7 +84,7 @@ const ChartContainer = ({
                   valueFormatter={(val) => formatCurrency(Number(val), currency)}
                 />
               }
-              cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
+              cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
             />
             <Bar dataKey={dataKeyAmount} fill={color} radius={[4, 4, 0, 0]} barSize={10} />
           </BarChart>
@@ -110,7 +110,7 @@ const ForexChartContainer = ({
     data.reduce((sum, item) => sum + (Number(item[dataKeyAmount]) || 0), 0) / data.length || 0;
 
   return (
-    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
       <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
         {title}
       </h4>
@@ -128,21 +128,21 @@ const ForexChartContainer = ({
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 9, fontWeight: 700 }}
               dy={10}
               interval={2}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 9, fontWeight: 700 }}
               tickFormatter={(val) =>
                 `${getActiveCurrency()} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
               }
@@ -167,8 +167,8 @@ const ForexChartContainer = ({
               dataKey={dataKeyAmount}
               stroke={color}
               strokeWidth={2}
-              dot={{ r: 3, fill: color, strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 2 }}
+              dot={{ r: 3, fill: color, strokeWidth: 2, stroke: 'var(--card)' }}
+              activeDot={{ r: 6, fill: color, stroke: 'var(--card)', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -195,7 +195,7 @@ export default function EmployeeSalesGraphs({
   const [dailyData, setDailyData] = useState<SalesChartDataItem[]>([]);
 
   // Primary color variations (Blue shades)
-  const salesColor = '#1e40af'; // Blue 800
+  const salesColor = 'var(--primary)'; // Blue 800
   const dailyColor = 'var(--primary)'; // Red 600
 
   useEffect(() => {
@@ -298,9 +298,9 @@ export default function EmployeeSalesGraphs({
         {[1, 2].map((i) => (
           <div
             key={i}
-            className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full items-center justify-center"
+            className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full items-center justify-center"
           >
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ))}
       </div>

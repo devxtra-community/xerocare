@@ -166,17 +166,18 @@ export default function CardProcessingFeeRules() {
     }
   };
 
-  const wildcard = (v?: string | null) => (v ? v : <span className="text-slate-300">Any</span>);
+  const wildcard = (v?: string | null) =>
+    v ? v : <span className="text-muted-foreground">Any</span>;
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-black text-slate-800">
-            <CreditCard size={20} className="text-indigo-600" />
+          <h1 className="flex items-center gap-2 text-xl font-medium text-foreground">
+            <CreditCard size={20} className="text-primary" />
             Card Processing Fees
           </h1>
-          <p className="mt-1 max-w-2xl text-xs font-medium text-slate-500">
+          <p className="mt-1 max-w-2xl text-xs font-medium text-muted-foreground">
             The commission your acquirer charges on card payments, per your own merchant agreement.
             Blank fields match anything — the most specific matching rule wins. A card with no
             matching rule is refused at the till rather than charged a guessed rate.
@@ -188,22 +189,22 @@ export default function CardProcessingFeeRules() {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 py-16 text-sm text-slate-400">
+        <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
           <Loader2 size={16} className="animate-spin" /> Loading rules…
         </div>
       ) : rules.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-          <Info size={22} className="mx-auto mb-2 text-slate-400" />
-          <p className="text-sm font-bold text-slate-600">No fee rules configured yet</p>
-          <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+        <div className="rounded-xl border border-dashed border-border bg-muted p-8 text-center">
+          <Info size={22} className="mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm font-bold text-foreground">No fee rules configured yet</p>
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
             Until a rule exists, card payments cannot be recorded — the system will not invent a
             rate. Add your acquirer&apos;s agreed rates to start accepting cards.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500">
+            <thead className="bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left">Country</th>
                 <th className="px-3 py-2 text-left">Issuing Bank</th>
@@ -219,9 +220,9 @@ export default function CardProcessingFeeRules() {
                 <th className="px-3 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {rules.map((r) => (
-                <tr key={r.id} className={r.isActive ? '' : 'bg-slate-50/70 text-slate-400'}>
+                <tr key={r.id} className={r.isActive ? '' : 'bg-muted/70 text-muted-foreground'}>
                   <td className="px-3 py-2 font-bold">{r.issuerCountry}</td>
                   <td className="px-3 py-2">{wildcard(r.issuerBank)}</td>
                   <td className="px-3 py-2">{wildcard(r.cardType)}</td>
@@ -243,9 +244,7 @@ export default function CardProcessingFeeRules() {
                   <td className="px-3 py-2 text-center">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                        r.isActive
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-slate-200 text-slate-500'
+                        r.isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {r.isActive ? 'ACTIVE' : 'RETIRED'}
@@ -258,7 +257,7 @@ export default function CardProcessingFeeRules() {
                       </Button>
                       {r.isActive && (
                         <Button size="sm" variant="ghost" onClick={() => deactivate(r)}>
-                          <Power size={13} className="text-red-500" />
+                          <Power size={13} className="text-destructive" />
                         </Button>
                       )}
                     </div>

@@ -39,29 +39,33 @@ export default function EmployeeLeadsGraph() {
               bottom: 0,
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#6b7280', fontSize: 12 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
               dy={10}
             />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+            />
             <Tooltip
-              cursor={{ fill: '#f3f4f6' }}
+              cursor={{ fill: 'var(--muted)' }}
               contentStyle={{
                 borderRadius: '8px',
                 border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 4px 6px -1px color-mix(in srgb, var(--foreground) 10%, transparent)',
                 padding: '8px',
                 fontSize: '12px',
               }}
             />
             <Legend verticalAlign="top" height={36} />
             <Bar dataKey="website" fill="var(--primary)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="whatsapp" fill="#60a5fa" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="instagram" fill="#93c5fd" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="whatsapp" fill="var(--chart-blue-soft)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="instagram" fill="var(--chart-blue-light)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

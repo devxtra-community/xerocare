@@ -59,13 +59,13 @@ export default function MonthlyRevenueAreaChart() {
     fetchData();
   }, []);
 
-  if (!isClient) return <div className="h-[320px] w-full bg-white rounded-2xl animate-pulse" />;
+  if (!isClient) return <div className="h-[320px] w-full bg-card rounded-2xl animate-pulse" />;
 
   return (
-    <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
+    <div className="rounded-2xl bg-card h-[320px] w-full shadow-sm border border-primary/30 flex flex-col p-4">
       <div className="pb-4">
-        <h4 className="text-sm font-semibold text-gray-800">Monthly Revenue Source</h4>
-        <p className="text-[10px] text-gray-500">Revenue trends by type</p>
+        <h4 className="text-sm font-semibold text-foreground">Monthly Revenue Source</h4>
+        <p className="text-[10px] text-muted-foreground">Revenue trends by type</p>
       </div>
       <div className="flex-1 w-full -ml-4">
         <ResponsiveContainer width="100%" height="100%">
@@ -103,8 +103,8 @@ export default function MonthlyRevenueAreaChart() {
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   return (
-                    <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-50 flex flex-col gap-2 min-w-[120px]">
-                      <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
+                    <div className="bg-card p-4 rounded-xl shadow-lg border border-border flex flex-col gap-2 min-w-[120px]">
+                      <p className="text-xs font-bold text-foreground mb-2">{label}</p>
                       {(payload as { name: string; value: number; stroke: string }[]).map(
                         (entry, index: number) => (
                           <div key={index} className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export default function MonthlyRevenueAreaChart() {
                 paddingBottom: '20px',
                 fontSize: '10px',
                 fontWeight: 500,
-                color: '#64748b',
+                color: 'var(--chart-slate-dark)',
               }}
             />
             <Area

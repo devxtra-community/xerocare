@@ -33,7 +33,7 @@ export default function ARPostPreviewPage() {
           Back to Invoice
         </Button>
 
-        <Button disabled className="bg-emerald-600 text-white">
+        <Button disabled className="bg-success text-success-foreground">
           Confirm & Post
         </Button>
       </div>

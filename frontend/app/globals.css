@@ -58,57 +58,70 @@
   /* Sale Type Colors */
   --color-rent: var(--rent);
   --color-lease: var(--lease);
+  --color-lease-foreground: var(--lease-foreground);
   --color-sale: var(--sale);
 }
 
 :root {
   --radius: 0.625rem;
 
-  /* Page background (light blue) */
-  --background: #eff6ff;
-  --foreground: #374151;
+  /* Product design tokens used by shared controls and dashboards. */
+  --primary-blue: #2563eb;
+  --primary-blue-hover: #1d4ed8;
+  --primary-blue-dark: #1e40af;
+  --soft-blue: #dbeafe;
+  --light-blue: #eff6ff;
+  --page-background: #f7f8fa;
+  --surface: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --divider: #eef0f2;
+
+  /* Blue enterprise foundation */
+  --background: #f7f8fa;
+  --foreground: #1f2937;
 
   /* Cards (PURE WHITE) */
   --card: #ffffff;
-  --card-foreground: #374151;
+  --card-foreground: #1f2937;
 
-  --primary: #1e3a8a;
+  --primary: #1e40af;
   --primary-foreground: #ffffff;
 
   --secondary: #f8fafc;
-  --secondary-foreground: #374151;
+  --secondary-foreground: #1f2937;
 
   --muted: #f9fafb;
-  --muted-foreground: #6b7280;
+  --muted-foreground: #64748b;
 
-  --accent: #f97316;
-  --accent-foreground: #ffffff;
+  --accent: #eff6ff;
+  --accent-foreground: #1e40af;
 
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
   --border: #e5e7eb;
   --input: #e5e7eb;
-  --ring: #1e3a8a;
+  --ring: #2563eb;
   --popover: #ffffff;
-  --popover-foreground: #374151;
-  --row-mixed: #f0f9ff;
+  --popover-foreground: #1f2937;
+  --row-mixed: #f8fafc;
 
-  --sidebar: #1e3a8a;
-  --sidebar-foreground: #fcfcfc;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #64748b;
 
-  --sidebar-primary: #1e3a8a;
+  --sidebar-primary: #2563eb;
   --sidebar-primary-foreground: #ffffff;
 
-  --sidebar-accent: #0ea5e9;
-  --sidebar-accent-foreground: #ffffff;
+  --sidebar-accent: #dbeafe;
+  --sidebar-accent-foreground: #64748b;
 
-  --sidebar-border: #0284c7;
-  --sidebar-ring: #38bdf8;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #2563eb;
 
   /* Semantic mappings */
-  --bg-muted: #eff6ff;
-  /* Light blue background */
+  --bg-muted: #f8fafc;
 
   --success: #22c55e;
   --success-foreground: #14532d;
@@ -120,12 +133,13 @@
   --warning-foreground: #78350f;
 
   --info: #3b82f6;
-  --info-foreground: #1e3a8a;
+  --info-foreground: #1e40af;
 
   /* Sale Type Colors (Legacy fallback or specific overrides) */
   --rent: #f97316;
   /* Orange */
   --lease: #a855f7;
+  --lease-foreground: #ffffff;
   /* Purple */
   --sale: #3b82f6;
   /* Blue */
@@ -141,11 +155,49 @@
   --chart-sky: #e0f2fe;
   --chart-slate: #94a3b8;
   --chart-slate-dark: #64748b;
-  --chart-grid: #f1f5f9;
+  --chart-grid: #e5e7eb;
 
-  --primary-rgb: 30 58 138;
+  --primary-rgb: 30 64 175;
   --primary-light-rgb: 191 219 254;
   --muted-rgb: 229 231 235;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --background: #0b1120;
+  --foreground: #cbd5e1;
+  --card: #111827;
+  --card-foreground: #cbd5e1;
+  --primary: #fde68a;
+  --primary-foreground: #1f2937;
+  --secondary: #1e293b;
+  --secondary-foreground: #cbd5e1;
+  --muted: #1e293b;
+  --muted-foreground: #9ca3af;
+  --accent: #273449;
+  --accent-foreground: #fde68a;
+  --border: #334155;
+  --input: #475569;
+  --ring: #facc15;
+  --popover: #111827;
+  --popover-foreground: #cbd5e1;
+  --row-mixed: #172033;
+  --sidebar: #0b1120;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #facc15;
+  --sidebar-primary-foreground: #1f2937;
+  --sidebar-accent: #273449;
+  --sidebar-accent-foreground: #fde68a;
+  --sidebar-border: #273449;
+  --sidebar-ring: #facc15;
+  --bg-muted: #172033;
+  --primary-blue: #fde68a;
+  --primary-blue-hover: #facc15;
+  --primary-blue-dark: #facc15;
+  --text-primary: #cbd5e1;
+  --text-secondary: #9ca3af;
+  --text-muted: #94a3b8;
+  --divider: #273449;
 }
 
 /* ── Enterprise action-icon system ─────────────────────────────────────────────
@@ -255,10 +307,134 @@
   --chart-profit: #10b981;
   --chart-payroll: #64748b;
   --chart-purchase: #93c5fd;
-  --chart-grid: #eef2f6;
+  --chart-grid: #e5e7eb;
   --chart-axis: #64748b;
 }
 
+/* Keep blue dashboard headings consistently at the deeper blue-800 shade. */
+h1.text-primary,
+h2.text-primary,
+h3.text-primary,
+h4.text-primary,
+h1[class*='text-blue-'],
+h2[class*='text-blue-'],
+h3[class*='text-blue-'],
+h4[class*='text-blue-'] {
+  color: #1e40af;
+}
+
+/* Shared sidebar states apply consistently to every role desk. */
+[data-slot='sidebar-inner'] {
+  border-right: 1px solid var(--sidebar-border);
+}
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-slot='sidebar-menu-button'],
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-slot='sidebar-menu-sub-button'] {
+  color: var(--sidebar-foreground);
+  border-radius: 0.5rem;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-slot='sidebar-menu-button']:hover,
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-slot='sidebar-menu-sub-button']:hover {
+  background: #eff6ff !important;
+  color: #2563eb !important;
+}
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-active='true'] {
+  background: #dbeafe !important;
+  color: #2563eb !important;
+  font-weight: 600;
+}
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-active='true'] svg {
+  color: #2563eb !important;
+}
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='header'],
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='content'],
+:is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='footer'] {
+  background-color: #fff;
+}
+
+/* Native tables share the same theme surfaces and readable text as UI tables. */
+table:not([data-slot='table']) {
+  color: var(--foreground);
+  background-color: var(--card);
+}
+table:not([data-slot='table']) thead { background-color: var(--muted); }
+table:not([data-slot='table']) th {
+  color: var(--foreground);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+table:not([data-slot='table']) td { border-bottom: 1px solid var(--border); }
+table:not([data-slot='table']) tbody tr:hover {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+table:not([data-slot='table']) tbody tr[data-state='selected'] {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* Dark mode: blue accents become soft yellow, and near-black text becomes gray. */
+.dark [class*='text-blue-'],
+.dark [class~='text-primary'],
+.dark h1[class*='text-blue-'],
+.dark h2[class*='text-blue-'],
+.dark h3[class*='text-blue-'],
+.dark h4[class*='text-blue-'],
+.dark h1.text-primary,
+.dark h2.text-primary,
+.dark h3.text-primary,
+.dark h4.text-primary {
+  color: #fde68a !important;
+}
+.dark [class~='text-black'],
+.dark [class~='text-gray-900'],
+.dark [class~='text-gray-800'],
+.dark [class~='text-gray-700'],
+.dark [class~='text-gray-600'],
+.dark [class~='text-slate-900'],
+.dark [class~='text-slate-800'],
+.dark [class~='text-slate-700'],
+.dark [class~='text-slate-600'],
+.dark [class~='text-zinc-900'],
+.dark [class~='text-zinc-800'],
+.dark [class~='text-neutral-900'],
+.dark [class~='text-foreground'] {
+  color: #cbd5e1 !important;
+}
+.dark .bg-white {
+  background-color: #111827 !important;
+}
+.dark .bg-slate-50,
+.dark .bg-slate-100,
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark .bg-neutral-50,
+.dark .bg-blue-50,
+.dark .bg-blue-100 {
+  background-color: #1e293b !important;
+}
+.dark [class*='border-slate-200'],
+.dark [class*='border-gray-200'],
+.dark [class*='border-blue-100'] {
+  border-color: #334155 !important;
+}
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-active='true'] {
+  background: #273449 !important;
+  color: #fde68a !important;
+}
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-active='true'] svg {
+  color: #fde68a !important;
+}
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-slot='sidebar-menu-button']:hover,
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-slot='sidebar-menu-sub-button']:hover {
+  background: #1e293b !important;
+  color: #fde68a !important;
+}
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='header'],
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='content'],
+.dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='footer'] {
+  background-color: #0b1120 !important;
+}
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -267,14 +443,13 @@
   html,
   body {
     @apply bg-background text-foreground overflow-x-hidden;
-    scrollbar-gutter: stable;
   }
 }
 
 /* Radix/react-remove-scroll-bar injects a runtime <style> forcing
    body[data-scroll-locked] { margin-right: <gap>px !important } to fake-compensate
-   for the scrollbar it hides on dropdown/dialog open. scrollbar-gutter above already
-   reserves that space, so the extra margin only shows up as a dead strip on the right.
+   for the scrollbar it hides on dropdown/dialog open. The injected margin creates a
+   dead strip on the right, so keep the locked body aligned with its normal width.
    Higher specificity beats their same-specificity rule regardless of injection order. */
 html body[data-scroll-locked] {
   margin-right: 0 !important;

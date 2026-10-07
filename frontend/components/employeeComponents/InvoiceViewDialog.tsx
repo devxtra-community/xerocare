@@ -294,7 +294,7 @@ export function InvoiceViewDialog({
         dataUrl = await toPng(element, {
           quality: 1,
           pixelRatio: 2,
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--card)',
           width: TARGET_WIDTH,
         });
       } finally {
@@ -824,7 +824,7 @@ export function InvoiceViewDialog({
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       {isReturnInvoice && !showingOriginalInvoice ? (
-        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col h-[98vh]">
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-card flex flex-col h-[98vh]">
           <DialogTitle className="sr-only">Return Invoice</DialogTitle>
           <ReturnInvoiceLayout
             invoice={invoice}
@@ -833,7 +833,7 @@ export function InvoiceViewDialog({
           />
         </DialogContent>
       ) : (
-        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col h-[98vh]">
+        <DialogContent className="sm:max-w-5xl rounded-none border-none shadow-2xl p-0 overflow-hidden bg-card flex flex-col h-[98vh]">
           <DialogTitle className="sr-only">Invoice Document</DialogTitle>
           {(() => {
             if (!invoice.effectiveTo) return null;
@@ -857,8 +857,8 @@ export function InvoiceViewDialog({
               <div
                 className={`p-4 flex items-center gap-3 border-b ${
                   isExpired
-                    ? 'bg-red-50 border-red-100 text-red-700'
-                    : 'bg-amber-50 border-amber-100 text-amber-700'
+                    ? 'bg-destructive/10 border-destructive/30 text-destructive'
+                    : 'bg-warning/10 border-warning/30 text-warning'
                 }`}
               >
                 {isExpired ? (
@@ -882,7 +882,7 @@ export function InvoiceViewDialog({
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
             <div
               id="invoice-print-content"
-              className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
+              className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-card"
               style={watermarkBackground}
             >
               {useTemplate ? (
@@ -1055,18 +1055,18 @@ export function InvoiceViewDialog({
                     invoice.warrantyType &&
                     invoice.warrantyType !== 'none' && (
                       <div className="flex flex-col mt-8 pl-12 pr-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <div className="border border-red-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
-                          <div className="flex items-center justify-between border-b border-red-50 pb-3 mb-6">
+                        <div className="border border-destructive rounded-3xl px-8 py-6 bg-card shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
+                          <div className="flex items-center justify-between border-b border-destructive/30 pb-3 mb-6">
                             <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center">
-                                <span className="text-emerald-600">🛡️</span>
+                              <div className="h-8 w-8 bg-success/10 rounded-xl flex items-center justify-center">
+                                <span className="text-success">🛡️</span>
                               </div>
-                              <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
+                              <h3 className="text-xl font-normal text-foreground uppercase tracking-tighter">
                                 Warranty Details
                               </h3>
                             </div>
-                            <div className="bg-emerald-100 px-3 py-1 rounded-full">
-                              <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">
+                            <div className="bg-success/10 px-3 py-1 rounded-full">
+                              <p className="text-[9px] font-bold text-success uppercase tracking-widest">
                                 Guaranteed Coverage
                               </p>
                             </div>
@@ -1074,15 +1074,15 @@ export function InvoiceViewDialog({
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-8">
                             <div>
-                              <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1">
+                              <p className="text-[10px] font-normal text-muted-foreground uppercase tracking-widest mb-1">
                                 Identification
                               </p>
                               <div className="space-y-3">
-                                <div className="flex justify-between border-b border-slate-50 pb-2">
-                                  <span className="text-[12px] text-slate-500 font-normal">
+                                <div className="flex justify-between border-b border-border pb-2">
+                                  <span className="text-[12px] text-muted-foreground font-normal">
                                     Warranty Type
                                   </span>
-                                  <span className="text-[12px] font-normal text-slate-900 uppercase italic">
+                                  <span className="text-[12px] font-normal text-foreground uppercase italic">
                                     {invoice.warrantyType === 'duration'
                                       ? 'By Duration'
                                       : invoice.warrantyType === 'copies'
@@ -1093,11 +1093,11 @@ export function InvoiceViewDialog({
 
                                 {(invoice.warrantyType === 'duration' ||
                                   invoice.warrantyType === 'both') && (
-                                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                                    <span className="text-[12px] text-slate-500 font-normal">
+                                  <div className="flex justify-between border-b border-border pb-2">
+                                    <span className="text-[12px] text-muted-foreground font-normal">
                                       Coverage Period
                                     </span>
-                                    <span className="text-[12px] font-normal text-slate-900 uppercase">
+                                    <span className="text-[12px] font-normal text-foreground uppercase">
                                       {invoice.warrantyDurationValue} {invoice.warrantyDurationUnit}
                                     </span>
                                   </div>
@@ -1105,11 +1105,11 @@ export function InvoiceViewDialog({
 
                                 {(invoice.warrantyType === 'copies' ||
                                   invoice.warrantyType === 'both') && (
-                                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                                    <span className="text-[12px] text-slate-500 font-normal">
+                                  <div className="flex justify-between border-b border-border pb-2">
+                                    <span className="text-[12px] text-muted-foreground font-normal">
                                       Maximum Copy Limit
                                     </span>
-                                    <span className="text-[12px] font-normal text-slate-900">
+                                    <span className="text-[12px] font-normal text-foreground">
                                       {Number(invoice.warrantyCopyLimit || 0).toLocaleString()}{' '}
                                       COPIES
                                     </span>
@@ -1117,7 +1117,7 @@ export function InvoiceViewDialog({
                                 )}
 
                                 {invoice.warrantyType === 'both' && (
-                                  <p className="text-[10px] text-slate-400 font-normal italic pt-1">
+                                  <p className="text-[10px] text-muted-foreground font-normal italic pt-1">
                                     Whichever comes first — warranty ends as soon as either the
                                     coverage period or the copy limit above is reached.
                                   </p>
@@ -1125,12 +1125,12 @@ export function InvoiceViewDialog({
                               </div>
                             </div>
 
-                            <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-center">
-                              <p className="text-[10px] font-normal text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            <div className="bg-warning/10 p-5 rounded-2xl border border-warning/30 flex flex-col justify-center">
+                              <p className="text-[10px] font-normal text-warning uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-warning" />
                                 Terms & Limitations
                               </p>
-                              <p className="text-[11px] text-amber-900 leading-relaxed font-normal">
+                              <p className="text-[11px] text-warning leading-relaxed font-normal">
                                 Technical support and replacement parts are provided free of charge
                                 during the warranty period specified above. After the warranty
                                 period expires, or once the applicable usage limit is reached, all
@@ -1148,9 +1148,9 @@ export function InvoiceViewDialog({
                   {/* Company letterhead — the printed stationery artwork. */}
                   <LetterheadTop />
 
-                  <div className="px-12 pb-6 space-y-4 bg-white flex-1 overflow-visible">
+                  <div className="px-12 pb-6 space-y-4 bg-card flex-1 overflow-visible">
                     <div className="flex justify-between items-start pt-1">
-                      <div className="space-y-0 text-black">
+                      <div className="space-y-0 text-foreground">
                         <h3 className="text-[17px] font-black uppercase leading-tight">
                           {invoice.customerName || 'No Customer Assigned'}
                         </h3>
@@ -1160,17 +1160,17 @@ export function InvoiceViewDialog({
                           </h3>
                         ) : null}
                         {invoice.customerEmail && (
-                          <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                          <p className="text-[14px] font-bold text-foreground leading-tight">
                             Email: {invoice.customerEmail}
                           </p>
                         )}
                         {invoice.customerPhone && (
-                          <p className="text-[14px] font-bold text-gray-700 leading-tight">
+                          <p className="text-[14px] font-bold text-foreground leading-tight">
                             Phone: {invoice.customerPhone}
                           </p>
                         )}
                       </div>
-                      <div className="text-right space-y-0 text-black">
+                      <div className="text-right space-y-0 text-foreground">
                         <p className="text-[16px] font-black">
                           DATE:{' '}
                           {new Date(invoice.createdAt).toLocaleDateString('en-US', {
@@ -1186,9 +1186,9 @@ export function InvoiceViewDialog({
                       </div>
                     </div>
 
-                    <div className="relative flex items-center bg-[#CCCCCC] border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
-                      <div className="absolute left-0 top-0 bottom-0 w-3 bg-gray-500 border-r border-black"></div>
-                      <p className="w-full py-1.5 px-4 text-center text-[13px] font-black text-black uppercase tracking-tight ml-3">
+                    <div className="relative flex items-center bg-[var(--border)] border border-border shadow-[2px_2px_0px_color-mix(in srgb, var(--foreground) 10%, transparent)]">
+                      <div className="absolute left-0 top-0 bottom-0 w-3 bg-muted border-r border-border"></div>
+                      <p className="w-full py-1.5 px-4 text-center text-[13px] font-black text-foreground uppercase tracking-tight ml-3">
                         Sub:{' '}
                         {isSparePartSale
                           ? `Invoice for Replacement Consumables for ${firstModelName}`
@@ -1198,17 +1198,17 @@ export function InvoiceViewDialog({
 
                     <div className="space-y-6">
                       {isSparePartSale ? (
-                        <div className="border-[2px] border-black overflow-hidden bg-white">
+                        <div className="border-[2px] border-border overflow-hidden bg-card">
                           <table className="w-full border-collapse">
                             <thead>
-                              <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
-                                <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[25%]">
+                              <tr className="bg-[var(--accent)] border-b-[2px] border-border">
+                                <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-border w-[25%]">
                                   PART NAME
                                 </th>
-                                <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[40%]">
+                                <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-border w-[40%]">
                                   DESCRIPTION
                                 </th>
-                                <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[20%]">
+                                <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-border w-[20%]">
                                   YIELD*
                                 </th>
                                 <th className="text-center py-2 px-4 text-[13px] font-black w-[15%] underline">
@@ -1233,11 +1233,11 @@ export function InvoiceViewDialog({
                                   Number(item.discount || 0);
 
                                 return (
-                                  <tr key={idx} className="border-b border-black last:border-b-0">
-                                    <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
+                                  <tr key={idx} className="border-b border-border last:border-b-0">
+                                    <td className="border-r-[2px] border-border p-3 text-[12px] font-black text-center uppercase">
                                       {partName}
                                     </td>
-                                    <td className="border-r-[2px] border-black p-3 text-[12px] align-top text-left">
+                                    <td className="border-r-[2px] border-border p-3 text-[12px] align-top text-left">
                                       <div className="space-y-1.5">
                                         {description.split('\n').map((line: string, i: number) => {
                                           const trimmedLine = line.trim();
@@ -1246,10 +1246,10 @@ export function InvoiceViewDialog({
                                           return (
                                             <p
                                               key={i}
-                                              className={`flex gap-2 items-start ${isRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                              className={`flex gap-2 items-start ${isRed ? 'font-black text-destructive' : 'font-bold text-foreground'}`}
                                             >
                                               <span
-                                                className={`${isRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
+                                                className={`${isRed ? 'text-destructive' : 'text-foreground'} mt-0.5`}
                                               >
                                                 ➤
                                               </span>
@@ -1259,7 +1259,7 @@ export function InvoiceViewDialog({
                                         })}
                                       </div>
                                     </td>
-                                    <td className="border-r-[2px] border-black p-3 text-[12px] font-black text-center uppercase">
+                                    <td className="border-r-[2px] border-border p-3 text-[12px] font-black text-center uppercase">
                                       {yieldSpec}
                                     </td>
                                     <td className="p-3 text-[12px] font-black text-center">
@@ -1293,21 +1293,21 @@ export function InvoiceViewDialog({
                           return (
                             <div key={idx} className="space-y-4 relative">
                               <div className="pl-2">
-                                <h4 className="text-[16px] font-black text-black border-b-2 border-black inline-block pb-0.5">
+                                <h4 className="text-[16px] font-black text-foreground border-b-2 border-border inline-block pb-0.5">
                                   {idx + 1}. {productName}
                                 </h4>
                               </div>
-                              <div className="border-[2px] border-black overflow-hidden bg-white">
+                              <div className="border-[2px] border-border overflow-hidden bg-card">
                                 <table className="w-full border-collapse">
                                   <thead>
-                                    <tr className="bg-[#D1E5F4] border-b-[2px] border-black">
-                                      <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[65%]">
+                                    <tr className="bg-[var(--accent)] border-b-[2px] border-border">
+                                      <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-border w-[65%]">
                                         Description
                                       </th>
-                                      <th className="text-center py-2 px-2 text-[13px] font-black border-r-[2px] border-black w-[7.5%] underline">
+                                      <th className="text-center py-2 px-2 text-[13px] font-black border-r-[2px] border-border w-[7.5%] underline">
                                         Qty.
                                       </th>
-                                      <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-black w-[13.75%] underline">
+                                      <th className="text-center py-2 px-4 text-[13px] font-black border-r-[2px] border-border w-[13.75%] underline">
                                         Unit Price <br /> (Qr.)
                                       </th>
                                       <th className="text-center py-2 px-4 text-[13px] font-black w-[13.75%] underline">
@@ -1319,13 +1319,13 @@ export function InvoiceViewDialog({
                                     <tr>
                                       <td
                                         rowSpan={2}
-                                        className="border-r-[2px] border-black align-top p-5"
+                                        className="border-r-[2px] border-border align-top p-5"
                                         style={{ width: '65%' }}
                                       >
-                                        <p className="text-[15px] font-black text-black underline uppercase mb-3">
+                                        <p className="text-[15px] font-black text-foreground underline uppercase mb-3">
                                           {productName}
                                         </p>
-                                        <div className="text-[12px] text-black space-y-1.5 font-bold leading-relaxed">
+                                        <div className="text-[12px] text-foreground space-y-1.5 font-bold leading-relaxed">
                                           {productDesc ? (
                                             productDesc
                                               .split('\n')
@@ -1350,16 +1350,18 @@ export function InvoiceViewDialog({
                                                 return (
                                                   <p
                                                     key={i}
-                                                    className={`flex gap-2 ${shouldBeRed ? 'font-black text-[#D41B22]' : 'font-bold text-black'}`}
+                                                    className={`flex gap-2 ${shouldBeRed ? 'font-black text-destructive' : 'font-bold text-foreground'}`}
                                                   >
                                                     <span
-                                                      className={`${shouldBeRed ? 'text-[#D41B22]' : 'text-gray-900'} mt-0.5`}
+                                                      className={`${shouldBeRed ? 'text-destructive' : 'text-foreground'} mt-0.5`}
                                                     >
                                                       ➤
                                                     </span>
                                                     <span
                                                       className={
-                                                        isHeader ? 'underline decoration-black' : ''
+                                                        isHeader
+                                                          ? 'underline decoration-current'
+                                                          : ''
                                                       }
                                                     >
                                                       {trimmedLine}
@@ -1369,7 +1371,7 @@ export function InvoiceViewDialog({
                                               })
                                           ) : (
                                             <p className="flex gap-2">
-                                              <span className="text-gray-900 mt-0.5">➤</span>
+                                              <span className="text-foreground mt-0.5">➤</span>
                                               <span>
                                                 Standard specification as per brand guidelines.
                                               </span>
@@ -1379,7 +1381,7 @@ export function InvoiceViewDialog({
                                       </td>
                                       <td
                                         colSpan={3}
-                                        className="border-b-[2px] border-black text-center p-4"
+                                        className="border-b-[2px] border-border text-center p-4"
                                         style={{ height: '360px' }}
                                       >
                                         {image ? (
@@ -1394,20 +1396,20 @@ export function InvoiceViewDialog({
                                       </td>
                                     </tr>
                                     <tr>
-                                      <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
-                                        <p className="text-[15px] font-black text-black">
+                                      <td className="text-center align-middle py-5 border-r-[2px] border-border font-black text-foreground">
+                                        <p className="text-[15px] font-black text-foreground">
                                           {String(item.quantity || 1).padStart(2, '0')}
                                         </p>
                                       </td>
-                                      <td className="text-center align-middle py-5 border-r-[2px] border-black font-black text-black">
-                                        <p className="text-[15px] font-black text-black">
+                                      <td className="text-center align-middle py-5 border-r-[2px] border-border font-black text-foreground">
+                                        <p className="text-[15px] font-black text-foreground">
                                           {Number(item.unitPrice || 0).toLocaleString(undefined, {
                                             minimumFractionDigits: 2,
                                           })}
                                         </p>
                                       </td>
-                                      <td className="text-center align-middle py-5 font-black text-black">
-                                        <p className="text-[15px] font-black text-black">
+                                      <td className="text-center align-middle py-5 font-black text-foreground">
+                                        <p className="text-[15px] font-black text-foreground">
                                           {Number(
                                             (item.quantity || 1) * (item.unitPrice || 0),
                                           ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -1425,10 +1427,10 @@ export function InvoiceViewDialog({
 
                     <div className="space-y-8 mt-6">
                       <div className="pl-1">
-                        <h4 className="text-[14px] font-black text-black underline mb-3 uppercase tracking-wider">
+                        <h4 className="text-[14px] font-black text-foreground underline mb-3 uppercase tracking-wider">
                           TERMS AND CONDITIONS
                         </h4>
-                        <div className="space-y-1 text-[13px] font-bold text-black">
+                        <div className="space-y-1 text-[13px] font-bold text-foreground">
                           <div className="flex gap-4">
                             <span className="w-28 uppercase">1) PAYMENT</span>
                             <span>: CONFIRMED LPO</span>
@@ -1455,18 +1457,20 @@ export function InvoiceViewDialog({
                       </div>
 
                       <div className="pl-1 space-y-4">
-                        <p className="text-[13px] font-bold text-black">
+                        <p className="text-[13px] font-bold text-foreground">
                           For any further clarifications please feel free to contact the undersigned
                           on Mob: 70717282 or Email: mail@xerocare.com
                         </p>
                         <div className="space-y-1">
-                          <p className="text-[13px] font-bold text-black">With warm regards,</p>
+                          <p className="text-[13px] font-bold text-foreground">
+                            With warm regards,
+                          </p>
                           <div className="pt-2">
-                            <p className="text-[13px] font-black text-black uppercase">For</p>
-                            <p className="text-[13px] font-black text-black uppercase">
+                            <p className="text-[13px] font-black text-foreground uppercase">For</p>
+                            <p className="text-[13px] font-black text-foreground uppercase">
                               XEROCARE TECHNOLOGY L.L.C
                             </p>
-                            <p className="text-[13px] font-black text-black uppercase">
+                            <p className="text-[13px] font-black text-foreground uppercase">
                               DOHA QATAR
                             </p>
                           </div>
@@ -1485,22 +1489,24 @@ export function InvoiceViewDialog({
 
                     {/* Maintenance Summary */}
                     {(isRent || isLease) && (
-                      <div className="border-[2px] border-black p-4 bg-white mt-10">
-                        <h4 className="text-[14px] font-black text-black underline uppercase mb-3 text-center">
+                      <div className="border-[2px] border-border p-4 bg-card mt-10">
+                        <h4 className="text-[14px] font-black text-foreground underline uppercase mb-3 text-center">
                           Contract Terms Summary
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                           <div>
-                            <p className="text-[10px] font-black text-gray-500 uppercase">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase">
                               First Month Advance Payment
                             </p>
-                            <p className="text-sm font-black text-black">
+                            <p className="text-sm font-black text-foreground">
                               {getActiveCurrency()} {(invoice.advanceAmount || 0).toLocaleString()}
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-gray-500 uppercase">Period</p>
-                            <p className="text-sm font-black text-black">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase">
+                              Period
+                            </p>
+                            <p className="text-sm font-black text-foreground">
                               {invoice.effectiveFrom
                                 ? new Date(invoice.effectiveFrom).toLocaleDateString()
                                 : 'N/A'}{' '}
@@ -1511,10 +1517,10 @@ export function InvoiceViewDialog({
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-gray-500 uppercase">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase">
                               Monthly
                             </p>
-                            <p className="text-sm font-black text-black">
+                            <p className="text-sm font-black text-foreground">
                               {getActiveCurrency()}{' '}
                               {(
                                 invoice.monthlyRent ||
@@ -1528,8 +1534,8 @@ export function InvoiceViewDialog({
                     )}
 
                     <div className="flex justify-end pt-2">
-                      <div className="border-[2px] border-black px-8 py-3 bg-[#D1E5F4] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                        <p className="text-xl font-black text-black uppercase tracking-tight">
+                      <div className="border-[2px] border-border px-8 py-3 bg-[var(--accent)] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                        <p className="text-xl font-black text-foreground uppercase tracking-tight">
                           Total: {getActiveCurrency()}{' '}
                           {Number(invoice.totalAmount || 0).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
@@ -1541,40 +1547,40 @@ export function InvoiceViewDialog({
 
                   {/* Contract Rental Value & Initial Payment */}
                   {(isRent || isLease) && contractMonthsInvoice > 0 && (
-                    <div className="px-12 py-6 bg-blue-50/30 border-t border-blue-100">
+                    <div className="px-12 py-6 bg-primary/10 border-t border-primary/30">
                       <div className="grid grid-cols-2 gap-8">
                         <div>
-                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">
+                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-3">
                             Contract Rental Value
                           </p>
-                          <div className="bg-white rounded-lg p-4 border border-blue-100">
+                          <div className="bg-card rounded-lg p-4 border border-primary/30">
                             <div className="flex justify-between items-center mb-2">
-                              <span className="text-[11px] text-slate-600">
+                              <span className="text-[11px] text-foreground">
                                 Monthly Rent × {contractMonthsInvoice} Months
                               </span>
-                              <span className="text-[14px] font-black text-blue-700">
+                              <span className="text-[14px] font-black text-primary">
                                 {getActiveCurrency()}{' '}
                                 {contractRentalValueInvoice.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
                                 })}
                               </span>
                             </div>
-                            <p className="text-[9px] text-slate-400 italic">
+                            <p className="text-[9px] text-muted-foreground italic">
                               Total base rental across all contract periods.
                             </p>
                           </div>
                         </div>
                         <div>
-                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">
+                          <p className="text-[10px] font-black text-success uppercase tracking-widest mb-3">
                             Initial Payment
                           </p>
-                          <div className="bg-white rounded-lg p-4 border border-emerald-100 space-y-2">
+                          <div className="bg-card rounded-lg p-4 border border-success/30 space-y-2">
                             {!isArrearsInvoice && (
                               <div className="flex justify-between">
-                                <span className="text-[11px] text-slate-600">
+                                <span className="text-[11px] text-foreground">
                                   First Month Advance
                                 </span>
-                                <span className="text-[11px] font-semibold text-slate-900">
+                                <span className="text-[11px] font-semibold text-foreground">
                                   {getActiveCurrency()}{' '}
                                   {firstMonthAdvanceInvoice.toLocaleString(undefined, {
                                     minimumFractionDigits: 2,
@@ -1584,27 +1590,27 @@ export function InvoiceViewDialog({
                             )}
                             {isArrearsInvoice && (
                               <div className="flex justify-between">
-                                <span className="text-[11px] text-slate-600">
+                                <span className="text-[11px] text-foreground">
                                   First Month Advance
                                 </span>
-                                <span className="text-[11px] text-slate-400 italic">
+                                <span className="text-[11px] text-muted-foreground italic">
                                   Not Applicable (Postpaid)
                                 </span>
                               </div>
                             )}
                             <div className="flex justify-between">
-                              <span className="text-[11px] text-slate-600">Security Deposit</span>
-                              <span className="text-[11px] font-semibold text-slate-900">
+                              <span className="text-[11px] text-foreground">Security Deposit</span>
+                              <span className="text-[11px] font-semibold text-foreground">
                                 {securityDepositInvoice > 0
                                   ? `${getActiveCurrency()} ${securityDepositInvoice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                   : 'None'}
                               </span>
                             </div>
-                            <div className="border-t border-emerald-200 pt-2 flex justify-between">
-                              <span className="text-[11px] font-black text-emerald-800 uppercase">
+                            <div className="border-t border-success/30 pt-2 flex justify-between">
+                              <span className="text-[11px] font-black text-success uppercase">
                                 Initial Amount Payable
                               </span>
-                              <span className="text-[13px] font-black text-emerald-700">
+                              <span className="text-[13px] font-black text-success">
                                 {getActiveCurrency()}{' '}
                                 {initialAmountPayableInvoice.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
@@ -1618,47 +1624,47 @@ export function InvoiceViewDialog({
                       {/* Monthly Schedule */}
                       {monthlyScheduleInvoice.length > 0 && (
                         <div className="mt-6">
-                          <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-3">
+                          <p className="text-[10px] font-black text-lease uppercase tracking-widest mb-3">
                             Contract Rental Schedule
                           </p>
-                          <table className="w-full text-xs border border-slate-200 border-collapse">
+                          <table className="w-full text-xs border border-border border-collapse">
                             <thead>
-                              <tr className="bg-slate-50">
-                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                              <tr className="bg-muted">
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                                   Period
                                 </th>
-                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                                   Start Date
                                 </th>
-                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                                   End Date
                                 </th>
-                                <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                                   Base Rent
                                 </th>
                               </tr>
                             </thead>
                             <tbody>
                               {monthlyScheduleInvoice.map((row) => (
-                                <tr key={row.month} className="border-b border-slate-100">
-                                  <td className="px-3 py-2 font-semibold text-slate-800">
+                                <tr key={row.month} className="border-b border-border">
+                                  <td className="px-3 py-2 font-semibold text-foreground">
                                     Month {row.month} — {row.label}
                                   </td>
-                                  <td className="px-3 py-2 text-slate-600">
+                                  <td className="px-3 py-2 text-foreground">
                                     {row.start.toLocaleDateString('en-GB', {
                                       day: '2-digit',
                                       month: 'short',
                                       year: 'numeric',
                                     })}
                                   </td>
-                                  <td className="px-3 py-2 text-slate-600">
+                                  <td className="px-3 py-2 text-foreground">
                                     {row.end.toLocaleDateString('en-GB', {
                                       day: '2-digit',
                                       month: 'short',
                                       year: 'numeric',
                                     })}
                                   </td>
-                                  <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                                  <td className="px-3 py-2 text-right font-semibold text-foreground">
                                     {getActiveCurrency()}{' '}
                                     {row.baseRent.toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
@@ -1666,14 +1672,14 @@ export function InvoiceViewDialog({
                                   </td>
                                 </tr>
                               ))}
-                              <tr className="bg-blue-50/50">
+                              <tr className="bg-primary/10">
                                 <td
                                   colSpan={3}
-                                  className="px-3 py-2 text-right text-[11px] font-black uppercase tracking-widest text-blue-700"
+                                  className="px-3 py-2 text-right text-[11px] font-black uppercase tracking-widest text-primary"
                                 >
                                   Total Contract Rental Value
                                 </td>
-                                <td className="px-3 py-2 text-right text-[13px] font-black text-blue-700">
+                                <td className="px-3 py-2 text-right text-[13px] font-black text-primary">
                                   {getActiveCurrency()}{' '}
                                   {contractRentalValueInvoice.toLocaleString(undefined, {
                                     minimumFractionDigits: 2,
@@ -1697,8 +1703,8 @@ export function InvoiceViewDialog({
             {invoice.creditNotes &&
               showReturnSidebar &&
               invoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED') && (
-                <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-violet-100 bg-violet-50/20 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
-                  <div className="flex items-center gap-2 text-violet-700">
+                <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-lease/30 bg-lease/10 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
+                  <div className="flex items-center gap-2 text-lease">
                     <RotateCcw className="h-5 w-5" />
                     <h3 className="text-sm font-black uppercase tracking-widest">
                       Returns &amp; Exchange
@@ -1714,79 +1720,81 @@ export function InvoiceViewDialog({
                         (cn.replacementDiscount || 0);
                       return (
                         <div key={cn.id} className="space-y-4">
-                          <div className="rounded-xl border border-violet-100 bg-white p-4 shadow-sm space-y-4">
+                          <div className="rounded-xl border border-lease/30 bg-card p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
-                              <Badge className="bg-violet-600 text-white border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                              <Badge className="bg-lease text-lease-foreground border-none text-[9px] font-black tracking-widest px-2 py-0.5">
                                 {cn.type.replace('_', ' ')}
                               </Badge>
-                              <span className="text-[10px] font-bold text-slate-400">
+                              <span className="text-[10px] font-bold text-muted-foreground">
                                 {cn.creditNoteNo}
                               </span>
                             </div>
 
                             <div className="space-y-3">
                               {/* Returned */}
-                              <div className="p-3 rounded-lg bg-rose-50 border border-rose-100">
-                                <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-1">
+                              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                                <p className="text-[9px] font-black text-destructive uppercase tracking-widest mb-1">
                                   ↩ Returned
                                 </p>
-                                <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                                <p className="text-xs font-bold text-foreground line-clamp-1">
                                   {cn.productName}
                                 </p>
-                                <p className="text-[11px] font-black text-rose-600 mt-1">
+                                <p className="text-[11px] font-black text-destructive mt-1">
                                   {formatCurrency(cn.productAmount, currency)}
                                 </p>
                               </div>
 
                               <div className="flex justify-center -my-2 relative z-10">
-                                <div className="bg-white p-1 rounded-full border border-violet-100 shadow-sm">
-                                  <MoveHorizontal className="h-4 w-4 text-violet-400" />
+                                <div className="bg-card p-1 rounded-full border border-lease/30 shadow-sm">
+                                  <MoveHorizontal className="h-4 w-4 text-lease" />
                                 </div>
                               </div>
 
                               {/* Replacement */}
-                              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">
+                              <div className="p-3 rounded-lg bg-success/10 border border-success/30">
+                                <p className="text-[9px] font-black text-success uppercase tracking-widest mb-1">
                                   ↗ Replacement
                                 </p>
-                                <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                                <p className="text-xs font-bold text-foreground line-clamp-1">
                                   {cn.replacementProductName || 'New Product'}
                                 </p>
-                                <p className="text-[11px] font-black text-emerald-600 mt-1">
+                                <p className="text-[11px] font-black text-success mt-1">
                                   {formatCurrency(cn.replacementAmount || 0, currency)}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="pt-3 border-t border-slate-100 space-y-1.5">
+                            <div className="pt-3 border-t border-border space-y-1.5">
                               <div className="flex justify-between text-xs">
-                                <span className="text-slate-500 font-medium">New Price</span>
-                                <span className="font-bold text-slate-700">
+                                <span className="text-muted-foreground font-medium">New Price</span>
+                                <span className="font-bold text-foreground">
                                   {formatCurrency(cn.replacementAmount || 0, currency)}
                                 </span>
                               </div>
                               <div className="flex justify-between text-xs">
-                                <span className="text-slate-500 font-medium">Returned Credit</span>
-                                <span className="font-bold text-rose-600">
+                                <span className="text-muted-foreground font-medium">
+                                  Returned Credit
+                                </span>
+                                <span className="font-bold text-destructive">
                                   − {formatCurrency(cn.productAmount, currency)}
                                 </span>
                               </div>
                               {cn.replacementDiscount > 0 && (
                                 <div className="flex justify-between text-xs">
-                                  <span className="text-slate-500 font-medium">
+                                  <span className="text-muted-foreground font-medium">
                                     Exchange Discount
                                   </span>
-                                  <span className="font-bold text-rose-500">
+                                  <span className="font-bold text-destructive">
                                     − {formatCurrency(cn.replacementDiscount, currency)}
                                   </span>
                                 </div>
                               )}
-                              <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
-                                <span className="text-[10px] font-black text-violet-600 uppercase">
+                              <div className="pt-2 border-t border-border flex justify-between items-center">
+                                <span className="text-[10px] font-black text-lease uppercase">
                                   Net Variation
                                 </span>
                                 <span
-                                  className={`text-sm font-black ${variation >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}
+                                  className={`text-sm font-black ${variation >= 0 ? 'text-warning' : 'text-success'}`}
                                 >
                                   {variation >= 0 ? '+' : ''}
                                   {formatCurrency(variation, currency)}
@@ -1802,46 +1810,46 @@ export function InvoiceViewDialog({
 
             {/* Service Ticket Details Sidebar */}
             {invoice.serviceTicketId && (
-              <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-slate-100 bg-slate-50/50 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
-                <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-3">
-                  <ClipboardList className="h-5 w-5 text-violet-600" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">
+              <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-border bg-muted/50 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
+                <div className="flex items-center gap-2 text-foreground border-b border-border pb-3">
+                  <ClipboardList className="h-5 w-5 text-lease" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">
                     Service Ticket Context
                   </h3>
                 </div>
 
                 {loadingTicket ? (
                   <div className="flex items-center space-x-2 text-xs text-muted-foreground py-4">
-                    <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+                    <Loader2 className="h-4 w-4 animate-spin text-lease" />
                     <span>Loading ticket details...</span>
                   </div>
                 ) : ticketDetails ? (
                   <div className="space-y-4">
-                    <div className="rounded-xl border border-slate-150 bg-white p-4 shadow-sm space-y-4">
+                    <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-4">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Ticket Number
                         </span>
-                        <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 font-mono text-[10px] px-2 py-0.5 rounded border-none">
+                        <Badge className="bg-muted text-foreground hover:bg-muted font-mono text-[10px] px-2 py-0.5 rounded border-none">
                           {ticketDetails.ticketNumber}
                         </Badge>
                       </div>
 
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Complaint Registered
                         </span>
-                        <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 font-medium">
+                        <p className="text-xs text-foreground leading-relaxed bg-muted p-2.5 rounded border border-border font-medium">
                           {ticketDetails.issueDescription || 'No complaint details provided.'}
                         </p>
                       </div>
 
                       {ticketDetails.problemFound && (
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Problem Found
                           </span>
-                          <span className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 block">
+                          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1.5 rounded border border-border block">
                             {ticketDetails.problemFound}
                           </span>
                         </div>
@@ -1849,10 +1857,10 @@ export function InvoiceViewDialog({
 
                       {ticketDetails.rootCause && (
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Root Cause
                           </span>
-                          <span className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 block">
+                          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1.5 rounded border border-border block">
                             {ticketDetails.rootCause}
                           </span>
                         </div>
@@ -1861,10 +1869,10 @@ export function InvoiceViewDialog({
                       {ticketDetails.meterReadingAtService !== undefined &&
                         ticketDetails.meterReadingAtService !== null && (
                           <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                               Meter Reading (at Service)
                             </span>
-                            <span className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 block font-mono">
+                            <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1.5 rounded border border-border block font-mono">
                               {ticketDetails.meterReadingAtService}
                             </span>
                           </div>
@@ -1872,10 +1880,10 @@ export function InvoiceViewDialog({
 
                       {ticketDetails.diagnosisNotes && (
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Technician Diagnosis Notes
                           </span>
-                          <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 whitespace-pre-wrap font-medium">
+                          <p className="text-xs text-foreground leading-relaxed bg-muted p-2.5 rounded border border-border whitespace-pre-wrap font-medium">
                             {ticketDetails.diagnosisNotes}
                           </p>
                         </div>
@@ -1883,10 +1891,10 @@ export function InvoiceViewDialog({
 
                       {ticketDetails.technicianNoteToFinance && (
                         <div>
-                          <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                          <span className="text-[10px] font-black text-warning uppercase tracking-wider block mb-1 flex items-center gap-1">
                             📝 Note to Finance
                           </span>
-                          <p className="text-xs text-amber-900 leading-relaxed bg-amber-50/50 p-2.5 rounded border border-amber-200/50 whitespace-pre-wrap font-medium">
+                          <p className="text-xs text-warning leading-relaxed bg-warning/10 p-2.5 rounded border border-warning/30 whitespace-pre-wrap font-medium">
                             {ticketDetails.technicianNoteToFinance}
                           </p>
                         </div>
@@ -1894,20 +1902,22 @@ export function InvoiceViewDialog({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-xs text-red-500 py-4">Failed to load ticket details.</div>
+                  <div className="text-xs text-destructive py-4">
+                    Failed to load ticket details.
+                  </div>
                 )}
               </div>
             )}
           </div>
 
           {/* Footer Actions */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+          <div className="px-6 py-4 bg-muted border-t border-border flex justify-between items-center">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="font-black text-[11px] uppercase tracking-widest text-slate-500"
+                className="font-black text-[11px] uppercase tracking-widest text-muted-foreground"
               >
                 Close
               </Button>
@@ -1917,7 +1927,7 @@ export function InvoiceViewDialog({
                     variant="outline"
                     size="sm"
                     onClick={() => setShowingOriginalInvoice(false)}
-                    className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-50 font-black text-[11px] uppercase tracking-widest"
+                    className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 font-black text-[11px] uppercase tracking-widest"
                   >
                     <RotateCcw size={13} />
                     Back to Return Invoice
@@ -1928,8 +1938,8 @@ export function InvoiceViewDialog({
                     onClick={() => setShowReturnSidebar(!showReturnSidebar)}
                     className={`gap-2 font-black text-[11px] uppercase tracking-widest ${
                       showReturnSidebar
-                        ? 'bg-violet-600 text-white hover:bg-violet-700 border-none'
-                        : 'border-violet-200 text-violet-700 hover:bg-violet-50'
+                        ? 'bg-lease text-lease-foreground hover:bg-lease/90 border-none'
+                        : 'border-lease/30 text-lease hover:bg-lease/10'
                     }`}
                   >
                     <RotateCcw size={13} className={showReturnSidebar ? 'animate-spin-once' : ''} />
@@ -1942,7 +1952,7 @@ export function InvoiceViewDialog({
               {onReject && !isRejecting && (
                 <Button
                   variant="outline"
-                  className="text-red-600 border-red-200"
+                  className="text-destructive border-destructive/30"
                   onClick={() => setIsRejecting(true)}
                 >
                   Reject
@@ -1952,7 +1962,7 @@ export function InvoiceViewDialog({
                 <div className="flex items-center gap-2">
                   <input
                     placeholder="Reason..."
-                    className="h-9 border border-red-200 rounded px-2 text-xs"
+                    className="h-9 border border-destructive/30 rounded px-2 text-xs"
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
                   />
@@ -1978,7 +1988,7 @@ export function InvoiceViewDialog({
               )}
               {onApprove && (
                 <Button
-                  className="bg-emerald-600 text-white font-bold"
+                  className="bg-success text-success-foreground font-bold"
                   disabled={!!deciding}
                   onClick={() => void runDecision('approve', onApprove)}
                 >
@@ -1988,12 +1998,12 @@ export function InvoiceViewDialog({
               )}
               {/* Distribution Buttons */}
               {showDistribution && (
-                <div className="flex gap-2 border-l border-slate-200 pl-4 ml-2">
+                <div className="flex gap-2 border-l border-border pl-4 ml-2">
                   <Button
                     variant="outline"
                     onClick={() => handleSendCustomer('EMAIL')}
                     disabled={isSendingCustomer}
-                    className="h-9 px-4 rounded-md font-black uppercase text-[10px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                    className="h-9 px-4 rounded-md font-black uppercase text-[10px] tracking-widest border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
                   >
                     <Mail size={14} /> Gmail
                   </Button>
@@ -2001,7 +2011,7 @@ export function InvoiceViewDialog({
                     variant="outline"
                     onClick={() => handleSendCustomer('WHATSAPP')}
                     disabled={isSendingCustomer}
-                    className="h-9 px-4 rounded-md font-black uppercase text-[10px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                    className="h-9 px-4 rounded-md font-black uppercase text-[10px] tracking-widest border-success/30 text-success hover:bg-success/10 gap-2"
                   >
                     <Phone size={14} /> WhatsApp
                   </Button>

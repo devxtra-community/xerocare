@@ -57,24 +57,24 @@ function statusChip(row: CreditNoteSettlement) {
     // shows in Receivables/Payables. Saying just "Rejected" would read as "closed".
     return {
       label: row.outstanding > 0 ? 'Rejected — still outstanding' : 'Rejected',
-      cls: 'bg-red-100 text-red-700 border-red-200',
+      cls: 'bg-destructive/10 text-destructive border-destructive/30',
     };
   }
   if (row.approvalStatus === 'PENDING') {
     return {
       label: 'Pending Accounts Approval',
-      cls: 'bg-amber-100 text-amber-800 border-amber-200',
+      cls: 'bg-warning/10 text-warning border-warning/30',
     };
   }
   if (row.settlementStatus === 'SETTLED') {
-    return { label: 'Paid / Settled', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    return { label: 'Paid / Settled', cls: 'bg-success/10 text-success border-success/30' };
   }
   if (row.settlementStatus === 'PARTIAL') {
-    return { label: 'Partly Settled', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
+    return { label: 'Partly Settled', cls: 'bg-primary/10 text-primary border-primary/30' };
   }
   return {
     label: 'Approved — Payment Pending',
-    cls: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    cls: 'bg-primary/10 text-primary border-primary/30',
   };
 }
 
@@ -84,8 +84,8 @@ function DirectionChip({ row }: { row: CreditNoteSettlement }) {
     <span
       className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
         incoming
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          : 'border-orange-200 bg-orange-50 text-orange-700'
+          ? 'border-success/30 bg-success/10 text-success'
+          : 'border-warning/30 bg-warning/10 text-warning'
       }`}
     >
       {incoming ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
@@ -151,10 +151,10 @@ function SettleModal({
     ? null
     : insufficientBalanceError(row.outstanding, selectedAccount);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-bold text-slate-800">
+          <h2 className="font-bold text-foreground">
             {incoming ? 'Collect from Customer' : 'Pay Customer Refund'}
           </h2>
           <button onClick={onClose}>
@@ -173,7 +173,7 @@ function SettleModal({
                 <span>{formatCurrency(row.netAmount, row.currency || currency)}</span>
               </div>
               {row.discountAmount > 0 && (
-                <div className="flex justify-between text-emerald-700">
+                <div className="flex justify-between text-success">
                   <span>Discount</span>
                   <span>− {formatCurrency(row.discountAmount, row.currency || currency)}</span>
                 </div>
@@ -250,7 +250,7 @@ function SettleModal({
           </div>
         </div>
         {balanceWarning && (
-          <p className="px-6 pb-1 text-xs font-medium text-red-600">{balanceWarning}</p>
+          <p className="px-6 pb-1 text-xs font-medium text-destructive">{balanceWarning}</p>
         )}
         <div className="flex gap-3 px-6 pb-5">
           <Button variant="outline" onClick={onClose} className="flex-1">
@@ -319,7 +319,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-bold text-slate-800">Credit Note Settlements</h3>
+          <h3 className="font-bold text-foreground">Credit Note Settlements</h3>
           <p className="text-xs text-muted-foreground">
             Refunds and exchange differences awaiting Accounts approval. No money moves until a
             request is approved and then settled.
@@ -327,7 +327,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
         </div>
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
-            <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+            <span className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-[11px] font-semibold text-warning">
               {pendingCount} awaiting approval
             </span>
           )}
@@ -384,7 +384,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="pl-4">
-                        <div className="font-mono text-xs text-slate-700">{r.referenceNo}</div>
+                        <div className="font-mono text-xs text-foreground">{r.referenceNo}</div>
                         <div className="font-mono text-[10px] text-muted-foreground">
                           {r.creditNoteNo}
                         </div>
@@ -399,7 +399,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                       <TableCell className="text-right text-sm">
                         {formatCurrency(r.netAmount, r.currency || currency)}
                       </TableCell>
-                      <TableCell className="text-right text-sm text-emerald-700">
+                      <TableCell className="text-right text-sm text-success">
                         {r.discountAmount > 0
                           ? `− ${formatCurrency(r.discountAmount, r.currency || currency)}`
                           : '—'}
@@ -407,7 +407,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                       <TableCell className="text-right text-sm">
                         {formatCurrency(r.taxAmount, r.currency || currency)}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-bold text-slate-800">
+                      <TableCell className="text-right text-sm font-bold text-foreground">
                         {formatCurrency(r.amount, r.currency || currency)}
                       </TableCell>
                       <TableCell>
@@ -417,7 +417,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                           {chip.label}
                         </span>
                         {r.rejectionReason && (
-                          <div className="mt-1 max-w-48 text-[10px] text-red-600">
+                          <div className="mt-1 max-w-48 text-[10px] text-destructive">
                             {r.rejectionReason}
                           </div>
                         )}
@@ -437,7 +437,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                               <button
                                 onClick={() => approveMut.mutate(r.id)}
                                 disabled={approveMut.isPending}
-                                className="rounded-md p-1.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
+                                className="rounded-md p-1.5 text-success hover:bg-success/10 disabled:opacity-50"
                                 title="Approve"
                               >
                                 <Check className="h-3.5 w-3.5" />
@@ -451,7 +451,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                                     rejectMut.mutate({ id: r.id, reason: reason.trim() });
                                 }}
                                 disabled={rejectMut.isPending}
-                                className="rounded-md p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                                 title="Reject"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -461,7 +461,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                           {canSettle && (
                             <button
                               onClick={() => setSettling(r)}
-                              className="rounded-md p-1.5 text-amber-600 hover:bg-amber-50"
+                              className="rounded-md p-1.5 text-warning hover:bg-warning/10"
                               title={
                                 r.paymentDirection === 'CUSTOMER_TO_COMPANY'
                                   ? 'Record collection'

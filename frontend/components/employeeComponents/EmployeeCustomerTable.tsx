@@ -193,27 +193,27 @@ export default function EmployeeCustomerTable() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-primary">Customer Management</h2>
-          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider">
+          <h2 className="text-xl font-medium text-primary">Customer Management</h2>
+          <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
             {customers.length} Total
           </span>
         </div>
         <Button
           onClick={handleAddCustomer}
-          className="h-10 rounded-lg bg-primary hover:bg-primary/90 text-white shadow-md gap-2"
+          className="h-10 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-md gap-2"
         >
           <Plus className="h-4 w-4" /> Add Customer
         </Button>
       </div>
 
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Search Customers
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name or ID..."
                 value={searchTerm}
@@ -223,7 +223,7 @@ export default function EmployeeCustomerTable() {
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Type
             </label>
             <Select
@@ -241,13 +241,13 @@ export default function EmployeeCustomerTable() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Actions
             </label>
             <Button
               variant="outline"
               onClick={fetchCustomers}
-              className="h-9 text-xs w-full justify-center gap-2 border-gray-200 hover:bg-gray-50"
+              className="h-9 text-xs w-full justify-center gap-2 border-border hover:bg-muted"
             >
               Refresh Data
             </Button>
@@ -289,10 +289,10 @@ export default function EmployeeCustomerTable() {
                 </TableRow>
               ) : (
                 paginatedCustomers.map((customer, index) => (
-                  <TableRow key={customer.id} className={index % 2 ? 'bg-blue-50/20' : 'bg-card'}>
+                  <TableRow key={customer.id} className={index % 2 ? 'bg-primary/10' : 'bg-card'}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs border border-blue-200">
+                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-primary font-bold text-xs border border-primary/30">
                           {customer.name.charAt(0)}
                         </div>
                         <span className="text-sm font-semibold text-foreground">
@@ -311,8 +311,8 @@ export default function EmployeeCustomerTable() {
                         variant="secondary"
                         className={`font-semibold border-none ${
                           (customer.customerType ?? 'B2C') === 'B2B'
-                            ? 'bg-indigo-100 text-indigo-700'
-                            : 'bg-slate-100 text-slate-600'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-foreground'
                         }`}
                       >
                         {customer.customerType ?? 'B2C'}
@@ -323,8 +323,8 @@ export default function EmployeeCustomerTable() {
                         variant="secondary"
                         className={`font-semibold border-none ${
                           customer.isActive
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-destructive/10 text-destructive'
                         }`}
                       >
                         {customer.isActive ? 'ACTIVE' : 'INACTIVE'}
@@ -346,7 +346,7 @@ export default function EmployeeCustomerTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           onClick={() => router.push(`/employee/customers/${customer.id}`)}
                           title="View Customer"
                         >
@@ -355,7 +355,7 @@ export default function EmployeeCustomerTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           onClick={() =>
                             router.push(
                               isManager
@@ -374,7 +374,7 @@ export default function EmployeeCustomerTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           onClick={() => handleEditCustomer(customer)}
                           title="Edit Customer"
                         >
@@ -383,7 +383,7 @@ export default function EmployeeCustomerTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                           onClick={() => handleDeleteClick(customer.id)}
                           title="Delete Customer"
                         >

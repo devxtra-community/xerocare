@@ -20,12 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  APPROVED: 'bg-emerald-100 text-emerald-700',
-  PAID: 'bg-blue-100 text-blue-700',
-  REJECTED: 'bg-red-100 text-red-700',
+  PENDING: 'bg-warning/10 text-warning',
+  APPROVED: 'bg-success/10 text-success',
+  PAID: 'bg-primary/10 text-primary',
+  REJECTED: 'bg-destructive/10 text-destructive',
 };
 
 function ExpensesContent() {
@@ -77,6 +79,7 @@ function ExpensesContent() {
     const matchSearch = !search || e.description?.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+  const expensePaging = useTablePagination(filtered, `${search}|${catFilter}`, 10);
 
   const total = filtered.reduce((s, e) => s + Number(e.amount), 0);
   const pending = filtered.filter((e) => e.status === 'PENDING').length;
@@ -102,15 +105,17 @@ function ExpensesContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expenses — Consolidated</h1>
-          <p className="text-sm text-gray-500">All branches</p>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">
+            Expenses — Consolidated
+          </h1>
+          <p className="text-sm text-muted-foreground">All branches</p>
         </div>
         <button
           onClick={() => setShowStatement(true)}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted"
         >
           <FileText className="h-4 w-4" /> Generate Statement
         </button>
@@ -134,12 +139,12 @@ function ExpensesContent() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Category Breakdown</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Category Breakdown</h3>
           <DonutChart data={charts?.categoryDonut ?? []} height={220} currency={currency} />
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Trend</h3>
+        <div className="bg-card rounded-xl border p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Monthly Trend</h3>
           <StackedBarChart
             data={charts?.monthlyTrend ?? []}
             xKey="month"
@@ -150,19 +155,19 @@ function ExpensesContent() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <div className="flex items-center gap-3 p-4 border-b">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search expenses..."
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger className="border-orange-200 text-sm">
+            <SelectTrigger className="border-warning/30 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -176,11 +181,11 @@ function ExpensesContent() {
           </Select>
         </div>
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400">Loading…</div>
+          <div className="p-8 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   {['Expense #', 'Date', 'Category', 'Description', 'Amount', 'Status'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium">
@@ -192,14 +197,16 @@ function ExpensesContent() {
               <tbody className="divide-y">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       No expenses found
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.expenseNo}</td>
+                  expensePaging.pageRows.map((e) => (
+                    <tr key={e.id} className="hover:bg-muted">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {e.expenseNo}
+                      </td>
                       <td className="px-4 py-3">{e.date?.slice(0, 10)}</td>
                       <td className="px-4 py-3">{e.category.replace(/_/g, ' ')}</td>
                       <td className="px-4 py-3 max-w-[200px] truncate">{e.description}</td>
@@ -208,7 +215,7 @@ function ExpensesContent() {
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[e.status] ?? 'bg-gray-100 text-gray-700'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[e.status] ?? 'bg-muted text-foreground'}`}
                         >
                           {e.status}
                         </span>
@@ -218,6 +225,15 @@ function ExpensesContent() {
                 )}
               </tbody>
             </table>
+            {expensePaging.total > expensePaging.pageSize && (
+              <Pagination
+                page={expensePaging.page}
+                totalPages={expensePaging.totalPages}
+                total={expensePaging.total}
+                limit={expensePaging.pageSize}
+                onPageChange={expensePaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>
@@ -235,7 +251,7 @@ function ExpensesContent() {
 
 export default function AdminExpensesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <ExpensesContent />
     </Suspense>
   );

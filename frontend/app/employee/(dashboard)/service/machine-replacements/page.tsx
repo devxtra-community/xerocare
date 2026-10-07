@@ -137,9 +137,9 @@ function MachineReplacementsContent() {
   };
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-3 sm:p-4 md:p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-3 sm:p-4 md:p-6 space-y-6">
       <div className="flex flex-col space-y-1">
-        <h3 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
           Machine Replacements
         </h3>
         <p className="text-sm text-muted-foreground font-medium">
@@ -147,9 +147,9 @@ function MachineReplacementsContent() {
         </p>
       </div>
 
-      <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden p-4">
+      <div className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden p-4">
         <div className="overflow-x-auto mb-2">
-          <Table className="min-w-[980px] sm:min-w-full">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[980px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">REQUEST</TableHead>
@@ -181,24 +181,24 @@ function MachineReplacementsContent() {
               ) : (
                 rows.map((r) => (
                   <TableRow key={r.id} className="hover:bg-muted/50 transition-colors">
-                    <TableCell className="font-mono text-xs font-bold text-blue-600">
+                    <TableCell className="font-mono text-xs font-bold text-primary">
                       {r.requestNo}
                     </TableCell>
-                    <TableCell className="font-bold text-slate-700 whitespace-nowrap">
+                    <TableCell className="font-bold text-foreground whitespace-nowrap">
                       {r.customerName}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-slate-600">
+                    <TableCell className="font-mono text-xs text-foreground">
                       {r.contractNumber}
                     </TableCell>
-                    <TableCell className="font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                      <span className="text-red-600">{r.oldSerialNumber}</span>
+                    <TableCell className="font-mono text-[11px] text-foreground whitespace-nowrap">
+                      <span className="text-destructive">{r.oldSerialNumber}</span>
                       {' → '}
-                      <span className="text-emerald-700">{r.newSerialNumber ?? '—'}</span>
+                      <span className="text-success">{r.newSerialNumber ?? '—'}</span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {fmt(r.selectedAt)}
                     </TableCell>
-                    <TableCell className="text-slate-600 whitespace-nowrap">
+                    <TableCell className="text-foreground whitespace-nowrap">
                       {r.technicianName ?? '—'}
                     </TableCell>
                     {/* How long the technician was on site. "In progress" while their
@@ -206,15 +206,15 @@ function MachineReplacementsContent() {
                         needing the technician to tell them. */}
                     <TableCell className="whitespace-nowrap">
                       {r.workDurationSeconds != null ? (
-                        <span className="font-mono text-xs font-bold text-slate-700">
+                        <span className="font-mono text-xs font-bold text-foreground">
                           {formatWorkDuration(r.workDurationSeconds)}
                         </span>
                       ) : r.workStartedAt ? (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-success">
                           In progress
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-300">—</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -227,7 +227,7 @@ function MachineReplacementsContent() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 rounded-lg text-blue-500 hover:bg-blue-50"
+                          className="h-8 w-8 p-0 rounded-lg text-primary hover:bg-primary/10"
                           title="View replacement"
                           onClick={() => setViewingId(r.id)}
                         >
@@ -239,7 +239,7 @@ function MachineReplacementsContent() {
                             variant="ghost"
                             size="sm"
                             disabled={busyId === r.id}
-                            className="h-8 w-8 p-0 rounded-lg text-indigo-600 hover:bg-indigo-50"
+                            className="h-8 w-8 p-0 rounded-lg text-primary hover:bg-primary/10"
                             title="Mark as delivered"
                             onClick={() => setDelivered(r, true)}
                           >
@@ -257,7 +257,7 @@ function MachineReplacementsContent() {
                               variant="ghost"
                               size="sm"
                               disabled={busyId === r.id}
-                              className="h-8 w-8 p-0 rounded-lg text-violet-600 hover:bg-violet-50"
+                              className="h-8 w-8 p-0 rounded-lg text-lease hover:bg-lease/10"
                               title={
                                 r.status === 'TECHNICIAN_ASSIGNED'
                                   ? 'Reassign technician'
@@ -274,7 +274,7 @@ function MachineReplacementsContent() {
                               variant="ghost"
                               size="sm"
                               disabled={busyId === r.id}
-                              className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:bg-slate-100"
+                              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted"
                               title="Not delivered — undo"
                               onClick={() => setDelivered(r, false)}
                             >
@@ -306,7 +306,7 @@ function MachineReplacementsContent() {
             moves onto the new machine, so only assign someone who is going out to do the swap.
           </p>
           <div className="space-y-1.5">
-            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+            <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Technician
             </Label>
             <SearchableSelect

@@ -142,16 +142,16 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
       <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl p-0 border-0 shadow-2xl">
         <DialogTitle className="sr-only">Record Replacement Install</DialogTitle>
 
-        <div className="bg-white p-5 border-b border-slate-100">
+        <div className="bg-card p-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center">
-              <Gauge size={18} className="text-slate-500" />
+            <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
+              <Gauge size={18} className="text-muted-foreground" />
             </div>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                 Record Replacement Install
               </p>
-              <p className="text-base font-black text-slate-800">
+              <p className="text-base font-black text-foreground">
                 {r?.requestNo ?? '…'} · {r?.customerName ?? ''}
               </p>
             </div>
@@ -160,33 +160,33 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <div className="p-5 space-y-5">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-red-200 bg-red-50/40 p-3">
-                <p className="text-[9px] font-black uppercase tracking-widest text-red-700">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-destructive">
                   Removing
                 </p>
-                <p className="mt-1 font-mono text-sm font-bold text-slate-800">
+                <p className="mt-1 font-mono text-sm font-bold text-foreground">
                   {r?.oldSerialNumber}
                 </p>
-                <p className="text-[11px] text-slate-500">{detail?.oldProduct?.name}</p>
+                <p className="text-[11px] text-muted-foreground">{detail?.oldProduct?.name}</p>
               </div>
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
-                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700">
+              <div className="rounded-xl border border-success/30 bg-success/10 p-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-success">
                   Installing
                 </p>
-                <p className="mt-1 font-mono text-sm font-bold text-slate-800">
+                <p className="mt-1 font-mono text-sm font-bold text-foreground">
                   {r?.newSerialNumber}
                 </p>
-                <p className="text-[11px] text-slate-500">{detail?.newProduct?.name}</p>
+                <p className="text-[11px] text-muted-foreground">{detail?.newProduct?.name}</p>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Installation date
               </Label>
               <Input
@@ -195,33 +195,33 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
                 onChange={(e) => setInstalledOn(e.target.value)}
                 className="h-10 text-sm font-bold"
               />
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-muted-foreground">
                 This date sets the billing boundary between the two machines.
               </p>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-border">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       Counter
                     </th>
-                    <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-red-600">
+                    <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-destructive">
                       Old — closing
                     </th>
-                    <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-emerald-700">
+                    <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-success">
                       New — opening
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {COUNTERS.map(([key, label]) => (
-                    <tr key={key} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-semibold text-slate-700">
+                    <tr key={key} className="border-t border-border">
+                      <td className="px-3 py-2 font-semibold text-foreground">
                         {label}
                         {floor && (
-                          <span className="ml-2 font-mono text-[10px] text-slate-400">
+                          <span className="ml-2 font-mono text-[10px] text-muted-foreground">
                             last {floor[key].toLocaleString()}
                           </span>
                         )}
@@ -233,7 +233,7 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
                           value={oldMeter[key]}
                           onChange={(e) => setOldMeter((m) => ({ ...m, [key]: e.target.value }))}
                           className={`h-9 text-right font-mono text-sm tabular-nums ${
-                            belowFloor(key) ? 'border-red-400 bg-red-50' : ''
+                            belowFloor(key) ? 'border-destructive/30 bg-destructive/10' : ''
                           }`}
                         />
                       </td>
@@ -253,9 +253,9 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
             </div>
 
             {anyBelowFloor && (
-              <div className="flex gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3">
-                <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-600" />
-                <p className="text-[12px] leading-relaxed text-red-800">
+              <div className="flex gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0 text-destructive" />
+                <p className="text-[12px] leading-relaxed text-destructive">
                   A closing reading is below what this machine was last recorded at. A meter cannot
                   run backwards — check the figure before submitting.
                 </p>
@@ -263,7 +263,7 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
             )}
 
             <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                 Meter photos (optional)
               </Label>
               <Input
@@ -277,7 +277,7 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4">
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted p-4">
           <Button
             variant="outline"
             onClick={onClose}
@@ -289,7 +289,7 @@ export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDon
           <Button
             onClick={submit}
             disabled={!allFilled || anyBelowFloor || saving}
-            className="h-9 bg-primary text-xs font-black text-white hover:bg-primary/90"
+            className="h-9 bg-primary text-xs font-black text-primary-foreground hover:bg-primary/90"
           >
             {saving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
             Complete Replacement

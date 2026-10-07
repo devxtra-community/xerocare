@@ -45,8 +45,8 @@ function Panel({
   children?: React.ReactNode;
 }) {
   const ring =
-    tone === 'out' ? 'border-red-200 bg-red-50/40' : 'border-emerald-200 bg-emerald-50/40';
-  const chip = tone === 'out' ? 'text-red-700' : 'text-emerald-700';
+    tone === 'out' ? 'border-destructive/30 bg-destructive/10' : 'border-success/30 bg-success/10';
+  const chip = tone === 'out' ? 'text-destructive' : 'text-success';
   return (
     <div className={`flex-1 rounded-xl border p-4 space-y-3 ${ring}`}>
       <p className={`text-[9px] font-black uppercase tracking-widest ${chip}`}>{heading}</p>
@@ -57,15 +57,15 @@ function Panel({
           width={320}
           height={150}
           unoptimized
-          className="w-full rounded-lg border border-white object-cover"
+          className="w-full rounded-lg border border-border object-cover"
           style={{ maxHeight: 150 }}
         />
       )}
       <div className="space-y-1">
-        <p className="text-sm font-black text-slate-800">{product?.name || '—'}</p>
-        <p className="font-mono text-xs text-slate-600">{serial || 'Not selected'}</p>
+        <p className="text-sm font-black text-foreground">{product?.name || '—'}</p>
+        <p className="font-mono text-xs text-foreground">{serial || 'Not selected'}</p>
         {(product?.brand || product?.model_name) && (
-          <p className="text-[11px] font-semibold text-slate-500">
+          <p className="text-[11px] font-semibold text-muted-foreground">
             {[product?.brand, product?.model_name].filter(Boolean).join(' · ')}
           </p>
         )}
@@ -133,16 +133,16 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
       <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl p-0 border-0 shadow-2xl">
         <DialogTitle className="sr-only">Select Replacement Machine</DialogTitle>
 
-        <div className="bg-white p-5 border-b border-slate-100">
+        <div className="bg-card p-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center">
-              <PackageCheck size={18} className="text-emerald-600" />
+            <div className="h-9 w-9 rounded-full bg-success/10 flex items-center justify-center">
+              <PackageCheck size={18} className="text-success" />
             </div>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                 Proceed Replacement · select the machine
               </p>
-              <p className="text-base font-black text-slate-800">
+              <p className="text-base font-black text-foreground">
                 {detail?.request.requestNo ?? '…'} · {detail?.request.customerName ?? ''}
               </p>
             </div>
@@ -151,7 +151,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <div className="p-5 space-y-5">
@@ -163,11 +163,11 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
                 product={detail?.oldProduct as never}
               >
                 {detail?.oldAllocation && (
-                  <div className="rounded-lg border border-white bg-white/70 p-2.5 space-y-1">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <div className="rounded-lg border border-border bg-card p-2.5 space-y-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       Current counters
                     </p>
-                    <p className="font-mono text-[11px] tabular-nums text-slate-700">
+                    <p className="font-mono text-[11px] tabular-nums text-foreground">
                       B&amp;W {detail.oldAllocation.currentBwA4.toLocaleString()} (+
                       {detail.oldAllocation.currentBwA3.toLocaleString()} A3) · Clr{' '}
                       {detail.oldAllocation.currentColorA4.toLocaleString()} (+
@@ -177,7 +177,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
                 )}
               </Panel>
 
-              <ArrowRight className="mx-auto hidden h-6 w-6 shrink-0 text-slate-300 md:block" />
+              <ArrowRight className="mx-auto hidden h-6 w-6 shrink-0 text-muted-foreground md:block" />
 
               <Panel
                 tone="in"
@@ -186,7 +186,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
                 product={chosen as never}
               >
                 <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     Available machines on this model
                   </Label>
                   <SearchableSelect
@@ -201,7 +201,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
                         <span className="flex items-center gap-2">
                           {p.serial_no} — {p.brand?.toUpperCase() || ''} {p.name}
                           {p.product_status !== 'AVAILABLE' && (
-                            <span className="text-[10px] font-bold text-amber-600">
+                            <span className="text-[10px] font-bold text-warning">
                               [{p.product_status}]
                             </span>
                           )}
@@ -212,7 +212,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
                     }))}
                   />
                   {candidates.length === 0 && (
-                    <p className="text-[11px] font-semibold text-amber-700">
+                    <p className="text-[11px] font-semibold text-warning">
                       No spare unit of this model is free right now. Add stock or return a unit
                       before proceeding.
                     </p>
@@ -221,8 +221,8 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
               </Panel>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] leading-relaxed text-slate-600">
+            <div className="rounded-xl border border-border bg-muted p-3">
+              <p className="text-[11px] leading-relaxed text-foreground">
                 Selecting a unit reserves it for this contract and sends the job to the service
                 desk. The machine on the contract does not change yet — the technician records both
                 meter readings on site, and that is what moves the billing across.
@@ -231,7 +231,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4">
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted p-4">
           <Button
             variant="outline"
             onClick={onClose}
@@ -243,7 +243,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
           <Button
             onClick={submit}
             disabled={!chosen || saving}
-            className="h-9 bg-emerald-600 text-xs font-black text-white hover:bg-emerald-700"
+            className="h-9 bg-success text-xs font-black text-success-foreground hover:bg-success/90"
           >
             {saving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
             Confirm &amp; Send to Service Desk

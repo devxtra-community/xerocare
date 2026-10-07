@@ -109,18 +109,18 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full sm:w-[250px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search parts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9 border-blue-100 focus:border-blue-400 focus:ring-blue-50 text-[12px]"
+            className="pl-9 h-9 border-primary/30 focus:border-primary/30 focus:ring-primary/30 text-[12px]"
           />
         </div>
 
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-            <SelectTrigger className="w-[130px] h-9 text-[11px] border-blue-50 bg-white/50">
+            <SelectTrigger className="w-[130px] h-9 text-[11px] border-primary/30 bg-card">
               <SelectValue placeholder="Brand" />
             </SelectTrigger>
             <SelectContent>
@@ -134,7 +134,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
           </Select>
 
           <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-            <SelectTrigger className="w-[140px] h-9 text-[11px] border-blue-50 bg-white/50">
+            <SelectTrigger className="w-[140px] h-9 text-[11px] border-primary/30 bg-card">
               <SelectValue placeholder="Warehouse" />
             </SelectTrigger>
             <SelectContent>
@@ -148,7 +148,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
           </Select>
 
           <Select value={selectedVendor} onValueChange={setSelectedVendor}>
-            <SelectTrigger className="w-[130px] h-9 text-[11px] border-blue-50 bg-white/50">
+            <SelectTrigger className="w-[130px] h-9 text-[11px] border-primary/30 bg-card">
               <SelectValue placeholder="Vendor" />
             </SelectTrigger>
             <SelectContent>
@@ -176,11 +176,11 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
         </div>
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <Table className="min-w-[900px]">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[900px]">
             <TableHeader>
-              <TableRow className="bg-muted/50/50 hover:bg-transparent">
+              <TableRow className="bg-muted/50 hover:bg-transparent">
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">
                   Lot / Order Number
                 </TableHead>
@@ -223,7 +223,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
                 filtered.map((item, i) => (
                   <TableRow
                     key={`${item.lotNumber}-${i}`}
-                    className={`transition-colors h-11 ${i % 2 === 0 ? 'bg-card' : 'bg-blue-50/20'}`}
+                    className={`transition-colors h-11 ${i % 2 === 0 ? 'bg-card' : 'bg-primary/10'}`}
                   >
                     <TableCell className="px-3 py-1.5 font-medium text-foreground text-[12px]">
                       {item.lotNumber}
@@ -231,16 +231,16 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
                     <TableCell className="px-3 py-1.5 font-medium text-primary text-[12px]">
                       {item.part_name}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    <TableCell className="px-3 py-1.5 text-foreground text-[11px]">
                       {item.brand}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    <TableCell className="px-3 py-1.5 text-foreground text-[11px]">
                       {item.compatible_model || 'Universal'}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    <TableCell className="px-3 py-1.5 text-foreground text-[11px]">
                       {item.warehouse_name || '-'}
                     </TableCell>
-                    <TableCell className="px-3 py-1.5 text-gray-600 text-[11px]">
+                    <TableCell className="px-3 py-1.5 text-foreground text-[11px]">
                       {item.vendor_name || '-'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center text-[12px]">
@@ -260,7 +260,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
                           </button>
                           <button
                             onClick={() => handleDeleteClick(item.id, item.part_name)}
-                            className="p-1 hover:bg-red-50 rounded text-red-500"
+                            className="p-1 hover:bg-destructive/10 rounded text-destructive"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -276,7 +276,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
                     className="text-center py-12 text-muted-foreground"
                   >
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="bg-gray-100 p-3 rounded-full">
+                      <div className="bg-muted p-3 rounded-full">
                         <span className="text-2xl">⚙️</span>
                       </div>
                       <p className="font-medium">No spare parts found</p>

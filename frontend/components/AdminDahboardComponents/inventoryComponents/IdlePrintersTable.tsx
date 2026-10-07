@@ -55,29 +55,29 @@ export default function IdlePrintersTable() {
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-4">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
-            <TableHead className="font-semibold text-gray-700">Printer Model</TableHead>
-            <TableHead className="font-semibold text-gray-700">Current Location</TableHead>
-            <TableHead className="font-semibold text-gray-700">Vendor</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-center">Idle Days</TableHead>
-            <TableHead className="font-semibold text-gray-700">Last Used</TableHead>
-            <TableHead className="font-semibold text-gray-700">Reason</TableHead>
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="font-semibold text-foreground">Printer Model</TableHead>
+            <TableHead className="font-semibold text-foreground">Current Location</TableHead>
+            <TableHead className="font-semibold text-foreground">Vendor</TableHead>
+            <TableHead className="font-semibold text-foreground text-center">Idle Days</TableHead>
+            <TableHead className="font-semibold text-foreground">Last Used</TableHead>
+            <TableHead className="font-semibold text-foreground">Reason</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {currentData.map((item, idx) => (
             <TableRow
               key={idx}
-              className={`hover:bg-muted/50/50 ${idx % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
+              className={`hover:bg-muted/50 ${idx % 2 !== 0 ? 'bg-primary/10' : 'bg-card'}`}
             >
               <TableCell className="font-medium text-foreground">{item.model}</TableCell>
-              <TableCell className="text-gray-600">{item.branch}</TableCell>
-              <TableCell className="text-gray-600">{item.vendor}</TableCell>
-              <TableCell className="text-center font-bold text-orange-600">
+              <TableCell className="text-foreground">{item.branch}</TableCell>
+              <TableCell className="text-foreground">{item.vendor}</TableCell>
+              <TableCell className="text-center font-bold text-warning">
                 {item.idleDays} Days
               </TableCell>
-              <TableCell className="text-gray-600">{item.lastUsed}</TableCell>
-              <TableCell className="text-gray-600 text-sm italic">{item.reason}</TableCell>
+              <TableCell className="text-foreground">{item.lastUsed}</TableCell>
+              <TableCell className="text-foreground text-sm italic">{item.reason}</TableCell>
             </TableRow>
           ))}
         </TableBody>

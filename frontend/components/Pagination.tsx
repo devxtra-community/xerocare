@@ -48,7 +48,7 @@ export default function Pagination({
           size="sm"
           disabled={page === 1}
           onClick={() => onPageChange(page - 1)}
-          className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-muted/50 text-[11px] px-3"
+          className="h-8 rounded-md border-border text-foreground hover:bg-primary/10 hover:text-primary text-[11px] px-3"
         >
           <ChevronLeft className="h-3.5 w-3.5 mr-1" />
           Prev
@@ -77,8 +77,8 @@ export default function Pagination({
                 aria-current={page === pageNum ? 'page' : undefined}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
                   page === pageNum
-                    ? 'bg-primary text-white font-bold shadow-sm shadow-primary/20'
-                    : 'text-muted-foreground hover:bg-muted hover:text-primary font-medium'
+                    ? 'bg-primary text-primary-foreground font-bold shadow-sm shadow-primary/20'
+                    : 'text-muted-foreground hover:bg-primary/10 hover:text-primary font-medium'
                 }`}
               >
                 {pageNum}
@@ -92,7 +92,7 @@ export default function Pagination({
           size="sm"
           disabled={page === totalPages || totalPages === 0}
           onClick={() => onPageChange(page + 1)}
-          className="h-8 rounded-lg border-gray-100 text-gray-600 hover:bg-muted/50 text-[11px] px-3"
+          className="h-8 rounded-md border-border text-foreground hover:bg-primary/10 hover:text-primary text-[11px] px-3"
         >
           Next
           <ChevronRight className="h-3.5 w-3.5 ml-1" />

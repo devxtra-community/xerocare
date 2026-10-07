@@ -35,11 +35,11 @@ import StatementDialog, {
 } from '@/components/shared/StatementDialog';
 
 const AGING_COLORS: Record<string, string> = {
-  Current: 'bg-emerald-100 text-emerald-700',
-  '1-30 days': 'bg-yellow-100 text-yellow-700',
-  '31-60 days': 'bg-orange-100 text-orange-700',
-  '61-90 days': 'bg-red-100 text-red-700',
-  '90+ days': 'bg-red-200 text-red-800',
+  Current: 'bg-success/10 text-success',
+  '1-30 days': 'bg-warning/10 text-warning',
+  '31-60 days': 'bg-warning/10 text-warning',
+  '61-90 days': 'bg-destructive/10 text-destructive',
+  '90+ days': 'bg-destructive/10 text-destructive',
 };
 
 function SelectCustomerModal({
@@ -53,16 +53,16 @@ function SelectCustomerModal({
 }) {
   const [chosen, setChosen] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-bold text-gray-900">Select Customer</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="font-bold text-foreground">Select Customer</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             ×
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             A Customer Statement of Account needs a specific customer — choose who this statement is
             for.
           </p>
@@ -256,24 +256,26 @@ function ReceivableContent() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full p-6 space-y-6">
+    <div className="bg-muted min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Receivables — Consolidated</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground">
+            Receivables — Consolidated
+          </h1>
+          <p className="text-sm text-muted-foreground">
             {branchIds ? 'Selected branch(es)' : 'All branches'} · balances, aging and payment
             receipts
           </p>
         </div>
-        <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="flex items-center gap-1 p-1 bg-card border border-border rounded-xl shadow-sm">
           {(['receivable', 'receipts'] as const).map((t) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
               className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${
                 activeTab === t
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {t === 'receivable' ? 'Receivable' : 'Receipts'}
@@ -283,7 +285,7 @@ function ReceivableContent() {
         <button
           onClick={handleGenerateStatementClick}
           disabled={generatingStatement}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-card hover:bg-muted disabled:opacity-50"
         >
           <FileText className="h-4 w-4" />{' '}
           {generatingStatement ? 'Generating…' : 'Generate Statement'}
@@ -313,48 +315,48 @@ function ReceivableContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 bg-white rounded-xl border p-4">
-              <h3 className="text-sm font-semibold text-gray-600 mb-3">Collection Rate Trend</h3>
+            <div className="md:col-span-2 bg-card rounded-xl border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Collection Rate Trend</h3>
               <SimpleLineChart
                 data={charts?.collectionRate ?? []}
                 xKey="month"
                 lines={[
-                  { key: 'issued', color: '#3b82f6', label: 'Issued' },
-                  { key: 'collected', color: '#10b981', label: 'Collected' },
+                  { key: 'issued', color: 'var(--chart-blue-mid)', label: 'Issued' },
+                  { key: 'collected', color: 'var(--chart-profit)', label: 'Collected' },
                 ]}
                 height={220}
                 currency={currency}
               />
             </div>
-            <div className="bg-white rounded-xl border p-4">
-              <h3 className="text-sm font-semibold text-gray-600 mb-3">By Type</h3>
+            <div className="bg-card rounded-xl border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">By Type</h3>
               <DonutChart data={charts?.byType ?? []} height={220} currency={currency} />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border p-4">
-            <h3 className="text-sm font-semibold text-gray-600 mb-3">Top Customers</h3>
+          <div className="bg-card rounded-xl border p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Top Customers</h3>
             <HorizontalBarChart
               data={charts?.topCustomers ?? []}
               height={200}
-              color="#8b5cf6"
+              color="var(--lease)"
               currency={currency}
             />
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
             <div className="flex items-center gap-3 p-4 border-b flex-wrap">
               <div className="relative flex-1 min-w-50">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search customer or reference..."
-                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="text-sm border-orange-200 bg-white">
+                <SelectTrigger className="text-sm border-warning/30 bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -366,7 +368,7 @@ function ReceivableContent() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <thead className="bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
                     {[
                       'Reference',
@@ -388,14 +390,14 @@ function ReceivableContent() {
                 <tbody className="divide-y">
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-8 text-gray-400">
+                      <td colSpan={9} className="text-center py-8 text-muted-foreground">
                         No receivables found
                       </td>
                     </tr>
                   ) : (
                     receivablePaging.pageRows.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      <tr key={r.id} className="hover:bg-muted">
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                           {r.referenceNo}
                         </td>
                         <td className="px-4 py-3">{r.customerName}</td>
@@ -403,14 +405,14 @@ function ReceivableContent() {
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               r.source === 'Invoice'
-                                ? 'bg-indigo-100 text-indigo-700'
-                                : 'bg-gray-100 text-gray-700'
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-muted text-foreground'
                             }`}
                           >
                             {r.source}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
                           {r.type?.replace(/_/g, ' ')}
                         </td>
                         <td className="px-4 py-3">{formatCurrency(r.amount, currency)}</td>
@@ -419,18 +421,18 @@ function ReceivableContent() {
                         </td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${AGING_COLORS[r.aging] ?? 'bg-gray-100 text-gray-700'}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${AGING_COLORS[r.aging] ?? 'bg-muted text-foreground'}`}
                           >
                             {r.aging}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{r.status}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">{r.status}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() =>
                               setViewingRow({ type: r.isInvoice ? 'INVOICE' : 'MANUAL', id: r.id })
                             }
-                            className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                            className="p-1.5 rounded-md hover:bg-primary/10 text-primary"
                             title="View full details"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -482,7 +484,7 @@ function ReceivableContent() {
 
 export default function AdminReceivablePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
       <ReceivableContent />
     </Suspense>
   );

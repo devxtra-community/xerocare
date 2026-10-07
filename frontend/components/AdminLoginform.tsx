@@ -116,7 +116,7 @@ export function AdminLoginForm({ className, ...props }: React.ComponentProps<'di
             />
           </Field>
 
-          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+          {error && <p className="text-sm text-destructive text-center">{error}</p>}
 
           <Field>
             <Button type="submit" className="w-full" disabled={loading}>

@@ -47,8 +47,8 @@ export default function StockMovementTrend() {
               onClick={() => setSelectedPeriod(period)}
               className={`px-2 py-0.5 rounded-md transition-colors ${
                 selectedPeriod === period
-                  ? 'bg-primary text-white font-medium shadow-sm'
-                  : 'text-blue-600 hover:bg-blue-50'
+                  ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                  : 'text-primary hover:bg-primary/10'
               }`}
             >
               {period}
@@ -73,22 +73,26 @@ export default function StockMovementTrend() {
                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorStockOut" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-blue-light)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--chart-blue-light)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E2E8F0" />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="month"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748B', fontSize: 10 }}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10 }}
               dy={5}
             />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--chart-slate-dark)', fontSize: 10 }}
+            />
             <Tooltip
               content={<ChartTooltipContent />}
-              cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              cursor={{ stroke: 'var(--chart-grid)', strokeWidth: 1 }}
             />
             <Area
               type="monotone"
@@ -103,7 +107,7 @@ export default function StockMovementTrend() {
             <Area
               type="monotone"
               dataKey="stockOut"
-              stroke="#93c5fd"
+              stroke="var(--chart-blue-light)"
               fillOpacity={1}
               fill="url(#colorStockOut)"
               strokeWidth={2}

@@ -8,116 +8,112 @@ import { cn } from '@/lib/utils';
 export const STATUS_MAP = {
   OPEN: {
     label: 'Open',
-    className:
-      'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
+    className: 'bg-warning/10 text-warning border-warning/30 dark:bg-warning/30 dark:text-warning',
   },
   ASSIGNED: {
     label: 'Assigned',
-    className: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
+    className: 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/30 dark:text-primary',
   },
   VISIT_SCHEDULED: {
     label: 'Visit Scheduled',
-    className: 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-400',
+    className: 'bg-info/10 text-info border-info/30 dark:bg-info/30 dark:text-info',
   },
   DIAGNOSED: {
     label: 'Diagnosed',
-    className:
-      'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400',
+    className: 'bg-lease/10 text-lease border-lease/30 dark:bg-lease/30 dark:text-lease',
   },
   QUOTED: {
     label: 'Quote Sent',
-    className:
-      'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400',
+    className: 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/30 dark:text-primary',
   },
   WAITING_FINANCE_APPROVAL: {
     label: 'Waiting Finance Approval',
-    className:
-      'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400',
+    className: 'bg-warning/10 text-warning border-warning/30 dark:bg-warning/30 dark:text-warning',
   },
   WAITING_FINANCE_APPROVAL_2: {
     label: 'Add. Work — Waiting Finance',
-    className:
-      'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400',
+    className: 'bg-warning/10 text-warning border-warning/30 dark:bg-warning/30 dark:text-warning',
   },
   FINANCE_APPROVED_2: {
     label: 'Add. Work Approved',
-    className: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400',
+    className: 'bg-info/10 text-info border-info/30 dark:bg-info/30 dark:text-info',
   },
   ESTIMATE_RECORDED: {
     label: 'Estimate Recorded',
-    className:
-      'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400',
+    className: 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/30 dark:text-primary',
   },
   ADDITIONAL_ESTIMATE_PENDING: {
     label: 'Additional Estimate Pending',
-    className:
-      'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
+    className: 'bg-warning/10 text-warning border-warning/30 dark:bg-warning/30 dark:text-warning',
   },
   REVISED: {
     label: 'Estimate Revised',
-    className:
-      'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400',
+    className: 'bg-lease/10 text-lease border-lease/30 dark:bg-lease/30 dark:text-lease',
   },
   FINANCE_APPROVED: {
     label: 'Finance Approved',
-    className: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400',
+    className: 'bg-info/10 text-info border-info/30 dark:bg-info/30 dark:text-info',
   },
   FINANCE_REJECTED: {
     label: 'Finance Rejected',
-    className: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400',
+    className:
+      'bg-destructive/10 text-destructive border-destructive/30 dark:bg-destructive/30 dark:text-destructive',
   },
   CUSTOMER_APPROVED: {
     label: 'Customer Approved',
-    className:
-      'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400',
+    className: 'bg-success/10 text-success border-success/30 dark:bg-success/30 dark:text-success',
   },
   CUSTOMER_REJECTED: {
     label: 'Customer Declined',
-    className: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400',
+    className:
+      'bg-destructive/10 text-destructive border-destructive/30 dark:bg-destructive/30 dark:text-destructive',
   },
   IN_PROGRESS: {
     label: 'In Progress',
-    className: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
+    className: 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/30 dark:text-primary',
   },
   COMPLETED: {
     label: 'Completed',
-    className: 'bg-green-800 text-white border-green-900 dark:bg-green-950 dark:text-green-300',
+    className: 'bg-success/10 text-success border-success/30 dark:bg-success/30 dark:text-success',
   },
   CANCELLED: {
     label: 'Cancelled',
-    className: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400',
+    className:
+      'bg-muted text-foreground border-border dark:bg-foreground dark:text-muted-foreground',
   },
   FREE_SERVICE: {
     label: 'Free Service',
-    className:
-      'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400',
+    className: 'bg-success/10 text-success border-success/30 dark:bg-success/30 dark:text-success',
   },
 } as const;
 
 // Context/Service Context configuration — keys must match the backend ServiceContext
 // enum (backend/ven_inv_service/src/entities/serviceTicketEntity.ts)
 export const CONTEXT_MAP = {
-  CHARGEABLE: { label: 'Chargeable', className: 'bg-orange-100 text-orange-800 border-orange-200' },
-  RENT: { label: 'Rent — Free', className: 'bg-green-100 text-green-800 border-green-200' },
+  CHARGEABLE: { label: 'Chargeable', className: 'bg-warning/10 text-warning border-warning/30' },
+  RENT: { label: 'Rent — Free', className: 'bg-success/10 text-success border-success/30' },
   WARRANTY: {
     label: 'Under Warranty',
-    className: 'bg-green-100 text-green-800 border-green-200',
+    className: 'bg-success/10 text-success border-success/30',
   },
   LEASE_UNDER_WARRANTY: {
     label: 'Lease — Under Warranty',
-    className: 'bg-green-100 text-green-800 border-green-200',
+    className: 'bg-success/10 text-success border-success/30',
   },
   LEASE_CPC: {
     label: 'Lease CPC — Free',
-    className: 'bg-green-100 text-green-800 border-green-200',
+    className: 'bg-success/10 text-success border-success/30',
   },
-  LEASE_EXPIRED: { label: 'Warranty Expired', className: 'bg-red-100 text-red-800 border-red-200' },
-  AMC: { label: 'AMC Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  FSMA: { label: 'FSMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  SMA: { label: 'SMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+  LEASE_EXPIRED: {
+    label: 'Warranty Expired',
+    className: 'bg-destructive/10 text-destructive border-destructive/30',
+  },
+  AMC: { label: 'AMC Contract', className: 'bg-primary/10 text-primary border-primary/30' },
+  FSMA: { label: 'FSMA Contract', className: 'bg-primary/10 text-primary border-primary/30' },
+  SMA: { label: 'SMA Contract', className: 'bg-primary/10 text-primary border-primary/30' },
   EXTERNAL_MACHINE: {
     label: 'External Machine',
-    className: 'bg-slate-100 text-slate-800 border-slate-200',
+    className: 'bg-muted text-foreground border-border',
   },
 } as const;
 
@@ -154,7 +150,7 @@ export function Badge({ className, variant, status, context, children, ...props 
         .toLowerCase()
         .replace(/\b\w/g, (c) => c.toUpperCase()),
       className:
-        'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400',
+        'bg-muted text-foreground border-border dark:bg-foreground/30 dark:text-muted-foreground',
     };
     return (
       <div
@@ -178,7 +174,7 @@ export function Badge({ className, variant, status, context, children, ...props 
         .toLowerCase()
         .replace(/\b\w/g, (c) => c.toUpperCase()),
       className:
-        'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400',
+        'bg-muted text-foreground border-border dark:bg-foreground/30 dark:text-muted-foreground',
     };
     return (
       <div

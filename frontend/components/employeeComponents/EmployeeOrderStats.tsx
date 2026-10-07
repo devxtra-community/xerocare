@@ -82,7 +82,7 @@ export default function EmployeeOrderStats({ invoices: propInvoices }: EmployeeO
             key={i}
             className="bg-card p-4 rounded-xl shadow-sm h-32 flex items-center justify-center"
           >
-            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ))}
       </div>

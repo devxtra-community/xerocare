@@ -18,18 +18,18 @@ import { formatDuration } from '@/lib/saleWorkflow';
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400">
+      <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
-      <span className="text-right text-xs font-bold text-slate-800">{value ?? '—'}</span>
+      <span className="text-right text-xs font-bold text-foreground">{value ?? '—'}</span>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <p className="mb-2 border-b border-slate-100 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="mb-2 border-b border-border pb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
         {title}
       </p>
       {children}
@@ -39,9 +39,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ReadingCell({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center">
-      <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="text-sm font-black text-slate-800">{value.toLocaleString()}</p>
+    <div className="rounded-lg border border-border bg-muted px-2 py-1.5 text-center">
+      <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm font-black text-foreground">{value.toLocaleString()}</p>
     </div>
   );
 }
@@ -51,16 +53,16 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
   const isMetered = request.saleType === 'RENT' || request.saleType === 'LEASE';
 
   return (
-    <div className="space-y-4 text-slate-800">
+    <div className="space-y-4 text-foreground">
       {/* ── Header ── */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-xl border border-border bg-muted p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Installation Report
             </p>
-            <p className="text-lg font-black text-slate-900">{request.invoiceNumber}</p>
-            <p className="text-xs font-bold text-slate-500">
+            <p className="text-lg font-black text-foreground">{request.invoiceNumber}</p>
+            <p className="text-xs font-bold text-muted-foreground">
               {contract?.saleType ?? request.saleType ?? '—'}
               {contract?.rentPeriod ? ` · ${contract.rentPeriod}` : ''}
             </p>
@@ -69,8 +71,8 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
                 request.status === 'COMPLETED'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-amber-100 text-amber-700'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-warning/10 text-warning'
               }`}
             >
               {request.status === 'COMPLETED' && <CheckCircle2 size={11} />}
@@ -98,7 +100,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
       {/* ── Machines installed ── */}
       <Section title={machines.length > 1 ? 'Machines Installed' : 'Machine Installed'}>
         {machines.length === 0 ? (
-          <p className="py-2 text-xs font-bold text-slate-400">
+          <p className="py-2 text-xs font-bold text-muted-foreground">
             No machine allocation is recorded against this contract.
           </p>
         ) : (
@@ -106,7 +108,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
             {machines.map((m, i) => (
               <div
                 key={m.allocationId}
-                className={i > 0 ? 'border-t border-slate-100 pt-3' : undefined}
+                className={i > 0 ? 'border-t border-border pt-3' : undefined}
               >
                 <Row label="Product" value={m.productName || '—'} />
                 <Row label="Brand" value={m.brand || '—'} />
@@ -119,7 +121,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
                   <Row
                     label="Since"
                     value={
-                      <span className="text-amber-600">
+                      <span className="text-warning">
                         {m.allocationStatus === 'REPLACED' ? 'Replaced' : 'Returned'}
                       </span>
                     }
@@ -127,7 +129,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
                 )}
                 {isMetered && (
                   <div className="mt-2">
-                    <p className="mb-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <p className="mb-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                       Initial Meter Reading
                     </p>
                     <div className="grid grid-cols-4 gap-1.5">
@@ -146,7 +148,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
         {/* Contract-level reading, shown only when no allocation carries one. */}
         {machines.length === 0 && fallbackReading && isMetered && (
           <div className="mt-2">
-            <p className="mb-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <p className="mb-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               Initial Meter Reading
             </p>
             <div className="grid grid-cols-4 gap-1.5">
@@ -187,7 +189,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
       <Section title="Customer Acceptance">
         {signature.signed ? (
           <div className="space-y-2">
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               The customer confirmed the machine was installed and working, and that the readings
               above are correct.
             </p>
@@ -196,7 +198,7 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
               <img
                 src={signature.data}
                 alt="Customer signature"
-                className="h-24 w-auto rounded-lg border border-slate-200 bg-white"
+                className="h-24 w-auto rounded-lg border border-border bg-card"
               />
             )}
             <Row label="Signed By" value={signature.name || '—'} />
@@ -209,26 +211,26 @@ export function InstallationReportView({ detail }: { detail: InstallationReportD
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               By signing, the customer confirms the machine listed above was installed and is
               working, and that the initial readings recorded are correct.
             </p>
             {/* Printed copies are signed by hand, so leave a real ruled space. */}
             <div className="hidden print:block">
-              <div className="mt-10 border-t border-slate-400 pt-1">
-                <p className="text-[10px] font-bold text-slate-500">
+              <div className="mt-10 border-t border-border pt-1">
+                <p className="text-[10px] font-bold text-muted-foreground">
                   Customer signature &amp; date
                 </p>
               </div>
             </div>
-            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-400 print:hidden">
+            <p className="rounded-lg border border-dashed border-border bg-muted px-3 py-2 text-[11px] font-bold text-muted-foreground print:hidden">
               Not yet signed.
             </p>
           </div>
         )}
       </Section>
 
-      <p className="flex items-center justify-center gap-1 pt-1 text-[9px] font-bold uppercase tracking-widest text-slate-300">
+      <p className="flex items-center justify-center gap-1 pt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
         <PrinterIcon size={9} /> Xerocare · Installation Report · {request.invoiceNumber}
       </p>
     </div>

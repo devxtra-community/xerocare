@@ -293,12 +293,12 @@ export default function InstallationRequestsPage() {
 
   const statusBadge = (status: InstallationRequest['status']) => {
     const map = {
-      PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-700' },
-      ASSIGNED: { label: 'Assigned', color: 'bg-blue-100 text-blue-700' },
-      IN_PROGRESS: { label: 'In Progress', color: 'bg-emerald-100 text-emerald-700' },
-      COMPLETED: { label: 'Completed', color: 'bg-slate-100 text-slate-600' },
+      PENDING: { label: 'Pending', color: 'bg-warning/10 text-warning' },
+      ASSIGNED: { label: 'Assigned', color: 'bg-primary/10 text-primary' },
+      IN_PROGRESS: { label: 'In Progress', color: 'bg-success/10 text-success' },
+      COMPLETED: { label: 'Completed', color: 'bg-muted text-foreground' },
     };
-    const cfg = map[status] || { label: status, color: 'bg-slate-100 text-slate-500' };
+    const cfg = map[status] || { label: status, color: 'bg-muted text-muted-foreground' };
     return (
       <span
         className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${cfg.color}`}
@@ -317,10 +317,10 @@ export default function InstallationRequestsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Installation Requests
           </h1>
-          <p className="text-xs text-slate-400 font-bold mt-0.5">
+          <p className="text-xs text-muted-foreground font-bold mt-0.5">
             {jobTab === 'installations' || isServiceHelpDesk
               ? 'Track and manage product installation tasks'
               : 'Machine replacements assigned to you'}
@@ -330,7 +330,7 @@ export default function InstallationRequestsPage() {
           variant="ghost"
           size="sm"
           onClick={loadData}
-          className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-9"
+          className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-9"
         >
           <RefreshCw size={12} className="mr-1" />
           Refresh
@@ -340,7 +340,7 @@ export default function InstallationRequestsPage() {
       {/* Job type tabs — a lone tab is just noise, so the bar only appears when the
           viewer actually has a choice. */}
       {!isServiceHelpDesk && (
-        <div className="flex gap-1 border-b border-slate-200">
+        <div className="flex gap-1 border-b border-border">
           {(
             [
               ['installations', 'Installations'],
@@ -353,7 +353,7 @@ export default function InstallationRequestsPage() {
               className={`px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${
                 jobTab === key
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-400 hover:text-slate-600'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {label}
@@ -402,12 +402,15 @@ export default function InstallationRequestsPage() {
 
           {/* Search */}
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by invoice, customer, or technician..."
-              className="pl-9 h-9 border-slate-200 text-sm font-bold"
+              className="pl-9 h-9 border-border text-sm font-bold"
             />
           </div>
 
@@ -415,48 +418,50 @@ export default function InstallationRequestsPage() {
             <CardContent className="p-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-slate-400" />
+                  <Loader2 size={24} className="animate-spin text-muted-foreground" />
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-12">
-                  <Wrench size={32} className="mx-auto mb-3 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-500">No installation requests</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <Wrench size={32} className="mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-sm font-bold text-muted-foreground">
+                    No installation requests
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     Requests appear here when created from Customer Contracts.
                   </p>
                 </div>
               ) : (
-                <Table>
+                <Table pagination={{ pageSize: 10 }}>
                   <TableHeader>
-                    <TableRow className="bg-slate-50/70">
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <TableRow className="bg-muted/70">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Invoice
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Type
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Customer
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Service Desk
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Warehouse
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Technician
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Status
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Duration
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Started
                       </TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -467,8 +472,8 @@ export default function InstallationRequestsPage() {
                       const liveSec = liveTimers[req.id];
                       const isRentLease = req.saleType === 'RENT' || req.saleType === 'LEASE';
                       return (
-                        <TableRow key={req.id} className="hover:bg-slate-50/50">
-                          <TableCell className="text-slate-800 text-sm">
+                        <TableRow key={req.id} className="hover:bg-muted/50">
+                          <TableCell className="text-foreground text-sm">
                             {req.invoiceNumber}
                           </TableCell>
                           <TableCell>
@@ -476,53 +481,55 @@ export default function InstallationRequestsPage() {
                               const type = req.saleType?.toUpperCase();
                               if (type === 'SALE')
                                 return (
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-success/10 text-success">
                                     Sale
                                   </span>
                                 );
                               if (type === 'RENT')
                                 return (
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-primary/10 text-primary">
                                     Rent
                                   </span>
                                 );
                               if (type === 'LEASE')
                                 return (
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-700">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-lease/10 text-lease">
                                     Lease
                                   </span>
                                 );
-                              return <span className="text-slate-400 text-[11px]">—</span>;
+                              return <span className="text-muted-foreground text-[11px]">—</span>;
                             })()}
                           </TableCell>
-                          <TableCell className="font-bold text-slate-600 text-sm">
+                          <TableCell className="font-bold text-foreground text-sm">
                             {req.customerName}
                             {req.customerAddress && (
-                              <p className="text-[10px] text-slate-400">{req.customerAddress}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {req.customerAddress}
+                              </p>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600">
+                          <TableCell className="text-sm text-foreground">
                             {req.assignedByEmployeeName || '—'}
                           </TableCell>
-                          <TableCell className="text-sm text-slate-500">
+                          <TableCell className="text-sm text-muted-foreground">
                             {req.currentProductId && warehouseCache[req.currentProductId] ? (
                               <span className="flex items-center gap-1">
-                                <WarehouseIcon size={11} className="text-slate-400" />
+                                <WarehouseIcon size={11} className="text-muted-foreground" />
                                 {warehouseCache[req.currentProductId]}
                               </span>
                             ) : (
                               '—'
                             )}
                           </TableCell>
-                          <TableCell className="font-bold text-slate-600 text-sm">
+                          <TableCell className="font-bold text-foreground text-sm">
                             {req.technicianName || (
-                              <span className="text-slate-400 text-[11px]">Unassigned</span>
+                              <span className="text-muted-foreground text-[11px]">Unassigned</span>
                             )}
                           </TableCell>
                           <TableCell>{statusBadge(req.status)}</TableCell>
-                          <TableCell className="font-bold text-slate-700">
+                          <TableCell className="font-bold text-foreground">
                             {req.status === 'IN_PROGRESS' && liveSec !== undefined ? (
-                              <span className="flex items-center gap-1 text-emerald-600">
+                              <span className="flex items-center gap-1 text-success">
                                 <Timer size={12} className="animate-pulse" />
                                 {formatDuration(liveSec)}
                               </span>
@@ -532,7 +539,7 @@ export default function InstallationRequestsPage() {
                               '—'
                             )}
                           </TableCell>
-                          <TableCell className="text-[11px] text-slate-500 font-bold">
+                          <TableCell className="text-[11px] text-muted-foreground font-bold">
                             {req.startTime
                               ? new Date(req.startTime).toLocaleString('en-GB', {
                                   day: '2-digit',
@@ -609,12 +616,12 @@ export default function InstallationRequestsPage() {
                                         ? 'Security deposit collected and approved by Finance'
                                         : 'Security deposit collected — awaiting Finance approval'
                                     }
-                                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-3 text-[9px] font-black uppercase tracking-widest text-emerald-700 ring-1 ring-emerald-200"
+                                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-success/10 px-3 text-[9px] font-black uppercase tracking-widest text-success ring-1 ring-success/30"
                                   >
                                     <ShieldCheck size={12} />
                                     Deposit Collected
                                     {req.securityDepositStatus !== 'APPROVED' && (
-                                      <span className="font-bold normal-case tracking-normal text-emerald-600/80">
+                                      <span className="font-bold normal-case tracking-normal text-success/80">
                                         (awaiting approval)
                                       </span>
                                     )}
@@ -624,9 +631,9 @@ export default function InstallationRequestsPage() {
                                     type="button"
                                     onClick={() => setDepositTarget(req)}
                                     title={`Collect the ${Number(req.securityDepositAmount).toFixed(2)} refundable security deposit`}
-                                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full border-2 border-slate-800 bg-amber-400 px-3 text-[9px] font-black uppercase tracking-widest text-slate-900 transition-colors hover:bg-amber-500 active:translate-y-px"
+                                    className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-2 border-border bg-primary px-3 text-[10px] font-black uppercase tracking-widest text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-px"
                                   >
-                                    <SecurityBillMark size={16} />
+                                    <SecurityBillMark size={14} />
                                     Collect Deposit Now
                                   </button>
                                 ))}
@@ -636,7 +643,7 @@ export default function InstallationRequestsPage() {
                                   onClick={() => handleStart(req.id)}
                                   disabled={isActing}
                                   title="Start installation"
-                                  className="inline-flex h-8 items-center justify-center rounded-full border-2 border-slate-800 bg-blue-600 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-blue-700 active:translate-y-px disabled:pointer-events-none disabled:opacity-60"
+                                  className="inline-flex h-8 items-center justify-center rounded-full border-2 border-border bg-primary px-4 text-[10px] font-black uppercase tracking-widest text-primary-foreground transition-colors hover:bg-primary/90 active:translate-y-px disabled:pointer-events-none disabled:opacity-60"
                                 >
                                   {isActing ? (
                                     <Loader2 size={12} className="animate-spin" />
@@ -650,7 +657,7 @@ export default function InstallationRequestsPage() {
                                   size="sm"
                                   onClick={() => handleCompleteClick(req)}
                                   disabled={isActing}
-                                  className="h-7 bg-red-500 hover:bg-red-600 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
+                                  className="h-7 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
                                 >
                                   {isActing ? (
                                     <Loader2 size={12} className="animate-spin" />
@@ -671,20 +678,20 @@ export default function InstallationRequestsPage() {
                                   type="button"
                                   onClick={() => setReportRequestId(req.id)}
                                   title="Installation report & customer signature"
-                                  className="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-3 rounded-full bg-violet-50 text-violet-700 font-black text-[9px] uppercase tracking-widest ring-1 ring-violet-200 transition-all hover:bg-violet-100 hover:ring-violet-300 active:translate-y-px"
+                                  className="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-3 rounded-full bg-lease/10 text-lease font-black text-[9px] uppercase tracking-widest ring-1 ring-lease/30 transition-all hover:bg-lease/10 hover:ring-lease/30 active:translate-y-px"
                                 >
                                   <ReportMark size={20} />
                                   Report
                                 </button>
                               )}
                               {req.status === 'COMPLETED' && (
-                                <span className="flex items-center gap-1 text-emerald-500">
+                                <span className="flex items-center gap-1 text-success">
                                   <CheckCircle2 size={14} />
                                   <span className="text-[10px] font-black">Done</span>
                                 </span>
                               )}
                               {req.status === 'PENDING' && (
-                                <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-warning flex items-center gap-1">
                                   <Clock size={12} />
                                   Pending
                                 </span>
@@ -756,9 +763,9 @@ export default function InstallationRequestsPage() {
           <DialogTitle className="sr-only">Contract Agreement</DialogTitle>
           {viewContract && (
             <>
-              <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 p-5 text-white flex items-start justify-between">
+              <div className="bg-gradient-to-r from-primary to-primary p-5 text-primary-foreground flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <div className="h-9 w-9 rounded-full bg-card flex items-center justify-center flex-shrink-0">
                     <FileText size={18} />
                   </div>
                   <div>
@@ -777,7 +784,7 @@ export default function InstallationRequestsPage() {
                 </div>
                 <button
                   onClick={() => setViewContract(null)}
-                  className="text-white/60 hover:text-white mt-0.5"
+                  className="text-primary-foreground hover:text-primary-foreground mt-0.5"
                 >
                   <X size={16} />
                 </button>
@@ -785,61 +792,61 @@ export default function InstallationRequestsPage() {
               <div className="p-5 space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
                       Customer
                     </p>
-                    <p className="font-bold text-slate-700">{viewContract.customerName || '—'}</p>
+                    <p className="font-bold text-foreground">{viewContract.customerName || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
                       Created By
                     </p>
-                    <p className="font-bold text-slate-700">
+                    <p className="font-bold text-foreground">
                       {viewContract.createdByEmployeeName || '—'}
                     </p>
                   </div>
                   {viewContract.customerPhone && (
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
                         Phone
                       </p>
-                      <p className="font-bold text-slate-700">{viewContract.customerPhone}</p>
+                      <p className="font-bold text-foreground">{viewContract.customerPhone}</p>
                     </div>
                   )}
                   {viewContract.customerEmail && (
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
                         Email
                       </p>
-                      <p className="font-bold text-slate-700">{viewContract.customerEmail}</p>
+                      <p className="font-bold text-foreground">{viewContract.customerEmail}</p>
                     </div>
                   )}
                 </div>
-                <div className="border-t border-slate-100 pt-3 space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                <div className="border-t border-border pt-3 space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Signatures
                   </p>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-bold text-xs">Employee</span>
+                    <span className="text-foreground font-bold text-xs">Employee</span>
                     {viewContract.employeeSignatureData ? (
-                      <span className="flex items-center gap-1 text-emerald-600 text-xs font-black">
+                      <span className="flex items-center gap-1 text-success text-xs font-black">
                         <CheckCircle2 size={12} />
                         {viewContract.employeeSignedByName ?? 'Signed'}
                       </span>
                     ) : (
-                      <span className="text-slate-400 text-xs font-bold">Pending</span>
+                      <span className="text-muted-foreground text-xs font-bold">Pending</span>
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-bold text-xs">Customer</span>
+                    <span className="text-foreground font-bold text-xs">Customer</span>
                     {viewContract.customerSignatureData ||
                     viewContract.customerSignedDocumentUrl ? (
-                      <span className="flex items-center gap-1 text-emerald-600 text-xs font-black">
+                      <span className="flex items-center gap-1 text-success text-xs font-black">
                         <CheckCircle2 size={12} />
                         {viewContract.customerSignedByName ?? 'Signed'}
                       </span>
                     ) : (
-                      <span className="text-slate-400 text-xs font-bold">Pending</span>
+                      <span className="text-muted-foreground text-xs font-bold">Pending</span>
                     )}
                   </div>
                 </div>
@@ -876,20 +883,20 @@ export default function InstallationRequestsPage() {
           <DialogTitle className="sr-only">Initial Meter Readings</DialogTitle>
 
           {/* Header */}
-          <div className="bg-white border-b border-slate-100 p-5 text-slate-800">
+          <div className="bg-card border-b border-border p-5 text-foreground">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 text-blue-600">
+                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary">
                   <Gauge size={18} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                     Initial Meter Readings
                   </p>
-                  <p className="text-base font-black text-slate-800">
+                  <p className="text-base font-black text-foreground">
                     {readingTarget?.invoiceNumber}
                   </p>
-                  <p className="text-[11px] text-slate-500 font-bold font-sans">
+                  <p className="text-[11px] text-muted-foreground font-bold font-sans">
                     {readingTarget?.customerName}
                   </p>
                 </div>
@@ -899,7 +906,7 @@ export default function InstallationRequestsPage() {
                   setReadingTarget(null);
                   setReadingContract(null);
                 }}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X size={16} />
               </button>
@@ -920,16 +927,16 @@ export default function InstallationRequestsPage() {
               <div className="p-5 space-y-4 max-h-[72vh] overflow-y-auto">
                 {/* Rent Info */}
                 {readingContract && (
-                  <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-blue-500 mb-2">
+                  <div className="bg-primary/10 border border-primary/30 rounded-xl p-3">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-primary mb-2">
                       Rent Info
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider">
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-wider">
                           Monthly Rent
                         </p>
-                        <p className="font-black text-slate-700 text-sm">
+                        <p className="font-black text-foreground text-sm">
                           QAR{' '}
                           {Number(readingContract.monthlyRent ?? 0).toLocaleString('en', {
                             minimumFractionDigits: 2,
@@ -938,10 +945,10 @@ export default function InstallationRequestsPage() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider">
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-wider">
                           Rent Type
                         </p>
-                        <p className="font-black text-slate-700 text-xs">
+                        <p className="font-black text-foreground text-xs">
                           {readingContract.rentType?.replace(/_/g, ' ') ?? '—'}
                         </p>
                       </div>
@@ -950,16 +957,16 @@ export default function InstallationRequestsPage() {
                 )}
 
                 {/* Black & White Readings */}
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-3">
+                <div className="bg-muted border border-border rounded-xl p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full bg-slate-700" />
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-600">
+                      <div className="h-2.5 w-2.5 rounded-full bg-foreground" />
+                      <p className="text-[10px] font-black uppercase tracking-wider text-foreground">
                         Black &amp; White Readings
                       </p>
                     </div>
                     {bwItem && (
-                      <div className="text-right text-[9px] text-slate-400 font-bold leading-tight">
+                      <div className="text-right text-[9px] text-muted-foreground font-bold leading-tight">
                         <span>Free: {Number(bwItem.bwIncludedLimit ?? 0).toLocaleString()}/mo</span>
                         <span className="mx-1">·</span>
                         <span>Excess: QAR {Number(bwItem.bwExcessRate ?? 0).toFixed(3)}</span>
@@ -968,8 +975,8 @@ export default function InstallationRequestsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        A4 Starting Count <span className="text-red-500">*</span>
+                      <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                        A4 Starting Count <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         type="number"
@@ -977,11 +984,11 @@ export default function InstallationRequestsPage() {
                         placeholder="0"
                         value={bwCount}
                         onChange={(e) => setBwCount(e.target.value)}
-                        className="h-9 text-sm font-bold bg-white"
+                        className="h-9 text-sm font-bold bg-card"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                         A3 Starting Count
                       </Label>
                       <Input
@@ -990,7 +997,7 @@ export default function InstallationRequestsPage() {
                         placeholder="0 (optional)"
                         value={bwA3Count}
                         onChange={(e) => setBwA3Count(e.target.value)}
-                        className="h-9 text-sm font-bold bg-white"
+                        className="h-9 text-sm font-bold bg-card"
                       />
                     </div>
                   </div>
@@ -998,16 +1005,16 @@ export default function InstallationRequestsPage() {
 
                 {/* Color Readings — hidden when contract has no color billing rule */}
                 {showColor && (
-                  <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-3 space-y-3">
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-600">
+                        <div className="h-2.5 w-2.5 rounded-full bg-destructive" />
+                        <p className="text-[10px] font-black uppercase tracking-wider text-foreground">
                           Color Readings
                         </p>
                       </div>
                       {colorItem && (
-                        <div className="text-right text-[9px] text-slate-400 font-bold leading-tight">
+                        <div className="text-right text-[9px] text-muted-foreground font-bold leading-tight">
                           <span>
                             Free: {Number(colorItem.colorIncludedLimit ?? 0).toLocaleString()}/mo
                           </span>
@@ -1020,7 +1027,7 @@ export default function InstallationRequestsPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                           A4 Starting Count
                         </Label>
                         <Input
@@ -1029,11 +1036,11 @@ export default function InstallationRequestsPage() {
                           placeholder="0 (optional)"
                           value={colorCount}
                           onChange={(e) => setColorCount(e.target.value)}
-                          className="h-9 text-sm font-bold bg-white"
+                          className="h-9 text-sm font-bold bg-card"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                           A3 Starting Count
                         </Label>
                         <Input
@@ -1042,7 +1049,7 @@ export default function InstallationRequestsPage() {
                           placeholder="0 (optional)"
                           value={colorA3Count}
                           onChange={(e) => setColorA3Count(e.target.value)}
-                          className="h-9 text-sm font-bold bg-white"
+                          className="h-9 text-sm font-bold bg-card"
                         />
                       </div>
                     </div>
@@ -1051,7 +1058,7 @@ export default function InstallationRequestsPage() {
 
                 {/* Installation Date */}
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Installation Date
                   </Label>
                   <Input
@@ -1062,7 +1069,7 @@ export default function InstallationRequestsPage() {
                   />
                 </div>
 
-                <p className="text-[10px] text-slate-400 font-bold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-muted-foreground font-bold bg-primary/10 border border-primary/30 rounded-lg px-3 py-2">
                   These readings mark the starting point for billing calculations. B&W A4 count is
                   required.
                 </p>
@@ -1079,7 +1086,7 @@ export default function InstallationRequestsPage() {
                     Cancel
                   </Button>
                   <Button
-                    className="flex-1 h-9 text-xs font-black bg-blue-600 hover:bg-blue-700"
+                    className="flex-1 h-9 text-xs font-black bg-primary hover:bg-primary/90"
                     onClick={handleSubmitReadings}
                     disabled={isSavingReading || !bwCount}
                   >

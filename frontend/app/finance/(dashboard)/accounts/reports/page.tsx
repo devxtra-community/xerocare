@@ -44,17 +44,17 @@ import { getActiveCurrency } from '@/lib/currency';
 type Period = 'month' | 'quarter' | 'year' | 'custom';
 
 const COLOR_MAP: Record<string, string> = {
-  emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-  blue: 'bg-blue-50 border-blue-200 text-blue-700',
-  indigo: 'bg-indigo-50 border-indigo-200 text-indigo-700',
-  orange: 'bg-orange-50 border-orange-200 text-orange-700',
-  amber: 'bg-amber-50 border-amber-200 text-amber-700',
-  purple: 'bg-purple-50 border-purple-200 text-purple-700',
-  red: 'bg-red-50 border-red-200 text-red-700',
-  slate: 'bg-slate-50 border-slate-200 text-slate-700',
-  teal: 'bg-teal-50 border-teal-200 text-teal-700',
-  pink: 'bg-pink-50 border-pink-200 text-pink-700',
-  violet: 'bg-violet-50 border-violet-200 text-violet-700',
+  emerald: 'bg-success/10 border-success/30 text-success',
+  blue: 'bg-primary/10 border-primary/30 text-primary',
+  indigo: 'bg-primary/10 border-primary/30 text-primary',
+  orange: 'bg-warning/10 border-warning/30 text-warning',
+  amber: 'bg-warning/10 border-warning/30 text-warning',
+  purple: 'bg-lease/10 border-lease/30 text-lease',
+  red: 'bg-destructive/10 border-destructive/30 text-destructive',
+  slate: 'bg-muted border-border text-foreground',
+  teal: 'bg-info/10 border-info/30 text-info',
+  pink: 'bg-destructive/10 border-destructive/30 text-destructive',
+  violet: 'bg-lease/10 border-lease/30 text-lease',
 };
 
 export default function ReportsHubPage() {
@@ -459,18 +459,20 @@ export default function ReportsHubPage() {
   ];
 
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div>
-        <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Financial Reports Hub</h3>
+        <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+          Financial Reports Hub
+        </h3>
         <p className="text-muted-foreground">
           Generate and download all financial reports in one place
         </p>
       </div>
 
       {/* Period filter */}
-      <div className="flex flex-wrap items-center gap-3 bg-card rounded-xl p-4 border border-slate-100 shadow-sm">
-        <span className="text-sm font-medium text-slate-700">Report Period:</span>
+      <div className="flex flex-wrap items-center gap-3 bg-card rounded-xl p-4 border border-border shadow-sm">
+        <span className="text-sm font-medium text-foreground">Report Period:</span>
         <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <SelectTrigger className="w-44 bg-background border-border">
             <SelectValue />
@@ -509,12 +511,12 @@ export default function ReportsHubPage() {
         {reports.map((r) => (
           <div
             key={r.id}
-            className="rounded-2xl bg-card shadow-sm border border-slate-100 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
+            className="rounded-2xl bg-card shadow-sm border border-border p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
           >
             <div className="flex items-start gap-3">
               <div className={`p-2.5 rounded-xl border ${COLOR_MAP[r.color] ?? ''}`}>{r.icon}</div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-sm text-slate-800 leading-tight">{r.title}</h3>
+                <h3 className="font-bold text-sm text-foreground leading-tight">{r.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                   {r.description}
                 </p>
@@ -530,12 +532,12 @@ export default function ReportsHubPage() {
               </Button>
               {r.exportFn && (
                 <Button
-                  className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="gap-1.5 text-xs bg-success hover:bg-success/90 text-success-foreground"
                   disabled={loading === r.id}
                   onClick={() => handleExport(r.id, r.exportFn!)}
                 >
                   {loading === r.id ? (
-                    <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="h-3 w-3 border-2 border-border border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <Download className="h-3 w-3" />
                   )}

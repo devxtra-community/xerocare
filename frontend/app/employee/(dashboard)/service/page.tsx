@@ -163,8 +163,8 @@ function ActiveTimer({ startTime }: { startTime: string }) {
   }, [startTime]);
 
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 text-red-600 rounded-md font-mono text-[11px] font-bold shadow-sm animate-pulse">
-      <span className="w-2 h-2 rounded-full bg-red-500 block"></span>
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-destructive/10 border border-destructive/30 text-destructive rounded-md font-mono text-[11px] font-bold shadow-sm animate-pulse">
+      <span className="w-2 h-2 rounded-full bg-destructive block"></span>
       <span>{elapsed}</span>
     </div>
   );
@@ -184,8 +184,8 @@ function PausedTimer({
   const paused = new Date(pausedAt).getTime();
   const elapsedMs = paused - start - (pausedDurationMinutes || 0) * 60000;
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-md font-mono text-[11px] font-bold shadow-sm">
-      <span className="w-2 h-2 rounded-full bg-amber-500 block"></span>
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-warning/10 border border-warning/30 text-warning rounded-md font-mono text-[11px] font-bold shadow-sm">
+      <span className="w-2 h-2 rounded-full bg-warning block"></span>
       <span>Paused · {formatElapsed(elapsedMs)}</span>
     </div>
   );
@@ -2099,16 +2099,16 @@ export default function ServiceDashboardPage() {
   const rejectHasDiscount = Number(rejectDiscountAmount) > 0;
 
   return (
-    <div className="bg-slate-50 min-h-full p-4 sm:p-6 space-y-6">
+    <div className="bg-muted min-h-full p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight flex items-center gap-2">
             <Wrench className="text-primary h-6 w-6" /> Service Management Module
           </h1>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-muted-foreground font-medium">
             Logged in as:{' '}
-            <span className="font-bold text-slate-700">
+            <span className="font-bold text-foreground">
               {user?.employeeJob || user?.role || 'Service Representative'}
             </span>
           </p>
@@ -2122,7 +2122,7 @@ export default function ServiceDashboardPage() {
                 setCreateTicketError('');
                 setShowCreateModal(true);
               }}
-              className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl shadow-sm gap-2"
+              className="bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl shadow-sm gap-2"
             >
               <Plus size={16} /> Create Service Ticket
             </Button>
@@ -2135,7 +2135,7 @@ export default function ServiceDashboardPage() {
               setSelectedIntelCustomer('');
             }}
             variant="outline"
-            className="border-slate-200 hover:bg-slate-100 rounded-xl shadow-none font-bold gap-2 text-slate-700"
+            className="border-border hover:bg-muted rounded-xl shadow-none font-bold gap-2 text-foreground"
           >
             <History size={16} /> Customer Intel History
           </Button>
@@ -2143,7 +2143,7 @@ export default function ServiceDashboardPage() {
           <Button
             onClick={fetchInitialData}
             variant="ghost"
-            className="rounded-xl text-xs text-slate-500 font-bold"
+            className="rounded-xl text-xs text-muted-foreground font-bold"
           >
             Refresh Data
           </Button>
@@ -2151,10 +2151,10 @@ export default function ServiceDashboardPage() {
       </div>
 
       {/* Main List */}
-      <Card className="border-none shadow-sm bg-white overflow-hidden">
-        <CardHeader className="border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="border-none shadow-sm bg-card overflow-hidden">
+        <CardHeader className="border-b border-border p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <CardTitle className="text-base font-bold text-slate-800">Service Tickets</CardTitle>
+            <CardTitle className="text-base font-bold text-foreground">Service Tickets</CardTitle>
             <CardDescription className="text-xs">
               Manage active customer breakdown, lease maintenance, and installation requests.
             </CardDescription>
@@ -2163,12 +2163,12 @@ export default function ServiceDashboardPage() {
           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             {/* Search */}
             <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search ticket #, serial, or model..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                className="pl-9 h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
               />
             </div>
 
@@ -2177,7 +2177,7 @@ export default function ServiceDashboardPage() {
               <select
                 value={selectedBranch}
                 onChange={(e) => setSelectedBranch(e.target.value)}
-                className="h-9 text-xs border border-slate-200 bg-slate-50 rounded-xl px-3 outline-none focus:border-primary text-slate-600 font-medium"
+                className="h-9 text-xs border border-border bg-muted rounded-xl px-3 outline-none focus:border-primary text-foreground font-medium"
               >
                 <option value="ALL">All Branches</option>
                 {branches.map((b) => (
@@ -2192,7 +2192,7 @@ export default function ServiceDashboardPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 text-xs border border-slate-200 bg-slate-50 rounded-xl px-3 outline-none focus:border-primary text-slate-600 font-medium"
+              className="h-9 text-xs border border-border bg-muted rounded-xl px-3 outline-none focus:border-primary text-foreground font-medium"
             >
               <option value="ALL">All Statuses</option>
               <option value="OPEN">Open</option>
@@ -2220,73 +2220,73 @@ export default function ServiceDashboardPage() {
           {loading ? (
             <div className="text-center py-20">
               <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <span className="text-xs text-slate-400 mt-2 block font-medium">
+              <span className="text-xs text-muted-foreground mt-2 block font-medium">
                 Loading service tickets...
               </span>
             </div>
           ) : filteredTickets.length === 0 ? (
-            <div className="text-center py-20 text-slate-400 text-xs">
+            <div className="text-center py-20 text-muted-foreground text-xs">
               No service tickets found matching your selection.
             </div>
           ) : (
             <Table className="w-full">
-              <TableHeader className="bg-slate-50/50">
+              <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Ticket No
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Customer
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Brand / Model
                   </TableHead>
                   {user?.role === 'ADMIN' && (
-                    <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                       Branch
                     </TableHead>
                   )}
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Job Type
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Visit Date
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Status
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                  <TableHead className="font-bold text-xs text-foreground px-4 py-3">
                     Actions
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTickets.map((ticket) => (
-                  <TableRow key={ticket.id} className="hover:bg-slate-50 transition-colors">
-                    <TableCell className="px-4 py-3 font-mono text-xs font-bold text-blue-600">
+                  <TableRow key={ticket.id} className="hover:bg-muted transition-colors">
+                    <TableCell className="px-4 py-3 font-mono text-xs font-bold text-primary">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedTicket(ticket);
                           setShowDetailsModal(true);
                         }}
-                        className="hover:underline text-blue-600 hover:text-blue-800 font-bold focus:outline-none"
+                        className="hover:underline text-primary hover:text-primary font-bold focus:outline-none"
                       >
                         {ticket.ticketNumber}
                       </button>
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-xs font-medium text-slate-700 max-w-[200px] truncate">
+                    <TableCell className="px-4 py-3 text-xs font-medium text-foreground max-w-[200px] truncate">
                       {getTicketCustomerName(ticket)}
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <div className="text-xs font-bold text-slate-700 max-w-[260px] truncate">
+                      <div className="text-xs font-bold text-foreground max-w-[260px] truncate">
                         {formatMachineName(
                           ticket.productBrand,
                           ticket.productModel,
                           ticket.productName,
                         )}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -2295,21 +2295,21 @@ export default function ServiceDashboardPage() {
                               handleOpenMachineIntel(ticket.serialNumber);
                             }
                           }}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-mono font-bold hover:underline focus:outline-none"
+                          className="text-[10px] text-primary hover:text-primary font-mono font-bold hover:underline focus:outline-none"
                         >
                           SN: {ticket.serialNumber || 'N/A'}
                         </button>
                       </div>
                     </TableCell>
                     {user?.role === 'ADMIN' && (
-                      <TableCell className="px-4 py-3 text-xs text-slate-600 font-medium">
+                      <TableCell className="px-4 py-3 text-xs text-foreground font-medium">
                         {ticket.branchName || '—'}
                       </TableCell>
                     )}
-                    <TableCell className="px-4 py-3 text-xs text-slate-500 font-medium">
+                    <TableCell className="px-4 py-3 text-xs text-muted-foreground font-medium">
                       {ticket.jobType}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-xs text-slate-500 font-medium">
+                    <TableCell className="px-4 py-3 text-xs text-muted-foreground font-medium">
                       {ticket.scheduledVisitDate
                         ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
                         : 'Unscheduled'}
@@ -2320,7 +2320,7 @@ export default function ServiceDashboardPage() {
                         {ticket.status === 'COMPLETED' && (
                           <button
                             title="Share Completion Bill"
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               setShareTicket(ticket);
@@ -2340,7 +2340,7 @@ export default function ServiceDashboardPage() {
                           ticket.status === 'CUSTOMER_APPROVED') && (
                           <button
                             title="Share Service Quotation"
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               setShareTicket(ticket);
@@ -2369,7 +2369,7 @@ export default function ServiceDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-slate-200 text-slate-600 hover:bg-slate-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="border-border text-foreground hover:bg-muted h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() => {
                                   setSelectedTicket(ticket);
                                   setAssignForm({
@@ -2389,7 +2389,7 @@ export default function ServiceDashboardPage() {
                             ticket.assignedTechnicianId &&
                             ticket.repairStartedAt && (
                               <span
-                                className="text-[10px] font-medium text-slate-400 italic"
+                                className="text-[10px] font-medium text-muted-foreground italic"
                                 title="Repair is already in progress"
                               >
                                 Technician locked — repair in progress
@@ -2405,7 +2405,7 @@ export default function ServiceDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="border-success/30 text-success hover:bg-success/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() => {
                                   loadCashBankAccounts(ticket.branchId);
                                   setCollectVCPaymentMode('');
@@ -2434,7 +2434,7 @@ export default function ServiceDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="border-success/30 text-success hover:bg-success/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() => openCollectCompletionPayment(ticket)}
                               >
                                 <DollarSign className="size-3.5" />
@@ -2453,7 +2453,7 @@ export default function ServiceDashboardPage() {
                                   ? `Collected by ${ticket.visitChargeCollectedByName}`
                                   : undefined
                               }
-                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200"
+                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-warning/10 text-warning border border-warning/30"
                             >
                               <Clock className="size-3.5" />
                               Awaiting Accounts Approval
@@ -2467,7 +2467,7 @@ export default function ServiceDashboardPage() {
                                   ? `Collected by ${ticket.visitChargeCollectedByName}`
                                   : undefined
                               }
-                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-success/10 text-success border border-success/30"
                             >
                               <CheckCircle2 className="size-3.5" />
                               Visit Charge Collected
@@ -2477,7 +2477,7 @@ export default function ServiceDashboardPage() {
                             ticket.visitChargeRejectionReason && (
                               <span
                                 title={ticket.visitChargeRejectionReason}
-                                className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-red-50 text-red-700 border border-red-200"
+                                className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-destructive/10 text-destructive border border-destructive/30"
                               >
                                 <AlertTriangle className="size-3.5" />
                                 Accounts Rejected
@@ -2493,7 +2493,7 @@ export default function ServiceDashboardPage() {
                               <>
                                 <Button
                                   size="sm"
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  className="bg-success hover:bg-success/90 text-success-foreground h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() =>
                                     setApproveModal({
                                       kind: 'ticket',
@@ -2511,7 +2511,7 @@ export default function ServiceDashboardPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  className="border-destructive/30 text-destructive hover:bg-destructive/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => {
                                     const eligible = isVisitChargeCollectionEligible(ticket);
                                     setRejectCollect(eligible);
@@ -2545,7 +2545,7 @@ export default function ServiceDashboardPage() {
                             !ticket.diagnosisStartedAt && (
                               <Button
                                 size="sm"
-                                className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() =>
                                   setArrivalDialog({
                                     ticketId: ticket.id,
@@ -2565,7 +2565,7 @@ export default function ServiceDashboardPage() {
                             ticket.diagnosisStartedBy &&
                             ticket.diagnosisStartedBy !== user?.userId && (
                               <span
-                                className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md select-none"
+                                className="text-[10px] font-bold uppercase text-warning bg-warning/10 border border-warning/30 px-2 py-0.5 rounded-md select-none"
                                 title="Diagnosis was started by another user"
                               >
                                 Opened by{' '}
@@ -2582,7 +2582,7 @@ export default function ServiceDashboardPage() {
                                 <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
                                 <Button
                                   size="sm"
-                                  className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  className="bg-warning hover:bg-warning/90 text-warning-foreground h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => {
                                     setSelectedTicket(ticket);
                                     loadCashBankAccounts(ticket.branchId);
@@ -2621,7 +2621,7 @@ export default function ServiceDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="border-primary/30 text-primary hover:bg-primary/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() => handleOpenEstimates(ticket)}
                               >
                                 <Calculator className="size-3.5" />
@@ -2635,7 +2635,7 @@ export default function ServiceDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="border-warning/30 text-warning hover:bg-warning/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() => {
                                   setSelectedTicket(ticket);
                                   loadCashBankAccounts(ticket.branchId);
@@ -2692,7 +2692,7 @@ export default function ServiceDashboardPage() {
                             !ticket.repairStartedAt && (
                               <Button
                                 size="sm"
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="bg-success hover:bg-success/90 text-success-foreground h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() => handleStartRepair(ticket.id)}
                               >
                                 <Play className="size-3.5 fill-current" />
@@ -2709,7 +2709,7 @@ export default function ServiceDashboardPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  className="border-warning/30 text-warning hover:bg-warning/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => handlePauseRepair(ticket.id)}
                                 >
                                   <Pause className="size-3.5" />
@@ -2717,7 +2717,7 @@ export default function ServiceDashboardPage() {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  className="bg-success hover:bg-success/90 text-success-foreground h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => {
                                     setSelectedTicket(ticket);
                                     setCompleteForm({
@@ -2751,7 +2751,7 @@ export default function ServiceDashboardPage() {
                                 />
                                 <Button
                                   size="sm"
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  className="bg-success hover:bg-success/90 text-success-foreground h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => handleResumeRepair(ticket.id)}
                                 >
                                   <Play className="size-3.5 fill-current" />
@@ -2769,7 +2769,7 @@ export default function ServiceDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                className="border-destructive/30 text-destructive hover:bg-destructive/10 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                 onClick={() =>
                                   handleCancelTicketClick(ticket.id, ticket.ticketNumber)
                                 }
@@ -2782,7 +2782,7 @@ export default function ServiceDashboardPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-slate-500 hover:bg-slate-100 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                            className="text-muted-foreground hover:bg-muted h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                             onClick={() => {
                               setSelectedTicket(ticket);
                               setShowDetailsModal(true);
@@ -2804,10 +2804,10 @@ export default function ServiceDashboardPage() {
 
       {/* CREATE TICKET MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
-              <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-xl bg-card border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-5">
+              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                 <Plus className="text-primary" size={18} /> Create Service Ticket
               </CardTitle>
               <CardDescription className="text-xs">
@@ -2816,7 +2816,7 @@ export default function ServiceDashboardPage() {
             </CardHeader>
             <form onSubmit={handleCreateTicket}>
               {createTicketError && (
-                <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-5 py-3 text-xs font-semibold text-red-700">
+                <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-5 py-3 text-xs font-semibold text-destructive">
                   <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>{createTicketError}</span>
                 </div>
@@ -2828,7 +2828,7 @@ export default function ServiceDashboardPage() {
                     {/* Customer Selection */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                           Select Customer (Name or ID)
                         </label>
                         <button
@@ -2863,15 +2863,15 @@ export default function ServiceDashboardPage() {
                           loadModalCustomerIntel(val);
                         }}
                         placeholder="Search customer by name or ID..."
-                        className="h-10 rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
+                        className="h-10 rounded-xl border-border bg-muted text-xs font-medium text-foreground"
                       />
                     </div>
 
                     {/* Step 2: Machine Selection (appears after customer loads) */}
                     {loadingModalIntel && (
-                      <div className="flex flex-col items-center justify-center py-8 space-y-2 border border-dashed border-slate-200 rounded-2xl">
+                      <div className="flex flex-col items-center justify-center py-8 space-y-2 border border-dashed border-border rounded-2xl">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <p className="text-xs text-slate-500 font-medium">
+                        <p className="text-xs text-muted-foreground font-medium">
                           Fetching customer product history...
                         </p>
                       </div>
@@ -2880,12 +2880,12 @@ export default function ServiceDashboardPage() {
                     {newTicket.customerId && !loadingModalIntel && (
                       <div className="space-y-3">
                         {!isOtherMachine ? (
-                          <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                              <h4 className="text-xs font-bold text-slate-700">Select Machine</h4>
+                          <div className="border border-border rounded-2xl p-4 bg-muted/50 space-y-3">
+                            <div className="flex items-center justify-between border-b border-border pb-2">
+                              <h4 className="text-xs font-bold text-foreground">Select Machine</h4>
                               {selectedMachine && (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                  <span className="text-[10px] bg-success/10 text-success font-bold px-2 py-0.5 rounded-full">
                                     Selected: {selectedMachine.serialNumber}
                                   </span>
                                   <button
@@ -2904,7 +2904,7 @@ export default function ServiceDashboardPage() {
                                         machineType: 'PRINTER',
                                       }));
                                     }}
-                                    className="text-[10px] font-bold text-red-600 hover:text-white bg-red-50 hover:bg-red-500 border border-red-200 hover:border-red-500 px-2 py-0.5 rounded-full transition cursor-pointer"
+                                    className="text-[10px] font-bold text-destructive hover:text-destructive-foreground bg-destructive/10 hover:bg-destructive/90 border border-destructive/30 hover:border-destructive px-2 py-0.5 rounded-full transition cursor-pointer"
                                   >
                                     Remove
                                   </button>
@@ -2913,14 +2913,14 @@ export default function ServiceDashboardPage() {
                             </div>
 
                             {/* Tab Navigation */}
-                            <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-1">
+                            <div className="flex gap-1 overflow-x-auto border-b border-border pb-1">
                               <button
                                 type="button"
                                 onClick={() => setActiveMachineTab('rented')}
                                 className={`px-3 py-1 text-xs font-semibold rounded-lg shrink-0 transition ${
                                   activeMachineTab === 'rented'
-                                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:bg-slate-100'
+                                    ? 'bg-card text-foreground shadow-sm border border-border'
+                                    : 'text-muted-foreground hover:bg-muted'
                                 }`}
                               >
                                 Rented ({getRentedMachines().length})
@@ -2930,8 +2930,8 @@ export default function ServiceDashboardPage() {
                                 onClick={() => setActiveMachineTab('leased')}
                                 className={`px-3 py-1 text-xs font-semibold rounded-lg shrink-0 transition ${
                                   activeMachineTab === 'leased'
-                                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:bg-slate-100'
+                                    ? 'bg-card text-foreground shadow-sm border border-border'
+                                    : 'text-muted-foreground hover:bg-muted'
                                 }`}
                               >
                                 Leased ({getLeasedMachines().length})
@@ -2941,8 +2941,8 @@ export default function ServiceDashboardPage() {
                                 onClick={() => setActiveMachineTab('purchased')}
                                 className={`px-3 py-1 text-xs font-semibold rounded-lg shrink-0 transition ${
                                   activeMachineTab === 'purchased'
-                                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:bg-slate-100'
+                                    ? 'bg-card text-foreground shadow-sm border border-border'
+                                    : 'text-muted-foreground hover:bg-muted'
                                 }`}
                               >
                                 Purchased ({getPurchasedMachines().length})
@@ -2952,8 +2952,8 @@ export default function ServiceDashboardPage() {
                                 onClick={() => setActiveMachineTab('external')}
                                 className={`px-3 py-1 text-xs font-semibold rounded-lg shrink-0 transition ${
                                   activeMachineTab === 'external'
-                                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:bg-slate-100'
+                                    ? 'bg-card text-foreground shadow-sm border border-border'
+                                    : 'text-muted-foreground hover:bg-muted'
                                 }`}
                               >
                                 External ({getExternalMachines().length})
@@ -2964,8 +2964,8 @@ export default function ServiceDashboardPage() {
                                   onClick={() => setActiveMachineTab('contract')}
                                   className={`px-3 py-1 text-xs font-semibold rounded-lg shrink-0 transition ${
                                     activeMachineTab === 'contract'
-                                      ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                      : 'text-slate-500 hover:bg-slate-100'
+                                      ? 'bg-card text-foreground shadow-sm border border-border'
+                                      : 'text-muted-foreground hover:bg-muted'
                                   }`}
                                 >
                                   Contracts ({getContractMachines().length})
@@ -2978,7 +2978,7 @@ export default function ServiceDashboardPage() {
                               {activeMachineTab === 'rented' && (
                                 <>
                                   {getRentedMachines().length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 py-3 text-center">
+                                    <p className="text-[11px] text-muted-foreground py-3 text-center">
                                       No rented machines found.
                                     </p>
                                   ) : (
@@ -3002,39 +3002,39 @@ export default function ServiceDashboardPage() {
                                         className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 ${
                                           selectedMachine?.serialNumber === machine.serialNumber
                                             ? 'border-primary bg-primary/5 shadow-sm'
-                                            : 'border-slate-100 bg-white hover:border-slate-200'
+                                            : 'border-border bg-card hover:border-border'
                                         }`}
                                       >
                                         <div className="flex justify-between items-start">
-                                          <span className="font-bold text-slate-800">
+                                          <span className="font-bold text-foreground">
                                             {machine.modelName}
                                           </span>
                                           <span
                                             className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                               machine.contractStatus === 'ACTIVE'
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                                : 'bg-red-100 text-red-800'
+                                                ? 'bg-success/10 text-success'
+                                                : 'bg-destructive/10 text-destructive'
                                             }`}
                                           >
                                             {machine.contractStatus}
                                           </span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                                           <div>
                                             Serial:{' '}
-                                            <span className="font-mono text-slate-700 font-semibold">
+                                            <span className="font-mono text-foreground font-semibold">
                                               {machine.serialNumber}
                                             </span>
                                           </div>
                                           <div>
                                             Rent:{' '}
-                                            <span className="font-bold text-slate-700">
+                                            <span className="font-bold text-foreground">
                                               QR {machine.monthlyRent}
                                             </span>
                                           </div>
                                           <div className="col-span-2">
                                             Period:{' '}
-                                            <span className="font-semibold text-slate-600">
+                                            <span className="font-semibold text-foreground">
                                               {machine.effectiveFrom} → {machine.effectiveTo}
                                             </span>
                                           </div>
@@ -3049,7 +3049,7 @@ export default function ServiceDashboardPage() {
                               {activeMachineTab === 'leased' && (
                                 <>
                                   {getLeasedMachines().length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 py-3 text-center">
+                                    <p className="text-[11px] text-muted-foreground py-3 text-center">
                                       No leased machines found.
                                     </p>
                                   ) : (
@@ -3075,18 +3075,18 @@ export default function ServiceDashboardPage() {
                                         className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 ${
                                           selectedMachine?.serialNumber === machine.serialNumber
                                             ? 'border-primary bg-primary/5 shadow-sm'
-                                            : 'border-slate-100 bg-white hover:border-slate-200'
+                                            : 'border-border bg-card hover:border-border'
                                         }`}
                                       >
                                         <div className="flex justify-between items-start">
-                                          <span className="font-bold text-slate-800">
+                                          <span className="font-bold text-foreground">
                                             {machine.modelName}
                                           </span>
                                           <span
                                             className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                               machine.isUnderWarranty
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                                : 'bg-red-100 text-red-800'
+                                                ? 'bg-success/10 text-success'
+                                                : 'bg-destructive/10 text-destructive'
                                             }`}
                                           >
                                             {machine.isUnderWarranty
@@ -3094,16 +3094,16 @@ export default function ServiceDashboardPage() {
                                               : 'Warranty Expired'}
                                           </span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                                           <div>
                                             Serial:{' '}
-                                            <span className="font-mono text-slate-700 font-semibold">
+                                            <span className="font-mono text-foreground font-semibold">
                                               {machine.serialNumber}
                                             </span>
                                           </div>
                                           <div>
                                             Start:{' '}
-                                            <span className="font-semibold text-slate-700">
+                                            <span className="font-semibold text-foreground">
                                               {machine.effectiveFrom}
                                             </span>
                                           </div>
@@ -3111,13 +3111,13 @@ export default function ServiceDashboardPage() {
                                             <>
                                               <div>
                                                 Remaining Time:{' '}
-                                                <span className="text-emerald-700 font-bold">
+                                                <span className="text-success font-bold">
                                                   {machine.remainingTime}
                                                 </span>
                                               </div>
                                               <div>
                                                 Remaining Copies:{' '}
-                                                <span className="text-emerald-700 font-bold">
+                                                <span className="text-success font-bold">
                                                   {machine.remainingCopies}
                                                 </span>
                                               </div>
@@ -3125,7 +3125,7 @@ export default function ServiceDashboardPage() {
                                           ) : (
                                             <div className="col-span-2">
                                               Expired First:{' '}
-                                              <span className="text-red-700 font-bold">
+                                              <span className="text-destructive font-bold">
                                                 {machine.expiredFirst}
                                               </span>
                                             </div>
@@ -3141,7 +3141,7 @@ export default function ServiceDashboardPage() {
                               {activeMachineTab === 'purchased' && (
                                 <>
                                   {getPurchasedMachines().length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 py-3 text-center">
+                                    <p className="text-[11px] text-muted-foreground py-3 text-center">
                                       No purchased machines found.
                                     </p>
                                   ) : (
@@ -3167,18 +3167,18 @@ export default function ServiceDashboardPage() {
                                         className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 ${
                                           selectedMachine?.serialNumber === machine.serialNumber
                                             ? 'border-primary bg-primary/5 shadow-sm'
-                                            : 'border-slate-100 bg-white hover:border-slate-200'
+                                            : 'border-border bg-card hover:border-border'
                                         }`}
                                       >
                                         <div className="flex justify-between items-start">
-                                          <span className="font-bold text-slate-800">
+                                          <span className="font-bold text-foreground">
                                             {machine.modelName}
                                           </span>
                                           <span
                                             className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                               machine.isUnderWarranty
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                                : 'bg-red-100 text-red-800'
+                                                ? 'bg-success/10 text-success'
+                                                : 'bg-destructive/10 text-destructive'
                                             }`}
                                           >
                                             {machine.isUnderWarranty
@@ -3186,16 +3186,16 @@ export default function ServiceDashboardPage() {
                                               : 'Warranty Expired'}
                                           </span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                                           <div>
                                             Serial:{' '}
-                                            <span className="font-mono text-slate-700 font-semibold">
+                                            <span className="font-mono text-foreground font-semibold">
                                               {machine.serialNumber}
                                             </span>
                                           </div>
                                           <div>
                                             Purchase Date:{' '}
-                                            <span className="font-semibold text-slate-700">
+                                            <span className="font-semibold text-foreground">
                                               {machine.purchaseDate}
                                             </span>
                                           </div>
@@ -3203,13 +3203,13 @@ export default function ServiceDashboardPage() {
                                             <>
                                               <div>
                                                 Remaining Time:{' '}
-                                                <span className="text-emerald-700 font-bold">
+                                                <span className="text-success font-bold">
                                                   {machine.remainingTime}
                                                 </span>
                                               </div>
                                               <div>
                                                 Remaining Copies:{' '}
-                                                <span className="text-emerald-700 font-bold">
+                                                <span className="text-success font-bold">
                                                   {machine.remainingCopies}
                                                 </span>
                                               </div>
@@ -3218,7 +3218,7 @@ export default function ServiceDashboardPage() {
                                             machine.expiredFirst && (
                                               <div className="col-span-2">
                                                 Expired First:{' '}
-                                                <span className="text-red-700 font-bold">
+                                                <span className="text-destructive font-bold">
                                                   {machine.expiredFirst}
                                                 </span>
                                               </div>
@@ -3235,7 +3235,7 @@ export default function ServiceDashboardPage() {
                               {activeMachineTab === 'contract' && (
                                 <>
                                   {getContractMachines().length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 py-3 text-center">
+                                    <p className="text-[11px] text-muted-foreground py-3 text-center">
                                       No contracts found.
                                     </p>
                                   ) : (
@@ -3259,27 +3259,27 @@ export default function ServiceDashboardPage() {
                                         className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 ${
                                           selectedMachine?.serialNumber === machine.serialNumber
                                             ? 'border-primary bg-primary/5 shadow-sm'
-                                            : 'border-slate-100 bg-white hover:border-slate-200'
+                                            : 'border-border bg-card hover:border-border'
                                         }`}
                                       >
                                         <div className="flex justify-between items-start">
-                                          <span className="font-bold text-slate-800">
+                                          <span className="font-bold text-foreground">
                                             {machine.modelName}
                                           </span>
-                                          <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
+                                          <span className="text-[10px] bg-primary/10 text-primary font-bold px-1.5 py-0.5 rounded">
                                             {machine.contractType}
                                           </span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                                           <div>
                                             Serial:{' '}
-                                            <span className="font-mono text-slate-700 font-semibold">
+                                            <span className="font-mono text-foreground font-semibold">
                                               {machine.serialNumber}
                                             </span>
                                           </div>
                                           <div>
                                             Expiry Date:{' '}
-                                            <span className="font-semibold text-slate-700">
+                                            <span className="font-semibold text-foreground">
                                               {machine.effectiveTo}
                                             </span>
                                           </div>
@@ -3293,7 +3293,7 @@ export default function ServiceDashboardPage() {
                               {activeMachineTab === 'external' && (
                                 <>
                                   {getExternalMachines().length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 py-3 text-center">
+                                    <p className="text-[11px] text-muted-foreground py-3 text-center">
                                       No external machines found.
                                     </p>
                                   ) : (
@@ -3317,28 +3317,28 @@ export default function ServiceDashboardPage() {
                                         className={`p-2.5 border rounded-xl cursor-pointer text-xs transition flex flex-col gap-1 ${
                                           selectedMachine?.serialNumber === machine.serialNumber
                                             ? 'border-primary bg-primary/5 shadow-sm'
-                                            : 'border-slate-100 bg-white hover:border-slate-200'
+                                            : 'border-border bg-card hover:border-border'
                                         }`}
                                       >
                                         <div className="flex justify-between items-start">
-                                          <span className="font-bold text-slate-800">
+                                          <span className="font-bold text-foreground">
                                             {machine.modelName}
                                           </span>
                                           <div className="flex items-center gap-1">
                                             {machine.contractType && (
-                                              <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-1.5 py-0.5 rounded">
+                                              <span className="text-[10px] bg-primary/10 text-primary border border-primary/30 font-bold px-1.5 py-0.5 rounded">
                                                 Under {machine.contractType}
                                               </span>
                                             )}
-                                            <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
+                                            <span className="text-[10px] bg-muted text-foreground font-bold px-1.5 py-0.5 rounded">
                                               EXTERNAL
                                             </span>
                                           </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                                        <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
                                           <div>
                                             Serial:{' '}
-                                            <span className="font-mono text-slate-700 font-semibold">
+                                            <span className="font-mono text-foreground font-semibold">
                                               {machine.serialNumber}
                                             </span>
                                           </div>
@@ -3349,11 +3349,11 @@ export default function ServiceDashboardPage() {
                                           {machine.contractType && (
                                             <div className="col-span-2">
                                               Active Contract:{' '}
-                                              <span className="font-bold text-indigo-600">
+                                              <span className="font-bold text-primary">
                                                 {machine.contractType}
                                               </span>
                                               {machine.effectiveTo && (
-                                                <span className="text-slate-500">
+                                                <span className="text-muted-foreground">
                                                   {' '}
                                                   · valid until{' '}
                                                   {new Date(
@@ -3371,7 +3371,7 @@ export default function ServiceDashboardPage() {
                               )}
                             </div>
 
-                            <div className="pt-2 border-t border-slate-100 flex justify-end">
+                            <div className="pt-2 border-t border-border flex justify-end">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -3398,9 +3398,9 @@ export default function ServiceDashboardPage() {
                           </div>
                         ) : (
                           /* Manual Entry Mode */
-                          <div className="border border-slate-100 rounded-2xl p-4 bg-amber-50/20 space-y-3">
+                          <div className="border border-border rounded-2xl p-4 bg-warning/10 space-y-3">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-amber-800">
+                              <span className="text-xs font-bold text-warning">
                                 Other Machine (Not from Xerocare)
                               </span>
                               <button
@@ -3414,7 +3414,7 @@ export default function ServiceDashboardPage() {
 
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                   Product Brand
                                 </label>
                                 <div className="flex gap-1.5 items-center">
@@ -3434,7 +3434,7 @@ export default function ServiceDashboardPage() {
                                         }))
                                       }
                                       placeholder="Select brand..."
-                                      className="h-9 rounded-xl border-slate-200 bg-white text-xs font-medium text-slate-700"
+                                      className="h-9 rounded-xl border-border bg-card text-xs font-medium text-foreground"
                                     />
                                   </div>
                                   <Button
@@ -3442,7 +3442,7 @@ export default function ServiceDashboardPage() {
                                     variant="outline"
                                     size="icon"
                                     onClick={() => setShowCreateBrandModal(true)}
-                                    className="h-9 w-9 shrink-0 border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500"
+                                    className="h-9 w-9 shrink-0 border-border rounded-xl bg-card hover:bg-muted text-muted-foreground"
                                   >
                                     <Plus size={16} />
                                   </Button>
@@ -3450,7 +3450,7 @@ export default function ServiceDashboardPage() {
                               </div>
 
                               <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                   Product Model
                                 </label>
                                 <div className="flex gap-1.5 items-center">
@@ -3477,7 +3477,7 @@ export default function ServiceDashboardPage() {
                                         }));
                                       }}
                                       placeholder="Select model..."
-                                      className="h-9 rounded-xl border-slate-200 bg-white text-xs font-medium text-slate-700"
+                                      className="h-9 rounded-xl border-border bg-card text-xs font-medium text-foreground"
                                     />
                                   </div>
                                   <Button
@@ -3485,7 +3485,7 @@ export default function ServiceDashboardPage() {
                                     variant="outline"
                                     size="icon"
                                     onClick={handleOpenCreateModel}
-                                    className="h-9 w-9 shrink-0 border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500"
+                                    className="h-9 w-9 shrink-0 border-border rounded-xl bg-card hover:bg-muted text-muted-foreground"
                                   >
                                     <Plus size={16} />
                                   </Button>
@@ -3493,7 +3493,7 @@ export default function ServiceDashboardPage() {
                               </div>
 
                               <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                   Product Name
                                 </label>
                                 <Input
@@ -3502,12 +3502,12 @@ export default function ServiceDashboardPage() {
                                   onChange={(e) =>
                                     setNewTicket({ ...newTicket, productName: e.target.value })
                                   }
-                                  className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
+                                  className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-primary"
                                 />
                               </div>
 
                               <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                   Serial Number
                                 </label>
                                 <Input
@@ -3516,7 +3516,7 @@ export default function ServiceDashboardPage() {
                                   onChange={(e) =>
                                     setNewTicket({ ...newTicket, serialNumber: e.target.value })
                                   }
-                                  className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary font-mono"
+                                  className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-primary font-mono"
                                 />
                               </div>
                             </div>
@@ -3527,28 +3527,28 @@ export default function ServiceDashboardPage() {
 
                     {/* DYNAMIC COVERAGE PREVIEW PANEL */}
                     {selectedMachine && (
-                      <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                        <h4 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 flex items-center justify-between">
+                      <div className="border border-border rounded-2xl p-4 bg-muted/50 space-y-3 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <h4 className="text-xs font-bold text-foreground border-b border-border pb-1.5 flex items-center justify-between">
                           <span>Machine & Coverage Details</span>
                           {machineContextLoading ? (
-                            <span className="text-[10px] text-slate-400 font-normal animate-pulse">
+                            <span className="text-[10px] text-muted-foreground font-normal animate-pulse">
                               Checking coverage...
                             </span>
                           ) : !machineContextData || machineContextData.coverageUnverified ? (
                             // Never show CHARGEABLE as a fallback: a machine whose contract
                             // could not be checked may well be on Rent or a covered Lease.
-                            <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase">
+                            <span className="text-[10px] bg-warning/10 text-warning font-bold px-2 py-0.5 rounded-full uppercase">
                               Coverage unknown
                             </span>
                           ) : (
-                            <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full uppercase">
+                            <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full uppercase">
                               {machineContextData.serviceContext}
                             </span>
                           )}
                         </h4>
                         {!machineContextLoading &&
                           (!machineContextData || machineContextData.coverageUnverified) && (
-                            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+                            <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] font-medium text-warning">
                               Could not confirm whether this machine is on a Rent, Lease or Sale
                               contract. Re-select the machine to try again — the ticket cannot be
                               created until coverage is confirmed.
@@ -3556,41 +3556,41 @@ export default function ServiceDashboardPage() {
                           )}
 
                         {machineContextLoading ? (
-                          <div className="py-4 text-center text-xs text-slate-400">
+                          <div className="py-4 text-center text-xs text-muted-foreground">
                             Loading machine coverage context...
                           </div>
                         ) : (
                           <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div>
-                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">
                                   Machine Model
                                 </span>
-                                <span className="font-semibold text-slate-800">
+                                <span className="font-semibold text-foreground">
                                   {selectedMachine.modelName}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">
                                   Serial Number
                                 </span>
-                                <span className="font-mono font-semibold text-slate-800">
+                                <span className="font-mono font-semibold text-foreground">
                                   {selectedMachine.serialNumber}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">
                                   Ownership Status
                                 </span>
-                                <span className="font-semibold text-slate-800 uppercase">
+                                <span className="font-semibold text-foreground uppercase">
                                   {selectedMachine.type || 'UNKNOWN'}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">
                                   Warranty / Contract Expiry
                                 </span>
-                                <span className="font-semibold text-slate-800">
+                                <span className="font-semibold text-foreground">
                                   {machineContextData?.contract?.endDate
                                     ? new Date(
                                         machineContextData.contract.endDate,
@@ -3609,8 +3609,8 @@ export default function ServiceDashboardPage() {
                                 Asked regardless of ownership (SALE/LEASE/RENT/EXTERNAL) so
                                 meterReadingAtCreation is always captured for the ticket. */}
                             {newTicket.machineType === 'PRINTER' && (
-                              <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
-                                <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
+                              <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl space-y-2">
+                                <label className="text-[10px] uppercase font-bold tracking-wider text-warning block">
                                   Current Meter Reading (Total Copies)
                                   {machineContextData?.warrantyInfo?.copyLimit != null && ' *'}
                                 </label>
@@ -3638,14 +3638,14 @@ export default function ServiceDashboardPage() {
                                       (e.target as HTMLInputElement).blur();
                                     }
                                   }}
-                                  className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
+                                  className="h-9 text-xs bg-card border-warning/30 rounded-xl focus-visible:ring-warning font-mono"
                                 />
                                 {machineContextData?.warrantyInfo && (
                                   <p
                                     className={`text-[11px] font-semibold ${
                                       machineContextData.warrantyInfo.isUnderWarranty
-                                        ? 'text-emerald-700'
-                                        : 'text-red-700'
+                                        ? 'text-success'
+                                        : 'text-destructive'
                                     }`}
                                   >
                                     {machineContextData.warrantyInfo.isUnderWarranty
@@ -3669,17 +3669,17 @@ export default function ServiceDashboardPage() {
                             )}
 
                             {machineContextData?.contract && (
-                              <div className="p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl space-y-1">
+                              <div className="p-2.5 bg-primary/10 border border-primary/30 rounded-xl space-y-1">
                                 <div className="flex justify-between items-center text-xs">
-                                  <span className="font-bold text-blue-800">
+                                  <span className="font-bold text-primary">
                                     Active {machineContextData.contract.contractType} Agreement
                                   </span>
-                                  <span className="font-bold text-blue-700 text-[10px]">
+                                  <span className="font-bold text-primary text-[10px]">
                                     Valued: {getActiveCurrency()}{' '}
                                     {Number(machineContextData.contract.contractValue).toFixed(2)}
                                   </span>
                                 </div>
-                                <p className="text-[11px] text-blue-600/80">
+                                <p className="text-[11px] text-primary/80">
                                   Period:{' '}
                                   {new Date(
                                     machineContextData.contract.startDate,
@@ -3692,8 +3692,8 @@ export default function ServiceDashboardPage() {
                               </div>
                             )}
 
-                            <div className="p-3 bg-white border border-slate-100 rounded-xl space-y-2">
-                              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                            <div className="p-3 bg-card border border-border rounded-xl space-y-2">
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
                                 Coverage Checklist
                               </span>
                               <div className="grid grid-cols-2 gap-2">
@@ -3709,15 +3709,15 @@ export default function ServiceDashboardPage() {
                                   return (
                                     <div key={key} className="flex items-center gap-1.5 text-xs">
                                       {covered ? (
-                                        <span className="text-emerald-500 font-bold">✓</span>
+                                        <span className="text-success font-bold">✓</span>
                                       ) : (
-                                        <span className="text-rose-500 font-bold">✗</span>
+                                        <span className="text-destructive font-bold">✗</span>
                                       )}
                                       <span
                                         className={
                                           covered
-                                            ? 'text-slate-700 font-medium'
-                                            : 'text-slate-400 line-through'
+                                            ? 'text-foreground font-medium'
+                                            : 'text-muted-foreground line-through'
                                         }
                                       >
                                         {label}
@@ -3730,8 +3730,8 @@ export default function ServiceDashboardPage() {
                                 <p
                                   className={`text-[11px] font-semibold ${
                                     machineContextData.contractUsage.limitExceeded
-                                      ? 'text-rose-600'
-                                      : 'text-slate-500'
+                                      ? 'text-destructive'
+                                      : 'text-muted-foreground'
                                   }`}
                                 >
                                   Contract copies:{' '}
@@ -3753,15 +3753,15 @@ export default function ServiceDashboardPage() {
                 {/* STEP 3 & 4: JOB TYPE & REMAINING FIELDS */}
                 {((creationPath === 'existing' && (selectedMachine || isOtherMachine)) ||
                   creationPath === 'new') && (
-                  <div className="space-y-4 border-t border-slate-100 pt-4">
+                  <div className="space-y-4 border-t border-border pt-4">
                     {/* Machine Type — Printer keeps the meter-based workflow;
                         Computer / Other have no meter and time-only warranty. */}
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Machine Type
                       </label>
                       {creationPath === 'existing' && selectedMachine && !isOtherMachine ? (
-                        <div className="h-9 px-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-between">
+                        <div className="h-9 px-3 border border-border rounded-xl bg-muted text-foreground text-xs font-bold flex items-center justify-between">
                           <span>
                             {newTicket.machineType === 'PRINTER'
                               ? 'Printer / Copier'
@@ -3769,12 +3769,12 @@ export default function ServiceDashboardPage() {
                                 ? 'Computer'
                                 : 'Other Machine'}
                           </span>
-                          <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-extrabold uppercase">
+                          <span className="text-[9px] bg-muted text-foreground px-1.5 py-0.5 rounded font-extrabold uppercase">
                             From machine record
                           </span>
                         </div>
                       ) : (
-                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <div className="flex bg-muted p-1 rounded-xl">
                           {(['PRINTER', 'COMPUTER', 'OTHER'] as const).map((mt) => (
                             <button
                               key={mt}
@@ -3782,8 +3782,8 @@ export default function ServiceDashboardPage() {
                               onClick={() => setNewTicket((prev) => ({ ...prev, machineType: mt }))}
                               className={`flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition ${
                                 newTicket.machineType === mt
-                                  ? 'bg-white text-slate-800 shadow-sm'
-                                  : 'text-slate-500 hover:text-slate-700'
+                                  ? 'bg-card text-foreground shadow-sm'
+                                  : 'text-muted-foreground hover:text-foreground'
                               }`}
                             >
                               {mt === 'PRINTER'
@@ -3796,7 +3796,7 @@ export default function ServiceDashboardPage() {
                         </div>
                       )}
                       {newTicket.machineType !== 'PRINTER' && (
-                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                        <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
                           No meter reading. Warranty is time-based; only RENT or an active AMC
                           contract covers the service.
                         </p>
@@ -3808,7 +3808,7 @@ export default function ServiceDashboardPage() {
                     {(creationPath === 'new' || isOtherMachine) &&
                       newTicket.machineType === 'PRINTER' && (
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Current Meter Reading (Total Copies) *
                           </label>
                           <Input
@@ -3818,7 +3818,7 @@ export default function ServiceDashboardPage() {
                             placeholder="Ask the customer for the machine's current meter reading..."
                             value={meterReadingInput}
                             onChange={(e) => setMeterReadingInput(e.target.value)}
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary font-mono"
+                            className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-primary font-mono"
                           />
                         </div>
                       )}
@@ -3829,40 +3829,40 @@ export default function ServiceDashboardPage() {
                       let bannerText = '';
 
                       if (creationPath === 'new' || isOtherMachine) {
-                        bannerClass = 'bg-orange-50 border-orange-200 text-orange-800';
+                        bannerClass = 'bg-warning/10 border-warning/30 text-warning';
                         bannerText =
                           'External/New Lead Machine. Service will be charged under standard rates (CHARGEABLE).';
                       } else if (selectedMachine) {
                         const ctx = newTicket.serviceContext;
                         if (ctx === 'RENT') {
-                          bannerClass = 'bg-blue-50 border-blue-200 text-blue-800';
+                          bannerClass = 'bg-primary/10 border-primary/30 text-primary';
                           bannerText =
                             'Active Rent Contract: Repair service & spare parts are fully covered.';
                         } else if (ctx === 'LEASE_CPC') {
-                          bannerClass = 'bg-blue-50 border-blue-200 text-blue-800';
+                          bannerClass = 'bg-primary/10 border-primary/30 text-primary';
                           bannerText =
                             'Lease (CPC): Full-service — labour, spare parts and toner/consumables are all covered.';
                         } else if (ctx === 'LEASE_UNDER_WARRANTY') {
-                          bannerClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                          bannerClass = 'bg-success/10 border-success/30 text-success';
                           bannerText =
                             'Lease Under Warranty: Service, labour & spare parts covered. Toner/consumables are chargeable.';
                         } else if (ctx === 'LEASE_EXPIRED') {
-                          bannerClass = 'bg-red-50 border-red-200 text-red-800';
+                          bannerClass = 'bg-destructive/10 border-destructive/30 text-destructive';
                           bannerText = `Lease Warranty EXPIRED (Limit hit: ${
                             machineContextData?.warrantyInfo?.expiredBy ||
                             selectedMachine.expiredFirst ||
                             'TIME/COPIES'
                           }). Repairs will be CHARGEABLE.`;
                         } else if (ctx === 'WARRANTY') {
-                          bannerClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                          bannerClass = 'bg-success/10 border-success/30 text-success';
                           bannerText =
                             'Purchased Machine Under Warranty: Repair service & spare parts covered. Toner/consumables are chargeable.';
                         } else if (ctx === 'CHARGEABLE') {
-                          bannerClass = 'bg-orange-50 border-orange-200 text-orange-800';
+                          bannerClass = 'bg-warning/10 border-warning/30 text-warning';
                           bannerText =
                             'Purchased Machine: Out of warranty. Standard service charges apply.';
                         } else if (['AMC', 'FSMA', 'SMA'].includes(ctx)) {
-                          bannerClass = 'bg-blue-50 border-blue-200 text-blue-800';
+                          bannerClass = 'bg-primary/10 border-primary/30 text-primary';
                           bannerText = `Active ${ctx} Service Contract: Maintenance & breakdown repairs are covered.`;
                         }
                       }
@@ -3900,7 +3900,7 @@ export default function ServiceDashboardPage() {
                       if (!chargeableVisit) return null;
                       return (
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Visit Charge Amount ({getActiveCurrency()})
                           </label>
                           <Input
@@ -3912,13 +3912,13 @@ export default function ServiceDashboardPage() {
                             onChange={(e) =>
                               setNewTicket({ ...newTicket, visitChargeAmount: e.target.value })
                             }
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
+                            className="h-9 text-xs bg-card border-border rounded-xl focus-visible:ring-primary"
                           />
-                          <p className="text-[10px] text-slate-400 mt-1">
+                          <p className="text-[10px] text-muted-foreground mt-1">
                             Sent to the customer in the confirmation email. Leave blank to confirm
                             the amount later — technician assignment is never blocked on payment.
                           </p>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mt-3 mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mt-3 mb-1">
                             Visit Charge Payment Status
                           </label>
                           <select
@@ -3929,7 +3929,7 @@ export default function ServiceDashboardPage() {
                                 visitChargeCollected: e.target.value === 'COLLECTED',
                               })
                             }
-                            className="w-full h-9 text-xs border border-slate-200 rounded-xl px-3 bg-white"
+                            className="w-full h-9 text-xs border border-border rounded-xl px-3 bg-card"
                           >
                             <option value="NOT_COLLECTED">Not Collected</option>
                             <option value="COLLECTED">Collected now</option>
@@ -3939,7 +3939,7 @@ export default function ServiceDashboardPage() {
                               <select
                                 value={collectVCPaymentMode}
                                 onChange={(e) => handleCollectVCModeChange(e.target.value)}
-                                className="h-9 text-xs border border-slate-200 rounded-xl px-3 bg-white"
+                                className="h-9 text-xs border border-border rounded-xl px-3 bg-card"
                               >
                                 <option value="">Payment method</option>
                                 <option value="CASH">Cash</option>
@@ -3950,7 +3950,7 @@ export default function ServiceDashboardPage() {
                                 <select
                                   value={collectVCAccountId}
                                   onChange={(e) => setCollectVCAccountId(e.target.value)}
-                                  className="h-9 text-xs border border-slate-200 rounded-xl px-3 bg-white"
+                                  className="h-9 text-xs border border-border rounded-xl px-3 bg-card"
                                 >
                                   <option value="">Select account</option>
                                   {collectVCEligibleAccounts.map((account) => (
@@ -3971,7 +3971,7 @@ export default function ServiceDashboardPage() {
                             </div>
                           )}
                           {newTicket.visitChargeCollected && (
-                            <p className="text-[10px] text-amber-700 mt-2">
+                            <p className="text-[10px] text-warning mt-2">
                               The collection will be sent to Accounts for approval. It is not posted
                               to the cashbook until Accounts approves it.
                             </p>
@@ -3983,7 +3983,7 @@ export default function ServiceDashboardPage() {
                     {/* Job Type selection */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Job Type
                         </label>
                         {(() => {
@@ -4002,9 +4002,9 @@ export default function ServiceDashboardPage() {
 
                           if (lockOnsite) {
                             return (
-                              <div className="h-9 px-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-between">
+                              <div className="h-9 px-3 border border-border rounded-xl bg-muted text-foreground text-xs font-bold flex items-center justify-between">
                                 <span>Warranty / On-Site</span>
-                                <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-extrabold uppercase">
+                                <span className="text-[9px] bg-muted text-foreground px-1.5 py-0.5 rounded font-extrabold uppercase">
                                   LOCKED
                                 </span>
                               </div>
@@ -4017,7 +4017,7 @@ export default function ServiceDashboardPage() {
                               onChange={(e) =>
                                 setNewTicket({ ...newTicket, jobType: e.target.value })
                               }
-                              className="w-full h-9 text-xs border border-slate-200 rounded-xl px-3 outline-none focus:border-primary bg-slate-50 text-slate-700 font-medium"
+                              className="w-full h-9 text-xs border border-border rounded-xl px-3 outline-none focus:border-primary bg-muted text-foreground font-medium"
                             >
                               <option value="ONSITE">On-Site</option>
                               <option value="BRING_TO_CENTRE">Service Centre</option>
@@ -4029,7 +4029,7 @@ export default function ServiceDashboardPage() {
                       {/* Scheduled visit date (only if ONSITE) */}
                       {newTicket.jobType === 'ONSITE' && (
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Scheduled Visit Date *
                           </label>
                           <Input
@@ -4039,7 +4039,7 @@ export default function ServiceDashboardPage() {
                             onChange={(e) =>
                               setNewTicket({ ...newTicket, scheduledVisitDate: e.target.value })
                             }
-                            className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                            className="h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
                           />
                         </div>
                       )}
@@ -4048,7 +4048,7 @@ export default function ServiceDashboardPage() {
                     {/* Site location (only if ONSITE) — visit charge is priced from it */}
                     {newTicket.jobType === 'ONSITE' && (
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Site Location (for visit charge)
                         </label>
                         <Input
@@ -4057,9 +4057,9 @@ export default function ServiceDashboardPage() {
                           onChange={(e) =>
                             setNewTicket({ ...newTicket, serviceLocation: e.target.value })
                           }
-                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                          className="h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
                         />
-                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                        <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
                           Visit / estimate charge is decided based on this location.
                         </p>
                       </div>
@@ -4067,7 +4067,7 @@ export default function ServiceDashboardPage() {
 
                     {/* Issue Description */}
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Issue Description *
                       </label>
                       <Textarea
@@ -4076,13 +4076,13 @@ export default function ServiceDashboardPage() {
                         onChange={(e) =>
                           setNewTicket({ ...newTicket, issueDescription: e.target.value })
                         }
-                        className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[80px]"
+                        className="bg-muted border-border rounded-xl text-xs focus-visible:ring-primary min-h-[80px]"
                       />
                     </div>
                   </div>
                 )}
               </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+              <div className="bg-muted border-t border-border p-4 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -4101,7 +4101,7 @@ export default function ServiceDashboardPage() {
                   disabled={submitting}
                   className={cn(
                     buttonVariants(),
-                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs',
+                    'bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl text-xs',
                   )}
                 >
                   Create Ticket
@@ -4114,10 +4114,10 @@ export default function ServiceDashboardPage() {
 
       {/* CREATE LEAD MODAL */}
       {showCreateLeadModal && (
-        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-md bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
-              <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <div className="fixed inset-0 z-[60] bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-md bg-card border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-6">
+              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                 <Plus className="text-primary" size={18} /> Create New Lead
               </CardTitle>
               <CardDescription className="text-xs">
@@ -4127,32 +4127,32 @@ export default function ServiceDashboardPage() {
             <form onSubmit={handleCreateLead}>
               <CardContent className="p-6 space-y-4">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Lead Name <span className="text-red-500">*</span>
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                    Lead Name <span className="text-destructive">*</span>
                   </label>
                   <Input
                     required
                     placeholder="e.g. John Doe / Company A"
                     value={leadForm.name}
                     onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                    className="h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                     Location / Address
                   </label>
                   <Input
                     placeholder="e.g. Downtown Office, Suite 404"
                     value={leadForm.location}
                     onChange={(e) => setLeadForm({ ...leadForm, location: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                    className="h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                     Email Address
                   </label>
                   <Input
@@ -4160,12 +4160,12 @@ export default function ServiceDashboardPage() {
                     placeholder="e.g. lead@example.com"
                     value={leadForm.email}
                     onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                    className="h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                     Phone Number
                   </label>
                   <Input
@@ -4173,11 +4173,11 @@ export default function ServiceDashboardPage() {
                     placeholder="e.g. +1 555-0199"
                     value={leadForm.phone}
                     onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                    className="h-9 text-xs bg-muted border-border rounded-xl focus-visible:ring-primary"
                   />
                 </div>
               </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+              <div className="bg-muted border-t border-border p-4 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -4196,7 +4196,7 @@ export default function ServiceDashboardPage() {
                   disabled={creatingLead}
                   className={cn(
                     buttonVariants(),
-                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                    'bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl',
                   )}
                 >
                   Create &amp; Associate
@@ -4230,10 +4230,10 @@ export default function ServiceDashboardPage() {
           const currentTech = technicians.find((t) => t.id === selectedTicket.assignedTechnicianId);
           const isReassignment = !!selectedTicket.assignedTechnicianId;
           return (
-            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-              <Card className="w-full max-w-md bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
-                  <CardTitle className="text-base font-bold text-slate-800">
+            <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+              <Card className="w-full max-w-md bg-card border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <CardHeader className="bg-muted border-b border-border p-6">
+                  <CardTitle className="text-base font-bold text-foreground">
                     {isReassignment ? 'Change Technician' : 'Assign Technician'}
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -4245,7 +4245,7 @@ export default function ServiceDashboardPage() {
                 <form onSubmit={handleAssignTechnician}>
                   <CardContent className="p-6 space-y-4">
                     {isReassignment && (
-                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-[11px] font-semibold text-amber-800">
+                      <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 text-[11px] font-semibold text-warning">
                         Currently assigned to{' '}
                         <span className="font-bold">
                           {currentTech
@@ -4258,7 +4258,7 @@ export default function ServiceDashboardPage() {
                       </div>
                     )}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         {isReassignment ? 'New Technician' : 'Technician'}
                       </label>
                       <SearchableSelect
@@ -4270,11 +4270,11 @@ export default function ServiceDashboardPage() {
                         value={assignForm.technicianId}
                         onValueChange={(val) => setAssignForm({ ...assignForm, technicianId: val })}
                         placeholder="Search technician by name or email..."
-                        className="h-9 rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
+                        className="h-9 rounded-xl border-border bg-muted text-xs font-medium text-foreground"
                       />
                     </div>
                   </CardContent>
-                  <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+                  <div className="bg-muted border-t border-border p-4 flex items-center justify-end gap-2">
                     <Button
                       type="button"
                       variant="ghost"
@@ -4297,7 +4297,7 @@ export default function ServiceDashboardPage() {
                       }
                       className={cn(
                         buttonVariants(),
-                        'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                        'bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl',
                       )}
                     >
                       {isReassignment ? 'Change Job' : 'Assign Job'}
@@ -4311,17 +4311,17 @@ export default function ServiceDashboardPage() {
 
       {/* DIAGNOSE TICKET MODAL */}
       {showDiagnoseModal && selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-3xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-3xl bg-card border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-6">
               <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-blue-50 shrink-0">
-                  <Wrench className="size-5 text-blue-600" />
+                <div className="p-2 rounded-xl bg-primary/10 shrink-0">
+                  <Wrench className="size-5 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                     Technician Diagnosis
-                    <span className="text-[10px] font-bold text-slate-400 font-mono">
+                    <span className="text-[10px] font-bold text-muted-foreground font-mono">
                       {selectedTicket.ticketNumber}
                     </span>
                   </CardTitle>
@@ -4335,11 +4335,11 @@ export default function ServiceDashboardPage() {
               <CardContent className="p-6 space-y-4 max-h-[62vh] overflow-y-auto">
                 {/* Machine + Complaint context */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-1.5">
-                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="bg-muted border border-border rounded-xl p-3.5 space-y-1.5">
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Machine Under Service
                     </h4>
-                    <p className="text-xs font-bold text-slate-800 leading-snug">
+                    <p className="text-xs font-bold text-foreground leading-snug">
                       {[selectedTicket.productBrand, selectedTicket.productModel]
                         .filter(Boolean)
                         .join(' ') ||
@@ -4347,16 +4347,16 @@ export default function ServiceDashboardPage() {
                         'Machine details not recorded'}
                     </p>
                     {selectedTicket.serialNumber && (
-                      <p className="text-[11px] font-mono text-slate-500">
+                      <p className="text-[11px] font-mono text-muted-foreground">
                         SN: {selectedTicket.serialNumber}
                       </p>
                     )}
                   </div>
-                  <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3.5 space-y-1">
-                    <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                  <div className="bg-warning/10 border border-warning/30 rounded-xl p-3.5 space-y-1">
+                    <h4 className="text-[10px] font-bold text-warning uppercase tracking-wider">
                       Complaint Raised by Customer
                     </h4>
-                    <p className="text-xs text-amber-950 font-semibold whitespace-pre-wrap leading-relaxed">
+                    <p className="text-xs text-warning font-semibold whitespace-pre-wrap leading-relaxed">
                       {selectedTicket.issueDescription || 'No complaint details provided.'}
                     </p>
                   </div>
@@ -4364,7 +4364,7 @@ export default function ServiceDashboardPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Problem Found / Symptoms
                     </label>
                     <Input
@@ -4374,11 +4374,11 @@ export default function ServiceDashboardPage() {
                       onChange={(e) =>
                         setDiagnosisForm({ ...diagnosisForm, problemFound: e.target.value })
                       }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                      className="h-9 text-xs bg-muted border-border rounded-xl"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Root Cause
                     </label>
                     <Input
@@ -4388,7 +4388,7 @@ export default function ServiceDashboardPage() {
                       onChange={(e) =>
                         setDiagnosisForm({ ...diagnosisForm, rootCause: e.target.value })
                       }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                      className="h-9 text-xs bg-muted border-border rounded-xl"
                     />
                   </div>
                 </div>
@@ -4396,7 +4396,7 @@ export default function ServiceDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {selectedTicket.machineType === 'PRINTER' && (
                     <div>
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Current Meter Reading
                       </label>
                       <Input
@@ -4411,12 +4411,12 @@ export default function ServiceDashboardPage() {
                             meterReading: parseInt(e.target.value, 10) || 0,
                           })
                         }
-                        className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                        className="h-9 text-xs bg-muted border-border rounded-xl"
                       />
                     </div>
                   )}
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Diagnosis Notes
                     </label>
                     <Textarea
@@ -4426,7 +4426,7 @@ export default function ServiceDashboardPage() {
                       onChange={(e) =>
                         setDiagnosisForm({ ...diagnosisForm, notes: e.target.value })
                       }
-                      className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[40px]"
+                      className="bg-muted border-border rounded-xl text-xs focus-visible:ring-primary min-h-[40px]"
                     />
                   </div>
                 </div>
@@ -4435,7 +4435,7 @@ export default function ServiceDashboardPage() {
                   selectedTicket.serviceContext,
                 ) && (
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Labor Cost / Service Charge ({getActiveCurrency()})
                     </label>
                     <Input
@@ -4450,18 +4450,18 @@ export default function ServiceDashboardPage() {
                           labourCost: parseFloat(e.target.value) || 0,
                         })
                       }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                      className="h-9 text-xs bg-muted border-border rounded-xl"
                     />
                   </div>
                 )}
 
-                <div className="border-t border-slate-100 pt-4 space-y-3">
+                <div className="border-t border-border pt-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Package className="size-3.5 text-slate-400" />
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="size-3.5 text-muted-foreground" />
                       Spare Parts / Items Required
                       {diagnosisForm.items.length > 0 && (
-                        <span className="text-[10px] font-bold text-slate-400">
+                        <span className="text-[10px] font-bold text-muted-foreground">
                           ({diagnosisForm.items.length})
                         </span>
                       )}
@@ -4471,18 +4471,18 @@ export default function ServiceDashboardPage() {
                       variant="outline"
                       size="sm"
                       onClick={addDiagnosisItem}
-                      className="border-slate-200 text-xs font-bold text-primary rounded-xl h-8 gap-1.5"
+                      className="border-border text-xs font-bold text-primary rounded-xl h-8 gap-1.5"
                     >
                       <Plus size={12} /> Add Item
                     </Button>
                   </div>
 
                   {diagnosisForm.items.length === 0 && (
-                    <div className="border border-dashed border-slate-200 rounded-xl py-6 text-center">
-                      <p className="text-xs text-slate-400 font-medium">
+                    <div className="border border-dashed border-border rounded-xl py-6 text-center">
+                      <p className="text-xs text-muted-foreground font-medium">
                         No parts added. Click{' '}
-                        <span className="font-bold text-slate-500">Add Item</span> if the repair
-                        needs parts.
+                        <span className="font-bold text-muted-foreground">Add Item</span> if the
+                        repair needs parts.
                       </p>
                     </div>
                   )}
@@ -4490,10 +4490,10 @@ export default function ServiceDashboardPage() {
                   {diagnosisForm.items.map((item, idx) => (
                     <div
                       key={idx}
-                      className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3"
+                      className="bg-muted p-4 rounded-xl border border-border space-y-3"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-white border border-slate-200 rounded-md px-2 py-0.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-card border border-border rounded-md px-2 py-0.5">
                           Item {idx + 1}
                         </span>
                         <Button
@@ -4501,7 +4501,7 @@ export default function ServiceDashboardPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeDiagnosisItem(idx)}
-                          className="text-red-500 text-[11px] font-bold hover:bg-red-50 hover:text-red-600 rounded-lg h-7 px-2 gap-1"
+                          className="text-destructive text-[11px] font-bold hover:bg-destructive/10 hover:text-destructive rounded-lg h-7 px-2 gap-1"
                         >
                           <Trash2 className="size-3.5" />
                           Remove
@@ -4510,13 +4510,13 @@ export default function ServiceDashboardPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                             Item Source
                           </label>
                           <select
                             value={item.itemSource}
                             onChange={(e) => updateDiagnosisItem(idx, 'itemSource', e.target.value)}
-                            className="w-full h-9 text-xs border border-slate-200 rounded-lg px-2 bg-white text-slate-700 font-medium focus:outline-none focus:border-blue-500"
+                            className="w-full h-9 text-xs border border-border rounded-lg px-2 bg-card text-foreground font-medium focus:outline-none focus:border-primary"
                           >
                             <option value="SPARE_PART">Registered Spare Part</option>
                             <option value="CUSTOM">Unregistered Custom Part</option>
@@ -4525,7 +4525,7 @@ export default function ServiceDashboardPage() {
 
                         {item.itemSource === 'SPARE_PART' ? (
                           <div className="sm:col-span-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                               Spare Part
                             </label>
                             <SearchableSelect
@@ -4537,14 +4537,14 @@ export default function ServiceDashboardPage() {
                               value={item.sparePartId}
                               onValueChange={(val) => updateDiagnosisItem(idx, 'sparePartId', val)}
                               placeholder="Search spare part..."
-                              className="h-9 rounded-lg border-slate-200 bg-white text-xs font-medium text-slate-700 w-full"
+                              className="h-9 rounded-lg border-border bg-card text-xs font-medium text-foreground w-full"
                             />
                             {item.sparePartId &&
                               (() => {
                                 const sp = spareParts.find((p) => p.id === item.sparePartId);
                                 if (!sp) return null;
                                 return (
-                                  <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                                  <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
                                     Brand: {sp.brand || '—'} · Mfg. Part No: {sp.mpn || '—'}
                                   </p>
                                 );
@@ -4552,7 +4552,7 @@ export default function ServiceDashboardPage() {
                           </div>
                         ) : (
                           <div className="sm:col-span-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                               Custom Part Name
                             </label>
                             <Input
@@ -4563,7 +4563,7 @@ export default function ServiceDashboardPage() {
                                 updateDiagnosisItem(idx, 'customPartName', e.target.value);
                                 updateDiagnosisItem(idx, 'partName', e.target.value);
                               }}
-                              className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                              className="h-9 text-xs bg-card border-border rounded-lg"
                             />
                           </div>
                         )}
@@ -4573,7 +4573,7 @@ export default function ServiceDashboardPage() {
                         <div className="space-y-2">
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                                 Brand
                               </label>
                               <Input
@@ -4582,11 +4582,11 @@ export default function ServiceDashboardPage() {
                                 onChange={(e) =>
                                   updateDiagnosisItem(idx, 'customPartBrand', e.target.value)
                                 }
-                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                                className="h-9 text-xs bg-card border-border rounded-lg"
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                                 Model Name
                               </label>
                               <Input
@@ -4595,22 +4595,22 @@ export default function ServiceDashboardPage() {
                                 onChange={(e) =>
                                   updateDiagnosisItem(idx, 'customPartDescription', e.target.value)
                                 }
-                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                                className="h-9 text-xs bg-card border-border rounded-lg"
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                                 Mfg. Part Number
                               </label>
                               <Input
                                 placeholder="e.g. CB435A"
                                 value={item.mpn}
                                 onChange={(e) => updateDiagnosisItem(idx, 'mpn', e.target.value)}
-                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                                className="h-9 text-xs bg-card border-border rounded-lg"
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                                 Custom Service Cost (what we paid)
                               </label>
                               <Input
@@ -4626,11 +4626,11 @@ export default function ServiceDashboardPage() {
                                     parseFloat(e.target.value) || 0,
                                   )
                                 }
-                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                                className="h-9 text-xs bg-card border-border rounded-lg"
                               />
                             </div>
                           </div>
-                          <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                             <Info className="size-3 shrink-0" />
                             Brand and Model Name are pre-filled from the machine on this ticket —
                             edit if the part differs. This cost applies to off-catalog parts and is
@@ -4642,7 +4642,7 @@ export default function ServiceDashboardPage() {
 
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                             Quantity
                           </label>
                           <Input
@@ -4653,11 +4653,11 @@ export default function ServiceDashboardPage() {
                             onChange={(e) =>
                               updateDiagnosisItem(idx, 'quantity', parseInt(e.target.value, 10))
                             }
-                            className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                            className="h-9 text-xs bg-card border-border rounded-lg"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                             Unit Price ({getActiveCurrency()})
                           </label>
                           <Input
@@ -4669,17 +4669,17 @@ export default function ServiceDashboardPage() {
                             onChange={(e) =>
                               updateDiagnosisItem(idx, 'unitPrice', parseFloat(e.target.value))
                             }
-                            className="h-9 text-xs bg-white border-slate-200 rounded-lg disabled:opacity-60"
+                            className="h-9 text-xs bg-card border-border rounded-lg disabled:opacity-60"
                           />
                         </div>
-                        <label className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer select-none">
+                        <label className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-border bg-card cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={item.isFree}
                             onChange={(e) => updateDiagnosisItem(idx, 'isFree', e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                           />
-                          <span className="text-[11px] font-bold text-slate-600">Free / FOC</span>
+                          <span className="text-[11px] font-bold text-foreground">Free / FOC</span>
                         </label>
                       </div>
                     </div>
@@ -4688,8 +4688,8 @@ export default function ServiceDashboardPage() {
 
                 {/* TRACK B EXTRA PRICING AND REVISION FIELDS */}
                 {selectedTicket.track !== 'A' && (
-                  <div className="mt-6 border-t border-slate-100 pt-6 space-y-4">
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <div className="mt-6 border-t border-border pt-6 space-y-4">
+                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
                       Estimate & Pricing Details
                     </h4>
 
@@ -4706,13 +4706,13 @@ export default function ServiceDashboardPage() {
                       return (
                         <>
                           {travelCovered && (
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-[11px] font-bold text-emerald-700">
+                            <div className="bg-success/10 border border-success/30 rounded-xl p-3 text-[11px] font-bold text-success">
                               Visit &amp; transportation charges are FREE — this machine is covered
                               by {selectedTicket.serviceContext.replace(/_/g, ' ')}.
                             </div>
                           )}
                           {!travelCovered && selectedTicket.serviceLocation && (
-                            <div className="bg-sky-50 border border-sky-100 rounded-xl p-3 text-[11px] font-semibold text-sky-800">
+                            <div className="bg-info/10 border border-info/30 rounded-xl p-3 text-[11px] font-semibold text-info">
                               📍 Site location:{' '}
                               <span className="font-bold">{selectedTicket.serviceLocation}</span> —
                               price the visit charge based on this.
@@ -4720,7 +4720,7 @@ export default function ServiceDashboardPage() {
                           )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                 Visit Charge ({getActiveCurrency()})
                               </label>
                               <Input
@@ -4735,11 +4735,11 @@ export default function ServiceDashboardPage() {
                                     visitChargeAmount: parseFloat(e.target.value) || 0,
                                   })
                                 }
-                                className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl disabled:opacity-60"
+                                className="h-9 text-xs bg-muted border-border rounded-xl disabled:opacity-60"
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                 Visit Charge Method
                               </label>
                               <select
@@ -4753,7 +4753,7 @@ export default function ServiceDashboardPage() {
                                       | 'SEPARATE',
                                   })
                                 }
-                                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent animate-none disabled:opacity-60"
+                                className="w-full h-9 px-3 text-xs bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent animate-none disabled:opacity-60"
                               >
                                 <option value="ADDED_TO_ESTIMATE">
                                   Add to Estimate (collect after work)
@@ -4770,9 +4770,9 @@ export default function ServiceDashboardPage() {
                             diagnosisForm.visitChargeMethod === 'SEPARATE' &&
                             (diagnosisForm.visitChargeAmount || 0) > 0 &&
                             visitChargeTakenOrPending(selectedTicket) && (
-                              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
-                                <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
-                                <p className="text-[11px] font-bold text-slate-600">
+                              <div className="flex items-center gap-2 bg-muted border border-border rounded-xl p-3">
+                                <CheckCircle2 className="size-4 text-success shrink-0" />
+                                <p className="text-[11px] font-bold text-foreground">
                                   {selectedTicket.visitChargeStatus === 'PENDING_APPROVAL'
                                     ? 'Visit charge already collected by the service desk — awaiting Accounts approval. Do not collect it again.'
                                     : 'Visit charge already collected. Do not collect it again.'}
@@ -4788,7 +4788,7 @@ export default function ServiceDashboardPage() {
                             (diagnosisForm.visitChargeAmount || 0) > 0 &&
                             !visitChargeTakenOrPending(selectedTicket) && (
                               <>
-                                <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                <div className="flex items-center gap-2 bg-warning/10 border border-warning/30 rounded-xl p-3">
                                   <input
                                     type="checkbox"
                                     id="visit-charge-collected"
@@ -4799,11 +4799,11 @@ export default function ServiceDashboardPage() {
                                         visitChargeCollected: e.target.checked,
                                       })
                                     }
-                                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                   />
                                   <label
                                     htmlFor="visit-charge-collected"
-                                    className="text-[11px] font-bold text-amber-800"
+                                    className="text-[11px] font-bold text-warning"
                                   >
                                     Cash collected on-site — send {getActiveCurrency()}{' '}
                                     {Number(diagnosisForm.visitChargeAmount || 0).toFixed(2)} to
@@ -4814,7 +4814,7 @@ export default function ServiceDashboardPage() {
                                 {diagnosisForm.visitChargeCollected && (
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                         Payment Mode
                                       </label>
                                       <select
@@ -4826,7 +4826,7 @@ export default function ServiceDashboardPage() {
                                             visitChargeAccountId: '',
                                           })
                                         }
-                                        className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                                        className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30 focus:border-warning/30"
                                       >
                                         <option value="">Select mode...</option>
                                         <option value="CASH">Cash</option>
@@ -4836,7 +4836,7 @@ export default function ServiceDashboardPage() {
                                     </div>
                                     {diagnosisForm.visitChargePaymentMode === 'CHEQUE' && (
                                       <div>
-                                        <label className="text-[11px] font-bold text-orange-700 uppercase tracking-wider block mb-1">
+                                        <label className="text-[11px] font-bold text-warning uppercase tracking-wider block mb-1">
                                           Cheque No. *
                                         </label>
                                         <input
@@ -4848,14 +4848,14 @@ export default function ServiceDashboardPage() {
                                             })
                                           }
                                           placeholder="e.g. CHQ-004512"
-                                          className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                          className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                                         />
                                       </div>
                                     )}
                                     {diagnosisForm.visitChargePaymentMode &&
                                       diagnosisForm.visitChargePaymentMode !== 'CHEQUE' && (
                                         <div>
-                                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                             Deposit To Account
                                           </label>
                                           <select
@@ -4866,7 +4866,7 @@ export default function ServiceDashboardPage() {
                                                 visitChargeAccountId: e.target.value,
                                               })
                                             }
-                                            className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                                            className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30 focus:border-warning/30"
                                           >
                                             <option value="">Select account...</option>
                                             {accountsForMode(
@@ -4886,7 +4886,7 @@ export default function ServiceDashboardPage() {
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                 Transportation / Pickup Charge ({getActiveCurrency()})
                               </label>
                               <Input
@@ -4909,17 +4909,17 @@ export default function ServiceDashboardPage() {
                                     transportChargeAmount: parseFloat(e.target.value) || 0,
                                   })
                                 }
-                                className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl disabled:opacity-60"
+                                className="h-9 text-xs bg-muted border-border rounded-xl disabled:opacity-60"
                               />
                               {selectedTicket.jobType === 'BRING_TO_CENTRE' && !travelCovered && (
-                                <p className="mt-1 text-[10px] font-semibold text-amber-600">
+                                <p className="mt-1 text-[10px] font-semibold text-warning">
                                   This ticket is marked Bring-to-Centre — remember the pickup &
                                   delivery cost.
                                 </p>
                               )}
                             </div>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                                 Discount ({getActiveCurrency()})
                               </label>
                               <Input
@@ -4935,9 +4935,9 @@ export default function ServiceDashboardPage() {
                                     discountAmount: Math.min(entered, labourCost),
                                   });
                                 }}
-                                className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                                className="h-9 text-xs bg-muted border-border rounded-xl"
                               />
-                              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                              <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
                                 Cannot exceed the labour cost ({getActiveCurrency()}{' '}
                                 {(Number(diagnosisForm.labourCost) || 0).toFixed(2)}).
                               </p>
@@ -4946,10 +4946,10 @@ export default function ServiceDashboardPage() {
 
                           <div>
                             {/* Live Calculation display */}
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                               Grand Service Estimate Total
                             </label>
-                            <div className="h-9 px-3 flex items-center justify-between bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl text-xs font-bold">
+                            <div className="h-9 px-3 flex items-center justify-between bg-success/10 border border-success/30 text-success rounded-xl text-xs font-bold">
                               <span>{getActiveCurrency()}</span>
                               <span>
                                 {(() => {
@@ -4995,13 +4995,13 @@ export default function ServiceDashboardPage() {
 
                     {/* Technician Note to Finance */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Technician Note to Finance{' '}
                         {(selectedTicket.status === 'REVISED' ||
                           selectedTicket.status === 'FINANCE_REJECTED' ||
                           (selectedTicket.additionalEstimateCount &&
                             selectedTicket.additionalEstimateCount > 0)) && (
-                          <span className="text-red-500">* Required</span>
+                          <span className="text-destructive">* Required</span>
                         )}
                       </label>
                       <textarea
@@ -5013,13 +5013,13 @@ export default function ServiceDashboardPage() {
                             technicianNoteToFinance: e.target.value,
                           })
                         }
-                        className="w-full min-h-[70px] p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        className="w-full min-h-[70px] p-3 text-xs bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       />
                     </div>
                   </div>
                 )}
               </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+              <div className="bg-muted border-t border-border p-4 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -5035,7 +5035,7 @@ export default function ServiceDashboardPage() {
                   disabled={submitting}
                   className={cn(
                     buttonVariants(),
-                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                    'bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl',
                   )}
                 >
                   Submit Diagnosis
@@ -5048,10 +5048,10 @@ export default function ServiceDashboardPage() {
 
       {/* SUBMIT QUOTATION MODAL */}
       {showQuoteModal && selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
-              <CardTitle className="text-base font-bold text-slate-800">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-md bg-card border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-6">
+              <CardTitle className="text-base font-bold text-foreground">
                 Submit Service Quotation
               </CardTitle>
               <CardDescription className="text-xs">
@@ -5062,7 +5062,7 @@ export default function ServiceDashboardPage() {
             <form onSubmit={handleSubmitQuote}>
               <CardContent className="p-6 space-y-4">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                     Labor Cost / Service Charge ($)
                   </label>
                   <Input
@@ -5073,11 +5073,11 @@ export default function ServiceDashboardPage() {
                     onChange={(e) =>
                       setQuoteForm({ ...quoteForm, laborCost: parseFloat(e.target.value) })
                     }
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    className="h-9 text-xs bg-muted border-border rounded-xl"
                   />
                 </div>
               </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+              <div className="bg-muted border-t border-border p-4 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -5093,7 +5093,7 @@ export default function ServiceDashboardPage() {
                   disabled={submitting}
                   className={cn(
                     buttonVariants(),
-                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                    'bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl',
                   )}
                 >
                   Submit Quotation
@@ -5106,10 +5106,10 @@ export default function ServiceDashboardPage() {
 
       {/* COMPLETE SERVICE JOB MODAL */}
       {showCompleteModal && selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
-              <CardTitle className="text-base font-bold text-slate-800">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl bg-card border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-6">
+              <CardTitle className="text-base font-bold text-foreground">
                 Complete Service Job
               </CardTitle>
               <CardDescription className="text-xs">
@@ -5121,7 +5121,7 @@ export default function ServiceDashboardPage() {
               <CardContent className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Work Performed
                     </label>
                     <Textarea
@@ -5131,11 +5131,11 @@ export default function ServiceDashboardPage() {
                       onChange={(e) =>
                         setCompleteForm({ ...completeForm, workPerformed: e.target.value })
                       }
-                      className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[60px]"
+                      className="bg-muted border-border rounded-xl text-xs focus-visible:ring-primary min-h-[60px]"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Resolution Details
                     </label>
                     <Textarea
@@ -5145,7 +5145,7 @@ export default function ServiceDashboardPage() {
                       onChange={(e) =>
                         setCompleteForm({ ...completeForm, resolutionDetails: e.target.value })
                       }
-                      className="bg-slate-50 border-slate-200 rounded-xl text-xs focus-visible:ring-primary min-h-[60px]"
+                      className="bg-muted border-border rounded-xl text-xs focus-visible:ring-primary min-h-[60px]"
                     />
                   </div>
                 </div>
@@ -5153,7 +5153,7 @@ export default function ServiceDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {selectedTicket.machineType === 'PRINTER' && (
                     <div>
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Completion Meter Reading
                       </label>
                       <Input
@@ -5168,12 +5168,12 @@ export default function ServiceDashboardPage() {
                             meterReading: parseInt(e.target.value, 10) || 0,
                           })
                         }
-                        className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                        className="h-9 text-xs bg-muted border-border rounded-xl"
                       />
                     </div>
                   )}
                   <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                       Customer Remarks
                     </label>
                     <Input
@@ -5182,13 +5182,13 @@ export default function ServiceDashboardPage() {
                       onChange={(e) =>
                         setCompleteForm({ ...completeForm, customerRemarks: e.target.value })
                       }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                      className="h-9 text-xs bg-muted border-border rounded-xl"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                     Technician Remarks
                   </label>
                   <Input
@@ -5197,27 +5197,25 @@ export default function ServiceDashboardPage() {
                     onChange={(e) =>
                       setCompleteForm({ ...completeForm, technicianRemarks: e.target.value })
                     }
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                    className="h-9 text-xs bg-muted border-border rounded-xl"
                   />
                 </div>
 
                 {/* Payment taken at the door. Orange, matching the other money sections on
                     this page, and gated behind choosing a mode so a technician who took
                     nothing is not asked to fill anything in. */}
-                <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-3 space-y-3">
+                <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 space-y-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-warning">
                       Payment collected on site (optional)
                     </p>
                     {loadingDue ? (
-                      <span className="text-[10px] font-bold text-orange-500">
-                        Loading balance…
-                      </span>
+                      <span className="text-[10px] font-bold text-warning">Loading balance…</span>
                     ) : amountDue ? (
-                      <span className="text-[11px] font-black text-orange-800">
+                      <span className="text-[11px] font-black text-warning">
                         Due now: {getActiveCurrency()} {amountDue.outstanding.toFixed(2)}
                         {amountDue.invoiceNumber ? (
-                          <span className="ml-1 font-bold text-orange-500">
+                          <span className="ml-1 font-bold text-warning">
                             ({amountDue.invoiceNumber})
                           </span>
                         ) : null}
@@ -5229,19 +5227,19 @@ export default function ServiceDashboardPage() {
                       customer approves within validity — so the figure is spelled out
                       rather than left for the technician to reconcile in their head. */}
                   {amountDue && amountDue.paid > 0 && (
-                    <p className="text-[10px] text-orange-600">
+                    <p className="text-[10px] text-warning">
                       Invoice {getActiveCurrency()} {amountDue.total.toFixed(2)} · already collected{' '}
                       {getActiveCurrency()} {amountDue.paid.toFixed(2)}
                     </p>
                   )}
                   {amountDue && amountDue.outstanding === 0 && (
-                    <p className="text-[10px] font-bold text-emerald-700">
+                    <p className="text-[10px] font-bold text-success">
                       Nothing outstanding — this invoice is already settled.
                     </p>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                         Payment Mode
                       </label>
                       <select
@@ -5258,7 +5256,7 @@ export default function ServiceDashboardPage() {
                             loadCashBankAccounts(selectedTicket.branchId);
                           }
                         }}
-                        className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="w-full h-9 px-3 text-xs bg-card border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                       >
                         <option value="">Not collected</option>
                         <option value="CASH">Cash</option>
@@ -5269,7 +5267,7 @@ export default function ServiceDashboardPage() {
 
                     {collectMode && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                           Amount ({getActiveCurrency()})
                         </label>
                         <input
@@ -5278,10 +5276,10 @@ export default function ServiceDashboardPage() {
                           value={collectAmount}
                           onChange={(e) => setCollectAmount(e.target.value)}
                           placeholder={amountDue ? amountDue.outstanding.toFixed(2) : '0.00'}
-                          className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          className="w-full h-9 px-3 text-xs bg-card border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                         />
                         {amountDue && Number(collectAmount) > amountDue.outstanding + 0.01 && (
-                          <p className="text-[10px] font-bold text-red-600">
+                          <p className="text-[10px] font-bold text-destructive">
                             More than the {getActiveCurrency()} {amountDue.outstanding.toFixed(2)}{' '}
                             outstanding.
                           </p>
@@ -5291,7 +5289,7 @@ export default function ServiceDashboardPage() {
 
                     {collectMode && collectMode !== 'CHEQUE' && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                           {collectMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
                         </label>
                         <SearchableSelect
@@ -5302,7 +5300,7 @@ export default function ServiceDashboardPage() {
                           value={collectAccountId}
                           onValueChange={(val) => setCollectAccountId(val)}
                           placeholder="Select account..."
-                          className="w-full h-9 px-3 text-xs bg-white border-orange-200 rounded-xl text-orange-900 font-semibold"
+                          className="w-full h-9 px-3 text-xs bg-card border-warning/30 rounded-xl text-warning font-semibold"
                         />
                       </div>
                     )}
@@ -5314,32 +5312,32 @@ export default function ServiceDashboardPage() {
                         value={collectChequeNo}
                         onChange={(e) => setCollectChequeNo(e.target.value)}
                         placeholder="Cheque No. *"
-                        className="h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="h-9 px-3 text-xs bg-card border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                       />
                       <input
                         value={collectChequeBank}
                         onChange={(e) => setCollectChequeBank(e.target.value)}
                         placeholder="Bank"
-                        className="h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="h-9 px-3 text-xs bg-card border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                       />
                       <input
                         type="date"
                         value={collectChequeDate}
                         onChange={(e) => setCollectChequeDate(e.target.value)}
-                        className="h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="h-9 px-3 text-xs bg-card border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                       />
                     </div>
                   )}
 
                   {collectMode && (
-                    <p className="text-[10px] text-orange-700">
+                    <p className="text-[10px] text-warning">
                       Goes to Accounts for approval. The money posts to the account selected here
                       once they approve it — nothing reaches the cashbook before that.
                     </p>
                   )}
                 </div>
               </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+              <div className="bg-muted border-t border-border p-4 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -5355,7 +5353,7 @@ export default function ServiceDashboardPage() {
                   disabled={submitting}
                   className={cn(
                     buttonVariants(),
-                    'bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl',
+                    'bg-success hover:bg-success/90 text-success-foreground font-bold rounded-xl',
                   )}
                 >
                   Mark Completed
@@ -5368,11 +5366,11 @@ export default function ServiceDashboardPage() {
 
       {/* CUSTOMER INTEL MODAL */}
       {showIntelModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl bg-card border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                   <History className="text-primary" size={18} /> Customer Intelligence View
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -5393,7 +5391,7 @@ export default function ServiceDashboardPage() {
                     loadCustomerIntel(val);
                   }}
                   placeholder="Search customer by name or ID..."
-                  className="h-9 rounded-xl border-slate-200 bg-white text-xs font-medium text-slate-700"
+                  className="h-9 rounded-xl border-border bg-card text-xs font-medium text-foreground"
                 />
               </div>
             </CardHeader>
@@ -5401,12 +5399,12 @@ export default function ServiceDashboardPage() {
               {loadingIntel ? (
                 <div className="text-center py-20">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  <span className="text-xs text-slate-400 mt-2 block font-medium">
+                  <span className="text-xs text-muted-foreground mt-2 block font-medium">
                     Loading intel history...
                   </span>
                 </div>
               ) : !selectedIntelCustomer ? (
-                <div className="text-center py-20 text-slate-400 text-xs font-semibold">
+                <div className="text-center py-20 text-muted-foreground text-xs font-semibold">
                   Please select a customer from the dropdown above to pull intel history.
                 </div>
               ) : (
@@ -5419,11 +5417,11 @@ export default function ServiceDashboardPage() {
                 </div>
               )}
             </CardContent>
-            <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end">
+            <div className="bg-muted border-t border-border p-4 flex items-center justify-end">
               <Button
                 type="button"
                 onClick={() => setShowIntelModal(false)}
-                className="bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs"
+                className="bg-foreground hover:bg-foreground text-primary-foreground font-bold rounded-xl text-xs"
               >
                 Close Intel View
               </Button>
@@ -5451,13 +5449,13 @@ export default function ServiceDashboardPage() {
             );
 
             return (
-              <div className="space-y-4 text-slate-800">
+              <div className="space-y-4 text-foreground">
                 {/* TABS SELECTOR */}
-                <div className="flex border-b border-slate-200 gap-4 mb-2">
+                <div className="flex border-b border-border gap-4 mb-2">
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('info')}
-                    className={`pb-2 px-2 text-xs font-bold transition-all relative ${activeDetailTab === 'info' ? 'text-primary font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`pb-2 px-2 text-xs font-bold transition-all relative ${activeDetailTab === 'info' ? 'text-primary font-extrabold' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Ticket Details
                     {activeDetailTab === 'info' && (
@@ -5470,7 +5468,7 @@ export default function ServiceDashboardPage() {
                       setActiveDetailTab('revisions');
                       fetchTicketRevisions(selectedTicket.id);
                     }}
-                    className={`pb-2 px-2 text-xs font-bold transition-all relative ${activeDetailTab === 'revisions' ? 'text-primary font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`pb-2 px-2 text-xs font-bold transition-all relative ${activeDetailTab === 'revisions' ? 'text-primary font-extrabold' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Revision History
                     {activeDetailTab === 'revisions' && (
@@ -5482,17 +5480,17 @@ export default function ServiceDashboardPage() {
                 {activeDetailTab === 'info' ? (
                   <>
                     {/* TOP HEADER SECTION */}
-                    <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="bg-muted border border-border/60 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                             Service Ticket
                           </span>
-                          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                          <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/10">
                             {selectedTicket.jobType}
                           </span>
                         </div>
-                        <h3 className="text-lg font-bold tracking-tight text-slate-900 font-mono">
+                        <h3 className="text-lg font-bold tracking-tight text-foreground font-mono">
                           {selectedTicket.ticketNumber}
                         </h3>
                       </div>
@@ -5505,15 +5503,15 @@ export default function ServiceDashboardPage() {
                     {/* CORE INFO GRID (4 Columns side-by-side) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {/* Visit Date */}
-                      <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
-                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                      <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
                           <Calendar size={16} />
                         </div>
                         <div className="min-w-0">
-                          <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
                             Scheduled Visit
                           </span>
-                          <span className="text-xs font-semibold text-slate-800 block truncate">
+                          <span className="text-xs font-semibold text-foreground block truncate">
                             {selectedTicket.scheduledVisitDate
                               ? new Date(selectedTicket.scheduledVisitDate).toLocaleDateString(
                                   undefined,
@@ -5530,15 +5528,15 @@ export default function ServiceDashboardPage() {
                       </div>
 
                       {/* Technician */}
-                      <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
-                        <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
+                      <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
                           <Wrench size={16} />
                         </div>
                         <div className="min-w-0">
-                          <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
                             Assigned Technician
                           </span>
-                          <span className="text-xs font-semibold text-slate-800 block truncate">
+                          <span className="text-xs font-semibold text-foreground block truncate">
                             {technician
                               ? `${technician.first_name || ''} ${technician.last_name || ''}`.trim()
                               : 'Not Assigned'}
@@ -5547,10 +5545,10 @@ export default function ServiceDashboardPage() {
                       </div>
 
                       {/* Customer Info Card */}
-                      <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
-                        <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
-                          <User size={14} className="text-slate-400 shrink-0" />
-                          <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      <div className="border border-border/60 rounded-xl p-3 space-y-1.5 bg-card shadow-sm min-w-0">
+                        <div className="flex items-center gap-1.5 border-b border-border pb-1">
+                          <User size={14} className="text-muted-foreground shrink-0" />
+                          <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
                             Customer Info
                           </h4>
                         </div>
@@ -5558,19 +5556,19 @@ export default function ServiceDashboardPage() {
                           <a
                             href={`/employee/customers/${customer?.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs block truncate"
+                            className="text-primary hover:text-primary hover:underline font-bold text-xs block truncate"
                           >
                             {customer ? customer.name : 'Unknown Customer'}
                           </a>
                           {customer?.email && (
-                            <div className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0">
-                              <Mail size={10} className="text-slate-400 shrink-0" />
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
+                              <Mail size={10} className="text-muted-foreground shrink-0" />
                               <span className="truncate">{customer.email}</span>
                             </div>
                           )}
                           {customer?.phone && (
-                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                              <Phone size={10} className="text-slate-400 shrink-0" />
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <Phone size={10} className="text-muted-foreground shrink-0" />
                               <span className="truncate">{customer.phone}</span>
                             </div>
                           )}
@@ -5578,15 +5576,15 @@ export default function ServiceDashboardPage() {
                       </div>
 
                       {/* Machine Details Card */}
-                      <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
-                        <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
-                          <Laptop size={14} className="text-slate-400 shrink-0" />
-                          <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      <div className="border border-border/60 rounded-xl p-3 space-y-1.5 bg-card shadow-sm min-w-0">
+                        <div className="flex items-center gap-1.5 border-b border-border pb-1">
+                          <Laptop size={14} className="text-muted-foreground shrink-0" />
+                          <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
                             Machine Details
                           </h4>
                         </div>
                         <div className="space-y-0.5 min-w-0">
-                          <span className="font-bold text-slate-800 text-xs block truncate">
+                          <span className="font-bold text-foreground text-xs block truncate">
                             {formatMachineName(
                               selectedTicket.productBrand,
                               selectedTicket.productModel,
@@ -5602,13 +5600,13 @@ export default function ServiceDashboardPage() {
                                   handleOpenMachineIntel(selectedTicket.serialNumber);
                                 }
                               }}
-                              className="text-[10px] font-mono font-bold bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1.5 py-0.5 text-blue-600 hover:text-blue-800 transition-colors focus:outline-none truncate"
+                              className="text-[10px] font-mono font-bold bg-primary/10 hover:bg-primary/10 border border-primary/30 rounded px-1.5 py-0.5 text-primary hover:text-primary transition-colors focus:outline-none truncate"
                             >
                               SN: {selectedTicket.serialNumber || 'N/A'} (View)
                             </button>
                             {selectedTicket.machineType &&
                               selectedTicket.machineType !== 'PRINTER' && (
-                                <span className="text-[9px] font-extrabold uppercase tracking-wide bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-600">
+                                <span className="text-[9px] font-extrabold uppercase tracking-wide bg-muted border border-border rounded px-1.5 py-0.5 text-foreground">
                                   {selectedTicket.machineType === 'COMPUTER' ? 'Computer' : 'Other'}
                                 </span>
                               )}
@@ -5620,45 +5618,45 @@ export default function ServiceDashboardPage() {
                     {/* NOTES / DESCRIPTIONS CALLOUTS (3 Columns side-by-side) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {/* Issue Description */}
-                      <div className="bg-amber-50/45 border border-amber-200/50 rounded-xl p-3 space-y-1 shadow-sm">
-                        <div className="flex items-center gap-1 text-amber-800 font-bold text-[10px] uppercase tracking-wider">
+                      <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 space-y-1 shadow-sm">
+                        <div className="flex items-center gap-1 text-warning font-bold text-[10px] uppercase tracking-wider">
                           <FileText size={12} />
                           <span>Issue Description</span>
                         </div>
-                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                        <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
                           {selectedTicket.issueDescription || 'No description provided.'}
                         </p>
                       </div>
 
                       {/* Diagnosis Notes */}
-                      <div className="bg-purple-50/45 border border-purple-200/50 rounded-xl p-3 space-y-1 shadow-sm">
-                        <div className="flex items-center gap-1 text-purple-800 font-bold text-[10px] uppercase tracking-wider">
+                      <div className="bg-lease/10 border border-lease/30 rounded-xl p-3 space-y-1 shadow-sm">
+                        <div className="flex items-center gap-1 text-lease font-bold text-[10px] uppercase tracking-wider">
                           <Activity size={12} />
                           <span>Diagnosis Notes</span>
                         </div>
                         {selectedTicket.diagnosisNotes ? (
-                          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
                             {selectedTicket.diagnosisNotes}
                           </p>
                         ) : (
-                          <span className="text-[11px] text-slate-400 italic">
+                          <span className="text-[11px] text-muted-foreground italic">
                             Not yet submitted
                           </span>
                         )}
                       </div>
 
                       {/* Completion Notes */}
-                      <div className="bg-emerald-50/45 border border-emerald-200/50 rounded-xl p-3 space-y-1 shadow-sm">
-                        <div className="flex items-center gap-1 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">
+                      <div className="bg-success/10 border border-success/30 rounded-xl p-3 space-y-1 shadow-sm">
+                        <div className="flex items-center gap-1 text-success font-bold text-[10px] uppercase tracking-wider">
                           <CheckCircle2 size={12} />
                           <span>Completion Notes</span>
                         </div>
                         {selectedTicket.completionNotes ? (
-                          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
                             {selectedTicket.completionNotes}
                           </p>
                         ) : (
-                          <span className="text-[11px] text-slate-400 italic">
+                          <span className="text-[11px] text-muted-foreground italic">
                             Not yet completed
                           </span>
                         )}
@@ -5667,41 +5665,41 @@ export default function ServiceDashboardPage() {
 
                     {/* Items & Spare Parts Used */}
                     {selectedTicket.items && selectedTicket.items.length > 0 && (
-                      <div className="border-t border-slate-100 pt-3">
-                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      <div className="border-t border-border pt-3">
+                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
                           Spare Parts / Items Used
                         </h4>
-                        <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                        <div className="border border-border rounded-xl overflow-hidden shadow-sm">
                           <Table>
-                            <TableHeader className="bg-slate-50/50">
+                            <TableHeader className="bg-muted/50">
                               <TableRow>
-                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 px-2">
+                                <TableHead className="h-8 text-[10px] font-bold text-muted-foreground py-1 px-2">
                                   Part Name
                                 </TableHead>
-                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-center px-2">
+                                <TableHead className="h-8 text-[10px] font-bold text-muted-foreground py-1 text-center px-2">
                                   Qty
                                 </TableHead>
-                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
+                                <TableHead className="h-8 text-[10px] font-bold text-muted-foreground py-1 text-right px-2">
                                   Selling Price
                                 </TableHead>
-                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
+                                <TableHead className="h-8 text-[10px] font-bold text-muted-foreground py-1 text-right px-2">
                                   Customer Charge
                                 </TableHead>
-                                <TableHead className="h-8 text-[10px] font-bold text-amber-600 py-1 text-right px-2">
+                                <TableHead className="h-8 text-[10px] font-bold text-warning py-1 text-right px-2">
                                   Machine Service Cost
                                 </TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {selectedTicket.items.map((item, index: number) => (
-                                <TableRow key={item.id || index} className="hover:bg-slate-50/20">
-                                  <TableCell className="py-1 px-2 text-xs font-semibold text-slate-700">
+                                <TableRow key={item.id || index} className="hover:bg-muted/20">
+                                  <TableCell className="py-1 px-2 text-xs font-semibold text-foreground">
                                     {item.partName}
                                   </TableCell>
-                                  <TableCell className="py-1 px-2 text-xs text-slate-600 text-center">
+                                  <TableCell className="py-1 px-2 text-xs text-foreground text-center">
                                     {item.quantity}
                                   </TableCell>
-                                  <TableCell className="py-1 px-2 text-xs text-slate-600 text-right">
+                                  <TableCell className="py-1 px-2 text-xs text-foreground text-right">
                                     {getActiveCurrency()}{' '}
                                     {Number(item.listUnitPrice ?? item.unitPrice).toLocaleString(
                                       undefined,
@@ -5710,16 +5708,16 @@ export default function ServiceDashboardPage() {
                                       },
                                     )}
                                   </TableCell>
-                                  <TableCell className="py-1 px-2 text-xs font-bold text-slate-700 text-right">
+                                  <TableCell className="py-1 px-2 text-xs font-bold text-foreground text-right">
                                     {item.isFree ? (
-                                      <span className="text-emerald-600 font-bold text-[10px] uppercase">
+                                      <span className="text-success font-bold text-[10px] uppercase">
                                         FOC
                                       </span>
                                     ) : (
                                       `${getActiveCurrency()} ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                     )}
                                   </TableCell>
-                                  <TableCell className="py-1 px-2 text-xs font-semibold text-amber-700 text-right">
+                                  <TableCell className="py-1 px-2 text-xs font-semibold text-warning text-right">
                                     {getActiveCurrency()}{' '}
                                     {Number(item.totalCost || 0).toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
@@ -5730,7 +5728,7 @@ export default function ServiceDashboardPage() {
                             </TableBody>
                           </Table>
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-muted-foreground mt-1">
                           Machine Service Cost uses the catalog selling price captured when the part
                           was added; customer charges remain separate and may be zero for covered
                           parts.
@@ -5739,11 +5737,11 @@ export default function ServiceDashboardPage() {
                     )}
 
                     {/* Action buttons relevant to current status */}
-                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
                       {selectedTicket.status === 'COMPLETED' && (
                         <Button
                           size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 rounded-lg font-bold gap-1 mr-auto"
+                          className="bg-success hover:bg-success/90 text-success-foreground h-8 px-3 rounded-lg font-bold gap-1 mr-auto"
                           onClick={async () => {
                             try {
                               const blob = await downloadServiceReport(selectedTicket.id);
@@ -5773,7 +5771,7 @@ export default function ServiceDashboardPage() {
                           !selectedTicket.repairStartedAt) && (
                           <Button
                             size="sm"
-                            className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-lg font-bold gap-1"
                             onClick={() => {
                               setAssignForm({
                                 technicianId: selectedTicket.assignedTechnicianId || '',
@@ -5791,7 +5789,7 @@ export default function ServiceDashboardPage() {
                         selectedTicket.assignedTechnicianId &&
                         selectedTicket.repairStartedAt && (
                           <span
-                            className="text-[10px] font-medium text-slate-400 italic"
+                            className="text-[10px] font-medium text-muted-foreground italic"
                             title="Repair is already in progress"
                           >
                             Technician locked — repair in progress
@@ -5803,7 +5801,7 @@ export default function ServiceDashboardPage() {
                         !selectedTicket.diagnosisStartedAt && (
                           <Button
                             size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-lg font-bold gap-1"
                             onClick={() => {
                               setShowDetailsModal(false);
                               setArrivalDialog({
@@ -5825,7 +5823,7 @@ export default function ServiceDashboardPage() {
                             <ActiveTimer startTime={selectedTicket.diagnosisStartedAt.toString()} />
                             <Button
                               size="sm"
-                              className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-3 rounded-lg font-bold"
+                              className="bg-warning hover:bg-warning/90 text-warning-foreground h-8 px-3 rounded-lg font-bold"
                               onClick={() => {
                                 setShowDetailsModal(false);
                                 loadCashBankAccounts(selectedTicket.branchId);
@@ -5863,7 +5861,7 @@ export default function ServiceDashboardPage() {
                           selectedTicket.status === 'CUSTOMER_REJECTED') && (
                           <Button
                             size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 rounded-lg font-bold"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-lg font-bold"
                             onClick={() => {
                               setShowDetailsModal(false);
                               handleOpenEstimates(selectedTicket);
@@ -5880,7 +5878,7 @@ export default function ServiceDashboardPage() {
                         !selectedTicket.repairStartedAt && (
                           <Button
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            className="bg-success hover:bg-success/90 text-success-foreground h-8 px-3 rounded-lg font-bold gap-1"
                             onClick={() => {
                               setShowDetailsModal(false);
                               handleStartRepair(selectedTicket.id);
@@ -5900,7 +5898,7 @@ export default function ServiceDashboardPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-amber-200 text-amber-600 hover:bg-amber-50 h-8 px-3 rounded-lg font-bold gap-1"
+                              className="border-warning/30 text-warning hover:bg-warning/10 h-8 px-3 rounded-lg font-bold gap-1"
                               onClick={() => handlePauseRepair(selectedTicket.id)}
                             >
                               <Pause className="size-3.5" />
@@ -5908,7 +5906,7 @@ export default function ServiceDashboardPage() {
                             </Button>
                             <Button
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold"
+                              className="bg-success hover:bg-success/90 text-success-foreground h-8 px-3 rounded-lg font-bold"
                               onClick={() => {
                                 setShowDetailsModal(false);
                                 setCompleteForm({
@@ -5941,7 +5939,7 @@ export default function ServiceDashboardPage() {
                             />
                             <Button
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
+                              className="bg-success hover:bg-success/90 text-success-foreground h-8 px-3 rounded-lg font-bold gap-1"
                               onClick={() => handleResumeRepair(selectedTicket.id)}
                             >
                               <Play className="size-3.5 fill-current" />
@@ -5973,7 +5971,7 @@ export default function ServiceDashboardPage() {
                         selectedTicket.status === 'CUSTOMER_APPROVED') && (
                         <Button
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold flex items-center gap-1"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-lg font-bold flex items-center gap-1"
                           onClick={() => {
                             setShareTicket(selectedTicket);
                             setShareDocType('quotation');
@@ -5988,7 +5986,7 @@ export default function ServiceDashboardPage() {
                       {selectedTicket.status === 'COMPLETED' && (
                         <Button
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold flex items-center gap-1"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-lg font-bold flex items-center gap-1"
                           onClick={() => {
                             setShareTicket(selectedTicket);
                             setShareDocType('completion-bill');
@@ -6009,7 +6007,7 @@ export default function ServiceDashboardPage() {
                           setActiveDetailTab('info');
                           setTicketRevisions([]);
                         }}
-                        className="text-slate-500 border-slate-300 hover:bg-slate-50 h-8 px-3 rounded-lg font-bold"
+                        className="text-muted-foreground border-border hover:bg-muted h-8 px-3 rounded-lg font-bold"
                       >
                         Close
                       </Button>
@@ -6017,17 +6015,17 @@ export default function ServiceDashboardPage() {
                   </>
                 ) : (
                   <div className="space-y-4 pt-2">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                       Estimate Revision History
                     </h4>
 
                     {loadingRevisions ? (
-                      <div className="flex items-center justify-center py-8 text-slate-400 text-xs">
+                      <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" /> Loading
                         revision history...
                       </div>
                     ) : ticketRevisions.length === 0 ? (
-                      <div className="text-xs text-slate-400 bg-slate-50 p-6 rounded-xl border border-slate-100 italic text-center">
+                      <div className="text-xs text-muted-foreground bg-muted p-6 rounded-xl border border-border italic text-center">
                         No revisions recorded for this ticket estimate.
                       </div>
                     ) : (
@@ -6035,51 +6033,57 @@ export default function ServiceDashboardPage() {
                         {ticketRevisions.map((rev) => (
                           <div
                             key={rev.id}
-                            className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3"
+                            className="bg-muted border border-border/80 rounded-xl p-4 space-y-3"
                           >
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-800">
+                              <span className="text-xs font-bold text-foreground">
                                 Revision #{rev.revisionNumber} ({rev.revisionType || 'REVISION'})
                               </span>
                               <span
                                 className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                                   rev.financeDecision === 'APPROVED'
-                                    ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                                    ? 'border-success/30 text-success bg-success/10'
                                     : rev.financeDecision === 'REJECTED'
-                                      ? 'border-red-200 text-red-700 bg-red-50'
-                                      : 'border-amber-200 text-amber-700 bg-amber-50'
+                                      ? 'border-destructive/30 text-destructive bg-destructive/10'
+                                      : 'border-warning/30 text-warning bg-warning/10'
                                 }`}
                               >
                                 {rev.financeDecision || 'PENDING'}
                               </span>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px] text-slate-600 bg-white p-3 rounded-lg border border-slate-100">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px] text-foreground bg-card p-3 rounded-lg border border-border">
                               <div>
-                                <span className="text-slate-400 block font-bold">Total Amount</span>
-                                <span className="font-semibold text-slate-900">
+                                <span className="text-muted-foreground block font-bold">
+                                  Total Amount
+                                </span>
+                                <span className="font-semibold text-foreground">
                                   {getActiveCurrency()} {Number(rev.totalAmount || 0).toFixed(2)}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block font-bold">
+                                <span className="text-muted-foreground block font-bold">
                                   Discount Applied
                                 </span>
-                                <span className="font-semibold text-slate-900">
+                                <span className="font-semibold text-foreground">
                                   {getActiveCurrency()}{' '}
                                   {Number(rev.discountApplied || 0).toFixed(2)}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block font-bold">Visit Charge</span>
-                                <span className="font-semibold text-slate-900">
+                                <span className="text-muted-foreground block font-bold">
+                                  Visit Charge
+                                </span>
+                                <span className="font-semibold text-foreground">
                                   {getActiveCurrency()}{' '}
                                   {Number(rev.visitChargeAmount || 0).toFixed(2)}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block font-bold">Submitted At</span>
-                                <span className="font-semibold text-slate-900">
+                                <span className="text-muted-foreground block font-bold">
+                                  Submitted At
+                                </span>
+                                <span className="font-semibold text-foreground">
                                   {rev.submittedAt
                                     ? new Date(rev.submittedAt).toLocaleDateString()
                                     : 'N/A'}
@@ -6088,22 +6092,22 @@ export default function ServiceDashboardPage() {
                             </div>
 
                             {rev.technicianNoteToFinance && (
-                              <div className="text-[11px] bg-indigo-50/50 border border-indigo-100/60 p-2.5 rounded-lg">
-                                <span className="font-bold text-indigo-900 block mb-0.5">
+                              <div className="text-[11px] bg-primary/10 border border-primary/30 p-2.5 rounded-lg">
+                                <span className="font-bold text-primary block mb-0.5">
                                   Technician Note to Finance:
                                 </span>
-                                <p className="text-slate-700 leading-relaxed">
+                                <p className="text-foreground leading-relaxed">
                                   {rev.technicianNoteToFinance}
                                 </p>
                               </div>
                             )}
 
                             {rev.financeDecisionNote && (
-                              <div className="text-[11px] bg-red-50/50 border border-red-100/60 p-2.5 rounded-lg">
-                                <span className="font-bold text-red-900 block mb-0.5">
+                              <div className="text-[11px] bg-destructive/10 border border-destructive/30 p-2.5 rounded-lg">
+                                <span className="font-bold text-destructive block mb-0.5">
                                   Finance Decision Note:
                                 </span>
-                                <p className="text-slate-700 leading-relaxed">
+                                <p className="text-foreground leading-relaxed">
                                   {rev.financeDecisionNote}
                                 </p>
                               </div>
@@ -6111,12 +6115,12 @@ export default function ServiceDashboardPage() {
 
                             {rev.itemsSnapshot && Object.keys(rev.itemsSnapshot).length > 0 && (
                               <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
                                   Items Snapshot
                                 </span>
-                                <div className="border border-slate-200/60 rounded-lg overflow-hidden bg-white">
-                                  <table className="w-full text-[10px] text-left text-slate-500">
-                                    <thead className="bg-slate-50 text-slate-700 uppercase font-bold">
+                                <div className="border border-border/60 rounded-lg overflow-hidden bg-card">
+                                  <table className="w-full text-[10px] text-left text-muted-foreground">
+                                    <thead className="bg-muted text-foreground uppercase font-bold">
                                       <tr>
                                         <th className="px-3 py-1.5">Description</th>
                                         <th className="px-3 py-1.5 text-center">Qty</th>
@@ -6124,7 +6128,7 @@ export default function ServiceDashboardPage() {
                                         <th className="px-3 py-1.5 text-right">Total</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
+                                    <tbody className="divide-y divide-border">
                                       {Array.isArray(rev.itemsSnapshot)
                                         ? (
                                             rev.itemsSnapshot as {
@@ -6136,7 +6140,7 @@ export default function ServiceDashboardPage() {
                                             }[]
                                           ).map((item, idx) => (
                                             <tr key={idx}>
-                                              <td className="px-3 py-1 font-medium text-slate-700">
+                                              <td className="px-3 py-1 font-medium text-foreground">
                                                 {item.partName || item.description || 'Spare Part'}
                                               </td>
                                               <td className="px-3 py-1 text-center">
@@ -6146,7 +6150,7 @@ export default function ServiceDashboardPage() {
                                                 {getActiveCurrency()}{' '}
                                                 {Number(item.unitPrice || 0).toFixed(2)}
                                               </td>
-                                              <td className="px-3 py-1 text-right font-bold text-slate-700">
+                                              <td className="px-3 py-1 text-right font-bold text-foreground">
                                                 {item.isFree
                                                   ? 'FOC'
                                                   : `${getActiveCurrency()} ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
@@ -6163,7 +6167,7 @@ export default function ServiceDashboardPage() {
                                             }[]
                                           ).map((item, idx) => (
                                             <tr key={idx}>
-                                              <td className="px-3 py-1 font-medium text-slate-700">
+                                              <td className="px-3 py-1 font-medium text-foreground">
                                                 {item.partName || item.description || 'Spare Part'}
                                               </td>
                                               <td className="px-3 py-1 text-center">
@@ -6173,7 +6177,7 @@ export default function ServiceDashboardPage() {
                                                 {getActiveCurrency()}{' '}
                                                 {Number(item.unitPrice || 0).toFixed(2)}
                                               </td>
-                                              <td className="px-3 py-1 text-right font-bold text-slate-700">
+                                              <td className="px-3 py-1 text-right font-bold text-foreground">
                                                 {item.isFree
                                                   ? 'FOC'
                                                   : `${getActiveCurrency()} ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
@@ -6190,7 +6194,7 @@ export default function ServiceDashboardPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
                       <Button
                         size="sm"
                         variant="outline"
@@ -6200,7 +6204,7 @@ export default function ServiceDashboardPage() {
                           setActiveDetailTab('info');
                           setTicketRevisions([]);
                         }}
-                        className="text-slate-500 border-slate-300 hover:bg-slate-50 h-8 px-3 rounded-lg font-bold"
+                        className="text-muted-foreground border-border hover:bg-muted h-8 px-3 rounded-lg font-bold"
                       >
                         Close
                       </Button>
@@ -6231,46 +6235,50 @@ export default function ServiceDashboardPage() {
 
       {/* ESTIMATES AND REVISIONS WORKFLOW MODAL */}
       {showEstimatesModal && selectedTicket && estimatesData && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl bg-card border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-5 flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                   <DollarSign className="text-primary" size={18} /> Cost Estimates & Revisions
                   Workflow
                 </CardTitle>
                 <CardDescription className="text-xs">
                   Ticket #{selectedTicket.ticketNumber} | Context:{' '}
-                  <span className="font-bold text-slate-700">{selectedTicket.serviceContext}</span>
+                  <span className="font-bold text-foreground">{selectedTicket.serviceContext}</span>
                 </CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowEstimatesModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                className="text-muted-foreground hover:text-foreground font-bold"
               >
                 Close
               </Button>
             </CardHeader>
             <CardContent className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto">
               {/* Full-width Ticket Details Section */}
-              <div className="lg:col-span-2 bg-slate-50 rounded-xl border border-slate-100 p-4 space-y-3">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="lg:col-span-2 bg-muted rounded-xl border border-border p-4 space-y-3">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <FileText className="text-primary size-4" /> Service Ticket Context & Details
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   <div className="md:col-span-3">
-                    <span className="text-slate-500 font-medium block">Complaint Registered:</span>
-                    <p className="text-slate-800 mt-1 bg-white p-2.5 rounded-lg border border-slate-200/60 leading-relaxed font-medium">
+                    <span className="text-muted-foreground font-medium block">
+                      Complaint Registered:
+                    </span>
+                    <p className="text-foreground mt-1 bg-card p-2.5 rounded-lg border border-border/60 leading-relaxed font-medium">
                       {selectedTicket.issueDescription || 'No complaint details provided.'}
                     </p>
                   </div>
 
                   {selectedTicket.problemFound && (
                     <div>
-                      <span className="text-slate-500 font-medium block">Problem Found:</span>
-                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1">
+                      <span className="text-muted-foreground font-medium block">
+                        Problem Found:
+                      </span>
+                      <span className="font-semibold text-foreground bg-card px-2 py-1 rounded border border-border/60 block mt-1">
                         {selectedTicket.problemFound}
                       </span>
                     </div>
@@ -6278,8 +6286,8 @@ export default function ServiceDashboardPage() {
 
                   {selectedTicket.rootCause && (
                     <div>
-                      <span className="text-slate-500 font-medium block">Root Cause:</span>
-                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1">
+                      <span className="text-muted-foreground font-medium block">Root Cause:</span>
+                      <span className="font-semibold text-foreground bg-card px-2 py-1 rounded border border-border/60 block mt-1">
                         {selectedTicket.rootCause}
                       </span>
                     </div>
@@ -6288,10 +6296,10 @@ export default function ServiceDashboardPage() {
                   {selectedTicket.machineType === 'PRINTER' &&
                     selectedTicket.meterReadingAtCreation !== undefined && (
                       <div>
-                        <span className="text-slate-500 font-medium block">
+                        <span className="text-muted-foreground font-medium block">
                           Meter Reading (at Ticket Creation):
                         </span>
-                        <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
+                        <span className="font-semibold text-foreground bg-card px-2 py-1 rounded border border-border/60 block mt-1 font-mono">
                           {selectedTicket.meterReadingAtCreation}
                         </span>
                       </div>
@@ -6300,10 +6308,10 @@ export default function ServiceDashboardPage() {
                   {selectedTicket.machineType === 'PRINTER' &&
                     selectedTicket.meterReadingAtService !== undefined && (
                       <div>
-                        <span className="text-slate-500 font-medium block">
+                        <span className="text-muted-foreground font-medium block">
                           Meter Reading (at Service):
                         </span>
-                        <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
+                        <span className="font-semibold text-foreground bg-card px-2 py-1 rounded border border-border/60 block mt-1 font-mono">
                           {selectedTicket.meterReadingAtService}
                         </span>
                       </div>
@@ -6313,20 +6321,20 @@ export default function ServiceDashboardPage() {
                     <div className="md:col-span-3 space-y-3">
                       {selectedTicket.diagnosisNotes && (
                         <div>
-                          <span className="text-slate-500 font-medium block">
+                          <span className="text-muted-foreground font-medium block">
                             Technician Diagnosis Notes:
                           </span>
-                          <p className="text-slate-700 mt-1 bg-white p-2.5 rounded-lg border border-slate-200/60 whitespace-pre-wrap">
+                          <p className="text-foreground mt-1 bg-card p-2.5 rounded-lg border border-border/60 whitespace-pre-wrap">
                             {selectedTicket.diagnosisNotes}
                           </p>
                         </div>
                       )}
                       {selectedTicket.technicianNoteToFinance && (
                         <div>
-                          <span className="text-amber-800 font-bold block flex items-center gap-1">
+                          <span className="text-warning font-bold block flex items-center gap-1">
                             📝 Note to Finance:
                           </span>
-                          <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded-lg border border-amber-200 font-medium whitespace-pre-wrap font-sans">
+                          <p className="text-warning mt-1 bg-warning/10 p-2.5 rounded-lg border border-warning/30 font-medium whitespace-pre-wrap font-sans">
                             {selectedTicket.technicianNoteToFinance}
                           </p>
                         </div>
@@ -6338,7 +6346,7 @@ export default function ServiceDashboardPage() {
 
               {/* Left Column: Existing Estimates & Revisions */}
               <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Approval Timeline & History
                 </h3>
 
@@ -6355,37 +6363,37 @@ export default function ServiceDashboardPage() {
                   if (!isExpired) return null;
 
                   return (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2.5">
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3.5 space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-red-800 flex items-center gap-1.5">
-                          <AlertTriangle size={14} className="text-red-600 animate-pulse" />{' '}
+                        <span className="text-xs font-bold text-destructive flex items-center gap-1.5">
+                          <AlertTriangle size={14} className="text-destructive animate-pulse" />{' '}
                           Estimate Validity Expired
                         </span>
-                        <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">
+                        <span className="text-[10px] bg-destructive/10 text-destructive px-2 py-0.5 rounded font-bold">
                           Expired
                         </span>
                       </div>
-                      <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      <p className="text-[11.5px] text-foreground leading-relaxed">
                         The estimate validity expired on{' '}
-                        <span className="font-bold text-red-700">
+                        <span className="font-bold text-destructive">
                           {new Date(latestRev.validUntil!).toLocaleDateString()}
                         </span>
                         . Finance approval is required to extend validity.
                       </p>
                       {canManageFinance && (
                         <div className="space-y-2 pt-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase block">
                             Set New Validity Date
                           </label>
                           <div className="flex gap-2">
                             <Input
                               type="date"
-                              className="h-8 text-xs bg-white border-slate-200 rounded-lg"
+                              className="h-8 text-xs bg-card border-border rounded-lg"
                               id="extendValidityDate"
                             />
                             <Button
                               size="sm"
-                              className="bg-primary hover:bg-primary/90 text-white text-[11px] h-8 px-3 rounded-lg shrink-0"
+                              className="bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] h-8 px-3 rounded-lg shrink-0"
                               onClick={async () => {
                                 const inputEl = document.getElementById(
                                   'extendValidityDate',
@@ -6418,7 +6426,7 @@ export default function ServiceDashboardPage() {
                 })()}
 
                 {estimatesData.estimates.length === 0 ? (
-                  <div className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                  <div className="text-xs text-muted-foreground bg-muted p-4 rounded-xl border border-border italic">
                     No cost estimates registered yet. Submit labor and parts below.
                   </div>
                 ) : (
@@ -6427,33 +6435,33 @@ export default function ServiceDashboardPage() {
                     {estimatesData.estimates.map((est) => (
                       <div
                         key={est.id}
-                        className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5"
+                        className="bg-muted border border-border rounded-xl p-4 space-y-2.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-700">
+                          <span className="text-xs font-bold text-foreground">
                             Baseline Estimate (v{est.version})
                           </span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10">
                             {est.status}
                           </span>
                         </div>
-                        <div className="text-xs space-y-1 text-slate-600">
+                        <div className="text-xs space-y-1 text-foreground">
                           <p>
                             Labor Cost:{' '}
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold text-foreground">
                               {getActiveCurrency()} {Number(est.labourCost || 0).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Parts/Items Cost:{' '}
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold text-foreground">
                               {getActiveCurrency()} {Number(est.partsCost || 0).toFixed(2)}
                             </span>
                           </p>
                           {Number(est.transportChargeAmount || 0) > 0 && (
                             <p>
                               Transportation Charge:{' '}
-                              <span className="font-semibold text-slate-800">
+                              <span className="font-semibold text-foreground">
                                 {getActiveCurrency()}{' '}
                                 {Number(est.transportChargeAmount || 0).toFixed(2)}
                               </span>
@@ -6462,7 +6470,7 @@ export default function ServiceDashboardPage() {
                           {Number(est.visitChargeAmount || 0) > 0 && (
                             <p>
                               Visit Charge:{' '}
-                              <span className="font-semibold text-slate-800">
+                              <span className="font-semibold text-foreground">
                                 {getActiveCurrency()}{' '}
                                 {Number(est.visitChargeAmount || 0).toFixed(2)}
                               </span>
@@ -6472,7 +6480,7 @@ export default function ServiceDashboardPage() {
                             Number(selectedTicket.visitChargeAmount || 0) > 0 && (
                               <p>
                                 Visit Charge (separate collection):{' '}
-                                <span className="font-semibold text-slate-800">
+                                <span className="font-semibold text-foreground">
                                   {getActiveCurrency()}{' '}
                                   {Number(selectedTicket.visitChargeAmount).toFixed(2)}{' '}
                                   <span className="text-[10px] font-bold uppercase">
@@ -6489,14 +6497,14 @@ export default function ServiceDashboardPage() {
                           {Number(est.discountAmount || 0) > 0 && (
                             <p>
                               Discount:{' '}
-                              <span className="font-semibold text-red-600">
+                              <span className="font-semibold text-destructive">
                                 -{getActiveCurrency()} {Number(est.discountAmount || 0).toFixed(2)}
                               </span>
                             </p>
                           )}
                           <p>
                             Total Cost:{' '}
-                            <span className="font-bold text-slate-900 text-sm">
+                            <span className="font-bold text-foreground text-sm">
                               {getActiveCurrency()} {Number(est.totalCost || 0).toFixed(2)}
                             </span>
                           </p>
@@ -6504,8 +6512,8 @@ export default function ServiceDashboardPage() {
 
                         {/* Items List */}
                         {est.items && est.items.length > 0 && (
-                          <div className="bg-white border border-slate-100 rounded-lg p-2 text-[11px] space-y-1">
-                            <span className="font-bold text-slate-500 block mb-1">
+                          <div className="bg-card border border-border rounded-lg p-2 text-[11px] space-y-1">
+                            <span className="font-bold text-muted-foreground block mb-1">
                               Declared Parts:
                             </span>
                             {est.items.map((item, idx) => {
@@ -6519,7 +6527,7 @@ export default function ServiceDashboardPage() {
                               return (
                                 <div
                                   key={idx}
-                                  className="flex justify-between gap-2 text-slate-600 border-b border-slate-50 pb-0.5 last:border-b-0"
+                                  className="flex justify-between gap-2 text-foreground border-b border-border pb-0.5 last:border-b-0"
                                 >
                                   <span>
                                     {item.partName} x {item.quantity}
@@ -6528,7 +6536,7 @@ export default function ServiceDashboardPage() {
                                     {covered ? (
                                       <>
                                         {getActiveCurrency()} {worth.toFixed(2)}{' '}
-                                        <span className="rounded bg-emerald-50 px-1 font-sans text-[9px] font-bold text-emerald-700">
+                                        <span className="rounded bg-success/10 px-1 font-sans text-[9px] font-bold text-success">
                                           COVERED
                                         </span>
                                       </>
@@ -6552,7 +6560,7 @@ export default function ServiceDashboardPage() {
                                 0,
                               );
                               return coveredTotal > 0 ? (
-                                <div className="flex justify-between pt-1 text-emerald-700 font-semibold">
+                                <div className="flex justify-between pt-1 text-success font-semibold">
                                   <span>Covered value (not charged)</span>
                                   <span className="font-mono">
                                     {getActiveCurrency()} {coveredTotal.toFixed(2)}
@@ -6570,7 +6578,7 @@ export default function ServiceDashboardPage() {
                               <>
                                 <Button
                                   size="sm"
-                                  className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                  className="bg-success hover:bg-success/90 text-success-foreground text-[11px] h-8 px-3 rounded-lg"
                                   onClick={() => handleApproveFinance(est.id)}
                                 >
                                   Approve (Finance)
@@ -6594,7 +6602,7 @@ export default function ServiceDashboardPage() {
                                 </Button>
                               </>
                             ) : (
-                              <div className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-100 flex items-center gap-1.5">
+                              <div className="text-[11px] text-warning bg-warning/10 px-2.5 py-1.5 rounded border border-warning/30 flex items-center gap-1.5">
                                 <span>⏳ Estimate submitted to Finance. Awaiting approval.</span>
                               </div>
                             )}
@@ -6605,14 +6613,14 @@ export default function ServiceDashboardPage() {
                             only; Help Desk isn't on-site with the customer to confirm. */}
                         {est.status === 'FINANCE_APPROVED' &&
                           (isTechnician || isManagerOrAdmin) && (
-                            <div className="flex gap-2 pt-1.5 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100">
-                              <span className="text-[10px] text-yellow-800 font-bold block mb-1 w-full">
+                            <div className="flex gap-2 pt-1.5 bg-warning/10 p-2.5 rounded-lg border border-warning/30">
+                              <span className="text-[10px] text-warning font-bold block mb-1 w-full">
                                 Customer Action:
                               </span>
                               <div className="flex gap-2">
                                 <Button
                                   size="sm"
-                                  className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                  className="bg-success hover:bg-success/90 text-success-foreground text-[11px] h-8 px-3 rounded-lg"
                                   onClick={() =>
                                     setApproveModal({
                                       kind: 'estimate',
@@ -6661,15 +6669,15 @@ export default function ServiceDashboardPage() {
                             already-signed view. */}
                         {est.status === 'CUSTOMER_APPROVED' &&
                           (est.customerSignatureData || est.customerSignedDocumentUrl) && (
-                            <div className="space-y-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5">
+                            <div className="space-y-2 rounded-lg border border-success/30 bg-success/10 p-2.5">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-emerald-800">
+                                <span className="text-[10px] font-bold text-success">
                                   ✓ Customer Approved
                                   {est.customerApprovedByName
                                     ? ` — ${est.customerApprovedByName}`
                                     : ''}
                                 </span>
-                                <span className="text-[9px] text-emerald-600">
+                                <span className="text-[9px] text-success">
                                   {est.customerApprovedAt
                                     ? new Date(est.customerApprovedAt).toLocaleString()
                                     : ''}
@@ -6679,7 +6687,7 @@ export default function ServiceDashboardPage() {
                                 <img
                                   src={est.customerSignatureData}
                                   alt="Customer signature"
-                                  className="h-16 rounded border border-emerald-200 bg-white"
+                                  className="h-16 rounded border border-success/30 bg-card"
                                 />
                               ) : (
                                 <div className="space-y-1">
@@ -6687,12 +6695,12 @@ export default function ServiceDashboardPage() {
                                     href={est.customerSignedDocumentUrl ?? undefined}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-[11px] font-bold text-emerald-700 underline"
+                                    className="text-[11px] font-bold text-success underline"
                                   >
                                     View signed document
                                   </a>
                                   {est.customerSignedDocumentNote && (
-                                    <p className="text-[10px] text-slate-500">
+                                    <p className="text-[10px] text-muted-foreground">
                                       {est.customerSignedDocumentNote}
                                     </p>
                                   )}
@@ -6705,7 +6713,7 @@ export default function ServiceDashboardPage() {
                         {est.status === 'DRAFT' && (
                           <Button
                             size="sm"
-                            className="bg-primary hover:bg-primary/90 text-white text-[11px] h-8 px-3 rounded-lg w-full mt-1.5"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] h-8 px-3 rounded-lg w-full mt-1.5"
                             onClick={() => handleSubmitEstimate(selectedTicket.id)}
                           >
                             Submit to Finance for Approval
@@ -6718,45 +6726,45 @@ export default function ServiceDashboardPage() {
                     {estimatesData.revisions.map((rev) => (
                       <div
                         key={rev.id}
-                        className="bg-purple-50/55 border border-purple-200 rounded-xl p-4 space-y-2.5"
+                        className="bg-lease/10 border border-lease/30 rounded-xl p-4 space-y-2.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-purple-800">
+                          <span className="text-xs font-bold text-lease">
                             Estimate Revision (v{rev.version})
                           </span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-purple-300 text-purple-700 bg-purple-50">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-lease/30 text-lease bg-lease/10">
                             {rev.status}
                           </span>
                         </div>
-                        <div className="text-xs space-y-1 text-slate-600">
+                        <div className="text-xs space-y-1 text-foreground">
                           <p>
                             Additional Labor:{' '}
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold text-foreground">
                               {getActiveCurrency()} {Number(rev.labourCost || 0).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Additional Parts:{' '}
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold text-foreground">
                               {getActiveCurrency()}{' '}
                               {Number(rev.partsCost ?? rev.totalCost - rev.labourCost).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Additional Total:{' '}
-                            <span className="font-bold text-slate-900">
+                            <span className="font-bold text-foreground">
                               {getActiveCurrency()} {Number(rev.totalCost || 0).toFixed(2)}
                             </span>
                           </p>
                         </div>
 
                         {rev.items && rev.items.length > 0 && (
-                          <div className="bg-white border border-slate-100 rounded-lg p-2 text-[11px] space-y-1">
-                            <span className="font-bold text-slate-500 block mb-1">
+                          <div className="bg-card border border-border rounded-lg p-2 text-[11px] space-y-1">
+                            <span className="font-bold text-muted-foreground block mb-1">
                               Additional Parts:
                             </span>
                             {rev.items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between text-slate-600">
+                              <div key={idx} className="flex justify-between text-foreground">
                                 <span>
                                   {item.partName} x {item.quantity}
                                 </span>
@@ -6775,13 +6783,13 @@ export default function ServiceDashboardPage() {
                             {canManageFinance ? (
                               <Button
                                 size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                className="bg-success hover:bg-success/90 text-success-foreground text-[11px] h-8 px-3 rounded-lg"
                                 onClick={() => handleApproveRevisionFinance(rev.id)}
                               >
                                 Approve Finance (Rev)
                               </Button>
                             ) : (
-                              <div className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-100 flex items-center gap-1.5">
+                              <div className="text-[11px] text-warning bg-warning/10 px-2.5 py-1.5 rounded border border-warning/30 flex items-center gap-1.5">
                                 <span>⏳ Estimate submitted to Finance. Awaiting approval.</span>
                               </div>
                             )}
@@ -6792,7 +6800,7 @@ export default function ServiceDashboardPage() {
                           <div className="flex gap-2 pt-1.5">
                             <Button
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                              className="bg-success hover:bg-success/90 text-success-foreground text-[11px] h-8 px-3 rounded-lg"
                               onClick={() => handleApproveRevisionCustomer(rev.id)}
                             >
                               Approve Customer (Rev)
@@ -6806,22 +6814,22 @@ export default function ServiceDashboardPage() {
               </div>
 
               {/* Right Column: Dynamic Form to Create / Revise */}
-              <div className="border-l border-slate-100 pl-6 space-y-6">
+              <div className="border-l border-border pl-6 space-y-6">
                 {/* Check if baseline is customer approved, in which case we allow a revision */}
                 {estimatesData.estimates.some((e) => e.status === 'CUSTOMER_APPROVED') ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
                         Create Estimate Revision
                       </h3>
-                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                      <span className="text-[10px] text-success font-bold bg-success/10 px-2 py-0.5 rounded border border-success/30">
                         Baseline Approved
                       </span>
                     </div>
 
                     <form onSubmit={handleCreateRevision} className="space-y-4">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Additional Labor Cost ({getActiveCurrency()})
                         </label>
                         <Input
@@ -6830,13 +6838,13 @@ export default function ServiceDashboardPage() {
                           min={0}
                           value={newRevLabour || ''}
                           onChange={(e) => setNewRevLabour(parseFloat(e.target.value) || 0)}
-                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                          className="h-9 text-xs bg-muted border-border rounded-xl"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                             Additional Parts required
                           </label>
                           <Button
@@ -6844,7 +6852,7 @@ export default function ServiceDashboardPage() {
                             variant="outline"
                             size="sm"
                             onClick={addRevisionItem}
-                            className="text-[10px] h-7 px-2.5 rounded-lg border-slate-200 text-primary gap-1"
+                            className="text-[10px] h-7 px-2.5 rounded-lg border-border text-primary gap-1"
                           >
                             <Plus size={10} /> Add Part
                           </Button>
@@ -6853,7 +6861,7 @@ export default function ServiceDashboardPage() {
                         {newRevItems.map((item, idx) => (
                           <div
                             key={idx}
-                            className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-2"
+                            className="bg-muted p-3 rounded-lg border border-border space-y-2"
                           >
                             <SearchableSelect
                               options={spareParts.map((sp) => ({
@@ -6879,7 +6887,7 @@ export default function ServiceDashboardPage() {
                                     parseInt(e.target.value, 10) || 1,
                                   )
                                 }
-                                className="h-8 text-[11px] bg-white"
+                                className="h-8 text-[11px] bg-card"
                                 placeholder="Qty"
                               />
                               <Button
@@ -6887,7 +6895,7 @@ export default function ServiceDashboardPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeRevisionItem(idx)}
-                                className="text-red-500 text-[10px] h-8"
+                                className="text-destructive text-[10px] h-8"
                               >
                                 Remove
                               </Button>
@@ -6903,7 +6911,7 @@ export default function ServiceDashboardPage() {
                         disabled={submitting}
                         className={cn(
                           buttonVariants(),
-                          'w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs py-2.5',
+                          'w-full bg-lease hover:bg-lease/90 text-lease-foreground font-bold rounded-xl text-xs py-2.5',
                         )}
                       >
                         Submit Revision for Approval
@@ -6912,12 +6920,12 @@ export default function ServiceDashboardPage() {
                   </div>
                 ) : estimatesData.estimates.length === 0 ? (
                   <div className="space-y-4">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
                       Create Draft Estimate
                     </h3>
                     <form onSubmit={handleCreateEstimate} className="space-y-4">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Labor / Service Charge ({getActiveCurrency()})
                         </label>
                         <Input
@@ -6926,13 +6934,13 @@ export default function ServiceDashboardPage() {
                           min={0}
                           value={newEstLabour || ''}
                           onChange={(e) => setNewEstLabour(parseFloat(e.target.value) || 0)}
-                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                          className="h-9 text-xs bg-muted border-border rounded-xl"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                             Parts / Items Required
                           </label>
                           <Button
@@ -6940,7 +6948,7 @@ export default function ServiceDashboardPage() {
                             variant="outline"
                             size="sm"
                             onClick={addEstimateItem}
-                            className="text-[10px] h-7 px-2.5 rounded-lg border-slate-200 text-primary gap-1"
+                            className="text-[10px] h-7 px-2.5 rounded-lg border-border text-primary gap-1"
                           >
                             <Plus size={10} /> Add Part
                           </Button>
@@ -6949,7 +6957,7 @@ export default function ServiceDashboardPage() {
                         {newEstItems.map((item, idx) => (
                           <div
                             key={idx}
-                            className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-2"
+                            className="bg-muted p-3 rounded-lg border border-border space-y-2"
                           >
                             <SearchableSelect
                               options={spareParts.map((sp) => ({
@@ -6975,7 +6983,7 @@ export default function ServiceDashboardPage() {
                                     parseInt(e.target.value, 10) || 1,
                                   )
                                 }
-                                className="h-8 text-[11px] bg-white"
+                                className="h-8 text-[11px] bg-card"
                                 placeholder="Qty"
                               />
                               <Button
@@ -6983,7 +6991,7 @@ export default function ServiceDashboardPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeEstimateItem(idx)}
-                                className="text-red-500 text-[10px] h-8"
+                                className="text-destructive text-[10px] h-8"
                               >
                                 Remove
                               </Button>
@@ -6999,7 +7007,7 @@ export default function ServiceDashboardPage() {
                         disabled={submitting}
                         className={cn(
                           buttonVariants(),
-                          'w-full bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs py-2.5',
+                          'w-full bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-xl text-xs py-2.5',
                         )}
                       >
                         Create Draft Estimate
@@ -7007,7 +7015,7 @@ export default function ServiceDashboardPage() {
                     </form>
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-xl p-6 text-center italic">
+                  <div className="text-xs text-muted-foreground bg-muted border border-border rounded-xl p-6 text-center italic">
                     Estimate exists. Please wait for customer/finance approval before creating any
                     revisions.
                   </div>
@@ -7020,11 +7028,11 @@ export default function ServiceDashboardPage() {
 
       {/* MACHINE HISTORICAL INTEL & YIELD ANALYTICS MODAL */}
       {showMachineIntelModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl bg-card border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="bg-muted border-b border-border p-5 flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                   <Activity className="text-primary" size={18} /> Machine History & Consumable Yield
                   Intel
                 </CardTitle>
@@ -7036,7 +7044,7 @@ export default function ServiceDashboardPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowMachineIntelModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                className="text-muted-foreground hover:text-foreground font-bold"
               >
                 Close
               </Button>
@@ -7045,7 +7053,7 @@ export default function ServiceDashboardPage() {
               {loadingMachineIntel ? (
                 <div className="text-center py-20">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  <span className="text-xs text-slate-400 mt-2 block font-medium">
+                  <span className="text-xs text-muted-foreground mt-2 block font-medium">
                     Loading machine intel history...
                   </span>
                 </div>
@@ -7053,60 +7061,60 @@ export default function ServiceDashboardPage() {
                 <div className="space-y-6">
                   {/* KPI Cards Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    <div className="bg-muted border border-border rounded-xl p-3.5 shadow-sm text-center">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Total Repair Visits
                       </span>
-                      <span className="text-xl font-black text-slate-800">
+                      <span className="text-xl font-black text-foreground">
                         {machineCostData?.totalServiceVisits || 0}
                       </span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center bg-emerald-50/50 border-emerald-100">
-                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">
+                    <div className="bg-muted border border-border rounded-xl p-3.5 shadow-sm text-center bg-success/10 border-success/30">
+                      <span className="text-[10px] font-bold text-success uppercase tracking-wider block mb-1">
                         Current Meter Reading
                       </span>
-                      <span className="text-xl font-black text-emerald-900 font-mono">
+                      <span className="text-xl font-black text-success font-mono">
                         {machineCostData?.currentMeterReading != null
                           ? machineCostData.currentMeterReading
                           : 'N/A'}
                       </span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    <div className="bg-muted border border-border rounded-xl p-3.5 shadow-sm text-center">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Total Spare Parts Cost
                       </span>
-                      <span className="text-xl font-black text-slate-800 font-mono">
+                      <span className="text-xl font-black text-foreground font-mono">
                         {getActiveCurrency()}{' '}
                         {(machineCostData?.totalSparePartsCost || 0).toFixed(2)}
                       </span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    <div className="bg-muted border border-border rounded-xl p-3.5 shadow-sm text-center">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Total Labor Cost
                       </span>
-                      <span className="text-xl font-black text-slate-800 font-mono">
+                      <span className="text-xl font-black text-foreground font-mono">
                         {getActiveCurrency()} {(machineCostData?.totalLabourCost || 0).toFixed(2)}
                       </span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center bg-blue-50/50 border-blue-100">
-                      <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">
+                    <div className="bg-muted border border-border rounded-xl p-3.5 shadow-sm text-center bg-primary/10 border-primary/30">
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-1">
                         Total Lifetime Cost
                       </span>
-                      <span className="text-xl font-black text-blue-900 font-mono">
+                      <span className="text-xl font-black text-primary font-mono">
                         {getActiveCurrency()} {(machineCostData?.totalLifetimeCost || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
 
                   {/* Tab Selector */}
-                  <div className="flex border-b border-slate-200">
+                  <div className="flex border-b border-border">
                     <button
                       type="button"
                       onClick={() => setActiveIntelTab('visits')}
                       className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                         activeIntelTab === 'visits'
                           ? 'border-primary text-primary font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       Service Visits ({machineCostData?.visitLogs?.length || 0})
@@ -7117,7 +7125,7 @@ export default function ServiceDashboardPage() {
                       className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                         activeIntelTab === 'parts'
                           ? 'border-primary text-primary font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       Consumed Parts ({machinePartLogs?.length || 0})
@@ -7128,7 +7136,7 @@ export default function ServiceDashboardPage() {
                       className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                         activeIntelTab === 'yields'
                           ? 'border-primary text-primary font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       Toner Yield Analytics ({machineYieldData?.length || 0})
@@ -7139,11 +7147,11 @@ export default function ServiceDashboardPage() {
                     {/* Machine Visit History Logs */}
                     {activeIntelTab === 'visits' && (
                       <div className="space-y-3 animate-in fade-in duration-200">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                           Historical Service Visits
                         </h3>
                         {!machineCostData?.visitLogs || machineCostData.visitLogs.length === 0 ? (
-                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                          <p className="text-xs text-muted-foreground bg-muted p-4 rounded-xl border border-border italic">
                             No service visits logged for this machine.
                           </p>
                         ) : (
@@ -7151,13 +7159,13 @@ export default function ServiceDashboardPage() {
                             {machineCostData.visitLogs.map((log, idx) => (
                               <div
                                 key={idx}
-                                className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1 shadow-sm"
+                                className="bg-muted border border-border rounded-xl p-3.5 space-y-1 shadow-sm"
                               >
                                 <div className="flex items-center justify-between">
-                                  <span className="text-[11px] font-bold text-slate-700">
+                                  <span className="text-[11px] font-bold text-foreground">
                                     {log.ticketNumber} | {log.serviceContext}
                                   </span>
-                                  <span className="text-[10px] text-slate-400">
+                                  <span className="text-[10px] text-muted-foreground">
                                     {new Date(log.date).toLocaleDateString()}
                                   </span>
                                 </div>
@@ -7166,13 +7174,13 @@ export default function ServiceDashboardPage() {
                                 >
                                   {log.status}
                                 </Badge>
-                                <p className="text-xs text-slate-600">
+                                <p className="text-xs text-foreground">
                                   Meter Reading:{' '}
                                   <span className="font-semibold">{log.meterReading || 'N/A'}</span>
                                 </p>
-                                <p className="text-xs text-slate-600">
+                                <p className="text-xs text-foreground">
                                   Total Cost:{' '}
-                                  <span className="font-bold text-slate-800">
+                                  <span className="font-bold text-foreground">
                                     {getActiveCurrency()} {log.cost.toFixed(2)}
                                   </span>
                                 </p>
@@ -7186,17 +7194,17 @@ export default function ServiceDashboardPage() {
                     {/* Consumed Parts Log */}
                     {activeIntelTab === 'parts' && (
                       <div className="space-y-3 animate-in fade-in duration-200">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                           Consumed Parts & Consumables Log
                         </h3>
                         {!machinePartLogs || machinePartLogs.length === 0 ? (
-                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                          <p className="text-xs text-muted-foreground bg-muted p-4 rounded-xl border border-border italic">
                             No spare parts or consumables replaced yet.
                           </p>
                         ) : (
-                          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                          <div className="border border-border rounded-xl overflow-hidden shadow-sm">
                             <Table>
-                              <TableHeader className="bg-slate-50">
+                              <TableHeader className="bg-muted">
                                 <TableRow>
                                   <TableHead className="text-[10px] py-2 h-8 font-bold">
                                     Part Name / SKU
@@ -7218,13 +7226,13 @@ export default function ServiceDashboardPage() {
                               <TableBody>
                                 {machinePartLogs.map(
                                   (log: MachineHistoryResponse['partLogs'][number]) => (
-                                    <TableRow key={log.id} className="hover:bg-slate-50/30">
-                                      <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
+                                    <TableRow key={log.id} className="hover:bg-muted/30">
+                                      <TableCell className="py-2.5 text-xs font-semibold text-foreground">
                                         {log.partName} {log.sku ? `(${log.sku})` : ''}
                                       </TableCell>
                                       <TableCell className="py-2.5 text-xs text-center">
                                         <span
-                                          className={`px-2 py-0.5 rounded text-[10px] ${log.isConsumable ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}
+                                          className={`px-2 py-0.5 rounded text-[10px] ${log.isConsumable ? 'bg-warning/10 text-warning border border-warning/30' : 'bg-primary/10 text-primary border border-primary/30'}`}
                                         >
                                           {log.isConsumable ? 'Consumable' : 'Spare Part'}
                                         </span>
@@ -7235,7 +7243,7 @@ export default function ServiceDashboardPage() {
                                       <TableCell className="py-2.5 text-xs text-right font-mono font-bold">
                                         {Number(log.totalCost).toFixed(2)}
                                       </TableCell>
-                                      <TableCell className="py-2.5 text-xs text-center text-slate-500">
+                                      <TableCell className="py-2.5 text-xs text-center text-muted-foreground">
                                         {new Date(log.replacedAt).toLocaleDateString()}
                                       </TableCell>
                                     </TableRow>
@@ -7251,17 +7259,17 @@ export default function ServiceDashboardPage() {
                     {/* Consumable Yield Performance Log */}
                     {activeIntelTab === 'yields' && (
                       <div className="space-y-3 animate-in fade-in duration-200">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                           Consumable Yield Tracking Logs
                         </h3>
                         {machineYieldData.length === 0 ? (
-                          <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
+                          <p className="text-xs text-muted-foreground bg-muted p-4 rounded-xl border border-border italic">
                             No consumable yield events recorded for this machine.
                           </p>
                         ) : (
-                          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                          <div className="border border-border rounded-xl overflow-hidden shadow-sm">
                             <Table>
-                              <TableHeader className="bg-slate-50">
+                              <TableHeader className="bg-muted">
                                 <TableRow>
                                   <TableHead className="text-[10px] py-2 h-8 font-bold">
                                     Consumable SKU
@@ -7283,16 +7291,16 @@ export default function ServiceDashboardPage() {
                                     Math.round((actual / target) * 100),
                                   );
                                   return (
-                                    <TableRow key={y.id || idx} className="hover:bg-slate-50/30">
-                                      <TableCell className="py-2.5 text-xs font-semibold text-slate-700">
+                                    <TableRow key={y.id || idx} className="hover:bg-muted/30">
+                                      <TableCell className="py-2.5 text-xs font-semibold text-foreground">
                                         {y.consumableSku}
                                       </TableCell>
-                                      <TableCell className="py-2.5 text-xs text-slate-600 text-right font-mono font-bold">
+                                      <TableCell className="py-2.5 text-xs text-foreground text-right font-mono font-bold">
                                         {actual.toLocaleString()}
                                       </TableCell>
                                       <TableCell className="py-2.5 text-xs text-center font-bold">
                                         <span
-                                          className={`px-2 py-0.5 rounded text-[10px] ${yieldPct >= 90 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}
+                                          className={`px-2 py-0.5 rounded text-[10px] ${yieldPct >= 90 ? 'bg-success/10 text-success border border-success/30' : 'bg-destructive/10 text-destructive border border-destructive/30'}`}
                                         >
                                           {yieldPct}%
                                         </span>
@@ -7362,26 +7370,26 @@ export default function ServiceDashboardPage() {
       >
         {collectVCModal && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-foreground">
               Ticket {collectVCModal.ticketNumber} — outstanding visit charge of{' '}
               {getActiveCurrency()} {collectVCModal.amount.toFixed(2)}. This can be paid now or left
               for later (on-site or on the completion bill) — collecting it here does not affect
               technician assignment or diagnosis.
             </p>
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-warning bg-warning/10 border border-warning/30 rounded-lg px-3 py-2">
               Recording this sends the collection to Accounts for approval. Nothing is posted to the
               cashbook until they approve it, and the technician will no longer be offered this
               charge on site.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                   Payment Mode
                 </label>
                 <select
                   value={collectVCPaymentMode}
                   onChange={(e) => handleCollectVCModeChange(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30 focus:border-warning/30"
                 >
                   <option value="">Select mode...</option>
                   <option value="CASH">Cash</option>
@@ -7391,14 +7399,14 @@ export default function ServiceDashboardPage() {
               </div>
               {collectVCPaymentMode && collectVCPaymentMode !== 'CHEQUE' && (
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     {collectVCPaymentMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
                   </label>
                   <select
                     value={collectVCAccountId}
                     onChange={(e) => setCollectVCAccountId(e.target.value)}
                     disabled={collectVCEligibleAccounts.length === 0}
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 disabled:opacity-60"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30 focus:border-warning/30 disabled:opacity-60"
                   >
                     {collectVCEligibleAccounts.length === 0 ? (
                       <option value="">
@@ -7422,36 +7430,36 @@ export default function ServiceDashboardPage() {
             {collectVCPaymentMode === 'CHEQUE' && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     Cheque No. *
                   </label>
                   <input
                     value={collectVCChequeNumber}
                     onChange={(e) => setCollectVCChequeNumber(e.target.value)}
                     placeholder="e.g. CHQ-004512"
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     Bank
                   </label>
                   <input
                     value={collectVCChequeBank}
                     onChange={(e) => setCollectVCChequeBank(e.target.value)}
                     placeholder="e.g. FAB"
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     Cheque Date
                   </label>
                   <input
                     type="date"
                     value={collectVCChequeDate}
                     onChange={(e) => setCollectVCChequeDate(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                   />
                 </div>
               </div>
@@ -7484,15 +7492,15 @@ export default function ServiceDashboardPage() {
       >
         {collectCPModal && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-foreground">
               Ticket {collectCPModal.ticketNumber} — record a payment the customer made after the
               job was completed.
             </p>
             {collectCPLoadingDue ? (
-              <p className="text-xs text-slate-400">Loading outstanding balance…</p>
+              <p className="text-xs text-muted-foreground">Loading outstanding balance…</p>
             ) : collectCPAmountDue ? (
               collectCPAmountDue.outstanding > 0 ? (
-                <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-foreground bg-muted border border-border rounded-lg px-3 py-2">
                   Invoice {collectCPAmountDue.invoiceNumber || ''}: {getActiveCurrency()}{' '}
                   {collectCPAmountDue.total.toFixed(2)} total, {getActiveCurrency()}{' '}
                   {collectCPAmountDue.paid.toFixed(2)} already collected/pending —{' '}
@@ -7502,20 +7510,20 @@ export default function ServiceDashboardPage() {
                   .
                 </p>
               ) : (
-                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-success bg-success/10 border border-success/30 rounded-lg px-3 py-2">
                   Nothing outstanding — this invoice is already fully collected or pending approval.
                 </p>
               )
             ) : (
-              <p className="text-xs text-red-500">Could not load the invoice balance.</p>
+              <p className="text-xs text-destructive">Could not load the invoice balance.</p>
             )}
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-warning bg-warning/10 border border-warning/30 rounded-lg px-3 py-2">
               Recording this sends the collection to Accounts for approval. Nothing is posted to the
               cashbook until they approve it, into whichever account is selected here.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                   Amount ({getActiveCurrency()})
                 </label>
                 <input
@@ -7523,18 +7531,18 @@ export default function ServiceDashboardPage() {
                   min="0"
                   value={collectCPAmount}
                   onChange={(e) => setCollectCPAmount(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30 focus:border-warning/30"
                 />
                 {collectCPAmountDue &&
                   Number(collectCPAmount) > collectCPAmountDue.outstanding + 0.01 && (
-                    <p className="text-[10px] font-bold text-red-600">
+                    <p className="text-[10px] font-bold text-destructive">
                       More than the {getActiveCurrency()}{' '}
                       {collectCPAmountDue.outstanding.toFixed(2)} outstanding.
                     </p>
                   )}
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                   Payment Mode
                 </label>
                 <select
@@ -7543,7 +7551,7 @@ export default function ServiceDashboardPage() {
                     setCollectCPPaymentMode(e.target.value);
                     setCollectCPAccountId('');
                   }}
-                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30 focus:border-warning/30"
                 >
                   <option value="">Select mode...</option>
                   <option value="CASH">Cash</option>
@@ -7555,7 +7563,7 @@ export default function ServiceDashboardPage() {
 
             {collectCPPaymentMode && collectCPPaymentMode !== 'CHEQUE' && (
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                   {collectCPPaymentMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
                 </label>
                 <SearchableSelect
@@ -7568,7 +7576,7 @@ export default function ServiceDashboardPage() {
                       : 'Select account...'
                   }
                   disabled={collectCPEligibleAccounts.length === 0}
-                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border-orange-200 rounded-xl text-orange-900 font-semibold"
+                  className="w-full h-9 px-3 text-xs bg-warning/10 border-warning/30 rounded-xl text-warning font-semibold"
                 />
               </div>
             )}
@@ -7576,36 +7584,36 @@ export default function ServiceDashboardPage() {
             {collectCPPaymentMode === 'CHEQUE' && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     Cheque No. *
                   </label>
                   <input
                     value={collectCPChequeNumber}
                     onChange={(e) => setCollectCPChequeNumber(e.target.value)}
                     placeholder="e.g. CHQ-004512"
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     Bank
                   </label>
                   <input
                     value={collectCPChequeBank}
                     onChange={(e) => setCollectCPChequeBank(e.target.value)}
                     placeholder="e.g. FAB"
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-warning">
                     Cheque Date
                   </label>
                   <input
                     type="date"
                     value={collectCPChequeDate}
                     onChange={(e) => setCollectCPChequeDate(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full h-9 px-3 text-xs bg-warning/10 border border-warning/30 rounded-xl text-warning font-semibold focus:outline-none focus:ring-2 focus:ring-warning/30"
                   />
                 </div>
               </div>
@@ -7641,7 +7649,7 @@ export default function ServiceDashboardPage() {
           <div className="space-y-3">
             {rejectVCModal.eligible && !rejectHasDiscount && (
               <>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-foreground">
                   This ticket has an outstanding visit charge of {getActiveCurrency()}{' '}
                   {rejectVCModal.amount.toFixed(2)} that was set to be added to the estimate. Since
                   the customer is rejecting, you can collect it now.
@@ -7662,7 +7670,7 @@ export default function ServiceDashboardPage() {
                         setRejectPaymentMode(e.target.value);
                         setRejectAccountId('');
                       }}
-                      className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      className="w-full h-9 px-3 text-xs bg-muted border border-border rounded-xl"
                     >
                       <option value="">Select mode...</option>
                       <option value="CASH">Cash</option>
@@ -7674,7 +7682,7 @@ export default function ServiceDashboardPage() {
                       <select
                         value={rejectAccountId}
                         onChange={(e) => setRejectAccountId(e.target.value)}
-                        className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                        className="w-full h-9 px-3 text-xs bg-muted border border-border rounded-xl"
                       >
                         <option value="">Select account...</option>
                         {cashBankAccounts.map((a) => (
@@ -7696,7 +7704,7 @@ export default function ServiceDashboardPage() {
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Why is the customer rejecting the estimate?"
                 rows={2}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl resize-none"
+                className="w-full px-3 py-2 text-xs bg-muted border border-border rounded-xl resize-none"
               />
             </div>
 
@@ -7712,17 +7720,17 @@ export default function ServiceDashboardPage() {
                 onChange={(e) => setRejectDiscountAmount(e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0.00"
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                className="w-full h-9 px-3 text-xs bg-muted border border-border rounded-xl"
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 If the customer wants a lower price, enter a discount here instead of rejecting — it
                 applies immediately and the customer can approve/reject the new total.
               </p>
             </div>
 
             {rejectVCModal.kind === 'estimate' && !rejectHasDiscount && (
-              <div className="space-y-2 rounded-xl border border-red-100 bg-red-50/50 p-3">
-                <p className="text-[11px] font-semibold text-red-800">
+              <div className="space-y-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
+                <p className="text-[11px] font-semibold text-destructive">
                   You&apos;re recording a decision the customer has already made. This locks the
                   estimate as rejected and cannot be undone.
                 </p>
@@ -7731,14 +7739,14 @@ export default function ServiceDashboardPage() {
                     value={rejectCustomerName}
                     onChange={(e) => setRejectCustomerName(e.target.value)}
                     placeholder="Who rejected it? (full name)"
-                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                    className="h-9 w-full rounded-xl border border-border bg-card px-3 text-xs"
                   />
                   <select
                     value={rejectConfirmedVia}
                     onChange={(e) =>
                       setRejectConfirmedVia(e.target.value as CustomerDecisionChannel)
                     }
-                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                    className="h-9 w-full rounded-xl border border-border bg-card px-3 text-xs"
                   >
                     <option value="IN_PERSON">Confirmed in person</option>
                     <option value="PHONE">Confirmed by phone</option>
@@ -7746,7 +7754,7 @@ export default function ServiceDashboardPage() {
                     <option value="EMAIL">Confirmed by email</option>
                   </select>
                 </div>
-                <label className="flex cursor-pointer items-start gap-2 text-[11px] text-slate-700">
+                <label className="flex cursor-pointer items-start gap-2 text-[11px] text-foreground">
                   <input
                     type="checkbox"
                     checked={rejectAck}

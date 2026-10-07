@@ -38,7 +38,7 @@ function PlainRow({ label, value, currency }: { label: string; value: number; cu
     <div className="grid grid-cols-12 px-5 py-3 items-center text-sm">
       <span className="col-span-6 pl-5 text-muted-foreground">{label}</span>
       <span
-        className={`col-span-5 text-right font-medium tabular-nums ${value < 0 ? 'text-red-600' : 'text-slate-700'}`}
+        className={`col-span-5 text-right font-medium tabular-nums ${value < 0 ? 'text-destructive' : 'text-foreground'}`}
       >
         {formatCurrency(value, currency)}
       </span>
@@ -61,12 +61,12 @@ function TotalRow({
   return (
     <div
       className={`flex items-center justify-between px-5 py-2.5 mt-1 ${
-        grand ? 'border-t-2 border-slate-300 pt-3' : 'border-t border-border bg-slate-50/60'
+        grand ? 'border-t-2 border-border pt-3' : 'border-t border-border bg-muted/60'
       }`}
     >
-      <span className="text-sm font-bold text-slate-800">{label}</span>
+      <span className="text-sm font-bold text-foreground">{label}</span>
       <span
-        className={`text-sm font-bold tabular-nums ${value < 0 ? 'text-red-600' : 'text-slate-800'}`}
+        className={`text-sm font-bold tabular-nums ${value < 0 ? 'text-destructive' : 'text-foreground'}`}
       >
         {formatCurrency(value, currency)}
       </span>
@@ -229,7 +229,7 @@ function BalanceSheetContent() {
                 ? 'Generate disabled: some figures may be incomplete due to service warnings'
                 : undefined
             }
-            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FileText className="h-4 w-4" /> Generate Statement
           </Button>
@@ -241,21 +241,23 @@ function BalanceSheetContent() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : isError || !data ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center">
-          <p className="text-red-700 font-medium">Failed to load balance sheet. Please refresh.</p>
+        <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+          <p className="text-destructive font-medium">
+            Failed to load balance sheet. Please refresh.
+          </p>
         </div>
       ) : (
         <>
           {dataWarnings.length > 0 && (
-            <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
-              <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+            <div className="rounded-xl bg-warning/10 border border-warning/30 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-warning font-semibold text-sm">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Data incomplete — some figures below may be understated. Statement generation is
                 disabled until resolved.
               </div>
               <ul className="pl-6 list-disc space-y-0.5">
                 {dataWarnings.map((w: string, i: number) => (
-                  <li key={i} className="text-xs text-amber-700">
+                  <li key={i} className="text-xs text-warning">
                     {w}
                   </li>
                 ))}
@@ -264,12 +266,10 @@ function BalanceSheetContent() {
           )}
 
           <div
-            className={`flex items-center gap-2 rounded-xl p-3 border ${isBalanced ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}
+            className={`flex items-center gap-2 rounded-xl p-3 border ${isBalanced ? 'bg-success/10 border-success/30' : 'bg-warning/10 border-warning/30'}`}
           >
-            <Scale className={`h-4 w-4 ${isBalanced ? 'text-emerald-600' : 'text-amber-600'}`} />
-            <span
-              className={`text-sm font-medium ${isBalanced ? 'text-emerald-700' : 'text-amber-700'}`}
-            >
+            <Scale className={`h-4 w-4 ${isBalanced ? 'text-success' : 'text-warning'}`} />
+            <span className={`text-sm font-medium ${isBalanced ? 'text-success' : 'text-warning'}`}>
               {isBalanced
                 ? 'Balance sheet is balanced — Assets = Liabilities + Equity ✓'
                 : `Out of balance by ${formatCurrency(difference, currency)} — add equity or manual entries to reconcile`}
@@ -295,9 +295,9 @@ function BalanceSheetContent() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden">
+            <div className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden">
               <div className="px-5 py-4 border-b border-border">
-                <h3 className="font-black text-blue-700 text-sm uppercase tracking-wide">ASSETS</h3>
+                <h3 className="font-black text-primary text-sm uppercase tracking-wide">ASSETS</h3>
               </div>
               <div className="divide-y divide-border">
                 <div className="px-5 py-2 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -361,9 +361,9 @@ function BalanceSheetContent() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden">
+            <div className="rounded-2xl bg-card shadow-sm border border-border overflow-hidden">
               <div className="px-5 py-4 border-b border-border">
-                <h3 className="font-black text-red-700 text-sm uppercase tracking-wide">
+                <h3 className="font-black text-destructive text-sm uppercase tracking-wide">
                   LIABILITIES &amp; EQUITY
                 </h3>
               </div>
@@ -459,10 +459,12 @@ function BalanceSheetContent() {
 
 export default function AdminBalanceSheetPage() {
   return (
-    <div className="bg-blue-50/50 min-h-full p-6 space-y-6">
+    <div className="bg-primary/10 min-h-full p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Balance Sheet</h3>
+          <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
+            Balance Sheet
+          </h3>
           <p className="text-muted-foreground">Financial position — across branches</p>
         </div>
         <Suspense>

@@ -161,13 +161,13 @@ export default function ManagerNewTransferPage() {
   };
 
   return (
-    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold text-primary">New Stock Transfer</h1>
+          <h1 className="text-xl font-medium text-primary">New Stock Transfer</h1>
         </div>
 
         {/* Step indicator */}
@@ -177,25 +177,25 @@ export default function ManagerNewTransferPage() {
               <div
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
                   i === step
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : i < step
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-white text-slate-400'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-card text-muted-foreground'
                 }`}
               >
                 {i < step ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}
                 <span className="hidden sm:inline">{s}</span>
               </div>
-              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-slate-200" />}
+              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-muted" />}
             </React.Fragment>
           ))}
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 space-y-5">
+        <div className="bg-card rounded-xl p-6 shadow-sm border border-primary/30 space-y-5">
           {/* Step 1: Type */}
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="font-semibold text-slate-700">Select Transfer Type</h2>
+              <h2 className="font-semibold text-foreground">Select Transfer Type</h2>
               <div className="grid grid-cols-2 gap-4">
                 {(['INTRA_BRANCH', 'INTER_BRANCH'] as TransferType[]).map((type) => (
                   <button
@@ -206,14 +206,14 @@ export default function ManagerNewTransferPage() {
                     }}
                     className={`p-4 rounded-xl border-2 text-left transition-all ${
                       transferType === type
-                        ? 'border-primary bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-border'
                     }`}
                   >
-                    <div className="font-semibold text-sm text-slate-800">
+                    <div className="font-semibold text-sm text-foreground">
                       {type === 'INTRA_BRANCH' ? 'Intra-Branch' : 'Inter-Branch'}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {type === 'INTRA_BRANCH'
                         ? 'Move stock between your warehouses'
                         : 'Request stock from another branch'}
@@ -222,7 +222,7 @@ export default function ManagerNewTransferPage() {
                 ))}
               </div>
               {isInter && (
-                <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                <div className="text-xs text-muted-foreground bg-primary/10 rounded-lg px-3 py-2">
                   The giving branch manager reviews, can adjust quantities, assigns machines and
                   approves before anything moves.
                 </div>
@@ -233,7 +233,7 @@ export default function ManagerNewTransferPage() {
           {/* Step 2: Source */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="font-semibold text-slate-700">
+              <h2 className="font-semibold text-foreground">
                 {isInter ? 'Request From Branch' : 'Source Warehouse'}
               </h2>
               <div className="space-y-3">
@@ -257,13 +257,13 @@ export default function ManagerNewTransferPage() {
                         />
                       </div>
                     </div>
-                    <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                    <div className="text-xs text-muted-foreground bg-primary/10 rounded-lg px-3 py-2">
                       You will pick items from that branch&apos;s live inventory in the last step.
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                    <div className="text-xs text-muted-foreground bg-primary/10 rounded-lg px-3 py-2">
                       Intra-branch transfer within{' '}
                       <span className="font-semibold">{myBranch?.name ?? 'your branch'}</span> —
                       pick the warehouse to move stock from.
@@ -295,8 +295,8 @@ export default function ManagerNewTransferPage() {
           {/* Step 3: Destination */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="font-semibold text-slate-700">Destination Warehouse</h2>
-              <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+              <h2 className="font-semibold text-foreground">Destination Warehouse</h2>
+              <div className="text-xs text-muted-foreground bg-primary/10 rounded-lg px-3 py-2">
                 {isInter ? 'Receiving into' : 'Moving stock within'}{' '}
                 <span className="font-semibold">{myBranch?.name ?? 'your branch'}</span> — pick the
                 warehouse that will receive the items.
@@ -322,7 +322,7 @@ export default function ManagerNewTransferPage() {
           {/* Step 4: Items */}
           {step === 3 && (
             <div className="space-y-5">
-              <h2 className="font-semibold text-slate-700">Items & Details</h2>
+              <h2 className="font-semibold text-foreground">Items & Details</h2>
 
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
@@ -407,24 +407,24 @@ export default function ManagerNewTransferPage() {
                   {items.map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100"
+                      className="flex items-center gap-3 p-3 bg-muted rounded-lg border border-border"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-800 truncate">
+                        <div className="text-sm font-medium text-foreground truncate">
                           {item.label}
                           <Badge
-                            className={`ml-2 text-xs border-0 ${item.item_type === 'PRODUCT' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}
+                            className={`ml-2 text-xs border-0 ${item.item_type === 'PRODUCT' ? 'bg-lease/10 text-lease' : 'bg-primary/10 text-primary'}`}
                           >
                             {item.item_type === 'PRODUCT' ? 'Machine' : 'Spare Part'}
                           </Badge>
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
+                        <div className="text-xs text-muted-foreground mt-0.5">
                           Available: {item.availableQty}
                         </div>
                       </div>
                       {!(item.item_type === 'PRODUCT' && !isInter) && (
                         <div className="flex items-center gap-1.5">
-                          <Label className="text-xs text-slate-500 shrink-0">Qty</Label>
+                          <Label className="text-xs text-muted-foreground shrink-0">Qty</Label>
                           <Input
                             type="number"
                             min={1}
@@ -447,7 +447,7 @@ export default function ManagerNewTransferPage() {
                       )}
                       <button
                         onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                        className="text-red-400 hover:text-red-600 p-1"
+                        className="text-destructive hover:text-destructive p-1"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -458,7 +458,7 @@ export default function ManagerNewTransferPage() {
 
               <div>
                 <Label className="text-sm font-medium">
-                  Reason <span className="text-red-500">*</span>
+                  Reason <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   placeholder="Why is this transfer needed?"

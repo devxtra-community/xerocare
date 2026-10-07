@@ -211,12 +211,12 @@ export default function PendingServiceEstimateQueue({
   };
 
   return (
-    <section className="rounded-2xl bg-card shadow-sm border border-violet-100 overflow-hidden">
+    <section className="rounded-2xl bg-card shadow-sm border border-lease/30 overflow-hidden">
       <div className="px-4 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-start gap-2">
-          <ClipboardList className="h-4 w-4 text-violet-700 mt-0.5" />
+          <ClipboardList className="h-4 w-4 text-lease mt-0.5" />
           <div>
-            <h3 className="text-sm font-bold text-slate-800">Internal Service Estimates</h3>
+            <h3 className="text-sm font-bold text-foreground">Internal Service Estimates</h3>
             <p className="text-xs text-muted-foreground">
               Estimate records without a Billing quotation, including covered work with no customer
               charge.
@@ -232,8 +232,8 @@ export default function PendingServiceEstimateQueue({
         />
       </div>
       <div className="overflow-x-auto p-2">
-        <Table>
-          <TableHeader className="bg-violet-50/50">
+        <Table pagination={{ pageSize: 10 }}>
+          <TableHeader className="bg-lease/10">
             <TableRow>
               <TableHead>Source</TableHead>
               <TableHead>Ticket</TableHead>
@@ -257,7 +257,7 @@ export default function PendingServiceEstimateQueue({
               filtered.map((record) => (
                 <TableRow key={`${record.sourceType}-${record.sourceId}`}>
                   <TableCell>
-                    <div className="font-semibold text-violet-700 text-xs">SERVICE ESTIMATE</div>
+                    <div className="font-semibold text-lease text-xs">SERVICE ESTIMATE</div>
                     <div className="text-[10px] text-muted-foreground">
                       {record.sourceType === 'SERVICE_ESTIMATE_REVISION'
                         ? `Revision v${record.version}`
@@ -298,7 +298,7 @@ export default function PendingServiceEstimateQueue({
                         disabled={actionLoading === record.sourceId}
                         onClick={() => handleApprove(record)}
                       >
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <CheckCircle className="h-4 w-4 text-success" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -310,7 +310,7 @@ export default function PendingServiceEstimateQueue({
                           setRejectRemarks('');
                         }}
                       >
-                        <XCircle className="h-4 w-4 text-red-600" />
+                        <XCircle className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>
@@ -338,7 +338,7 @@ export default function PendingServiceEstimateQueue({
                 <Badge variant="outline">{selected.ticket.status}</Badge>
                 <Badge variant="outline">{selected.ticket.serviceContext}</Badge>
                 {['RENT', 'LEASE_CPC', 'FSMA'].includes(selected.ticket.serviceContext) && (
-                  <Badge className="bg-emerald-100 text-emerald-800">Fully covered</Badge>
+                  <Badge className="bg-success/10 text-success">Fully covered</Badge>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -391,7 +391,7 @@ export default function PendingServiceEstimateQueue({
                 />
               </div>
               <div className="rounded-lg border overflow-x-auto">
-                <Table>
+                <Table pagination={{ pageSize: 10 }}>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Part / item</TableHead>

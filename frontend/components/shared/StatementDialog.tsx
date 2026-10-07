@@ -409,9 +409,9 @@ export default function StatementDialog({
           of the viewport instead of scrolling. The doc-preview div below is the
           flex-1/overflow-y-auto child that actually scrolls, so only ONE region
           scrolls internally and the dialog chrome (footer) stays put. */}
-      <DialogContent className="sm:max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white flex flex-col max-h-[95vh]">
+      <DialogContent className="sm:max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
         {/* Document preview — the scrollable region */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide bg-gray-100 p-6">
+        <div className="flex-1 overflow-y-auto scrollbar-hide bg-muted p-6">
           <div
             ref={printRef}
             id="statement-print-content"
@@ -427,15 +427,15 @@ export default function StatementDialog({
         </div>
 
         {showEmailInput && (
-          <div className="shrink-0 flex items-center gap-2 px-6 py-3 bg-blue-50 border-t border-blue-100">
-            <Mail size={14} className="text-blue-500 shrink-0" />
+          <div className="shrink-0 flex items-center gap-2 px-6 py-3 bg-primary/10 border-t border-primary/30">
+            <Mail size={14} className="text-primary shrink-0" />
             <Input
               type="email"
               placeholder="Recipient email address"
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleEmail()}
-              className="h-9 text-sm rounded-md border-blue-200 bg-white flex-1"
+              className="h-9 text-sm rounded-md border-primary/30 bg-card flex-1"
               autoFocus
             />
             <Button
@@ -448,7 +448,7 @@ export default function StatementDialog({
             </Button>
             <button
               onClick={() => setShowEmailInput(false)}
-              className="text-slate-400 hover:text-slate-600"
+              className="text-muted-foreground hover:text-foreground"
             >
               <X size={14} />
             </button>
@@ -457,14 +457,14 @@ export default function StatementDialog({
 
         {/* Footer Actions — matches the Employee Quotation view's footer bar
             (spacing, proportions, and button treatment) exactly */}
-        <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center">
-          <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
-            <span className="text-[9px] font-normal uppercase tracking-widest text-slate-400">
+        <div className="px-6 pb-4 pt-4 bg-muted shrink-0 border-t border-border flex justify-between items-center">
+          <div className="flex items-center gap-2 px-3 py-1 bg-card border border-border rounded-full shadow-sm">
+            <span className="text-[9px] font-normal uppercase tracking-widest text-muted-foreground">
               {docTitle}
               {docId ? ':' : ''}
             </span>
             {docId && (
-              <span className="text-[9px] font-normal uppercase tracking-widest text-blue-600">
+              <span className="text-[9px] font-normal uppercase tracking-widest text-primary">
                 {docId}
               </span>
             )}
@@ -475,7 +475,7 @@ export default function StatementDialog({
                 variant="outline"
                 size="sm"
                 onClick={handlePrint}
-                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-slate-200 text-slate-700 hover:bg-slate-100 gap-2"
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted gap-2"
               >
                 <Printer size={14} /> Print
               </Button>
@@ -484,7 +484,7 @@ export default function StatementDialog({
                 size="sm"
                 onClick={handleDownload}
                 disabled={sending}
-                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-slate-200 text-slate-700 hover:bg-slate-100 gap-2"
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted gap-2"
               >
                 {sending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                 PDF
@@ -493,7 +493,7 @@ export default function StatementDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => setShowEmailInput(!showEmailInput)}
-                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
               >
                 <Mail size={14} /> Email
               </Button>
@@ -502,7 +502,7 @@ export default function StatementDialog({
               variant="ghost"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="h-9 text-[11px] font-normal uppercase tracking-widest text-slate-500 hover:text-red-600"
+              className="h-9 text-[11px] font-normal uppercase tracking-widest text-muted-foreground hover:text-destructive"
             >
               Close
             </Button>

@@ -27,6 +27,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { arCustomers, arInvoices, arPayments } from '@/lib/finance/ar';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 export default function SalesInvoiceListPage() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,6 +96,7 @@ export default function SalesInvoiceListPage() {
       return matchesStatus && matchesSearch;
     });
   }, [invoicesWithDerivedData, statusFilter, searchQuery]);
+  const invoicePaging = useTablePagination(filteredInvoices, `${statusFilter}|${searchQuery}`, 10);
 
   // Global KPIs based on filtered context
   const totalOutstanding = useMemo(
@@ -108,7 +111,7 @@ export default function SalesInvoiceListPage() {
   );
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 bg-muted/50/50 min-h-screen">
+    <div className="p-4 sm:p-8 space-y-8 bg-muted/50 min-h-screen">
       <PageHeader
         title="Sales Invoices"
         description="Accounts Receivable – Customer Invoices & Collections"
@@ -119,7 +122,7 @@ export default function SalesInvoiceListPage() {
         <StatsCard
           title="Total Outstanding"
           value={totalOutstanding}
-          icon={<ArrowUpRight className="text-blue-600" />}
+          icon={<ArrowUpRight className="text-primary" />}
         />
         <StatsCard
           title="Overdue Balance"
@@ -131,7 +134,7 @@ export default function SalesInvoiceListPage() {
           title="Invoices (MTD)"
           value={invoicesWithDerivedData.length}
           isCount
-          icon={<CheckCircle2 className="text-green-600" />}
+          icon={<CheckCircle2 className="text-success" />}
         />
       </div>
 
@@ -141,7 +144,7 @@ export default function SalesInvoiceListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search invoice or customer..."
-            className="pl-10 bg-muted/50/50 border-none h-10"
+            className="pl-10 bg-muted/50 border-none h-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -167,7 +170,7 @@ export default function SalesInvoiceListPage() {
       {/* 3. Data Table */}
       <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-muted/50/50">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-[140px] pl-6">Invoice No</TableHead>
               <TableHead>Customer</TableHead>
@@ -186,12 +189,12 @@ export default function SalesInvoiceListPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInvoices.map((inv) => (
-                <TableRow key={inv.id} className="group hover:bg-muted/50/30 transition-colors">
-                  <TableCell className="font-bold text-blue-600 pl-6">
+              invoicePaging.pageRows.map((inv) => (
+                <TableRow key={inv.id} className="group hover:bg-muted/50 transition-colors">
+                  <TableCell className="font-bold text-primary pl-6">
                     <Link href={`/finance/ar/invoices/${inv.id}`}>{inv.invoiceNumber}</Link>
                   </TableCell>
-                  <TableCell className="font-medium text-slate-700">{inv.customerName}</TableCell>
+                  <TableCell className="font-medium text-foreground">{inv.customerName}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{inv.issueDate}</TableCell>
                   <TableCell className="text-sm">
                     <div className="flex items-center gap-2">
@@ -215,6 +218,15 @@ export default function SalesInvoiceListPage() {
             )}
           </TableBody>
         </Table>
+        {filteredInvoices.length > 0 && (
+          <Pagination
+            page={invoicePaging.page}
+            totalPages={invoicePaging.totalPages}
+            total={invoicePaging.total}
+            limit={invoicePaging.pageSize}
+            onPageChange={invoicePaging.setPage}
+          />
+        )}
       </div>
     </div>
   );
@@ -236,7 +248,7 @@ function StatsCard({
   isCount?: boolean;
 }) {
   return (
-    <Card className="shadow-sm border-none bg-card ring-1 ring-slate-200">
+    <Card className="shadow-sm border-none bg-card ring-1 ring-ring">
       <CardContent className="p-6 flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -249,7 +261,7 @@ function StatsCard({
             {value.toLocaleString()}
           </h3>
         </div>
-        <div className="p-3 bg-muted/50 rounded-xl border border-slate-100">{icon}</div>
+        <div className="p-3 bg-muted/50 rounded-xl border border-border">{icon}</div>
       </CardContent>
     </Card>
   );

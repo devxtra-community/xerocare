@@ -108,7 +108,7 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
   return (
     <div className="space-y-4">
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-card p-4 rounded-xl shadow-sm border border-blue-100">
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-card p-4 rounded-xl shadow-sm border border-primary/30">
         <div className="relative w-full md:w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -166,7 +166,7 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
         </div>
       </div>
 
-      <div className="bg-card rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-primary/30 overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
@@ -196,11 +196,11 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
               paginatedRows.map((row, i) => (
                 <TableRow
                   key={i}
-                  className={`hover:bg-blue-50/30 transition-colors ${
-                    i % 2 ? 'bg-blue-50/20' : 'bg-card'
+                  className={`hover:bg-primary/10 transition-colors ${
+                    i % 2 ? 'bg-primary/10' : 'bg-card'
                   }`}
                 >
-                  <TableCell className="text-xs font-medium text-gray-600 px-4">
+                  <TableCell className="text-xs font-medium text-foreground px-4">
                     {row.month}
                   </TableCell>
                   <TableCell>
@@ -208,12 +208,12 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
                   ${
                     row.source === 'SALE'
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-primary/10 text-primary'
                       : row.source === 'RENT'
-                        ? 'bg-purple-100 text-purple-700'
+                        ? 'bg-lease/10 text-lease'
                         : row.source === 'LEASE'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-green-100 text-green-700'
+                          ? 'bg-warning/10 text-warning'
+                          : 'bg-success/10 text-success'
                   }`}
                     >
                       {row.source}

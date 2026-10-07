@@ -58,22 +58,24 @@ export function ArrivalDiagnosisDialog({
       <div className="flex flex-col items-center text-center p-2">
         {step === 'arrival' ? (
           <>
-            <div className="p-3 rounded-full mb-4 bg-blue-50">
-              <MapPin className="size-6 text-blue-600" />
+            <div className="p-3 rounded-full mb-4 bg-primary/10">
+              <MapPin className="size-6 text-primary" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Arrived at the location?</h3>
-            <div className={`text-sm text-gray-500 leading-relaxed ${location ? 'mb-3' : 'mb-6'}`}>
+            <h3 className="text-lg font-bold text-foreground mb-2">Arrived at the location?</h3>
+            <div
+              className={`text-sm text-muted-foreground leading-relaxed ${location ? 'mb-3' : 'mb-6'}`}
+            >
               Confirm you are at the customer site
               {ticketNo ? (
                 <>
                   {' '}
-                  for ticket <span className="font-semibold text-gray-700">{ticketNo}</span>
+                  for ticket <span className="font-semibold text-foreground">{ticketNo}</span>
                 </>
               ) : null}{' '}
               before starting the diagnosis timer.
             </div>
             {location && (
-              <div className="w-full flex items-center justify-center gap-1.5 mb-6 px-3 py-2 rounded-lg bg-blue-50 text-sm text-blue-700">
+              <div className="w-full flex items-center justify-center gap-1.5 mb-6 px-3 py-2 rounded-lg bg-primary/10 text-sm text-primary">
                 <MapPin className="size-4 shrink-0" />
                 <span className="font-semibold break-words">{location}</span>
               </div>
@@ -82,13 +84,13 @@ export function ArrivalDiagnosisDialog({
               <Button
                 variant="outline"
                 onClick={onClose}
-                className="text-gray-500 border-gray-300 hover:bg-gray-50 hover:text-gray-700 min-w-[90px] h-9"
+                className="text-muted-foreground border-border hover:bg-muted hover:text-foreground min-w-[90px] h-9"
               >
                 Not yet
               </Button>
               <Button
                 onClick={() => setStep('ready')}
-                className="min-w-[130px] h-9 bg-blue-600 hover:bg-[#1e3a8a] text-white"
+                className="min-w-[130px] h-9 bg-primary hover:bg-[var(--chart-indigo)] text-primary-foreground"
               >
                 Yes, I&apos;ve arrived
               </Button>
@@ -96,11 +98,11 @@ export function ArrivalDiagnosisDialog({
           </>
         ) : (
           <>
-            <div className="p-3 rounded-full mb-4 bg-green-50">
-              <Wrench className="size-6 text-green-600" />
+            <div className="p-3 rounded-full mb-4 bg-success/10">
+              <Wrench className="size-6 text-success" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Start diagnosis now?</h3>
-            <div className="text-sm text-gray-500 mb-6 leading-relaxed">
+            <h3 className="text-lg font-bold text-foreground mb-2">Start diagnosis now?</h3>
+            <div className="text-sm text-muted-foreground mb-6 leading-relaxed">
               The diagnosis timer starts immediately. Only start when you are ready to work on the
               machine.
             </div>
@@ -109,7 +111,7 @@ export function ArrivalDiagnosisDialog({
                 variant="ghost"
                 onClick={() => setStep('arrival')}
                 disabled={isLoading}
-                className="text-gray-500 hover:bg-gray-50 hover:text-gray-700 h-9 gap-1.5"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground h-9 gap-1.5"
               >
                 <ArrowLeft className="size-4" />
                 Back
@@ -118,7 +120,7 @@ export function ArrivalDiagnosisDialog({
                 variant="success"
                 onClick={handleStart}
                 disabled={isLoading}
-                className="min-w-[150px] h-9 bg-green-600 hover:bg-[#14532d] text-white gap-1.5"
+                className="min-w-[150px] h-9 bg-success hover:bg-[var(--success-foreground)] text-success-foreground gap-1.5"
               >
                 {isLoading ? (
                   <>

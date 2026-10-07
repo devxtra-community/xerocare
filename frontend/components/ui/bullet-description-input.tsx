@@ -51,7 +51,7 @@ export function BulletDescriptionInput({
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <label className="text-sm font-bold text-gray-700 uppercase tracking-tight pl-1">
+        <label className="text-sm font-bold text-foreground uppercase tracking-tight pl-1">
           {label}
         </label>
         <Button
@@ -59,7 +59,7 @@ export function BulletDescriptionInput({
           variant="outline"
           size="sm"
           onClick={addBullet}
-          className="h-8 px-2 text-[11px] font-bold border-dashed border-gray-300 hover:border-blue-400 hover:text-blue-600 transition-all gap-1"
+          className="h-8 px-2 text-[11px] font-bold border-dashed border-border hover:border-primary/30 hover:text-primary transition-all gap-1"
         >
           <Plus size={14} /> Add Point
         </Button>
@@ -68,7 +68,7 @@ export function BulletDescriptionInput({
       <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
         {bullets.map((bullet, index) => (
           <div key={index} className="flex gap-2 group items-start">
-            <div className="pt-3 text-gray-300 group-hover:text-gray-400 transition-colors">
+            <div className="pt-3 text-muted-foreground group-hover:text-muted-foreground transition-colors">
               <GripVertical size={14} />
             </div>
             <div className="flex-1 relative">
@@ -76,13 +76,13 @@ export function BulletDescriptionInput({
                 value={bullet}
                 onChange={(e) => updateBullet(index, e.target.value)}
                 placeholder={placeholder}
-                className="h-10 rounded-lg border-gray-200 bg-white shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pr-10"
+                className="h-10 rounded-lg border-border bg-card shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30 pr-10"
               />
               {bullets.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeBullet(index)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -93,8 +93,8 @@ export function BulletDescriptionInput({
       </div>
 
       {bullets.length === 0 && (
-        <div className="text-center py-4 border-2 border-dashed border-gray-100 rounded-xl">
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+        <div className="text-center py-4 border-2 border-dashed border-border rounded-xl">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
             No bullet points added
           </p>
         </div>

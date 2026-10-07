@@ -41,7 +41,7 @@ const ChartContainer = ({
   isClient: boolean;
   gradientId: string;
 }) => (
-  <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+  <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
     <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">{title}</h4>
     <div className="flex-1 w-full min-h-0">
       {isClient && (
@@ -64,20 +64,20 @@ const ChartContainer = ({
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e2e8f0"
+              stroke="var(--chart-grid)"
               strokeOpacity={0.5}
             />
             <XAxis
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
               dy={10}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
             />
             <Tooltip
               content={<ChartTooltipContent />}
@@ -106,9 +106,9 @@ export default function EmployeeLeadsGraphs() {
   const [isClient, setIsClient] = useState(false);
 
   // Source colors (matching the Sales shades for consistency)
-  const websiteColor = '#1e40af'; // Blue 800
+  const websiteColor = 'var(--primary)'; // Blue 800
   const whatsappColor = 'var(--primary)'; // Red 600 (Primary)
-  const instagramColor = '#60a5fa'; // Blue 400
+  const instagramColor = 'var(--chart-blue-soft)'; // Blue 400
 
   useEffect(() => {
     setIsClient(true);

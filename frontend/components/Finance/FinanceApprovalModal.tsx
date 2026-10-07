@@ -169,11 +169,11 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-xl p-0 overflow-hidden bg-white/95 backdrop-blur-sm shadow-2xl border-0"
+        className="sm:max-w-xl p-0 overflow-hidden bg-card backdrop-blur-sm shadow-2xl border-0"
       >
-        <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <DialogHeader className="px-6 py-4 border-b border-border bg-muted/50">
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <span className="bg-blue-100 text-blue-700 p-1.5 rounded-lg">
+            <span className="bg-primary/10 text-primary p-1.5 rounded-lg">
               <Box className="w-5 h-5" />
             </span>
             Allocate Products or Spareparts - #{invoice.invoiceNumber}
@@ -187,8 +187,8 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
           <div className="flex-1 p-6 overflow-y-auto max-h-[60vh]">
             <div className="space-y-4">
               {isLoadingProducts ? (
-                <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-3">
-                  <Loader2 className="animate-spin text-blue-500" size={32} />
+                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-3">
+                  <Loader2 className="animate-spin text-primary" size={32} />
                   <p className="text-xs font-medium">Checking Inventory...</p>
                 </div>
               ) : (
@@ -201,15 +201,17 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                   return (
                     <Card
                       key={item.id}
-                      className="border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+                      className="border-border shadow-sm hover:shadow-md transition-shadow"
                     >
                       <CardContent className="p-4 space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h4 className="font-bold text-slate-700 text-sm">{item.description}</h4>
+                            <h4 className="font-bold text-foreground text-sm">
+                              {item.description}
+                            </h4>
                             <Badge
                               variant="outline"
-                              className="mt-1 text-[10px] font-mono text-slate-400"
+                              className="mt-1 text-[10px] font-mono text-muted-foreground"
                             >
                               ID: {item.modelId?.slice(0, 8)}...
                             </Badge>
@@ -217,7 +219,7 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                           <Badge
                             variant={selected ? 'default' : 'secondary'}
                             className={
-                              selected ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''
+                              selected ? 'bg-success/10 text-success hover:bg-success/10' : ''
                             }
                           >
                             {selected ? 'Allocated' : 'Pending'}
@@ -225,10 +227,10 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                         </div>
 
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs text-slate-500">
+                          <div className="flex justify-between text-xs text-muted-foreground">
                             <Label className="text-xs">Select Serial Number</Label>
                             <span
-                              className={available.length > 0 ? 'text-green-600' : 'text-red-500'}
+                              className={available.length > 0 ? 'text-success' : 'text-destructive'}
                             >
                               {available.length} items available
                             </span>
@@ -254,7 +256,7 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
                             }
                             placeholder="Search product or sparepart..."
                             emptyText="No items found"
-                            className="bg-white"
+                            className="bg-card"
                           />
                         </div>
                       </CardContent>
@@ -265,12 +267,12 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
             </div>
           </div>
 
-          <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end items-center gap-3">
+          <div className="p-6 border-t border-border bg-muted flex justify-end items-center gap-3">
             <Button
               variant="outline"
               onClick={onClose}
               disabled={isSubmitting}
-              className="border-slate-200 hover:bg-white hover:text-slate-800"
+              className="border-border hover:bg-card hover:text-foreground"
             >
               Cancel
             </Button>
@@ -278,7 +280,7 @@ export function FinanceApprovalModal({ invoice, onClose, onSuccess }: FinanceApp
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || isLoadingProducts}
-              className="bg-blue-600 hover:bg-blue-700 shadow-blue-200 min-w-[140px] font-bold shadow-md transition-all"
+              className="bg-primary hover:bg-primary/90 shadow-primary/10 min-w-[140px] font-bold shadow-md transition-all"
             >
               {isSubmitting && <Loader2 className="animate-spin mr-2" size={16} />}
               Confirm Allocation

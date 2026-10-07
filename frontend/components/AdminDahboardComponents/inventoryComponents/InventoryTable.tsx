@@ -67,7 +67,7 @@ export default function InventoryTable() {
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden p-4">
-      <div className="pb-4 border-b bg-muted/50/50 mb-4">
+      <div className="pb-4 border-b bg-muted/50 mb-4">
         <h3 className="font-semibold text-lg">Critical Stock Alerts</h3>
         <p className="text-xs text-muted-foreground">
           Items requiring immediate attention (Stock &lt; 20)
@@ -75,7 +75,7 @@ export default function InventoryTable() {
       </div>
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50/50 hover:bg-muted/50/50">
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead className="font-medium text-muted-foreground">Product Name</TableHead>
             <TableHead className="font-medium text-muted-foreground">Warehouse ID</TableHead>
             <TableHead className="font-medium text-muted-foreground text-center">
@@ -89,22 +89,25 @@ export default function InventoryTable() {
         </TableHeader>
         <TableBody>
           {currentData.map((item) => (
-            <TableRow key={item.id} className="hover:bg-muted/50/50">
+            <TableRow key={item.id} className="hover:bg-muted/50">
               <TableCell className="font-medium text-foreground">{item.product.name}</TableCell>
-              <TableCell className="text-gray-600 truncate max-w-[150px]" title={item.warehouseId}>
+              <TableCell
+                className="text-foreground truncate max-w-[150px]"
+                title={item.warehouseId}
+              >
                 {item.warehouseId}
               </TableCell>
               <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-              <TableCell className="text-center text-gray-600">20</TableCell>
+              <TableCell className="text-center text-foreground">20</TableCell>
               <TableCell>
                 <div
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                   ${
                     item.quantity === 0
-                      ? 'bg-red-100 text-red-800'
+                      ? 'bg-destructive/10 text-destructive'
                       : item.quantity < 20
-                        ? 'bg-orange-100 text-orange-800'
-                        : 'bg-blue-100 text-blue-800'
+                        ? 'bg-warning/10 text-warning'
+                        : 'bg-primary/10 text-primary'
                   }`}
                 >
                   {item.quantity === 0

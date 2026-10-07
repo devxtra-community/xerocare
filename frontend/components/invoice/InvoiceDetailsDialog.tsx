@@ -418,7 +418,7 @@ export function InvoiceDetailsDialog({
 
   return (
     <Dialog open={true} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="p-0 overflow-y-auto rounded-none border-none shadow-2xl bg-white flex flex-col max-h-[95vh] sm:max-w-xl">
+      <DialogContent className="p-0 overflow-y-auto rounded-none border-none shadow-2xl bg-card flex flex-col max-h-[95vh] sm:max-w-xl">
         <DialogTitle className="sr-only">Invoice Details</DialogTitle>
         {(() => {
           if (!currentInvoice.effectiveTo) return null;
@@ -443,8 +443,8 @@ export function InvoiceDetailsDialog({
             <div
               className={`p-4 flex items-center gap-3 border-b ${
                 isExpired
-                  ? 'bg-red-50 border-red-100 text-red-700'
-                  : 'bg-amber-50 border-amber-100 text-amber-700'
+                  ? 'bg-destructive/10 border-destructive/30 text-destructive'
+                  : 'bg-warning/10 border-warning/30 text-warning'
               }`}
             >
               {isExpired ? (
@@ -469,16 +469,18 @@ export function InvoiceDetailsDialog({
           className="space-y-8 overflow-y-auto scrollbar-hide flex-1 p-8 pt-6"
           ref={scrollContainerRef}
         >
-          <div className="grid grid-cols-2 gap-x-12 gap-y-6 text-xs uppercase italic font-bold text-gray-500 text-[10px] border-b border-gray-100 pb-2 mb-2 tracking-widest">
+          <div className="grid grid-cols-2 gap-x-12 gap-y-6 text-xs uppercase italic font-bold text-muted-foreground text-[10px] border-b border-border pb-2 mb-2 tracking-widest">
             <span>Client &amp; Type Details</span>
           </div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <div className="space-y-4">
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Date
+                </p>
                 <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-gray-400" />
-                  <p className="text-sm font-bold text-gray-800">
+                  <Calendar size={14} className="text-muted-foreground" />
+                  <p className="text-sm font-bold text-foreground">
                     {new Date(currentInvoice.createdAt).toLocaleDateString(undefined, {
                       dateStyle: 'medium',
                     })}
@@ -486,10 +488,12 @@ export function InvoiceDetailsDialog({
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Type
+                </p>
                 <Badge
                   variant="outline"
-                  className="mt-1 font-bold text-[10px] rounded-lg border-gray-100 text-gray-600"
+                  className="mt-1 font-bold text-[10px] rounded-lg border-border text-foreground"
                 >
                   {currentInvoice.saleType}
                 </Badge>
@@ -499,8 +503,8 @@ export function InvoiceDetailsDialog({
 
           {/* Ticket Details Section */}
           {currentInvoice.serviceTicketId && (
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/50 pb-2">
+            <div className="p-4 bg-muted rounded-xl border border-border space-y-3">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border/50 pb-2">
                 <ClipboardList className="text-primary h-3.5 w-3.5" /> Service Ticket Context &
                 Details
               </h4>
@@ -513,16 +517,20 @@ export function InvoiceDetailsDialog({
               ) : ticketDetails ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   <div className="md:col-span-2">
-                    <span className="text-slate-500 font-medium block">Complaint Registered:</span>
-                    <p className="text-slate-800 mt-1 bg-white p-2.5 rounded border border-slate-200/60 leading-relaxed font-medium">
+                    <span className="text-muted-foreground font-medium block">
+                      Complaint Registered:
+                    </span>
+                    <p className="text-foreground mt-1 bg-card p-2.5 rounded border border-border/60 leading-relaxed font-medium">
                       {ticketDetails.issueDescription || 'No complaint details provided.'}
                     </p>
                   </div>
 
                   {ticketDetails.problemFound && (
                     <div>
-                      <span className="text-slate-500 font-medium block">Problem Found:</span>
-                      <span className="font-semibold text-slate-800 bg-white px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                      <span className="text-muted-foreground font-medium block">
+                        Problem Found:
+                      </span>
+                      <span className="font-semibold text-foreground bg-card px-2 py-1.5 rounded border border-border/60 block mt-1">
                         {ticketDetails.problemFound}
                       </span>
                     </div>
@@ -530,8 +538,8 @@ export function InvoiceDetailsDialog({
 
                   {ticketDetails.rootCause && (
                     <div>
-                      <span className="text-slate-500 font-medium block">Root Cause:</span>
-                      <span className="font-semibold text-slate-800 bg-white px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                      <span className="text-muted-foreground font-medium block">Root Cause:</span>
+                      <span className="font-semibold text-foreground bg-card px-2 py-1.5 rounded border border-border/60 block mt-1">
                         {ticketDetails.rootCause}
                       </span>
                     </div>
@@ -540,10 +548,10 @@ export function InvoiceDetailsDialog({
                   {ticketDetails.meterReadingAtService !== undefined &&
                     ticketDetails.meterReadingAtService !== null && (
                       <div>
-                        <span className="text-slate-500 font-medium block">
+                        <span className="text-muted-foreground font-medium block">
                           Meter Reading (at Service):
                         </span>
-                        <span className="font-semibold text-slate-800 bg-white px-2 py-1.5 rounded border border-slate-200/60 block mt-1 font-mono">
+                        <span className="font-semibold text-foreground bg-card px-2 py-1.5 rounded border border-border/60 block mt-1 font-mono">
                           {ticketDetails.meterReadingAtService}
                         </span>
                       </div>
@@ -553,20 +561,20 @@ export function InvoiceDetailsDialog({
                     <div className="md:col-span-2 space-y-2">
                       {ticketDetails.diagnosisNotes && (
                         <div>
-                          <span className="text-slate-500 font-medium block">
+                          <span className="text-muted-foreground font-medium block">
                             Technician Diagnosis Notes:
                           </span>
-                          <p className="text-slate-700 mt-1 bg-white p-2.5 rounded border border-slate-200/60 whitespace-pre-wrap font-medium">
+                          <p className="text-foreground mt-1 bg-card p-2.5 rounded border border-border/60 whitespace-pre-wrap font-medium">
                             {ticketDetails.diagnosisNotes}
                           </p>
                         </div>
                       )}
                       {ticketDetails.technicianNoteToFinance && (
                         <div>
-                          <span className="text-amber-800 font-bold block flex items-center gap-1">
+                          <span className="text-warning font-bold block flex items-center gap-1">
                             📝 Note to Finance:
                           </span>
-                          <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded border border-amber-200/60 font-medium whitespace-pre-wrap">
+                          <p className="text-warning mt-1 bg-warning/10 p-2.5 rounded border border-warning/30 font-medium whitespace-pre-wrap">
                             {ticketDetails.technicianNoteToFinance}
                           </p>
                         </div>
@@ -575,7 +583,7 @@ export function InvoiceDetailsDialog({
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-red-500 py-2">Failed to load ticket details.</div>
+                <div className="text-xs text-destructive py-2">Failed to load ticket details.</div>
               )}
             </div>
           )}
@@ -587,10 +595,10 @@ export function InvoiceDetailsDialog({
               <>
                 <div className="grid grid-cols-2 gap-x-12 gap-y-6 p-6 bg-muted/30 rounded-xl">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Contract Period
                     </p>
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-foreground">
                       <Calendar size={14} className="opacity-50" />
                       <p className="text-xs font-bold flex items-center gap-1">
                         <span>
@@ -619,13 +627,13 @@ export function InvoiceDetailsDialog({
 
                             if (months > 0) {
                               return (
-                                <span className="text-gray-500 font-normal text-[10px] ml-1">
+                                <span className="text-muted-foreground font-normal text-[10px] ml-1">
                                   ({months} Month{months !== 1 ? 's' : ''})
                                 </span>
                               );
                             }
                             return (
-                              <span className="text-gray-500 font-normal text-[10px] ml-1">
+                              <span className="text-muted-foreground font-normal text-[10px] ml-1">
                                 ({days} Day{days !== 1 ? 's' : ''})
                               </span>
                             );
@@ -634,10 +642,10 @@ export function InvoiceDetailsDialog({
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Billing Cycle
                     </p>
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-foreground">
                       <Coins size={14} className="opacity-50" />
                       <p className="text-xs font-bold">
                         Every {currentInvoice.billingCycleInDays || 30} Days
@@ -649,7 +657,7 @@ export function InvoiceDetailsDialog({
                 {/* Usage Breakdown for FINAL Invoices */}
                 {(currentInvoice.bwA4Count != null || currentInvoice.bwA3Count != null) && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Usage Breakdown
                     </h3>
                     <div className="rounded-xl border border-sale/20 overflow-hidden">
@@ -696,22 +704,22 @@ export function InvoiceDetailsDialog({
                             if (bwRule) {
                               return (
                                 <TableRow className="border-sale/10">
-                                  <TableCell className="font-bold text-gray-700 py-3 text-[10px] sm:text-xs">
+                                  <TableCell className="font-bold text-foreground py-3 text-[10px] sm:text-xs">
                                     B&W (A4 + 2x A3)
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-600 text-xs">
+                                  <TableCell className="text-center font-bold text-foreground text-xs">
                                     {bwTotal.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-400 text-xs">
+                                  <TableCell className="text-center font-bold text-muted-foreground text-xs">
                                     {bwLimit.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-blue-500 text-xs">
+                                  <TableCell className="text-center font-bold text-primary text-xs">
                                     {(currentInvoice.extraBwA4Count || 0).toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-sale text-xs">
                                     {bwExcess.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-500 text-xs">
+                                  <TableCell className="text-center font-bold text-muted-foreground text-xs">
                                     {formatCurrency(bwExcessRate, currency)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
@@ -740,22 +748,22 @@ export function InvoiceDetailsDialog({
                             if (colorRule) {
                               return (
                                 <TableRow className="border-sale/10">
-                                  <TableCell className="font-bold text-gray-700 py-3 text-[10px] sm:text-xs">
+                                  <TableCell className="font-bold text-foreground py-3 text-[10px] sm:text-xs">
                                     Color (A4 + 2x A3)
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-600 text-xs">
+                                  <TableCell className="text-center font-bold text-foreground text-xs">
                                     {colorTotal.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-400 text-xs">
+                                  <TableCell className="text-center font-bold text-muted-foreground text-xs">
                                     {colorLimit.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-rose-500 text-xs">
+                                  <TableCell className="text-center font-bold text-destructive text-xs">
                                     {(currentInvoice.extraColorA4Count || 0).toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-sale text-xs">
                                     {colorExcess.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-500 text-xs">
+                                  <TableCell className="text-center font-bold text-muted-foreground text-xs">
                                     {formatCurrency(colorExcessRate, currency)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
@@ -786,16 +794,16 @@ export function InvoiceDetailsDialog({
 
                               return (
                                 <TableRow className="border-sale/10">
-                                  <TableCell className="font-bold text-gray-700 py-3 text-[10px] sm:text-xs">
+                                  <TableCell className="font-bold text-foreground py-3 text-[10px] sm:text-xs">
                                     Combined Usage
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-600 text-xs">
+                                  <TableCell className="text-center font-bold text-foreground text-xs">
                                     {totalTotal.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-400 text-xs">
+                                  <TableCell className="text-center font-bold text-muted-foreground text-xs">
                                     {comboLimit.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-blue-400 text-xs">
+                                  <TableCell className="text-center font-bold text-primary text-xs">
                                     {(
                                       (currentInvoice.extraBwA4Count || 0) +
                                       (currentInvoice.extraColorA4Count || 0)
@@ -804,7 +812,7 @@ export function InvoiceDetailsDialog({
                                   <TableCell className="text-center font-bold text-sale text-xs">
                                     {comboExcess.toLocaleString()}
                                   </TableCell>
-                                  <TableCell className="text-center font-bold text-gray-500 text-xs">
+                                  <TableCell className="text-center font-bold text-muted-foreground text-xs">
                                     {formatCurrency(comboExcessRate, currency)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
@@ -827,24 +835,24 @@ export function InvoiceDetailsDialog({
           {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
             currentInvoice.productAllocations &&
             currentInvoice.productAllocations.length > 0 && (
-              <div className="space-y-4 pb-6 border-b border-gray-100 mb-6">
-                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <div className="space-y-4 pb-6 border-b border-border mb-6">
+                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   Allocated Equipment
                 </h3>
-                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
-                    <TableHeader className="bg-muted/50/80">
-                      <TableRow className="hover:bg-transparent border-gray-100">
-                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                    <TableHeader className="bg-muted/50">
+                      <TableRow className="hover:bg-transparent border-border">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                           MODEL/PRODUCT
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                           SERIAL NUMBER
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                           STATUS
                         </TableHead>
-                        <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
+                        <TableHead className="text-[10px] font-bold text-muted-foreground text-right h-10">
                           ACTIONS
                         </TableHead>
                       </TableRow>
@@ -861,12 +869,12 @@ export function InvoiceDetailsDialog({
                         return (
                           <TableRow
                             key={alloc.id}
-                            className={`border-gray-50 ${isReplaced ? 'bg-gray-50/50 opacity-70' : ''}`}
+                            className={`border-border ${isReplaced ? 'bg-muted/50 opacity-70' : ''}`}
                           >
-                            <TableCell className="py-3 font-medium text-sm text-gray-700">
+                            <TableCell className="py-3 font-medium text-sm text-foreground">
                               {item ? getCleanProductName(item.description) : 'Equipment'}
                             </TableCell>
-                            <TableCell className="py-3 font-bold text-[13px] text-gray-900">
+                            <TableCell className="py-3 font-bold text-[13px] text-foreground">
                               {alloc.serialNumber}
                             </TableCell>
                             <TableCell className="py-3 text-xs">
@@ -874,8 +882,8 @@ export function InvoiceDetailsDialog({
                                 variant={isReplaced ? 'outline' : 'default'}
                                 className={
                                   isReplaced
-                                    ? 'text-gray-500 bg-gray-100'
-                                    : 'bg-emerald-100/50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                                    ? 'text-muted-foreground bg-muted'
+                                    : 'bg-success/10 text-success hover:bg-success/10 border-success/30'
                                 }
                               >
                                 {alloc.status}
@@ -891,26 +899,26 @@ export function InvoiceDetailsDialog({
             )}
 
           <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Order Items
             </h3>
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
+            <div className="rounded-xl border border-border overflow-hidden">
               <Table>
-                <TableHeader className="bg-muted/50/80">
-                  <TableRow className="hover:bg-transparent border-gray-100">
-                    <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="hover:bg-transparent border-border">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                       DESCRIPTION
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                       LIMITS
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                       EXCESS RATES
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-center h-10">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-center h-10">
                       QTY
                     </TableHead>
-                    <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
+                    <TableHead className="text-[10px] font-bold text-muted-foreground text-right h-10">
                       TOTAL
                     </TableHead>
                   </TableRow>
@@ -925,10 +933,10 @@ export function InvoiceDetailsDialog({
                         !item.description.startsWith('Combined'),
                     )
                     .map((item, idx) => (
-                      <TableRow key={item.id || idx} className="border-gray-50">
+                      <TableRow key={item.id || idx} className="border-border">
                         <TableCell className="py-3">
                           <div className="space-y-1">
-                            <p className="font-bold text-gray-700 text-sm">
+                            <p className="font-bold text-foreground text-sm">
                               {(() => {
                                 const completedExchange = currentInvoice.creditNotes?.find(
                                   (cn) =>
@@ -937,9 +945,9 @@ export function InvoiceDetailsDialog({
                                 );
                                 if (completedExchange?.replacementProductName) {
                                   return (
-                                    <span className="text-violet-700">
+                                    <span className="text-lease">
                                       {completedExchange.replacementProductName}
-                                      <Badge className="ml-2 bg-violet-100 text-violet-500 border-none text-[8px] tracking-[0.05em]">
+                                      <Badge className="ml-2 bg-lease/10 text-lease border-none text-[8px] tracking-[0.05em]">
                                         EXCHANGED
                                       </Badge>
                                     </span>
@@ -954,7 +962,7 @@ export function InvoiceDetailsDialog({
                                 {item.initialBwCount !== undefined && item.initialBwCount > 0 && (
                                   <Badge
                                     variant="outline"
-                                    className="text-[9px] font-bold bg-blue-50 text-blue-700 border-blue-100 px-1.5 py-0"
+                                    className="text-[9px] font-bold bg-primary/10 text-primary border-primary/30 px-1.5 py-0"
                                   >
                                     B&W: {item.initialBwCount}
                                   </Badge>
@@ -963,7 +971,7 @@ export function InvoiceDetailsDialog({
                                   item.initialColorCount > 0 && (
                                     <Badge
                                       variant="outline"
-                                      className="text-[9px] font-bold bg-purple-50 text-purple-700 border-purple-100 px-1.5 py-0"
+                                      className="text-[9px] font-bold bg-lease/10 text-lease border-lease/30 px-1.5 py-0"
                                     >
                                       CLR: {item.initialColorCount}
                                     </Badge>
@@ -972,7 +980,7 @@ export function InvoiceDetailsDialog({
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
+                        <TableCell className="text-xs font-medium text-foreground align-top py-3">
                           <div className="flex flex-col gap-1">
                             {item.bwIncludedLimit ? (
                               <span className="whitespace-nowrap">BW: {item.bwIncludedLimit}</span>
@@ -990,15 +998,15 @@ export function InvoiceDetailsDialog({
                             {!item.bwIncludedLimit &&
                               !item.colorIncludedLimit &&
                               !item.combinedIncludedLimit && (
-                                <span className="text-gray-300">-</span>
+                                <span className="text-muted-foreground">-</span>
                               )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs font-medium text-gray-600 align-top py-3">
+                        <TableCell className="text-xs font-medium text-foreground align-top py-3">
                           <div className="flex flex-col gap-1">
                             {item.bwSlabRanges && item.bwSlabRanges.length > 0 ? (
                               <div className="flex flex-col">
-                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                <span className="font-semibold text-muted-foreground text-[10px] uppercase">
                                   BW Slabs
                                 </span>
                                 {item.bwSlabRanges.map(
@@ -1029,7 +1037,7 @@ export function InvoiceDetailsDialog({
 
                             {item.colorSlabRanges && item.colorSlabRanges.length > 0 ? (
                               <div className="flex flex-col mt-1">
-                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                <span className="font-semibold text-muted-foreground text-[10px] uppercase">
                                   Color Slabs
                                 </span>
                                 {item.colorSlabRanges.map(
@@ -1060,7 +1068,7 @@ export function InvoiceDetailsDialog({
 
                             {item.comboSlabRanges && item.comboSlabRanges.length > 0 ? (
                               <div className="flex flex-col mt-1">
-                                <span className="font-semibold text-gray-500 text-[10px] uppercase">
+                                <span className="font-semibold text-muted-foreground text-[10px] uppercase">
                                   Combo Slabs
                                 </span>
                                 {item.comboSlabRanges.map(
@@ -1095,7 +1103,7 @@ export function InvoiceDetailsDialog({
                               (!item.bwSlabRanges || item.bwSlabRanges.length === 0) &&
                               (!item.colorSlabRanges || item.colorSlabRanges.length === 0) &&
                               (!item.comboSlabRanges || item.comboSlabRanges.length === 0) && (
-                                <span className="text-gray-300">-</span>
+                                <span className="text-muted-foreground">-</span>
                               )}
                           </div>
                         </TableCell>
@@ -1122,14 +1130,14 @@ export function InvoiceDetailsDialog({
           </div>
 
           {/* Financial Summary Section */}
-          <div className="space-y-4 pt-6 border-t border-gray-100">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          <div className="space-y-4 pt-6 border-t border-border">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Financial Summary
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50/50 rounded-xl border border-gray-100">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-muted/50 rounded-xl border border-border">
               {currentInvoice.saleType !== 'SALE' && (
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">
                     {currentInvoice.saleType === 'LEASE'
                       ? currentInvoice.leaseType === 'FSM'
                         ? 'Monthly Lease Amount'
@@ -1140,7 +1148,7 @@ export function InvoiceDetailsDialog({
                           : 'Monthly Rent Balance'
                         : 'Monthly Rent'}
                   </p>
-                  <p className="text-sm font-bold text-gray-700">
+                  <p className="text-sm font-bold text-foreground">
                     {currentInvoice.saleType === 'LEASE'
                       ? formatCurrency(
                           currentInvoice.leaseType === 'FSM'
@@ -1164,17 +1172,17 @@ export function InvoiceDetailsDialog({
 
               {currentInvoice.saleType === 'LEASE' && (
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">
                     Total Lease Amount
                   </p>
-                  <p className="text-sm font-bold text-gray-700">
+                  <p className="text-sm font-bold text-foreground">
                     {formatCurrency(currentInvoice.totalLeaseAmount || 0, currency)}
                   </p>
                 </div>
               )}
               {currentInvoice.saleType !== 'SALE' && (
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">
                     {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
                   </p>
                   <p className="text-sm font-bold text-success">
@@ -1185,7 +1193,9 @@ export function InvoiceDetailsDialog({
 
               {currentInvoice.discountAmount || currentInvoice.discountPercent ? (
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Given</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                    Discount Given
+                  </p>
                   <p className="text-sm font-bold text-success">
                     - {getActiveCurrency()}{' '}
                     {(
@@ -1203,7 +1213,9 @@ export function InvoiceDetailsDialog({
                 <>
                   {financialSummary.extraUsage > 0 && (
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Usage</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Extra Usage
+                      </p>
                       <p className="text-sm font-bold text-warning">
                         + {getActiveCurrency()} {financialSummary.extraUsage.toLocaleString()}
                       </p>
@@ -1211,8 +1223,10 @@ export function InvoiceDetailsDialog({
                   )}
                   {financialSummary.additionalCharges > 0 && (
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Charges</p>
-                      <p className="text-sm font-bold text-orange-600">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Extra Charges
+                      </p>
+                      <p className="text-sm font-bold text-warning">
                         + {getActiveCurrency()}{' '}
                         {financialSummary.additionalCharges.toLocaleString()}
                       </p>
@@ -1221,7 +1235,7 @@ export function InvoiceDetailsDialog({
                 </>
               )}
               {mode === 'FINANCE' && currentInvoice.saleType !== 'SALE' && (
-                <div className="col-span-full pt-3 mt-1 border-t border-gray-100 flex justify-between items-center">
+                <div className="col-span-full pt-3 mt-1 border-t border-border flex justify-between items-center">
                   <p className="text-[10px] font-bold text-primary uppercase">
                     {currentInvoice.saleType === 'LEASE'
                       ? 'Total Pending Amount'
@@ -1243,8 +1257,8 @@ export function InvoiceDetailsDialog({
           {/* Returns & Credit Exchange Section */}
           {currentInvoice.creditNotes &&
             currentInvoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED') && (
-              <div className="space-y-4 pt-4 border-t border-violet-100">
-                <h3 className="text-[10px] font-bold text-violet-600 uppercase tracking-wider flex items-center gap-2">
+              <div className="space-y-4 pt-4 border-t border-lease/30">
+                <h3 className="text-[10px] font-bold text-lease uppercase tracking-wider flex items-center gap-2">
                   <RotateCcw size={12} />
                   Returns &amp; Credit Exchange History
                 </h3>
@@ -1259,106 +1273,106 @@ export function InvoiceDetailsDialog({
                       return (
                         <div
                           key={cn.id}
-                          className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/30 to-white p-4 space-y-4 shadow-sm"
+                          className="rounded-2xl border border-lease/30 bg-gradient-to-br from-lease/30 to-card p-4 space-y-4 shadow-sm"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="bg-violet-100 p-1.5 rounded-lg">
-                                <RotateCcw className="h-4 w-4 text-violet-600" />
+                              <div className="bg-lease/10 p-1.5 rounded-lg">
+                                <RotateCcw className="h-4 w-4 text-lease" />
                               </div>
                               <div>
-                                <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest">
+                                <p className="text-[9px] font-black text-lease uppercase tracking-widest">
                                   {cn.type.replace('_', ' ')}
                                 </p>
-                                <h4 className="text-sm font-bold text-slate-900">
+                                <h4 className="text-sm font-bold text-foreground">
                                   {cn.creditNoteNo}
                                 </h4>
                               </div>
                             </div>
-                            <Badge className="bg-violet-600 text-white border-none text-[9px] uppercase font-black tracking-widest px-2 py-0.5">
+                            <Badge className="bg-lease text-lease-foreground border-none text-[9px] uppercase font-black tracking-widest px-2 py-0.5">
                               Exchange Realized
                             </Badge>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
                             {/* Returned Product */}
-                            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 space-y-1">
-                              <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest">
+                            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 space-y-1">
+                              <p className="text-[9px] font-black text-destructive uppercase tracking-widest">
                                 ↩ Returned Product
                               </p>
-                              <p className="text-xs font-bold text-slate-800 leading-tight">
+                              <p className="text-xs font-bold text-foreground leading-tight">
                                 {cn.productName}
                               </p>
-                              <p className="text-[9px] text-slate-500 font-bold uppercase">
+                              <p className="text-[9px] text-muted-foreground font-bold uppercase">
                                 {cn.brand} · {cn.modelName}
                               </p>
-                              <p className="text-[9px] font-black text-rose-600 mt-1 bg-rose-100 px-2 py-0.5 rounded-full inline-block">
+                              <p className="text-[9px] font-black text-destructive mt-1 bg-destructive/10 px-2 py-0.5 rounded-full inline-block">
                                 Credit: {formatCurrency(cn.productAmount, currency)}
                               </p>
                             </div>
 
                             {/* New / Exchange Product */}
-                            <div className="bg-violet-50/60 border border-violet-100 rounded-xl p-3 space-y-1">
-                              <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest">
+                            <div className="bg-lease/10 border border-lease/30 rounded-xl p-3 space-y-1">
+                              <p className="text-[9px] font-black text-lease uppercase tracking-widest">
                                 ↗{' '}
                                 {cn.type === 'CREDIT_EXCHANGE'
                                   ? 'Exchange Product'
                                   : 'Replacement Product'}
                               </p>
-                              <p className="text-xs font-bold text-slate-800 leading-tight">
+                              <p className="text-xs font-bold text-foreground leading-tight">
                                 {cn.replacementProductName || '—'}
                               </p>
                               {cn.replacementSerialNumber && (
-                                <p className="text-[9px] text-violet-600 font-black uppercase bg-violet-100 px-2 py-0.5 rounded-full inline-block">
+                                <p className="text-[9px] text-lease font-black uppercase bg-lease/10 px-2 py-0.5 rounded-full inline-block">
                                   S/N: {cn.replacementSerialNumber}
                                 </p>
                               )}
-                              <p className="text-[9px] font-black text-emerald-600 mt-1 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
+                              <p className="text-[9px] font-black text-success mt-1 bg-success/10 px-2 py-0.5 rounded-full inline-block">
                                 Price: {formatCurrency(cn.replacementAmount || 0, currency)}
                               </p>
                             </div>
                           </div>
 
                           {/* Financial Breakdown */}
-                          <div className="bg-white rounded-xl border border-slate-100 p-3 space-y-2">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-2">
                               Financial Summary
                             </p>
                             <div className="flex justify-between text-xs">
-                              <span className="text-slate-500 font-semibold">
+                              <span className="text-muted-foreground font-semibold">
                                 New Product Price
                               </span>
-                              <span className="font-bold text-slate-800">
+                              <span className="font-bold text-foreground">
                                 {formatCurrency(cn.replacementAmount || 0, currency)}
                               </span>
                             </div>
-                            <div className="flex justify-between text-xs text-emerald-600">
+                            <div className="flex justify-between text-xs text-success">
                               <span className="font-semibold">Returned Credit</span>
                               <span className="font-bold">
                                 − {formatCurrency(cn.productAmount, currency)}
                               </span>
                             </div>
                             {(cn.replacementDiscount || 0) > 0 && (
-                              <div className="flex justify-between text-xs text-rose-500">
+                              <div className="flex justify-between text-xs text-destructive">
                                 <span className="font-semibold">Exchange Discount</span>
                                 <span className="font-bold">
                                   − {formatCurrency(cn.replacementDiscount, currency)}
                                 </span>
                               </div>
                             )}
-                            <div className="h-px bg-slate-100 my-1" />
+                            <div className="h-px bg-muted my-1" />
                             <div className="flex justify-between items-center">
-                              <span className="text-[9px] font-black uppercase tracking-widest text-violet-600">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-lease">
                                 Net Variation
                               </span>
                               <div className="text-right">
                                 <p
-                                  className={`text-sm font-black ${variation >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}
+                                  className={`text-sm font-black ${variation >= 0 ? 'text-warning' : 'text-success'}`}
                                 >
                                   {variation >= 0 ? '+' : ''}
                                   {formatCurrency(variation, currency)}
                                 </p>
-                                <p className="text-[8px] font-bold text-slate-400 italic">
+                                <p className="text-[8px] font-bold text-muted-foreground italic">
                                   {variation >= 0
                                     ? 'Customer Payable Gap'
                                     : 'Refundable to Customer'}
@@ -1375,21 +1389,21 @@ export function InvoiceDetailsDialog({
 
           {/* Invoice History Section */}
           {currentInvoice.invoiceHistory && currentInvoice.invoiceHistory.length > 0 && (
-            <div ref={historyRef} className="space-y-4 pt-4 border-t border-gray-100">
-              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            <div ref={historyRef} className="space-y-4 pt-4 border-t border-border">
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Invoice History
               </h3>
-              <div className="rounded-xl border border-gray-100 overflow-hidden">
+              <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-gray-50/80">
-                    <TableRow className="hover:bg-transparent border-gray-100">
-                      <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                  <TableHeader className="bg-muted/80">
+                    <TableRow className="hover:bg-transparent border-border">
+                      <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                         DATE
                       </TableHead>
-                      <TableHead className="text-[10px] font-bold text-gray-400 h-10">
+                      <TableHead className="text-[10px] font-bold text-muted-foreground h-10">
                         INVOICE #
                       </TableHead>
-                      <TableHead className="text-[10px] font-bold text-gray-400 text-right h-10">
+                      <TableHead className="text-[10px] font-bold text-muted-foreground text-right h-10">
                         AMOUNT
                       </TableHead>
                     </TableRow>
@@ -1398,10 +1412,10 @@ export function InvoiceDetailsDialog({
                     {currentInvoice.invoiceHistory.map((hist) => (
                       <TableRow
                         key={hist.id}
-                        className="border-gray-50 hover:bg-info/10 transition-colors cursor-pointer group"
+                        className="border-border hover:bg-info/10 transition-colors cursor-pointer group"
                         onClick={() => handleSelectInvoice(hist.id)}
                       >
-                        <TableCell className="text-xs font-bold text-gray-600">
+                        <TableCell className="text-xs font-bold text-foreground">
                           {new Date(hist.createdAt).toLocaleDateString(undefined, {
                             dateStyle: 'medium',
                           })}
@@ -1424,14 +1438,14 @@ export function InvoiceDetailsDialog({
           )}
 
           {/* Audit Timeline Section */}
-          <div className="pt-6 border-t border-gray-100">
+          <div className="pt-6 border-t border-border">
             <AuditTimeline entityId={currentInvoice.id} />
           </div>
         </div>
 
-        <div className="p-6 bg-muted/50/50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="p-6 bg-muted/50 border-t border-border flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex flex-col items-center md:items-start">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-1">
               Grand Total {currentInvoice.type === 'PROFORMA' && '(Collected)'}
             </p>
             <p className="text-2xl font-bold text-primary">
@@ -1452,7 +1466,7 @@ export function InvoiceDetailsDialog({
             <div className="flex-1 md:hidden" />
 
             {/* Separator on Desktop */}
-            <div className="hidden md:block w-px h-8 bg-gray-200" />
+            <div className="hidden md:block w-px h-8 bg-muted" />
 
             {/* Main Decision Actions */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1470,13 +1484,13 @@ export function InvoiceDetailsDialog({
                       variant="ghost"
                       size="sm"
                       onClick={() => setRejecting(false)}
-                      className="h-10 text-muted-foreground hover:text-slate-800"
+                      className="h-10 text-muted-foreground hover:text-foreground"
                     >
                       Cancel
                     </Button>
                     <Button
                       size="sm"
-                      className="h-10 bg-danger hover:bg-danger/90 text-white shadow-sm border border-danger/20 px-4"
+                      className="h-10 bg-danger hover:bg-danger/90 text-primary-foreground shadow-sm border border-danger/20 px-4"
                       onClick={handleReject}
                       disabled={isLoading}
                     >
@@ -1495,7 +1509,7 @@ export function InvoiceDetailsDialog({
                       Reject
                     </Button>
                     <Button
-                      className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-success text-white shadow-lg shadow-success/10 hover:bg-success/90 transition-all"
+                      className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-success text-success-foreground shadow-lg shadow-success/10 hover:bg-success/90 transition-all"
                       onClick={handleApprove}
                       disabled={isLoading}
                     >
@@ -1510,7 +1524,7 @@ export function InvoiceDetailsDialog({
                   <div className="flex items-center gap-2 w-full">
                     <Input
                       placeholder="Reason for rejection..."
-                      className="flex-1 h-10 text-xs bg-slate-50 border-slate-200"
+                      className="flex-1 h-10 text-xs bg-muted border-border"
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       autoFocus
@@ -1525,7 +1539,7 @@ export function InvoiceDetailsDialog({
                     </Button>
                     <Button
                       size="sm"
-                      className="h-10 bg-danger text-white"
+                      className="h-10 bg-danger text-primary-foreground"
                       onClick={handleReject}
                       disabled={isLoading}
                     >
@@ -1550,7 +1564,7 @@ export function InvoiceDetailsDialog({
                 (currentInvoice.status === 'DRAFT' || currentInvoice.status === 'SENT') ? (
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                   <Button
-                    className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-primary text-white shadow-lg shadow-primary/10 hover:bg-primary/90 transition-all"
+                    className="flex-1 sm:flex-none rounded-xl h-10 px-8 font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/10 hover:bg-primary/90 transition-all"
                     onClick={handleApprove}
                     disabled={isLoading}
                   >
@@ -1572,7 +1586,7 @@ export function InvoiceDetailsDialog({
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
-                    className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-muted-foreground hover:bg-gray-100"
+                    className="flex-1 sm:flex-none rounded-xl h-10 px-6 font-bold text-muted-foreground hover:bg-muted"
                     onClick={onClose}
                   >
                     Close
@@ -1589,7 +1603,7 @@ export function InvoiceDetailsDialog({
                   <Button
                     id="details-email-btn"
                     variant="outline"
-                    className="sm:flex-none rounded-xl h-10 px-5 font-bold text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-primary gap-2 transition-all shadow-sm"
+                    className="sm:flex-none rounded-xl h-10 px-5 font-bold text-foreground border-border hover:bg-muted hover:text-primary gap-2 transition-all shadow-sm"
                     title="Send via Email"
                     disabled={isLoading || isEmailSending}
                     onClick={async () => {
@@ -1788,7 +1802,7 @@ export function InvoiceDetailsDialog({
                   <Button
                     id="details-wa-btn"
                     variant="outline"
-                    className="sm:flex-none rounded-xl h-10 px-5 font-bold text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-green-600 gap-2 transition-all shadow-sm"
+                    className="sm:flex-none rounded-xl h-10 px-5 font-bold text-foreground border-border hover:bg-muted hover:text-success gap-2 transition-all shadow-sm"
                     title="Send via WhatsApp"
                     disabled={isLoading}
                     onClick={() => {

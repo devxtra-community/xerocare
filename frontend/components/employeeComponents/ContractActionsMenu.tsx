@@ -58,7 +58,7 @@ export function ContractActionsMenu({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
           title={label}
           aria-label={label}
         >
@@ -66,7 +66,7 @@ export function ContractActionsMenu({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-1.5">
-        <p className="px-2.5 pt-2 pb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+        <p className="px-2.5 pt-2 pb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </p>
         <div className="flex flex-col">
@@ -83,21 +83,23 @@ export function ContractActionsMenu({
                 if (action.closeOnSelect !== false) setOpen(false);
                 action.onClick();
               }}
-              className="flex items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none"
+              className="flex items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
             >
               <span className="shrink-0">
                 {action.loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 ) : (
                   action.icon
                 )}
               </span>
               <span className="min-w-0">
-                <span className="block text-[13px] font-semibold text-slate-800">
+                <span className="block text-[13px] font-semibold text-foreground">
                   {action.label}
                 </span>
                 {action.description && (
-                  <span className="block text-[11px] text-slate-500">{action.description}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {action.description}
+                  </span>
                 )}
               </span>
             </button>

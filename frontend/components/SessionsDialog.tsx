@@ -305,7 +305,7 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleLogoutOtherDevices}
-                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  className="text-destructive hover:bg-destructive/90 hover:text-destructive-foreground transition-colors"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out all other devices
@@ -381,7 +381,7 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleRevokeAllTrustedDevices}
-                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  className="text-destructive hover:bg-destructive/90 hover:text-destructive-foreground transition-colors"
                 >
                   <ShieldOff className="mr-2 h-4 w-4" />
                   Revoke all devices

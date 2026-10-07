@@ -1,17 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
+import { ERP_CHART_COLORS } from '@/lib/chartTheme';
 
 interface DepartmentData {
   department: string;
@@ -19,7 +12,7 @@ interface DepartmentData {
 }
 
 /**
- * Line chart visualizing employee distribution across departments (Roles).
+ * Horizontal bar chart visualizing employee distribution across departments (Roles).
  * Fetches all employees and aggregates them by role.
  */
 export default function HRDepartmentGraph() {
@@ -64,45 +57,50 @@ export default function HRDepartmentGraph() {
     return (
       <div className="bg-card rounded-2xl shadow-sm border-0 p-6">
         <h3 className="text-lg font-semibold text-primary mb-4">Department Distribution</h3>
-        <div className="h-[300px] bg-gray-100 animate-pulse rounded-lg" />
+        <div className="h-[300px] bg-muted animate-pulse rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-primary/30 flex flex-col h-[300px] w-full">
       <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
         Department Distribution
       </h4>
 
       <div className="flex-1 w-full min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          >
+            <CartesianGrid horizontal={false} stroke={ERP_CHART_COLORS.grid} />
             <XAxis
-              dataKey="department"
-              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              type="number"
+              tick={{ fill: ERP_CHART_COLORS.axis, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
-              dy={10}
             />
             <YAxis
-              tick={{ fill: 'var(--chart-slate)', fontSize: 9, fontWeight: 700 }}
+              type="category"
+              dataKey="department"
+              width={100}
+              tick={{ fill: ERP_CHART_COLORS.axis, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
             />
             <Tooltip
               content={<ChartTooltipContent valueFormatter={(val) => `${val} employees`} />}
             />
-            <Line
-              type="monotone"
+            <Bar
               dataKey="count"
-              stroke="var(--chart-blue)"
-              strokeWidth={3}
-              dot={{ r: 4, fill: 'var(--chart-blue)', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, fill: 'var(--chart-blue)', strokeWidth: 0 }}
+              name="Employees"
+              fill={ERP_CHART_COLORS.primary}
+              radius={[0, 5, 5, 0]}
+              barSize={16}
             />
-          </LineChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>

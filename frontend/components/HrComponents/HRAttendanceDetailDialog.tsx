@@ -30,10 +30,10 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
-        <div className="bg-card p-6 border-b border-slate-100">
+        <div className="bg-card p-6 border-b border-border">
           <DialogHeader>
             <div className="flex items-center gap-4 mb-6">
-              <div className="h-20 w-20 rounded-2xl bg-muted/50 border-2 border-slate-100 p-1 overflow-hidden flex-shrink-0">
+              <div className="h-20 w-20 rounded-2xl bg-muted/50 border-2 border-border p-1 overflow-hidden flex-shrink-0">
                 <div className="h-full w-full rounded-xl bg-card flex items-center justify-center relative overflow-hidden">
                   {employee.profile_image_url ? (
                     <Image
@@ -55,11 +55,11 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
                   {employee.first_name} {employee.last_name}
                 </DialogTitle>
                 <div className="flex flex-col gap-1 mt-1">
-                  <div className="flex items-center gap-2 text-[12px] font-bold text-slate-400">
+                  <div className="flex items-center gap-2 text-[12px] font-bold text-muted-foreground">
                     <Mail className="h-3 w-3 text-primary/60" />
                     {employee.email || 'no-email@xerocare.com'}
                   </div>
-                  <div className="flex items-center gap-2 text-[12px] font-bold text-slate-400">
+                  <div className="flex items-center gap-2 text-[12px] font-bold text-muted-foreground">
                     <Building2 className="h-3 w-3 text-primary/60" />
                     {employee?.role || 'General Staff'}
                   </div>
@@ -68,9 +68,9 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
             </div>
           </DialogHeader>
 
-          <div className="grid grid-cols-3 gap-4 border-t border-slate-50 pt-4">
+          <div className="grid grid-cols-3 gap-4 border-t border-border pt-4">
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Employee ID
               </span>
               <span className="text-sm font-mono font-black tracking-tight text-primary underline underline-offset-4 decoration-primary/20">
@@ -78,16 +78,16 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Role
               </span>
-              <span className="text-sm font-black uppercase text-slate-700">{employee.role}</span>
+              <span className="text-sm font-black uppercase text-foreground">{employee.role}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Branch
               </span>
-              <span className="text-sm font-black text-slate-700">
+              <span className="text-sm font-black text-foreground">
                 {employee.branch?.name || 'Main Branch'}
               </span>
             </div>
@@ -97,7 +97,7 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
         <div className="p-6 space-y-6 bg-card">
           {/* Summary Grid */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+            <div className="bg-primary/10 p-4 rounded-xl border border-primary/30 flex flex-col">
               <div className="flex items-center gap-2 text-primary mb-1">
                 <CheckCircle2 className="h-4 w-4" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Attendance</span>
@@ -107,7 +107,7 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
                 <span className="text-xs font-bold opacity-60">Days</span>
               </span>
             </div>
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+            <div className="bg-primary/10 p-4 rounded-xl border border-primary/30 flex flex-col">
               <div className="flex items-center gap-2 text-primary mb-1">
                 <LogOut className="h-4 w-4" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Leaves</span>
@@ -116,7 +116,7 @@ export default function HRAttendanceDetailDialog({ open, onOpenChange, employee 
                 {employee.leaveCount} <span className="text-xs font-bold opacity-60">Days</span>
               </span>
             </div>
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+            <div className="bg-primary/10 p-4 rounded-xl border border-primary/30 flex flex-col">
               <div className="flex items-center gap-2 text-primary mb-1">
                 <Clock className="h-4 w-4" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">

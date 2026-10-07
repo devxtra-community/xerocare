@@ -70,23 +70,23 @@ export default function RfqTable({ basePath }: RfqTableProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="p-4 sm:p-6 border-b border-border bg-muted/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by RFQ number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 h-10 w-full bg-white border-slate-200 focus-visible:ring-primary shadow-sm rounded-lg"
+              className="pl-10 pr-4 h-10 w-full bg-card border-border focus-visible:ring-primary shadow-sm rounded-lg"
             />
           </div>
 
           <select
             value={originFilter}
             onChange={(e) => setOriginFilter(e.target.value as 'ALL' | PurchaseOrigin)}
-            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm focus-visible:ring-primary"
+            className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground shadow-sm focus-visible:ring-primary"
             aria-label="Filter by purchase origin"
           >
             <option value="ALL">All Origins</option>
@@ -106,32 +106,32 @@ export default function RfqTable({ basePath }: RfqTableProps) {
 
       <div className="overflow-x-auto">
         {loading ? (
-          <div className="p-8 text-center text-slate-500 animate-pulse">Loading RFQs...</div>
+          <div className="p-8 text-center text-muted-foreground animate-pulse">Loading RFQs...</div>
         ) : (
-          <Table>
-            <TableHeader className="bg-slate-50">
+          <Table pagination={{ pageSize: 10 }}>
+            <TableHeader className="bg-muted">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="font-semibold text-slate-600">RFQ Number</TableHead>
-                <TableHead className="font-semibold text-slate-600">Date Created</TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center">Items</TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center">Vendors</TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center">Status</TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center">Origin</TableHead>
-                <TableHead className="text-right font-semibold text-slate-600">Actions</TableHead>
+                <TableHead className="font-semibold text-foreground">RFQ Number</TableHead>
+                <TableHead className="font-semibold text-foreground">Date Created</TableHead>
+                <TableHead className="font-semibold text-foreground text-center">Items</TableHead>
+                <TableHead className="font-semibold text-foreground text-center">Vendors</TableHead>
+                <TableHead className="font-semibold text-foreground text-center">Status</TableHead>
+                <TableHead className="font-semibold text-foreground text-center">Origin</TableHead>
+                <TableHead className="text-right font-semibold text-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredRfqs.length > 0 ? (
                 filteredRfqs.map((rfq) => (
-                  <TableRow key={rfq.id} className="group hover:bg-slate-50/80 transition-colors">
-                    <TableCell className="font-medium text-slate-900">{rfq.rfq_number}</TableCell>
-                    <TableCell className="text-slate-600">
+                  <TableRow key={rfq.id} className="group hover:bg-muted/80 transition-colors">
+                    <TableCell className="font-medium text-foreground">{rfq.rfq_number}</TableCell>
+                    <TableCell className="text-foreground">
                       {new Date(rfq.created_at).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-center text-slate-600">
+                    <TableCell className="text-center text-foreground">
                       {rfq.items ? rfq.items.length : 0}
                     </TableCell>
-                    <TableCell className="text-center text-slate-600">
+                    <TableCell className="text-center text-foreground">
                       {rfq.vendors ? rfq.vendors.length : 0}
                     </TableCell>
                     <TableCell className="text-center">
@@ -147,7 +147,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => router.push(`${basePath}/rfqs/${rfq.id}`)}
-                        className="text-slate-600 hover:text-primary transition-colors"
+                        className="text-foreground hover:text-primary transition-colors"
                       >
                         <Eye className="h-4 w-4 mr-1.5" />
                         View
@@ -157,7 +157,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                           variant="ghost"
                           size="sm"
                           onClick={() => router.push(`${basePath}/rfqs/create?edit=${rfq.id}`)}
-                          className="text-slate-600 hover:text-primary transition-colors"
+                          className="text-foreground hover:text-primary transition-colors"
                         >
                           <Pencil className="h-4 w-4 mr-1.5" />
                           Edit
@@ -168,7 +168,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-slate-500">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <p>No RFQs found.</p>
                       <Button
