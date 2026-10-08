@@ -34,7 +34,12 @@ import {
   type ExpenseEntry,
   type CashBankAccount,
 } from '@/lib/finance/accountsApi';
-import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
+import {
+  DonutChart,
+  HorizontalBarChart,
+  SimpleBarChart,
+  SimpleLineChart,
+} from '@/components/accounts/charts';
 import {
   fetchPurchases,
   agingBucket,
@@ -1368,51 +1373,66 @@ export default function AccountsPayablePage() {
                 )}
               </button>
               {chartsOpen && (
-                <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                      AP Aging Analysis (Outstanding)
+                <div className="space-y-4 px-4 pb-4">
+                  <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                        AP Aging Analysis (Outstanding)
+                      </h4>
+                      <SimpleBarChart
+                        data={agingTotals}
+                        xKey="bucket"
+                        bars={[{ key: 'total', color: 'var(--chart-blue)', label: 'Payable' }]}
+                        height={260}
+                        currency={currency}
+                      />
+                    </section>
+                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                        Payable by Type (Total)
+                      </h4>
+                      <DonutChart
+                        data={payCharts?.byType ?? []}
+                        height={280}
+                        colors={[
+                          'var(--chart-blue)',
+                          'var(--destructive)',
+                          'var(--lease)',
+                          'var(--chart-indigo)',
+                          'var(--chart-blue-soft)',
+                          'var(--chart-slate-dark)',
+                        ]}
+                        currency={currency}
+                      />
+                    </section>
+                  </div>
+                  <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Monthly Payments
                     </h4>
-                    <SimpleBarChart
-                      data={agingTotals}
-                      xKey="bucket"
-                      bars={[{ key: 'total', color: 'var(--chart-expense)', label: 'Payable' }]}
-                      height={200}
+                    <SimpleLineChart
+                      data={payCharts?.monthly ?? []}
+                      xKey="month"
+                      lines={[
+                        { key: 'payable', color: 'var(--chart-blue)', label: 'Payable' },
+                        { key: 'paid', color: 'var(--destructive)', label: 'Paid' },
+                      ]}
+                      height={320}
                       currency={currency}
+                      showArea
                     />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                      Payable by Type (Total)
-                    </h4>
-                    <DonutChart data={payCharts?.byType ?? []} height={200} currency={currency} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                  </section>
+                  <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                       Top 5 Vendors (Total)
                     </h4>
                     <HorizontalBarChart
                       data={payCharts?.topVendors ?? []}
-                      height={200}
-                      color="var(--chart-expense)"
+                      height={320}
+                      color="var(--lease)"
                       currency={currency}
                     />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                      Monthly Payments
-                    </h4>
-                    <SimpleBarChart
-                      data={payCharts?.monthly ?? []}
-                      xKey="month"
-                      bars={[
-                        { key: 'payable', color: 'var(--chart-expense)', label: 'Payable' },
-                        { key: 'paid', color: 'var(--chart-profit)', label: 'Paid' },
-                      ]}
-                      height={200}
-                      currency={currency}
-                    />
-                  </div>
+                  </section>
                 </div>
               )}
             </div>

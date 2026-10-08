@@ -843,56 +843,66 @@ export default function AccountsReceivablePage() {
                 )}
               </button>
               {chartsOpen && (
-                <div className="px-4 pb-4 space-y-4">
-                  {/* Aging bar */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                      AR Aging Analysis
-                    </h4>
-                    <SimpleBarChart
-                      data={agingTotals}
-                      xKey="bucket"
-                      bars={[
-                        { key: 'total', color: 'var(--chart-blue-mid)', label: 'Outstanding' },
-                      ]}
-                      height={220}
-                      currency={currency}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                        Collection Rate Trend
+                <div className="space-y-4 px-4 pb-4">
+                  <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                        AR Aging Analysis
                       </h4>
-                      <SimpleLineChart
-                        data={rcvCharts?.collectionRate ?? []}
-                        xKey="month"
-                        lines={[
-                          { key: 'issued', color: 'var(--chart-blue-mid)', label: 'Issued' },
-                          { key: 'collected', color: 'var(--chart-profit)', label: 'Collected' },
-                        ]}
-                        height={220}
+                      <SimpleBarChart
+                        data={agingTotals}
+                        xKey="bucket"
+                        bars={[{ key: 'total', color: 'var(--chart-blue)', label: 'Outstanding' }]}
+                        height={260}
                         currency={currency}
                       />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    </section>
+                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                         By Type
                       </h4>
-                      <DonutChart data={rcvCharts?.byType ?? []} height={220} currency={currency} />
-                    </div>
+                      <DonutChart
+                        data={rcvCharts?.byType ?? []}
+                        height={280}
+                        colors={[
+                          'var(--chart-blue)',
+                          'var(--destructive)',
+                          'var(--lease)',
+                          'var(--chart-indigo)',
+                          'var(--chart-blue-soft)',
+                          'var(--chart-slate-dark)',
+                        ]}
+                        currency={currency}
+                      />
+                    </section>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                  <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Collection Rate Trend
+                    </h4>
+                    <SimpleLineChart
+                      data={rcvCharts?.collectionRate ?? []}
+                      xKey="month"
+                      lines={[
+                        { key: 'issued', color: 'var(--chart-blue)', label: 'Issued' },
+                        { key: 'collected', color: 'var(--destructive)', label: 'Collected' },
+                      ]}
+                      height={320}
+                      currency={currency}
+                      showArea
+                    />
+                  </section>
+                  <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                       Top 10 Customers by Amount
                     </h4>
                     <HorizontalBarChart
                       data={rcvCharts?.topCustomers ?? []}
-                      height={240}
-                      color="var(--chart-blue-mid)"
+                      height={320}
+                      color="var(--lease)"
                       currency={currency}
                     />
-                  </div>
+                  </section>
                 </div>
               )}
             </div>
