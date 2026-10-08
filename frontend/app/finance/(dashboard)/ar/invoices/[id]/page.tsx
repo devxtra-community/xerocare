@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import {
   Table,
@@ -16,11 +16,13 @@ import { arInvoices, arCustomers, products } from '@/lib/finance/ar';
 import StatusBadge from '@/components/Finance/statusBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import { printDocument } from '@/lib/printDocument';
 
 export default function InvoiceViewPage() {
   const { id } = useParams<{ id: string }>();
 
   const router = useRouter();
+  const invoicePrintRef = useRef<HTMLDivElement>(null);
 
   const invoice = arInvoices.find((i) => i.id === id);
   if (!invoice) notFound();
@@ -51,7 +53,12 @@ export default function InvoiceViewPage() {
           <p className="text-xs text-muted-foreground">Issued: {invoice.issueDate}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden sm:flex border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden sm:flex border-border print:hidden"
+            onClick={() => printDocument(invoicePrintRef.current)}
+          >
             <Printer className="w-4 h-4 mr-2" /> Print
           </Button>
           <Button variant="outline" size="sm" className="border-border">
@@ -79,7 +86,16 @@ export default function InvoiceViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Document Section */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border shadow-sm rounded-2xl overflow-hidden">
+          <div
+            ref={invoicePrintRef}
+            className="bg-card border shadow-sm rounded-2xl overflow-hidden"
+          >
+            <div className="hidden print:block p-8 pb-0">
+              <h1 className="text-xl font-bold">{invoice.invoiceNumber}</h1>
+              <p className="text-sm">
+                Issued: {invoice.issueDate} · Due: {invoice.dueDate}
+              </p>
+            </div>
             {/* Header Branding */}
             <div className="p-8 border-b bg-muted/50 flex justify-between items-start">
               <div className="space-y-1">

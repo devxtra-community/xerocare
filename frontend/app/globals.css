@@ -489,8 +489,8 @@ body::-webkit-scrollbar-track,
    height of its scroll container.
 
    When a dialog is open, suppress the app chrome and promote its content out of the
-   fixed/centred positioning so it flows across as many pages as it needs. Documents
-   that opt into data-print-target also hide every sibling outside that document. */
+   fixed/centred positioning so it flows across as many pages as it needs. Standalone
+   finance documents use .print-document in an isolated print frame. */
 @media print {
   body:has([data-slot='dialog-content'])
     > *:not([data-slot='dialog-portal']):not([data-slot='dialog-content']):not(
@@ -499,30 +499,80 @@ body::-webkit-scrollbar-track,
     display: none !important;
   }
 
-  [data-print-hidden] {
-    display: none !important;
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 
-  [data-print-target] {
+  .print-document {
+    display: block !important;
     position: static !important;
     inset: auto !important;
     transform: none !important;
     width: 100% !important;
-    max-width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
     flex: none !important;
     overflow: visible !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
+    margin: 0 auto !important;
   }
 
-  [data-print-target] * {
+  .print-document,
+  .print-document * {
     box-sizing: border-box !important;
-    min-width: 0 !important;
+  }
+
+  .print-document > * {
     max-width: 100% !important;
+    min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
+  }
+
+  .print-document * {
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .print-document .fixed {
+    position: static !important;
+  }
+
+  .print-document .no-print,
+  .print-document .print\:hidden {
+    display: none !important;
+  }
+
+  .print-document table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-document thead {
+    display: table-header-group;
+  }
+
+  .print-document tfoot {
+    display: table-footer-group;
+  }
+
+  .print-document tr,
+  .print-document .print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-document h1,
+  .print-document h2,
+  .print-document h3,
+  .print-document h4 {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   body {
@@ -565,7 +615,7 @@ body::-webkit-scrollbar-track,
   }
 
   @page {
-    size: A4 portrait;
-    margin: 8mm;
+    size: A4;
+    margin: 12mm;
   }
 }
