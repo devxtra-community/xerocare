@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, Eye, RefreshCw } from 'lucide-react';
+import { Loader2, Eye, RefreshCw, WalletCards } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getBillsForContract, type BillForContract } from '@/lib/saleWorkflow';
@@ -20,7 +20,7 @@ import { UsageBillCollectionDialog, type CollectionTarget } from './UsageBillCol
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getApiErrorMessage } from '@/lib/apiError';
-import { BillsMark, AdvancePaymentMark } from '@/components/ui/BrandMarks';
+import { BillsMark } from '@/components/ui/BrandMarks';
 
 const safeFormatDate = (
   dateVal: string | number | Date | null | undefined,
@@ -44,11 +44,6 @@ interface Props {
   invoiceNumber: string;
   onClose: () => void;
 }
-
-/** Row action shell. Carries no hover tint of its own — each call site adds one, so
- *  two competing `hover:bg-*` classes can never both land in the class list. */
-const ACTION_BTN =
-  'group inline-flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed';
 
 const TH =
   'h-11 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap';
@@ -231,16 +226,23 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                             {formatCurrency(b.amountPending, currency)}
                           </TableCell>
                           <TableCell className="text-right pr-5">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
                                 onClick={() => setViewingBillId(b.usageRecordId)}
-                                className={`${ACTION_BTN} hover:bg-muted hover:ring-1 hover:ring-ring`}
+                                className="h-8 gap-1.5 border-border bg-muted/50 px-2.5 text-xs font-semibold text-muted-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
                                 title="View this bill"
                                 aria-label="View this bill"
                               >
-                                <Eye className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
-                              </button>
-                              <button
+                                <Eye className="h-4 w-4" />
+                                <span>View</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
                                 onClick={() =>
                                   setCollectTarget({
                                     usageRecordId: b.usageRecordId,
@@ -249,16 +251,13 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                                   })
                                 }
                                 disabled={!collectable}
-                                className={`${ACTION_BTN} enabled:hover:bg-primary/10 enabled:hover:ring-1 enabled:hover:ring-primary/30`}
+                                className="h-8 gap-1.5 border-success/20 bg-success/10 px-2.5 text-xs font-semibold text-success hover:border-success/30 hover:bg-success/15 hover:text-success disabled:opacity-50"
                                 title={collectHint}
                                 aria-label={collectHint}
                               >
-                                {/* A full-colour disc at 30% opacity just reads as a smudge,
-                                    so the disabled state desaturates it as well as fading it. */}
-                                <span className={collectable ? '' : 'opacity-40 grayscale'}>
-                                  <AdvancePaymentMark size={22} />
-                                </span>
-                              </button>
+                                <WalletCards className="h-4 w-4" />
+                                <span>Collect Amount</span>
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>

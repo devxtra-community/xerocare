@@ -1186,19 +1186,23 @@ export default function AccountsReceivablePage() {
                               <Eye className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
                             </button>
                             {r.isInvoice && (r.type === 'RENT' || r.type === 'LEASE') && (
-                              <button
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
                                 onClick={() =>
                                   setViewingBillsFor({
                                     contractId: r.id,
                                     invoiceNumber: r.referenceNo,
                                   })
                                 }
-                                className={`${ACTION_BTN} hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
+                                className="h-8 gap-1.5 whitespace-nowrap border-primary/20 bg-primary/10 px-2.5 text-xs font-semibold text-primary hover:bg-primary/15 hover:text-primary"
                                 title={`View bills raised on ${r.referenceNo}`}
-                                aria-label="View bills"
+                                aria-label="View raised bills"
                               >
-                                <BillsMark size={22} />
-                              </button>
+                                <BillsMark size={16} />
+                                <span>Raised Bills</span>
+                              </Button>
                             )}
                             {r.isInvoice &&
                               r.type === 'SERVICE' &&
