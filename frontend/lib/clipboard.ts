@@ -35,17 +35,15 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
     const textarea = document.createElement('textarea');
     textarea.value = value;
     textarea.setAttribute('readonly', '');
-    textarea.setAttribute('aria-hidden', 'true');
     Object.assign(textarea.style, {
       position: 'fixed',
       top: '0',
       left: '0',
-      width: '1px',
-      height: '1px',
-      padding: '0',
-      border: '0',
-      opacity: '0.01',
-      pointerEvents: 'none',
+      width: '320px',
+      height: '40px',
+      padding: '4px',
+      border: '1px solid currentColor',
+      opacity: '1',
       zIndex: '2147483647',
       fontSize: '16px',
       userSelect: 'text',
