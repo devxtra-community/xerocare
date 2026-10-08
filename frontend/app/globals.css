@@ -488,11 +488,43 @@ body::-webkit-scrollbar-track,
    and dimmed backdrop included — with the report itself clipped to the on-screen
    height of its scroll container.
 
-   When a dialog is open we therefore print ONLY the portal, promoted out of its
-   fixed/centred positioning so it flows across as many pages as it needs. */
+   When a dialog is open, suppress the app chrome and promote its content out of the
+   fixed/centred positioning so it flows across as many pages as it needs. Documents
+   that opt into data-print-target also hide every sibling outside that document. */
 @media print {
-  body:has([data-slot='dialog-content']) > *:not([data-slot='dialog-portal']) {
+  body:has([data-slot='dialog-content'])
+    > *:not([data-slot='dialog-portal']):not([data-slot='dialog-content']):not(
+      [data-slot='dialog-overlay']
+    ):not(:has([data-slot='dialog-content'])) {
     display: none !important;
+  }
+
+  [data-print-hidden] {
+    display: none !important;
+  }
+
+  [data-print-target] {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    flex: none !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  [data-print-target] * {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   [data-slot='dialog-overlay'] {

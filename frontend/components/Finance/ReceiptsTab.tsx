@@ -46,6 +46,7 @@ import {
 } from '@/lib/invoice';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { getActiveCurrency } from '@/lib/currency';
+import { printDocument } from '@/lib/printDocument';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -2269,8 +2270,8 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => window.print()}
-                      className="text-[10px] font-black uppercase text-muted-foreground h-9 ml-auto"
+                      onClick={() => printDocument(printRef.current)}
+                      className="text-[10px] font-black uppercase text-muted-foreground h-9 ml-auto print:hidden"
                     >
                       <Printer size={12} className="mr-1" /> Print
                     </Button>

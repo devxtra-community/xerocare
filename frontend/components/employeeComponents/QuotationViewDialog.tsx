@@ -33,6 +33,8 @@ import { toast } from 'sonner';
 
 import { getActiveCurrency } from '@/lib/currency';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { printDocument } from '@/lib/printDocument';
+
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
@@ -1510,7 +1512,7 @@ export function QuotationViewDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.print()}
+                onClick={() => printDocument(document.getElementById('quotation-print-content'))}
                 className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted hover:border-border gap-2"
               >
                 <Printer size={16} className="shrink-0" /> Print
@@ -2981,7 +2983,7 @@ export function QuotationViewDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.print()}
+                onClick={() => printDocument(document.getElementById('quotation-print-content'))}
                 className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted hover:border-border gap-2"
               >
                 <Printer size={16} className="shrink-0" /> Print

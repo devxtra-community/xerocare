@@ -38,6 +38,7 @@ import {
 import { Invoice } from '@/lib/invoice';
 import { BillDocumentBody } from './BillDocumentBody';
 import { getActiveCurrency } from '@/lib/currency';
+import { printDocument } from '@/lib/printDocument';
 
 interface BillModalProps {
   usageRecordId: string;
@@ -202,7 +203,7 @@ export function BillModal({
     }
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => printDocument(printRef.current);
 
   const status = bill ? STATUS_META[bill.billStatus] : null;
 
@@ -326,7 +327,7 @@ export function BillModal({
                       variant="ghost"
                       size="sm"
                       onClick={handlePrint}
-                      className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-8 w-full border border-border mt-4"
+                      className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-8 w-full border border-border mt-4 print:hidden"
                     >
                       <Printer size={12} className="mr-1" /> Print / Save PDF
                     </Button>
