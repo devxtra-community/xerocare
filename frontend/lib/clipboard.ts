@@ -12,15 +12,20 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   const value = typeof text === 'string' ? text : String(text ?? '');
   if (!value) return false;
 
-  // The modern API is the reliable path on secure origins. It only reports
-  // success after the browser resolves the write request.
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-      return true;
+  // Chrome exposes or partially exposes the Clipboard API on some insecure
+  // origins. Waiting for that request to reject can consume the click's user
+  // activation, making the legacy fallback report success without copying.
+  // On HTTP, skip that request and run execCommand synchronously in this click.
+  const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
+  if (isSecureContext) {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch {
+      // Try the synchronous fallback if the browser rejects the API write.
     }
-  } catch {
-    // Continue to the synchronous fallback when permissions reject the API.
   }
 
   // execCommand remains the available path on the app's plain HTTP deployment.
