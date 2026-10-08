@@ -1179,7 +1179,7 @@ export default function AccountsReceivablePage() {
                                   id: r.id,
                                 })
                               }
-                              className={`${ACTION_BTN} hover:bg-muted hover:ring-1 hover:ring-ring`}
+                              className={`${ACTION_BTN} border border-secondary bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80`}
                               title="View full details"
                               aria-label="View full details"
                             >
@@ -1189,14 +1189,14 @@ export default function AccountsReceivablePage() {
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
+                                variant="default"
                                 onClick={() =>
                                   setViewingBillsFor({
                                     contractId: r.id,
                                     invoiceNumber: r.referenceNo,
                                   })
                                 }
-                                className="h-8 gap-1.5 whitespace-nowrap border-primary/20 bg-primary/10 px-2.5 text-xs font-semibold text-primary hover:bg-primary/15 hover:text-primary"
+                                className="h-8 gap-1.5 whitespace-nowrap px-2.5 text-xs font-semibold shadow-sm"
                                 title={`View bills raised on ${r.referenceNo}`}
                                 aria-label="View raised bills"
                               >
@@ -1209,17 +1209,17 @@ export default function AccountsReceivablePage() {
                               (r.outstanding ?? 0) > 0.004 && (
                                 <button
                                   onClick={() => setCollectingServiceInvoiceId(r.id)}
-                                  className={`${ACTION_BTN} hover:bg-success/10 hover:ring-1 hover:ring-success/30`}
+                                  className={`${ACTION_BTN} border border-success bg-success text-success-foreground shadow-sm hover:bg-success/90`}
                                   title="Record service collection for Accounts approval"
                                   aria-label="Collect service invoice"
                                 >
-                                  <DollarSign className="h-4 w-4 text-success transition-colors group-hover:text-success" />
+                                  <DollarSign className="h-4 w-4" />
                                 </button>
                               )}
                             {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => setPayingFor(r as ManualReceivable)}
-                                className={`${ACTION_BTN} hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
+                                className={`${ACTION_BTN} border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90`}
                                 title="Record Payment"
                                 aria-label="Record payment"
                               >

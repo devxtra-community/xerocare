@@ -588,8 +588,8 @@ export default function UsageHistoryDialog({
                               <UsageDetailsModal record={record} />
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="h-8 whitespace-nowrap gap-1.5 border-primary/20 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/15 hover:text-primary"
+                                variant="default"
+                                className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs shadow-sm"
                                 onClick={() => setViewingBillId(record.id)}
                                 title="Create Bill"
                               >
@@ -600,7 +600,7 @@ export default function UsageHistoryDialog({
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-9 w-9 rounded-md border border-border bg-muted/50 p-0 text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                                  className="h-9 w-9 rounded-md border border-secondary bg-secondary p-0 text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80"
                                   onClick={() => setPreviewImage(record.meterImageUrl || null)}
                                   title="View Reading Image"
                                 >
@@ -610,10 +610,10 @@ export default function UsageHistoryDialog({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className={`h-9 w-9 rounded-md border p-0 transition-colors ${
+                                className={`h-9 w-9 rounded-md border p-0 shadow-sm transition-colors ${
                                   record.emailSentAt
-                                    ? 'border-success/20 bg-success/10 text-success hover:border-success/30 hover:bg-success/15'
-                                    : 'border-primary/20 bg-primary/10 text-primary hover:border-primary/30 hover:bg-primary/15'
+                                    ? 'border-success bg-success text-success-foreground hover:bg-success/90'
+                                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
                                 }`}
                                 onClick={() => handleSendInvoice(record)}
                                 disabled={sendingId === record.id}
@@ -641,8 +641,8 @@ export default function UsageHistoryDialog({
                                   'CUSTOMER_APPROVED' && (
                                   <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="h-8 whitespace-nowrap gap-1.5 border-warning/30 bg-warning/10 px-2.5 text-xs text-warning hover:bg-warning/15 hover:text-warning"
+                                    variant="default"
+                                    className="h-8 whitespace-nowrap gap-1.5 border-warning bg-warning px-2.5 text-xs text-warning-foreground shadow-sm hover:bg-warning/90"
                                     onClick={() => {
                                       setEditingRecord(record);
                                       setIsEditModalOpen(true);
@@ -786,9 +786,9 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
     <Dialog>
       <DialogTrigger asChild>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
-          className="h-8 whitespace-nowrap gap-1.5 border-primary/20 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/15 hover:text-primary"
+          className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs shadow-sm"
           title="View Detailed Breakdown"
         >
           <Eye className="h-4 w-4" />

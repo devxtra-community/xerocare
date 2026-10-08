@@ -460,8 +460,8 @@ export default function MonthlyCollectionTable({
       cell: (alertItem: CollectionAlert) => (
         <Button
           size="sm"
-          variant="outline"
-          className="h-8 whitespace-nowrap gap-1.5 border-primary/20 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/15 hover:text-primary"
+          variant="default"
+          className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs shadow-sm"
           onClick={() => handleShowHistory(alertItem)}
           aria-label="View bills and history"
         >
@@ -480,7 +480,7 @@ export default function MonthlyCollectionTable({
             size="sm"
             variant="ghost"
             onClick={() => handleViewDetails(alertItem)}
-            className="h-9 w-9 rounded-md border border-border bg-muted/50 p-0 text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+            className="h-9 w-9 rounded-md border border-secondary bg-secondary p-0 text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80"
             title="View Details"
           >
             <Eye className="h-4 w-4" />
@@ -492,7 +492,7 @@ export default function MonthlyCollectionTable({
               variant="ghost"
               onClick={() => handleGenerateOrViewAdvanceBill(alertItem)}
               disabled={generatingAdvanceBillFor === alertItem.contractId}
-              className="h-9 w-9 rounded-md border border-success/20 bg-success/10 p-0 text-success transition-colors hover:border-success/30 hover:bg-success/15"
+              className="h-9 w-9 rounded-md border border-success bg-success p-0 text-success-foreground shadow-sm transition-colors hover:bg-success/90"
               aria-label="View or generate advance bill"
               title={
                 advanceBillStatusMap[alertItem.contractId]?.advanceBillId
@@ -524,7 +524,7 @@ export default function MonthlyCollectionTable({
                 variant="ghost"
                 onClick={() => handleGenerateOrViewSecurityDepositBill(alertItem)}
                 disabled={generatingSecurityDepositBillFor === alertItem.contractId}
-                className="h-9 w-9 rounded-md border border-success/20 bg-success/10 p-0 text-success transition-colors hover:border-success/30 hover:bg-success/15"
+                className="h-9 w-9 rounded-md border border-success bg-success p-0 text-success-foreground shadow-sm transition-colors hover:bg-success/90"
                 aria-label="View or generate security deposit bill"
                 title={
                   securityDepositBillStatusMap[alertItem.contractId]?.securityDepositBillId
@@ -546,7 +546,7 @@ export default function MonthlyCollectionTable({
                 size="sm"
                 variant="ghost"
                 onClick={() => setDepositCollectTarget(alertItem)}
-                className="h-9 w-9 rounded-md border border-primary/20 bg-primary/10 p-0 text-primary transition-colors hover:border-primary/30 hover:bg-primary/15"
+                className="h-9 w-9 rounded-md border border-primary bg-primary p-0 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                 title="Collect Security Deposit — not yet recorded for this contract"
               >
                 <AdvancePaymentMark size={22} />

@@ -230,9 +230,9 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
+                                variant="secondary"
                                 onClick={() => setViewingBillId(b.usageRecordId)}
-                                className="h-8 gap-1.5 border-border bg-muted/50 px-2.5 text-xs font-semibold text-muted-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                                className="h-8 gap-1.5 px-2.5 text-xs font-semibold shadow-sm"
                                 title="View this bill"
                                 aria-label="View this bill"
                               >
@@ -242,7 +242,7 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
+                                variant="success"
                                 onClick={() =>
                                   setCollectTarget({
                                     usageRecordId: b.usageRecordId,
@@ -251,7 +251,7 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                                   })
                                 }
                                 disabled={!collectable}
-                                className="h-8 gap-1.5 border-success/20 bg-success/10 px-2.5 text-xs font-semibold text-success hover:border-success/30 hover:bg-success/15 hover:text-success disabled:opacity-50"
+                                className="h-8 gap-1.5 px-2.5 text-xs font-semibold shadow-sm disabled:opacity-50"
                                 title={collectHint}
                                 aria-label={collectHint}
                               >
