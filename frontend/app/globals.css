@@ -518,6 +518,9 @@ body::-webkit-scrollbar-track,
   }
 
   [data-print-target] * {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     max-height: none !important;
     overflow: visible !important;
   }
@@ -562,6 +565,7 @@ body::-webkit-scrollbar-track,
   }
 
   @page {
-    margin: 14mm;
+    size: A4 portrait;
+    margin: 8mm;
   }
 }
