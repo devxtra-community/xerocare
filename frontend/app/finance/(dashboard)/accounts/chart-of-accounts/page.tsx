@@ -190,7 +190,7 @@ export default function ChartOfAccountsPage() {
 
   if (isLoading)
     return (
-      <div className="bg-primary/10 min-h-full p-6 space-y-6">
+      <div className="bg-card min-h-full p-6 space-y-6">
         <div>
           <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">
             Chart of Accounts
@@ -203,7 +203,7 @@ export default function ChartOfAccountsPage() {
 
   if (isError)
     return (
-      <div className="bg-primary/10 min-h-full p-6 flex flex-col items-center justify-center gap-4">
+      <div className="bg-card min-h-full p-6 flex flex-col items-center justify-center gap-4">
         <p className="text-destructive font-medium">Failed to load Chart of Accounts</p>
         <Button onClick={() => refetch()} variant="outline">
           Retry
@@ -220,7 +220,7 @@ export default function ChartOfAccountsPage() {
   const equityTree = buildEquityTree(equity);
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-card min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

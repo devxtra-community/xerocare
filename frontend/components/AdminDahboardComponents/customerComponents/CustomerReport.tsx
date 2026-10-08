@@ -218,7 +218,7 @@ export default function CustomerReport() {
 
   if (loading) {
     return (
-      <div className="bg-muted min-h-screen p-6 flex flex-col items-center justify-center space-y-4">
+      <div className="bg-card min-h-screen p-6 flex flex-col items-center justify-center space-y-4">
         <RefreshCw className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground font-medium">Loading customers directory...</p>
       </div>
@@ -226,7 +226,7 @@ export default function CustomerReport() {
   }
 
   return (
-    <div className="bg-muted min-h-screen p-4 md:p-6 space-y-6">
+    <div className="bg-card min-h-screen p-4 md:p-6 space-y-6">
       {/* Title Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

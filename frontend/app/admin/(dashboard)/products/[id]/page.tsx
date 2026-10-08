@@ -156,7 +156,7 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 p-6 space-y-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card p-6 space-y-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm font-medium text-muted-foreground">Loading product details...</p>
       </div>
@@ -165,7 +165,7 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 p-6 space-y-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card p-6 space-y-4">
         <p className="text-lg font-bold text-foreground">Product not found</p>
         <Button
           onClick={() => router.back()}
@@ -191,7 +191,7 @@ export default function ProductDetailPage() {
     : '—';
 
   return (
-    <div className="min-h-screen bg-primary/10 p-4 sm:p-6 md:p-8 space-y-6">
+    <div className="min-h-screen bg-card p-4 sm:p-6 md:p-8 space-y-6">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-2xl border border-border shadow-sm">
         <div className="flex items-center gap-4">

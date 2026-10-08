@@ -277,7 +277,7 @@ export default function BranchReport() {
 
   if (loading) {
     return (
-      <div className="bg-bg-muted min-h-screen p-3 sm:p-4 md:p-6 flex items-center justify-center">
+      <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 flex items-center justify-center">
         <div className="text-primary text-lg">Loading...</div>
       </div>
     );
@@ -286,7 +286,7 @@ export default function BranchReport() {
   const paginatedFiltered = filtered.slice((page - 1) * limit, page * limit);
 
   return (
-    <div className="bg-bg-muted min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8 sm:space-y-10">
       <div className="space-y-4 sm:space-y-6">
         <h3 className="text-xl sm:text-2xl font-medium text-foreground">Branches</h3>
 

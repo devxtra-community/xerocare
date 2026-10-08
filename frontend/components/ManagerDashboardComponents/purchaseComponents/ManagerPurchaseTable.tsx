@@ -108,7 +108,7 @@ export default function ManagerPurchaseTable() {
   };
 
   return (
-    <div className="bg-muted min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
+    <div className="bg-card min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
       <div className="flex justify-between items-center">
         <h3 className="text-xl sm:text-2xl font-medium text-foreground italic tracking-tight">
           Lot Amount Records

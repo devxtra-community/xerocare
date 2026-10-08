@@ -21,11 +21,14 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
       const textarea = document.createElement('textarea');
       textarea.value = value;
       textarea.setAttribute('readonly', '');
-      // Off-screen but rendered — display:none breaks selection on some browsers.
+      // Keep the field in the viewport but visually transparent. Some browsers
+      // refuse to copy selections from a far off-screen element.
       textarea.style.position = 'fixed';
       textarea.style.top = '0';
-      textarea.style.left = '-9999px';
-      textarea.style.opacity = '0.01';
+      textarea.style.left = '0';
+      textarea.style.opacity = '0';
+      textarea.style.pointerEvents = 'none';
+      textarea.style.zIndex = '-1';
       textarea.style.fontSize = '16px';
       document.body.appendChild(textarea);
 

@@ -151,7 +151,13 @@ export function BillModal({
     if (ok) {
       toast.success('Copied! Link copied to clipboard');
     } else {
-      toast.error('Could not copy the link. Please copy it manually.');
+      const manualCopy = window.prompt(
+        'Clipboard access is unavailable. Copy this bill link manually:',
+        remoteLink,
+      );
+      if (manualCopy !== null) {
+        toast.info('Select the link in the prompt and press Ctrl+C or ⌘+C.');
+      }
     }
   };
 

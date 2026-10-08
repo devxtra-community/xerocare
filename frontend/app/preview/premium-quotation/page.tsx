@@ -108,7 +108,7 @@ export default function PremiumQuotationPreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-muted">
+        <div className="flex items-center justify-center min-h-screen bg-card">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
       }

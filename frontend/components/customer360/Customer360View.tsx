@@ -245,7 +245,7 @@ export default function Customer360View({
   ];
 
   return (
-    <div className="min-h-screen bg-muted p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-card p-4 md:p-6 space-y-6">
       {/* Back + Title */}
       <div className="flex items-center gap-3">
         <Button

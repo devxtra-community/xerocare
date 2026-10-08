@@ -26,7 +26,7 @@ export default function UnauthorizedPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-muted">
+    <div className="flex min-h-screen w-full items-center justify-center bg-card">
       <div className="max-w-md w-full mx-4 text-center">
         <div className="bg-card rounded-2xl shadow-sm border p-10 space-y-6">
           <div className="flex justify-center">

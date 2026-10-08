@@ -79,7 +79,7 @@ export default function SparePartDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm font-medium text-muted-foreground">Loading spare part details...</p>
       </div>
@@ -88,7 +88,7 @@ export default function SparePartDetailPage() {
 
   if (!part) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card gap-4">
         <Settings className="h-12 w-12 text-muted-foreground" />
         <p className="text-lg font-bold text-foreground">Spare part not found</p>
         <Button onClick={() => router.back()} className="bg-primary text-primary-foreground">
@@ -114,7 +114,7 @@ export default function SparePartDetailPage() {
         : 'Universal / Multiple Models');
 
   return (
-    <div className="min-h-screen bg-primary/10 p-4 sm:p-6 md:p-8 space-y-6">
+    <div className="min-h-screen bg-card p-4 sm:p-6 md:p-8 space-y-6">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-2xl border border-border shadow-sm">
         <div className="flex items-center gap-4">

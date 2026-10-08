@@ -77,7 +77,7 @@ export default function EmployeeDashboardPage() {
 
   if (isTechnician) {
     return (
-      <div className="bg-muted min-h-full p-4 sm:p-6 space-y-6">
+      <div className="bg-card min-h-full p-4 sm:p-6 space-y-6">
         <div className="flex flex-col space-y-2">
           <h1 className="text-xl sm:text-2xl font-medium text-primary tracking-tight">
             Technician Portal

@@ -1221,7 +1221,7 @@ export default function AccountsPayablePage() {
 
   if (isLoading) {
     return (
-      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
+      <div className="bg-card min-h-full p-6 flex items-center justify-center">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -1229,7 +1229,7 @@ export default function AccountsPayablePage() {
 
   if (isError) {
     return (
-      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
+      <div className="bg-card min-h-full p-6 flex items-center justify-center">
         <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-8 text-center space-y-3 max-w-sm w-full">
           <p className="text-destructive font-medium">Failed to load payables. Please retry.</p>
           <button
@@ -1244,7 +1244,7 @@ export default function AccountsPayablePage() {
   }
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-card min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

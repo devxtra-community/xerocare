@@ -111,7 +111,7 @@ export default function SalesInvoiceListPage() {
   );
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 bg-muted/50 min-h-screen">
+    <div className="p-4 sm:p-8 space-y-8 bg-card min-h-screen">
       <PageHeader
         title="Sales Invoices"
         description="Accounts Receivable – Customer Invoices & Collections"

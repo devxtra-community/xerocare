@@ -249,7 +249,7 @@ export default function UsageHistoryDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-7xl max-h-[90vh] overflow-hidden flex flex-col rounded-[2.5rem] p-0 border-none bg-card shadow-2xl">
+        <DialogContent className="w-[calc(100%-1rem)] max-w-none sm:w-[96vw] sm:max-w-[1600px] h-[85dvh] max-h-[900px] overflow-hidden flex flex-col rounded-2xl p-0 border border-border bg-card shadow-2xl">
           {/* Modern Header */}
           <DialogHeader className="p-8 pb-6 border-b border-border">
             <div className="flex items-center justify-between">
@@ -309,44 +309,50 @@ export default function UsageHistoryDialog({
               <>
                 <div className="rounded-[1.5rem] border border-border overflow-hidden shadow-sm">
                   <Table>
-                    <TableHeader className="bg-foreground border-none">
-                      <TableRow className="hover:bg-foreground border-none">
-                        <TableHead className="font-bold text-primary-foreground py-5 px-6">
+                    <TableHeader className="bg-muted border-b border-border">
+                      <TableRow className="bg-muted hover:bg-muted border-border">
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide py-4 px-6">
                           PERIOD
                         </TableHead>
                         {!isCpc && !isEmiLease && (
-                          <TableHead className="font-bold text-primary-foreground text-right">
+                          <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
                             FREE LIMIT
                           </TableHead>
                         )}
                         {!isEmiLease && (
                           <>
-                            <TableHead className="font-bold text-primary-foreground text-right">
+                            <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
                               USAGE
                             </TableHead>
-                            <TableHead className="font-bold text-primary-foreground text-center">
+                            <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-center">
                               STATUS
                             </TableHead>
-                            <TableHead className="font-bold text-warning text-right">
+                            <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
                               CHARGE
                             </TableHead>
                           </>
                         )}
-                        <TableHead className="font-bold text-primary-foreground text-right">
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
                           {isEmiLease ? 'EMI' : 'RENT'}
                         </TableHead>
                         {!isEmiLease && (
-                          <TableHead className="font-bold text-success text-right">
+                          <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
                             DISCOUNT
                           </TableHead>
                         )}
-                        <TableHead className="font-bold text-primary text-right">ADVANCE</TableHead>
-                        <TableHead className="font-bold text-info text-right">DEPOSIT</TableHead>
-                        <TableHead className="font-bold text-primary text-right">TOTAL</TableHead>
-                        <TableHead className="font-bold text-primary-foreground text-center">
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
+                          ADVANCE
+                        </TableHead>
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
+                          DEPOSIT
+                        </TableHead>
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-right">
+                          TOTAL
+                        </TableHead>
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-center">
                           APPROVAL
                         </TableHead>
-                        <TableHead className="font-bold text-primary-foreground text-center rounded-tr-[1.5rem]">
+                        <TableHead className="font-semibold text-muted-foreground uppercase tracking-wide text-center">
                           ACTION
                         </TableHead>
                       </TableRow>
@@ -582,12 +588,13 @@ export default function UsageHistoryDialog({
                               <UsageDetailsModal record={record} />
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-all"
+                                variant="outline"
+                                className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs"
                                 onClick={() => setViewingBillId(record.id)}
-                                title="View Bill"
+                                title="Create Bill"
                               >
                                 <FileText className="h-4 w-4" />
+                                <span>Create Bill</span>
                               </Button>
                               {record.meterImageUrl ? (
                                 <Button
@@ -634,15 +641,16 @@ export default function UsageHistoryDialog({
                                   'CUSTOMER_APPROVED' && (
                                   <Button
                                     size="sm"
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0 text-warning hover:text-warning hover:bg-warning/10 rounded-full transition-all"
+                                    variant="outline"
+                                    className="h-8 whitespace-nowrap gap-1.5 border-warning/30 px-2.5 text-xs text-warning hover:bg-warning/10 hover:text-warning"
                                     onClick={() => {
                                       setEditingRecord(record);
                                       setIsEditModalOpen(true);
                                     }}
-                                    title="Edit Usage Record"
+                                    title="Edit Usage"
                                   >
                                     <Edit className="h-4 w-4" />
+                                    <span>Edit Usage</span>
                                   </Button>
                                 )}
                             </div>
@@ -778,12 +786,13 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
     <Dialog>
       <DialogTrigger asChild>
         <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-lease hover:bg-lease/10 rounded-full"
+          variant="outline"
+          size="sm"
+          className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs"
           title="View Detailed Breakdown"
         >
           <Eye className="h-4 w-4" />
+          <span>View</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl bg-card">

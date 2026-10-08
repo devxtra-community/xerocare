@@ -8,7 +8,7 @@ import HRLeaveGraph from '@/components/HrComponents/HRLeaveGraph';
 
 export default function HRAttendancePage() {
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-primary/10 min-h-screen font-sans">
+    <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-card min-h-screen font-sans">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl sm:text-2xl font-medium text-primary">Attendance Management</h2>
         <p className="text-sm text-muted-foreground font-medium">

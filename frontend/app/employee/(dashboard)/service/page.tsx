@@ -2099,7 +2099,7 @@ export default function ServiceDashboardPage() {
   const rejectHasDiscount = Number(rejectDiscountAmount) > 0;
 
   return (
-    <div className="bg-muted min-h-full p-4 sm:p-6 space-y-6">
+    <div className="bg-card min-h-full p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
         <div>

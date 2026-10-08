@@ -456,15 +456,17 @@ export default function MonthlyCollectionTable({
     },
     {
       id: 'history',
-      header: 'HISTORY',
+      header: 'BILLS & HISTORY',
       cell: (alertItem: CollectionAlert) => (
         <Button
           size="sm"
-          variant="ghost"
-          className="h-8 w-8 p-0 text-primary hover:bg-primary/10 rounded-full"
+          variant="outline"
+          className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs"
           onClick={() => handleShowHistory(alertItem)}
+          aria-label="View bills and history"
         >
           <HistoryIcon className="h-4 w-4" />
+          <span>Bills &amp; History</span>
         </Button>
       ),
     },
@@ -490,7 +492,8 @@ export default function MonthlyCollectionTable({
               variant="ghost"
               onClick={() => handleGenerateOrViewAdvanceBill(alertItem)}
               disabled={generatingAdvanceBillFor === alertItem.contractId}
-              className="h-9 w-9 p-0 rounded-full transition-all hover:bg-success/10 hover:ring-1 hover:ring-success/30"
+              className="h-9 w-9 p-0 rounded-md border border-border transition-colors hover:bg-success/10 hover:ring-1 hover:ring-success/30"
+              aria-label="View or generate advance bill"
               title={
                 advanceBillStatusMap[alertItem.contractId]?.advanceBillId
                   ? securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment
@@ -506,7 +509,7 @@ export default function MonthlyCollectionTable({
               ) : (
                 // Same mark the Rent/Lease Contract Actions menu uses for this bill, so
                 // one action looks the same wherever Finance meets it.
-                <SecurityBillMark size={22} />
+                <SecurityBillMark size={18} />
               )}
             </Button>
           )}
@@ -521,7 +524,8 @@ export default function MonthlyCollectionTable({
                 variant="ghost"
                 onClick={() => handleGenerateOrViewSecurityDepositBill(alertItem)}
                 disabled={generatingSecurityDepositBillFor === alertItem.contractId}
-                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-success/10 hover:ring-1 hover:ring-success/30"
+                className="h-9 w-9 p-0 rounded-md border border-border transition-colors hover:bg-success/10 hover:ring-1 hover:ring-success/30"
+                aria-label="View or generate security deposit bill"
                 title={
                   securityDepositBillStatusMap[alertItem.contractId]?.securityDepositBillId
                     ? 'View Security Deposit Bill'
@@ -531,7 +535,7 @@ export default function MonthlyCollectionTable({
                 {generatingSecurityDepositBillFor === alertItem.contractId ? (
                   <RefreshCw className="h-4 w-4 animate-spin text-success" />
                 ) : (
-                  <SecurityBillMark size={22} />
+                  <SecurityBillMark size={18} />
                 )}
               </Button>
             )}

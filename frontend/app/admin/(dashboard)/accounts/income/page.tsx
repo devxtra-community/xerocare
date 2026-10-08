@@ -73,7 +73,7 @@ function IncomeContent() {
   };
 
   return (
-    <div className="bg-muted min-h-full p-6 space-y-6">
+    <div className="bg-card min-h-full p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-medium text-foreground">Income — Consolidated</h1>

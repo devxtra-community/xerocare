@@ -27,7 +27,7 @@ export default function LeasePage() {
   }, [fetchInvoices]);
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-card min-h-full p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col space-y-6">
         <div>
           <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">

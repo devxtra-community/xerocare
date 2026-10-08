@@ -187,7 +187,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
   }
 
   return (
-    <div className="min-h-screen bg-muted/50 p-6 space-y-8">
+    <div className="min-h-screen bg-card p-6 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

@@ -8,7 +8,7 @@ import HRBranchEmployeesGraph from '@/components/HrComponents/HRBranchEmployeesG
 
 export default function HREmployeesPage() {
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-primary/10 min-h-screen">
+    <div className="p-3 sm:p-4 md:p-6 space-y-6 bg-card min-h-screen">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl sm:text-2xl font-medium text-primary">Employee Management</h2>
         <p className="text-sm text-muted-foreground font-medium">

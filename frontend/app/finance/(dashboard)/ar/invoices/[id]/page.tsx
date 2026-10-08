@@ -41,7 +41,7 @@ export default function InvoiceViewPage() {
   const customer = arCustomers.find((c) => c.id === invoice.customerId);
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 bg-muted/50 min-h-screen">
+    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 bg-card min-h-screen">
       {/* Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-card/80 backdrop-blur sticky top-0 z-10 p-4 border rounded-xl shadow-sm">
         <div>
