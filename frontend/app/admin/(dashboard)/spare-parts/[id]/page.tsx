@@ -28,6 +28,7 @@ import { getSparePartById, getSparePartStock, SparePart, SparePartStock } from '
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 export default function SparePartDetailPage() {
   const currency = useBranchCurrency();
@@ -70,8 +71,11 @@ export default function SparePartDetailPage() {
     }
   };
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, field: string) => {
+    if (!(await copyTextToClipboard(text))) {
+      toast.error(`Could not copy ${field.toLowerCase()}`);
+      return;
+    }
     setCopiedField(field);
     toast.success(`${field} copied`);
     setTimeout(() => setCopiedField(null), 2000);

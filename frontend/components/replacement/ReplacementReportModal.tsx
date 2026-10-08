@@ -11,6 +11,7 @@ import { Loader2, Mail, Send, Link2, Copy, Printer, CheckCircle2, FileText } fro
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { publicAppLink } from '@/lib/publicAppUrl';
+import { copyTextToClipboard } from '@/lib/clipboard';
 import {
   getReplacement,
   sendReplacementReport,
@@ -174,9 +175,9 @@ export function ReplacementReportModal({
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 shrink-0 p-0 text-muted-foreground"
-                      onClick={() => {
-                        navigator.clipboard.writeText(link);
-                        toast.success('Link copied');
+                      onClick={async () => {
+                        if (await copyTextToClipboard(link)) toast.success('Link copied');
+                        else toast.error('Could not copy the link. Please copy it manually.');
                       }}
                     >
                       <Copy size={14} />

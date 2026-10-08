@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProductHistory, ProductHistoryResponse, HistoryEvent } from '@/lib/productHistory';
 import { resolveImageUrl } from '@/lib/imageUrl';
 import MachineServiceAnalyticsPanel from '@/components/products/MachineServiceAnalyticsPanel';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 interface ProductFeature {
   subHeading: string;
@@ -147,8 +148,11 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, field: string) => {
+    if (!(await copyTextToClipboard(text))) {
+      toast.error(`Could not copy ${field.toLowerCase()}`);
+      return;
+    }
     setCopiedField(field);
     toast.success(`${field} copied to clipboard`);
     setTimeout(() => setCopiedField(null), 2000);

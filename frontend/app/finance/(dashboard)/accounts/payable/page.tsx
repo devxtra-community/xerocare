@@ -1031,31 +1031,38 @@ export default function AccountsPayablePage() {
 
   const filtered = useMemo(
     () =>
-      allPayables.filter((p) => {
-        const matchType = typeFilter === 'ALL' || p.type === typeFilter;
-        const matchAging = agingFilter === 'ALL' || p.aging === agingFilter;
-        const matchSource = sourceFilter === 'ALL' || p.source === sourceFilter;
-        const matchStatus = statusFilter === 'ALL' || p.status === statusFilter;
-        const matchSearch =
-          !search ||
-          p.payableTo?.toLowerCase().includes(search.toLowerCase()) ||
-          p.referenceNo?.toLowerCase().includes(search.toLowerCase());
-        const matchAmountMin = !amountMin || (p.outstanding ?? 0) >= Number(amountMin);
-        const matchAmountMax = !amountMax || (p.outstanding ?? 0) <= Number(amountMax);
-        const matchDateFrom = !dateFrom || (p.issueDate?.slice(0, 10) ?? '') >= dateFrom;
-        const matchDateTo = !dateTo || (p.issueDate?.slice(0, 10) ?? '') <= dateTo;
-        return (
-          matchType &&
-          matchAging &&
-          matchSource &&
-          matchStatus &&
-          matchSearch &&
-          matchAmountMin &&
-          matchAmountMax &&
-          matchDateFrom &&
-          matchDateTo
-        );
-      }),
+      allPayables
+        .filter((p) => {
+          const matchType = typeFilter === 'ALL' || p.type === typeFilter;
+          const matchAging = agingFilter === 'ALL' || p.aging === agingFilter;
+          const matchSource = sourceFilter === 'ALL' || p.source === sourceFilter;
+          const matchStatus = statusFilter === 'ALL' || p.status === statusFilter;
+          const matchSearch =
+            !search ||
+            p.payableTo?.toLowerCase().includes(search.toLowerCase()) ||
+            p.referenceNo?.toLowerCase().includes(search.toLowerCase());
+          const matchAmountMin = !amountMin || (p.outstanding ?? 0) >= Number(amountMin);
+          const matchAmountMax = !amountMax || (p.outstanding ?? 0) <= Number(amountMax);
+          const matchDateFrom = !dateFrom || (p.issueDate?.slice(0, 10) ?? '') >= dateFrom;
+          const matchDateTo = !dateTo || (p.issueDate?.slice(0, 10) ?? '') <= dateTo;
+          return (
+            matchType &&
+            matchAging &&
+            matchSource &&
+            matchStatus &&
+            matchSearch &&
+            matchAmountMin &&
+            matchAmountMax &&
+            matchDateFrom &&
+            matchDateTo
+          );
+        })
+        .sort((a, b) =>
+          (a.referenceNo ?? '').localeCompare(b.referenceNo ?? '', undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          }),
+        ),
     [
       allPayables,
       typeFilter,

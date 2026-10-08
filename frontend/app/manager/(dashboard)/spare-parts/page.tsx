@@ -18,6 +18,7 @@ import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
 import { lotService } from '@/lib/lot';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import { getUserFromToken } from '@/lib/auth';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -231,10 +232,11 @@ function SparePartsContent() {
                   <div className="flex items-center gap-2 group">
                     <span className="font-mono text-[11px]">{item.lotNumber}</span>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        navigator.clipboard.writeText(item.lotNumber);
-                        toast.success('Copied to clipboard');
+                        if (await copyTextToClipboard(item.lotNumber)) {
+                          toast.success('Copied to clipboard');
+                        } else toast.error('Could not copy to clipboard');
                       }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                       title="Copy Lot ID"

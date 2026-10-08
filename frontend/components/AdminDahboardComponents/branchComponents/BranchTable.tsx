@@ -53,6 +53,7 @@ import { getUserFromToken } from '@/lib/auth';
 import Pagination from '@/components/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { countries } from 'countries-list';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 // --------------- Country/Currency helpers ---------------
 
@@ -1027,8 +1028,8 @@ function BranchDetailModal({
 }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(branch.id);
+  const handleCopy = async () => {
+    if (!(await copyTextToClipboard(branch.id))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

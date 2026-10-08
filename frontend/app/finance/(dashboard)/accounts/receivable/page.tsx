@@ -631,31 +631,38 @@ export default function AccountsReceivablePage() {
 
   const filtered = useMemo(
     () =>
-      allReceivables.filter((r) => {
-        const matchType = typeFilter === 'ALL' || r.type === typeFilter;
-        const matchAging = agingFilter === 'ALL' || r.aging === agingFilter;
-        const matchSource = sourceFilter === 'ALL' || r.source === sourceFilter;
-        const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
-        const matchSearch =
-          !search ||
-          r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-          r.referenceNo?.toLowerCase().includes(search.toLowerCase());
-        const matchAmountMin = !amountMin || (r.outstanding ?? 0) >= Number(amountMin);
-        const matchAmountMax = !amountMax || (r.outstanding ?? 0) <= Number(amountMax);
-        const matchDateFrom = !dateFrom || (r.issueDate?.slice(0, 10) ?? '') >= dateFrom;
-        const matchDateTo = !dateTo || (r.issueDate?.slice(0, 10) ?? '') <= dateTo;
-        return (
-          matchType &&
-          matchAging &&
-          matchSource &&
-          matchStatus &&
-          matchSearch &&
-          matchAmountMin &&
-          matchAmountMax &&
-          matchDateFrom &&
-          matchDateTo
-        );
-      }),
+      allReceivables
+        .filter((r) => {
+          const matchType = typeFilter === 'ALL' || r.type === typeFilter;
+          const matchAging = agingFilter === 'ALL' || r.aging === agingFilter;
+          const matchSource = sourceFilter === 'ALL' || r.source === sourceFilter;
+          const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
+          const matchSearch =
+            !search ||
+            r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+            r.referenceNo?.toLowerCase().includes(search.toLowerCase());
+          const matchAmountMin = !amountMin || (r.outstanding ?? 0) >= Number(amountMin);
+          const matchAmountMax = !amountMax || (r.outstanding ?? 0) <= Number(amountMax);
+          const matchDateFrom = !dateFrom || (r.issueDate?.slice(0, 10) ?? '') >= dateFrom;
+          const matchDateTo = !dateTo || (r.issueDate?.slice(0, 10) ?? '') <= dateTo;
+          return (
+            matchType &&
+            matchAging &&
+            matchSource &&
+            matchStatus &&
+            matchSearch &&
+            matchAmountMin &&
+            matchAmountMax &&
+            matchDateFrom &&
+            matchDateTo
+          );
+        })
+        .sort((a, b) =>
+          (a.referenceNo ?? '').localeCompare(b.referenceNo ?? '', undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          }),
+        ),
     [
       allReceivables,
       typeFilter,
