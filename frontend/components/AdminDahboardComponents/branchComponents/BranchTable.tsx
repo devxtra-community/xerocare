@@ -895,7 +895,7 @@ function Step2({
           <Input
             placeholder="e.g. VAT"
             value={form.tax_name}
-            onChange={(e) => setForm((p) => ({ ...p, tax_name: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, has_tax: true, tax_name: e.target.value }))}
             className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
           />
         </Field>
@@ -908,7 +908,7 @@ function Step2({
             step="0.01"
             placeholder="e.g. 5"
             value={form.tax_percent}
-            onChange={(e) => setForm((p) => ({ ...p, tax_percent: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, has_tax: true, tax_percent: e.target.value }))}
             className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
           />
         </Field>
@@ -917,7 +917,13 @@ function Step2({
           <Input
             placeholder="e.g. TRN100123456789003"
             value={form.tax_registration_number}
-            onChange={(e) => setForm((p) => ({ ...p, tax_registration_number: e.target.value }))}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                has_tax: true,
+                tax_registration_number: e.target.value,
+              }))
+            }
             className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
           />
           <p className="text-[10px] text-muted-foreground mt-1">
