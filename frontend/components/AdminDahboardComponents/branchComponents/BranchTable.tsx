@@ -890,77 +890,75 @@ function Step2({
         </button>
       </div>
 
-      {form.has_tax && (
-        <div className="space-y-4 pt-2">
-          <Field label="Tax Name">
-            <Input
-              placeholder="e.g. VAT"
-              value={form.tax_name}
-              onChange={(e) => setForm((p) => ({ ...p, tax_name: e.target.value }))}
-              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
-            />
-          </Field>
+      <div className="space-y-4 pt-2">
+        <Field label="Tax Name">
+          <Input
+            placeholder="e.g. VAT"
+            value={form.tax_name}
+            onChange={(e) => setForm((p) => ({ ...p, tax_name: e.target.value }))}
+            className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+          />
+        </Field>
 
-          <Field label="Tax Percentage (%)">
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              placeholder="e.g. 5"
-              value={form.tax_percent}
-              onChange={(e) => setForm((p) => ({ ...p, tax_percent: e.target.value }))}
-              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
-            />
-          </Field>
+        <Field label="Tax Percentage (%)">
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder="e.g. 5"
+            value={form.tax_percent}
+            onChange={(e) => setForm((p) => ({ ...p, tax_percent: e.target.value }))}
+            className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+          />
+        </Field>
 
-          <Field label="Tax Registration Number (optional)">
-            <Input
-              placeholder="e.g. TRN100123456789003"
-              value={form.tax_registration_number}
-              onChange={(e) => setForm((p) => ({ ...p, tax_registration_number: e.target.value }))}
-              className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
-            />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Required for UAE VAT legal compliance — printed on all invoices.
+        <Field label="Tax Registration Number (optional)">
+          <Input
+            placeholder="e.g. TRN100123456789003"
+            value={form.tax_registration_number}
+            onChange={(e) => setForm((p) => ({ ...p, tax_registration_number: e.target.value }))}
+            className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Required for UAE VAT legal compliance — printed on all invoices.
+          </p>
+        </Field>
+
+        {form.currency_code && form.tax_percent && (
+          <div className="rounded-xl bg-warning/10 border border-warning/30 p-3">
+            <p className="text-[10px] font-bold text-warning uppercase tracking-wider">
+              Tax Preview
             </p>
-          </Field>
-
-          {form.currency_code && form.tax_percent && (
-            <div className="rounded-xl bg-warning/10 border border-warning/30 p-3">
-              <p className="text-[10px] font-bold text-warning uppercase tracking-wider">
-                Tax Preview
-              </p>
-              <div className="mt-1.5 space-y-0.5 text-sm font-mono">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{form.currency_code} 10,000.00</span>
-                </div>
-                <div className="flex justify-between text-warning">
-                  <span>
-                    {form.tax_name || 'Tax'} ({form.tax_percent}%)
-                  </span>
-                  <span>
-                    {form.currency_code}{' '}
-                    {((10000 * Number(form.tax_percent)) / 100)
-                      .toFixed(2)
-                      .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  </span>
-                </div>
-                <div className="flex justify-between font-bold border-t border-warning/30 pt-0.5 mt-0.5">
-                  <span>Total</span>
-                  <span>
-                    {form.currency_code}{' '}
-                    {(10000 * (1 + Number(form.tax_percent) / 100))
-                      .toFixed(2)
-                      .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  </span>
-                </div>
+            <div className="mt-1.5 space-y-0.5 text-sm font-mono">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{form.currency_code} 10,000.00</span>
+              </div>
+              <div className="flex justify-between text-warning">
+                <span>
+                  {form.tax_name || 'Tax'} ({form.tax_percent}%)
+                </span>
+                <span>
+                  {form.currency_code}{' '}
+                  {((10000 * Number(form.tax_percent)) / 100)
+                    .toFixed(2)
+                    .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                </span>
+              </div>
+              <div className="flex justify-between font-bold border-t border-warning/30 pt-0.5 mt-0.5">
+                <span>Total</span>
+                <span>
+                  {form.currency_code}{' '}
+                  {(10000 * (1 + Number(form.tax_percent) / 100))
+                    .toFixed(2)
+                    .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                </span>
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {!form.has_tax && (
         <div className="rounded-xl bg-muted border border-border p-4 text-center text-muted-foreground text-sm">
