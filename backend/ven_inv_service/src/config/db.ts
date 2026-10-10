@@ -178,6 +178,20 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed branch currency & tax columns exist.');
 
+        // --- Branch-scoped brand catalog ---
+        // The Brand entity includes branch_id, but older installations created
+        // the brands table before branch scoping was introduced. Keep startup
+        // migration aligned with the entity so inserts from existing databases
+        // do not fail with `column branch_id does not exist`.
+        await Source.query(`
+          ALTER TABLE brands
+          ADD COLUMN IF NOT EXISTS branch_id UUID;
+          CREATE INDEX IF NOT EXISTS idx_brands_branch_id ON brands(branch_id);
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_name_branch_id_unique
+            ON brands(name, branch_id);
+        `);
+        logger.info('Guaranteed branch-scoped brand column and indexes exist.');
+
         // --- Vendor-declared tax treatment on purchases and lots ---
         // A vendor quotes either tax-inclusively or tax-exclusively, and the two produce
         // a different amount owed, a different taxable base and a different reclaimable
