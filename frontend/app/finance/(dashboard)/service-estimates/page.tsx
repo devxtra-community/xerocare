@@ -210,12 +210,22 @@ export default function FinanceServiceEstimatesPage() {
 
   const filtered = estimates.filter((e) => {
     const query = search.toLowerCase();
+    // The service-estimate record is the review row for diagnosis submissions.
+    // Keep its linked Billing quotation from appearing a second time below.
+    const hasServiceEstimateRow = internalEstimates.estimates.some(
+      (estimate) => estimate.ticketId === e.serviceTicketId,
+    );
     const matchesSearch =
       e.invoiceNumber?.toLowerCase().includes(query) ||
       e.customerName?.toLowerCase().includes(query) ||
       e.employeeName?.toLowerCase().includes(query) ||
       (e.serviceTicketId && e.serviceTicketId.toLowerCase().includes(query));
-    return e.billType === 'SERVICE' && e.status === 'WAITING_FINANCE_APPROVAL' && matchesSearch;
+    return (
+      e.billType === 'SERVICE' &&
+      e.status === 'WAITING_FINANCE_APPROVAL' &&
+      !hasServiceEstimateRow &&
+      matchesSearch
+    );
   });
 
   if (loading) {
@@ -227,11 +237,17 @@ export default function FinanceServiceEstimatesPage() {
     );
   }
 
+  const internalTicketIds = new Set(
+    internalEstimates.estimates.map((estimate) => estimate.ticketId),
+  );
+  const pendingBillingCount = estimates.filter(
+    (estimate) =>
+      estimate.billType === 'SERVICE' &&
+      estimate.status === 'WAITING_FINANCE_APPROVAL' &&
+      !internalTicketIds.has(estimate.serviceTicketId || ''),
+  ).length;
   const pendingCount =
-    estimates.filter((e) => e.billType === 'SERVICE' && e.status === 'WAITING_FINANCE_APPROVAL')
-      .length +
-    internalEstimates.estimates.length +
-    internalEstimates.revisions.length;
+    pendingBillingCount + internalEstimates.estimates.length + internalEstimates.revisions.length;
 
   return (
     <main className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">

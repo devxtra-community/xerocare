@@ -721,8 +721,9 @@ export class ServiceController {
 
   /**
    * GET /service/estimates/finance-pending
-   * The service estimate is the source record. Billing invoices remain a separate
-   * queue for chargeable quotations; this endpoint returns only unlinked work items.
+   * The service estimate is the source record. Include submitted estimates even
+   * when diagnosis also created a linked Billing quotation, so Finance never loses
+   * the service record from this review page.
    */
   getFinancePendingServiceEstimates = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -734,7 +735,6 @@ export class ServiceController {
         .where('estimate.status = :status', {
           status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL,
         })
-        .andWhere('ticket.serviceQuotationId IS NULL')
         .andWhere((query) => {
           const newer = query
             .subQuery()
@@ -2294,6 +2294,29 @@ Xerocare Technical Services`;
         throw new AppError('This estimate has been superseded by a newer version', 409);
       }
       await this.applyFinanceApproval(estimate, ticket);
+
+      // A submitted service estimate remains the Finance approval record even
+      // when diagnosis also created a Billing quotation. Keep the linked
+      // quotation in step when Finance approves from this queue.
+      if (ticket.serviceQuotationId) {
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            { expiresIn: '1m' },
+          );
+          await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-approve-quotation`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+        } catch (billingErr) {
+          logger.error(
+            'Failed to approve linked service quotation in billing service:',
+            billingErr,
+          );
+        }
+      }
 
       await this.logActivity(
         ticket.id,
