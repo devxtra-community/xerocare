@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Search, Filter, BookMarked, Eye, FileText } from 'lucide-react';
 import {
-  fetchARInvoices,
+  fetchLedgerInvoices,
   fetchPayments,
   fetchPurchases,
   fetchPayroll,
@@ -98,7 +98,7 @@ function GeneralLedgerContent() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
-  // fetchARInvoices/fetchPayments/fetchPurchases/fetchPayroll/getMyExpenseRequests
+  // fetchLedgerInvoices/fetchPayments/fetchPurchases/fetchPayroll/getMyExpenseRequests
   // only accept a single branchId (no IN-list support server-side) — same
   // single-branch-only convention already used by `activeBranch` below.
   const singleBranchId = branchIds && !branchIds.includes(',') ? branchIds : undefined;
@@ -144,7 +144,7 @@ function GeneralLedgerContent() {
     refetch: refetchInv,
   } = useQuery<InvoiceSummary[]>({
     queryKey: ['admin-gl-invoices', branchIds],
-    queryFn: () => fetchARInvoices({ branchId: singleBranchId }),
+    queryFn: () => fetchLedgerInvoices({ branchId: singleBranchId }),
     ...queryOptions,
   });
   const {

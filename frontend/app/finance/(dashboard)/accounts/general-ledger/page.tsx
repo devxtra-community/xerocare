@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Search, Filter, BookMarked, Eye, FileText } from 'lucide-react';
 import {
-  fetchARInvoices,
+  fetchLedgerInvoices,
   fetchPayments,
   fetchPurchases,
   fetchPayroll,
@@ -129,7 +129,7 @@ export default function GeneralLedgerPage() {
     refetch: refetchInv,
   } = useQuery<InvoiceSummary[]>({
     queryKey: ['gl-invoices'],
-    queryFn: () => fetchARInvoices(),
+    queryFn: () => fetchLedgerInvoices(),
     staleTime: 60_000,
   });
   const {
