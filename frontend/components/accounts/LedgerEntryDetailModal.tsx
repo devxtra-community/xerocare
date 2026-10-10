@@ -218,14 +218,32 @@ function PurchaseOrderDetail({
 
 function PaymentDetail({
   payment,
+  invoice,
   currency,
   onOpenCheques,
 }: {
   payment?: PaymentRecord;
+  invoice?: InvoiceSummary;
   currency: string;
   onOpenCheques: () => void;
 }) {
   const isCheque = payment?.sourceType === 'CHEQUE_CLEAR' && !!payment.sourceId;
+  const invoicePaymentLabel = invoice
+    ? (
+        {
+          SALE: 'Sale payment',
+          PRODUCT_SALE: 'Sale payment',
+          SPAREPART_SALE: 'Sale payment',
+          RENT: 'Rent payment',
+          LEASE: 'Lease payment',
+          SERVICE: 'Service payment',
+        } as Record<string, string>
+      )[invoice.saleType]
+    : undefined;
+  const paymentDescription =
+    invoice && invoicePaymentLabel
+      ? `${invoicePaymentLabel} — ${invoice.invoiceNumber} (${invoice.customerName || 'Customer'})`
+      : payment?.description;
   const { data: cheque, isLoading } = useQuery({
     queryKey: ['cheque-detail', payment?.sourceId],
     queryFn: () => fetchChequeById(payment!.sourceId as string),
@@ -245,7 +263,7 @@ function PaymentDetail({
             }
           />
           <DetailField label="Date" value={payment?.paymentDate?.slice(0, 10)} />
-          <DetailField label="Description" value={payment?.description} />
+          <DetailField label="Description" value={paymentDescription} />
         </div>
       </div>
 
@@ -430,6 +448,7 @@ export function LedgerEntryDetailModal({
         {source === 'Payment' && (
           <PaymentDetail
             payment={payment}
+            invoice={invoice}
             currency={currency}
             onOpenCheques={() => router.push(`${basePath}/accounts/cheques`)}
           />
