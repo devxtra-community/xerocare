@@ -54,7 +54,6 @@ export function selectPendingServiceEstimateQueue<
     .filter(
       (estimate) =>
         estimate.status === ServiceEstimateStatus.WAITING_FINANCE_APPROVAL &&
-        estimate.ticket.status === ServiceTicketStatus.WAITING_FINANCE_APPROVAL &&
         !estimate.ticket.serviceQuotationId &&
         branchAllowed(estimate.ticket),
     )

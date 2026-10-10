@@ -2293,9 +2293,6 @@ Xerocare Technical Services`;
       if (latestEstimate?.id !== estimate.id) {
         throw new AppError('This estimate has been superseded by a newer version', 409);
       }
-      if (ticket.status !== ServiceTicketStatus.WAITING_FINANCE_APPROVAL) {
-        throw new AppError('Ticket is no longer awaiting Finance approval', 409);
-      }
       await this.applyFinanceApproval(estimate, ticket);
 
       await this.logActivity(
