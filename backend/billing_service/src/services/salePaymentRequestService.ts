@@ -203,7 +203,7 @@ export async function createSalePaymentRequest(
   let card: ReturnType<typeof validateCardDetails> | null = null;
   let fee: Awaited<ReturnType<typeof calculateCardProcessingFee>> | null = null;
 
-  if (paymentMode === 'ONLINE_PAYMENT') {
+  if (paymentMode === 'ONLINE_PAYMENT' && invoice.isDirectSale !== true) {
     card = validateCardDetails(params);
     // Price the card if the rate is already on file, but never block the collection on
     // it. The salesperson takes the money at the counter and has no way of knowing what

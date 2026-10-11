@@ -656,7 +656,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const handleApprove = async () => {
     if (!actionTarget) return;
     const needsAccount =
-      MODES_NEEDING_ACCOUNT.includes(actionTarget.paymentMode) && !actionTarget.cashAccountId;
+      MODES_NEEDING_ACCOUNT.includes(actionTarget.paymentMode) &&
+      !actionTarget.cashAccountId &&
+      !(actionTarget.isDirectSale && actionTarget.paymentMode === 'ONLINE_PAYMENT');
     if (needsAccount && !approvingAccountId) {
       toast.error('Select a cash or bank account before approving');
       return;
@@ -667,12 +669,17 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       await approveSalePayment(
         actionTarget.id,
         accountToUse,
-        actionTarget.paymentMode === 'ONLINE_PAYMENT' && approvingCommissionRate !== ''
+        actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
+          !actionTarget.isDirectSale &&
+          approvingCommissionRate !== ''
           ? Number(approvingCommissionRate)
           : undefined,
       );
       toast.success('Payment approved', {
-        description: `${actionTarget.requestNo} — ${actionTarget.currency} ${Number(actionTarget.amount).toFixed(2)} posted to ledger.`,
+        description:
+          actionTarget.isDirectSale && actionTarget.paymentMode === 'ONLINE_PAYMENT'
+            ? `${actionTarget.requestNo} — moved to Card Settlements; no financial account posting yet.`
+            : `${actionTarget.requestNo} — ${actionTarget.currency} ${Number(actionTarget.amount).toFixed(2)} posted to ledger.`,
       });
       setActionTarget(null);
       setActionType(null);
@@ -2312,18 +2319,29 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               Approve Payment
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-              This will post{' '}
-              <span className="font-black text-success">
-                {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
-              </span>{' '}
-              ({actionTarget.paymentMode.replace('_', ' ')}) to the invoice ledger for{' '}
-              <span className="font-black">{actionTarget.customerName}</span>. This cannot be
-              undone.
+              {actionTarget.isDirectSale && actionTarget.paymentMode === 'ONLINE_PAYMENT' ? (
+                <>
+                  Approve the {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)} card
+                  receipt for {actionTarget.customerName} and move it to Card Settlements. No
+                  financial account is posted until settlement.
+                </>
+              ) : (
+                <>
+                  This will post{' '}
+                  <span className="font-black text-success">
+                    {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
+                  </span>{' '}
+                  ({actionTarget.paymentMode.replace('_', ' ')}) to the invoice ledger for{' '}
+                  <span className="font-black">{actionTarget.customerName}</span>. This cannot be
+                  undone.
+                </>
+              )}
             </DialogDescription>
             {/* No rate on file for this bank — Accounts sets it here. This is the point
                 where the commission is genuinely known, which is why capture no longer
                 asks for it. */}
             {actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
+              !actionTarget.isDirectSale &&
               actionTarget.commissionAmount == null && (
                 <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-warning">
@@ -2371,6 +2389,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             {/* Approving a card receipt posts three different numbers to three different
                 places, so state them before the click rather than after. */}
             {actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
+              !actionTarget.isDirectSale &&
               actionTarget.commissionAmount != null && (
                 <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs">
                   <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-primary">
@@ -2409,6 +2428,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 </div>
               )}
             {MODES_NEEDING_ACCOUNT.includes(actionTarget.paymentMode) &&
+              !(actionTarget.isDirectSale && actionTarget.paymentMode === 'ONLINE_PAYMENT') &&
               !actionTarget.cashAccountId && (
                 <div className="mt-3 space-y-1">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">

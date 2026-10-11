@@ -1902,7 +1902,21 @@ export const getPendingSalePayments = async (req: Request, res: Response, next: 
     }
 
     const payments = await qb.orderBy('spr."createdAt"', 'DESC').getMany();
-    res.json({ success: true, data: await attachAdvanceBillStatus(payments) });
+    const invoiceIds = [...new Set(payments.map((p) => p.invoiceId))];
+    const invoices = invoiceIds.length
+      ? await Source.getRepository(Invoice).find({
+          where: { id: In(invoiceIds) },
+          select: ['id', 'isDirectSale'],
+        })
+      : [];
+    const directSaleIds = new Set(invoices.filter((i) => i.isDirectSale).map((i) => i.id));
+    res.json({
+      success: true,
+      data: (await attachAdvanceBillStatus(payments)).map((p) => ({
+        ...p,
+        isDirectSale: directSaleIds.has(p.invoiceId),
+      })),
+    });
   } catch (err) {
     next(err);
   }
@@ -1937,7 +1951,21 @@ export const getAllSalePaymentsForBranch = async (
     }
 
     const payments = await qb.orderBy('spr."createdAt"', 'DESC').getMany();
-    res.json({ success: true, data: await attachAdvanceBillStatus(payments) });
+    const invoiceIds = [...new Set(payments.map((p) => p.invoiceId))];
+    const invoices = invoiceIds.length
+      ? await Source.getRepository(Invoice).find({
+          where: { id: In(invoiceIds) },
+          select: ['id', 'isDirectSale'],
+        })
+      : [];
+    const directSaleIds = new Set(invoices.filter((i) => i.isDirectSale).map((i) => i.id));
+    res.json({
+      success: true,
+      data: (await attachAdvanceBillStatus(payments)).map((p) => ({
+        ...p,
+        isDirectSale: directSaleIds.has(p.invoiceId),
+      })),
+    });
   } catch (err) {
     next(err);
   }
@@ -2239,6 +2267,13 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
       throw new AppError('Access denied', 403);
     }
 
+    const invoiceForApproval = await Source.getRepository(Invoice).findOne({
+      where: { id: request.invoiceId },
+      select: ['id', 'isDirectSale'],
+    });
+    const deferDirectSaleCardSettlement =
+      invoiceForApproval?.isDirectSale === true && request.paymentMode === 'ONLINE_PAYMENT';
+
     // Finance may supply the cash/bank account at approval time (for requests
     // where the employee didn't/couldn't select one at recording time).
     const approvingCashAccountId: string | undefined =
@@ -2249,7 +2284,11 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
     // branch below and approved with no cashbook entry at all — the money was recorded
     // against the invoice but never landed anywhere.
     const MODES_NEEDING_ACCOUNT = ['CASH', 'BANK_TRANSFER', 'ONLINE_PAYMENT'];
-    if (MODES_NEEDING_ACCOUNT.includes(request.paymentMode) && !approvingCashAccountId) {
+    if (
+      !deferDirectSaleCardSettlement &&
+      MODES_NEEDING_ACCOUNT.includes(request.paymentMode) &&
+      !approvingCashAccountId
+    ) {
       throw new AppError('Select a cash or bank account before approving this payment', 400);
     }
 
@@ -2258,7 +2297,7 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
     // account resolution below used to be a bare findOne with no type/branch check at
     // all, so a mismatched account (or one from a different branch) silently accepted
     // the approval and posted the cashbook entry against whatever it found.
-    if (MODES_NEEDING_ACCOUNT.includes(request.paymentMode)) {
+    if (!deferDirectSaleCardSettlement && MODES_NEEDING_ACCOUNT.includes(request.paymentMode)) {
       await requireCashAccount(Source, {
         branchId: request.branchId,
         paymentMode: request.paymentMode,
@@ -2278,7 +2317,7 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
     // bills a promotional or renegotiated percentage that is not yet on file — and
     // whatever is applied is snapshotted onto the request and the transaction, so the
     // receipt always shows the rate the money actually moved at.
-    if (request.paymentMode === 'ONLINE_PAYMENT') {
+    if (request.paymentMode === 'ONLINE_PAYMENT' && !deferDirectSaleCardSettlement) {
       const body = req.body ?? {};
       const overrideRate =
         body.commissionRatePercent !== undefined && body.commissionRatePercent !== null
@@ -2339,6 +2378,24 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
 
     try {
       // 1. Mark request as approved
+      if (deferDirectSaleCardSettlement) {
+        // Direct Sale card fees are deliberately unpriced until settlement. Older
+        // requests may already carry a capture-time quote, so clear those snapshots too.
+        await queryRunner.manager.update(SalePaymentRequest, id, {
+          commissionRateApplied: null as unknown as number,
+          commissionFixedApplied: null as unknown as number,
+          commissionAmount: null as unknown as number,
+          netSettlementAmount: null as unknown as number,
+          commissionRuleId: null as unknown as string,
+          commissionRuleVersion: null as unknown as number,
+        });
+        request.commissionRateApplied = undefined;
+        request.commissionFixedApplied = undefined;
+        request.commissionAmount = undefined;
+        request.netSettlementAmount = undefined;
+        request.commissionRuleId = undefined;
+        request.commissionRuleVersion = undefined;
+      }
       request.status = 'APPROVED';
       request.reviewedById = userId;
       request.reviewedByName = reviewerName;
@@ -2588,7 +2645,7 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
         } catch (chequeErr) {
           logger.warn('Failed to create cheque entity for sale payment:', chequeErr);
         }
-      } else if (approvingCashAccountId) {
+      } else if (approvingCashAccountId && !deferDirectSaleCardSettlement) {
         // CASH / BANK_TRANSFER / ONLINE_PAYMENT: post cashbook entry immediately. Type
         // and branch were already validated above — re-fetch through the queryRunner so
         // the balance update below is part of this same transaction and rolls back with
