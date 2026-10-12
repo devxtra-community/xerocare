@@ -3,8 +3,14 @@ import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
 import { CardProcessingFeeRule } from '../entities/cardProcessingFeeRuleEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { calculateCardProcessingFee } from '../services/cardProcessingFeeService';
+import { CashBankAccount } from '../entities/cashBankAccountEntity';
+import { CashbookEntry } from '../entities/cashbookEntryEntity';
+import { ExpenseEntry } from '../entities/expenseEntryEntity';
+import { requireCashAccount } from '../services/cashbookService';
+import { toMinor, fromMinor, percentOfMinor } from '../utils/money';
 
 /**
  * Quote the processing fee for a card the salesperson is about to charge.
@@ -263,6 +269,7 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
       't.transaction_reference AS "transactionReference"',
       't.currency_code AS currency',
       'i."invoiceNumber" AS "invoiceNumber"',
+      'i."isDirectSale" AS "isDirectSale"',
     ]).orderBy('t.transaction_date', 'DESC');
 
     const rows = await qb.getRawMany();
@@ -270,8 +277,10 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
     const totals = rows.reduce(
       (acc, r) => {
         acc.gross += Number(r.gross ?? 0);
-        acc.commission += Number(r.commission ?? 0);
-        acc.net += Number(r.net ?? r.gross ?? 0);
+        if (r.commission != null) {
+          acc.commission += Number(r.commission);
+          acc.net += Number(r.net ?? r.gross ?? 0);
+        }
         return acc;
       },
       { gross: 0, commission: 0, net: 0 },
@@ -287,9 +296,11 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
       const day = new Date(r.transactionDate).toISOString().slice(0, 10);
       const cur = byDay.get(day) ?? { date: day, gross: 0, commission: 0, net: 0, count: 0 };
       cur.gross += Number(r.gross ?? 0);
-      cur.commission += Number(r.commission ?? 0);
-      cur.net += Number(r.net ?? r.gross ?? 0);
       cur.count += 1;
+      if (r.commission != null) {
+        cur.commission += Number(r.commission);
+        cur.net += Number(r.net ?? r.gross ?? 0);
+      }
       byDay.set(day, cur);
     }
 
@@ -308,5 +319,157 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
     });
   } catch (err) {
     next(err);
+  }
+};
+
+/** Settle an approved Direct Sale card receipt. The transaction row is locked and the
+ * cashbook source link is the idempotency key, so retries cannot post twice. */
+export const processDirectSaleCardSettlement = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const runner = Source.createQueryRunner();
+  try {
+    const { userId, branchId, role } = req.user!;
+    if (!['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      throw new AppError('Only Finance can process card settlements', 403);
+    }
+    const { transactionId, cashAccountId, commissionRatePercent } = req.body ?? {};
+    if (!transactionId || !cashAccountId) throw new AppError('Select a bank account', 400);
+    const rateOverride = commissionRatePercent == null ? undefined : Number(commissionRatePercent);
+    if (
+      rateOverride !== undefined &&
+      (!Number.isFinite(rateOverride) || rateOverride < 0 || rateOverride > 100)
+    ) {
+      throw new AppError('Commission rate must be between 0 and 100', 400);
+    }
+    await runner.connect();
+    await runner.startTransaction();
+    const txn = await runner.manager.findOne(PaymentTransaction, {
+      where: { id: transactionId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!txn || txn.paymentMode !== 'ONLINE_PAYMENT')
+      throw new AppError('Card transaction not found', 404);
+    const invoice = await runner.manager.findOne(Invoice, { where: { id: txn.invoiceId } });
+    if (!invoice?.isDirectSale)
+      throw new AppError('Only Direct Sale card receipts can be processed here', 400);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && invoice.branchId !== branchId)
+      throw new AppError('Access denied', 403);
+    const prior = await runner.manager.findOne(CashbookEntry, {
+      where: { sourceType: 'DIRECT_SALE_CARD_SETTLEMENT', sourceId: txn.id },
+    });
+    if (prior) {
+      await runner.commitTransaction();
+      res.json({ success: true, data: { transactionId: txn.id, alreadyProcessed: true } });
+      return;
+    }
+    const account = await requireCashAccount(runner.manager, {
+      branchId: invoice.branchId,
+      explicitAccountId: cashAccountId,
+      requiredType: 'BANK',
+      actionLabel: 'processing a card settlement',
+    });
+    const currency = txn.currencyCode || 'AED';
+    const gross = Number(txn.amount);
+    let commission: number;
+    let rate: number;
+    let fixedFee = 0;
+    let ruleId: string | undefined;
+    let ruleVersion: number | undefined;
+    if (rateOverride !== undefined) {
+      rate = rateOverride;
+      commission = fromMinor(
+        Math.min(percentOfMinor(toMinor(gross, currency), rate), toMinor(gross, currency)),
+        currency,
+      );
+    } else {
+      const { findApplicableRule, applyRule } =
+        await import('../services/cardProcessingFeeService');
+      const rule = await findApplicableRule({
+        branchId: invoice.branchId,
+        issuerCountry: txn.issuerCountry || '',
+        issuerBank: txn.issuerBank,
+        cardType: txn.cardType || '',
+        cardNetwork: txn.cardNetwork,
+        paymentGateway: undefined,
+        currency,
+        grossAmount: gross,
+        onDate: new Date(txn.transactionDate).toISOString().slice(0, 10),
+      });
+      if (!rule)
+        throw new AppError(
+          'No commission rule is configured; enter the agreed rate to settle this payment',
+          400,
+        );
+      const priced = applyRule(rule, gross, currency);
+      rate = priced.ratePercentApplied;
+      fixedFee = priced.fixedFeeApplied;
+      commission = priced.commissionAmount;
+      ruleId = priced.ruleId;
+      ruleVersion = priced.ruleVersion;
+    }
+    const net = Math.max(0, gross - commission);
+    txn.commissionRateApplied = rate;
+    txn.commissionRuleId = ruleId;
+    txn.commissionAmount = commission;
+    txn.netSettlementAmount = net;
+    await runner.manager.save(PaymentTransaction, txn);
+    const request = await runner.manager.findOne(SalePaymentRequest, {
+      where: { paymentTransactionId: txn.id },
+    });
+    if (request) {
+      request.commissionRateApplied = rate;
+      request.commissionFixedApplied = fixedFee;
+      request.commissionAmount = commission;
+      request.netSettlementAmount = net;
+      request.commissionRuleId = ruleId;
+      request.commissionRuleVersion = ruleVersion;
+      await runner.manager.save(SalePaymentRequest, request);
+    }
+    const entry = runner.manager.create(CashbookEntry, {
+      referenceNo: `CSET-${txn.id}`,
+      date: new Date(),
+      accountId: account.id,
+      entryType: 'RECEIPT',
+      amount: net,
+      category: 'SALE_COLLECTION',
+      description: `Direct Sale card settlement — ${invoice.invoiceNumber} — gross ${gross}, fee ${commission}`,
+      linkedInvoiceId: invoice.id,
+      paymentMode: 'ONLINE_PAYMENT',
+      createdBy: userId,
+      branchId: invoice.branchId,
+      sourceType: 'DIRECT_SALE_CARD_SETTLEMENT',
+      sourceId: txn.id,
+    });
+    await runner.manager.save(CashbookEntry, entry);
+    account.currentBalance = Number(account.currentBalance) + net;
+    await runner.manager.save(CashBankAccount, account);
+    if (commission > 0) {
+      const feeExpense = runner.manager.create(ExpenseEntry, {
+        expenseNo: `CPF-${txn.id}`,
+        date: new Date(),
+        category: 'CARD_PROCESSING_FEE',
+        description: `Card processing fee — Direct Sale ${invoice.invoiceNumber}`,
+        branchId: invoice.branchId,
+        amount: commission,
+        vatAmount: 0,
+        netAmount: commission,
+        currency,
+        status: 'APPROVED',
+        referenceNo: txn.transactionReference,
+        approvedBy: userId,
+        createdBy: userId,
+      });
+      await runner.manager.save(ExpenseEntry, feeExpense);
+    }
+    await runner.commitTransaction();
+    res.json({ success: true, data: { transactionId: txn.id, gross, commission, net } });
+  } catch (err) {
+    if (runner.isTransactionActive) await runner.rollbackTransaction();
+    next(err);
+  } finally {
+    await runner.release();
   }
 };

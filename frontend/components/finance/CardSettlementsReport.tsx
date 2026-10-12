@@ -16,6 +16,8 @@ import {
 import api from '@/lib/api';
 import { GCC_COUNTRIES, CARD_NETWORK_LABEL, CardNetwork } from '@/lib/payments/gccCards';
 import StatCard from '@/components/StatCard';
+import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import { getApiErrorMessage } from '@/lib/apiError';
 
 /**
  * Card settlement reconciliation.
@@ -41,6 +43,7 @@ interface SettlementRow {
   transactionReference?: string;
   currency?: string;
   invoiceNumber: string;
+  isDirectSale?: boolean;
 }
 
 interface Totals {
@@ -75,6 +78,9 @@ export default function CardSettlementsReport() {
   const [cardNetwork, setCardNetwork] = useState('');
   const [issuerCountry, setIssuerCountry] = useState('');
   const [search, setSearch] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [settlementAccountId, setSettlementAccountId] = useState('');
+  const [settlementRate, setSettlementRate] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,6 +111,34 @@ export default function CardSettlementsReport() {
     return () => clearTimeout(t);
   }, [load]);
 
+  useEffect(() => {
+    fetchCashBankAccounts()
+      .then((accounts) =>
+        setBankAccounts(
+          accounts.filter((a) => a.type === 'BANK').map((a) => ({ id: a.id, name: a.name })),
+        ),
+      )
+      .catch(() => undefined);
+  }, []);
+
+  const processSettlement = async (transactionId: string) => {
+    if (!settlementAccountId) {
+      toast.error('Select the bank account for settlement');
+      return;
+    }
+    try {
+      await api.post('/b/card-fees/settlements/process-direct-sale', {
+        transactionId,
+        cashAccountId: settlementAccountId,
+        ...(settlementRate !== '' ? { commissionRatePercent: Number(settlementRate) } : {}),
+      });
+      toast.success('Card settlement processed');
+      await load();
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Could not process card settlement'));
+    }
+  };
+
   const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
   const fmt = (n: number | string | null | undefined) =>
     Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -120,6 +154,44 @@ export default function CardSettlementsReport() {
           What customers paid by card, what the acquirer&apos;s commission took, and what should
           therefore have reached the bank. Group totals are per settlement day, so a single deposit
           on the bank statement can be matched to the receipts behind it.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-3">
+        <div className="min-w-56">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">
+            Settlement bank account
+          </Label>
+          <Select value={settlementAccountId} onValueChange={setSettlementAccountId}>
+            <SelectTrigger className="mt-1 h-9">
+              <SelectValue placeholder="Select bank account" />
+            </SelectTrigger>
+            <SelectContent>
+              {bankAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-36">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">
+            Optional commission %
+          </Label>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.0001"
+            className="mt-1 h-9"
+            value={settlementRate}
+            onChange={(e) => setSettlementRate(e.target.value)}
+            placeholder="Use configured rate"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Applies when processing a Direct Sale card receipt with no configured rate.
         </p>
       </div>
 
@@ -304,6 +376,7 @@ export default function CardSettlementsReport() {
                   <th className="px-3 py-2 text-right">Rate</th>
                   <th className="px-3 py-2 text-right">Fee</th>
                   <th className="px-3 py-2 text-right">Net</th>
+                  <th className="px-3 py-2 text-right">Settlement</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -335,6 +408,21 @@ export default function CardSettlementsReport() {
                     </td>
                     <td className="px-3 py-2 text-right font-mono font-black text-success">
                       {fmt(r.net ?? r.gross)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {r.isDirectSale && r.commission == null ? (
+                        <button
+                          className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                          disabled={!settlementAccountId}
+                          onClick={() => processSettlement(r.id)}
+                        >
+                          Process
+                        </button>
+                      ) : r.isDirectSale ? (
+                        <span className="text-xs font-bold text-success">Processed</span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
                 ))}

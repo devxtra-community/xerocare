@@ -878,12 +878,15 @@ function Step2({
         <button
           type="button"
           onClick={() => setForm((p) => ({ ...p, has_tax: !p.has_tax }))}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            form.has_tax ? 'bg-primary' : 'bg-muted'
+          role="switch"
+          aria-checked={form.has_tax}
+          aria-label="Does this branch charge tax?"
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+            form.has_tax ? 'bg-primary' : 'bg-slate-500'
           }`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-card shadow-sm transition-transform ${
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-1 ring-black/10 transition-transform ${
               form.has_tax ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
@@ -918,7 +921,12 @@ function Step2({
             <Input
               placeholder="e.g. TRN100123456789003"
               value={form.tax_registration_number}
-              onChange={(e) => setForm((p) => ({ ...p, tax_registration_number: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  tax_registration_number: e.target.value,
+                }))
+              }
               className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
             />
             <p className="text-[10px] text-muted-foreground mt-1">
