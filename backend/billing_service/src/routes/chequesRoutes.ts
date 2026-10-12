@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import axios from 'axios';
 import { In } from 'typeorm';
 import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
@@ -19,6 +18,7 @@ import { getBranchManager } from '../services/billingHelpers';
 import { logger } from '../config/logger';
 import { sign } from 'jsonwebtoken';
 import { todayInBusinessTz } from '../utils/businessDate';
+import { sendEmployeeInternalNotification } from '../utils/employeeInternalNotification';
 
 const router = Router();
 
@@ -61,13 +61,14 @@ function makeServiceToken() {
 
 async function sendNotification(employeeId: string, title: string, message: string) {
   try {
-    await axios.post(
-      'http://localhost:3002/notifications/internal',
-      { employee_id: employeeId, title, message, type: 'INFO' },
-      { headers: { 'x-internal-service': 'billing' }, timeout: 3000 },
-    );
-  } catch {
-    logger.warn('[cheques] Notification send failed (non-fatal)');
+    await sendEmployeeInternalNotification({
+      employee_id: employeeId,
+      title,
+      message,
+      type: 'INFO',
+    });
+  } catch (error) {
+    logger.warn('[cheques] Notification send failed (non-fatal)', error);
   }
 }
 

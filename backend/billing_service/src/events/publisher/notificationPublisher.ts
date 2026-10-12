@@ -5,6 +5,7 @@ import {
   InAppNotificationRequestEvent,
 } from '../billingEvents';
 import { uniqueNotificationRecipients } from '../../services/notificationRecipientPolicy';
+import { publishConfirmed } from '../../utils/publishConfirmed';
 
 const EXCHANGE = 'domain_events'; // Or 'notification_events' if separated
 
@@ -13,7 +14,8 @@ export class NotificationPublisher {
     const channel = await getRabbitChannel();
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
-    channel.publish(
+    await publishConfirmed(
+      channel,
       EXCHANGE,
       BillingEventType.NOTIFICATION_EMAIL,
       Buffer.from(JSON.stringify(payload)),
@@ -25,7 +27,8 @@ export class NotificationPublisher {
     const channel = await getRabbitChannel();
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
-    channel.publish(
+    await publishConfirmed(
+      channel,
       EXCHANGE,
       BillingEventType.NOTIFICATION_WHATSAPP,
       Buffer.from(JSON.stringify(payload)),
@@ -49,7 +52,8 @@ export class NotificationPublisher {
       },
     };
 
-    channel.publish(
+    await publishConfirmed(
+      channel,
       EXCHANGE,
       BillingEventType.NOTIFICATION_IN_APP,
       Buffer.from(JSON.stringify(rabbitPayload)),

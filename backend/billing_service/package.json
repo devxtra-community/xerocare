@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --require ts-node/register test/*.test.cjs"
+    "test": "node --test --require ts-node/register test/*.test.cjs",
+    "test:service-decision": "node --test --require ts-node/register test/serviceEstimateDecision.integration.test.cjs"
   },
   "keywords": [],
   "author": "",

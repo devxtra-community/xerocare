@@ -20,6 +20,15 @@ export class ServiceEstimateRevision {
   @Column({ type: 'uuid', name: 'invoice_id', nullable: true })
   invoiceId!: string | null; // The service quotation invoice
 
+  @Column({ type: 'uuid', name: 'submission_correlation_id', nullable: true, unique: true })
+  submissionCorrelationId!: string | null;
+
+  @Column({ type: 'int', name: 'billing_revision', nullable: true })
+  billingRevision!: number | null;
+
+  @Column({ type: 'jsonb', name: 'submission_payload', nullable: true })
+  submissionPayload!: Record<string, unknown> | null;
+
   @Column({ type: 'uuid', nullable: true })
   estimateId!: string | null;
 
@@ -81,6 +90,12 @@ export class ServiceEstimateRevision {
 
   @Column({ type: 'timestamp', nullable: true, name: 'finance_decision_at' })
   financeDecisionAt!: Date | null;
+
+  @Column({ type: 'uuid', nullable: true, name: 'customer_approved_by' })
+  customerApprovedBy!: string | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'customer_approved_at' })
+  customerApprovedAt!: Date | null;
 
   @Column({ type: 'timestamp', nullable: true, name: 'valid_until' })
   validUntil!: Date | null;

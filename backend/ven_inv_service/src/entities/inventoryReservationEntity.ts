@@ -11,6 +11,9 @@ export class InventoryReservation {
   @Column({ type: 'uuid' })
   sparePartId!: string;
 
+  @Column({ type: 'uuid', name: 'revision_id', nullable: true })
+  revisionId!: string | null;
+
   @Column({ type: 'int' })
   reservedQuantity!: number;
 

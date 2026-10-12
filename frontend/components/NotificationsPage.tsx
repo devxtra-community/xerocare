@@ -9,6 +9,8 @@ import api from '@/lib/api';
 import { formatNotificationTime } from '@/lib/format';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { resolveServiceNotificationTarget } from '@/lib/notificationNavigation';
+import { shouldMarkNotificationRead } from '@/lib/notificationReadPolicy';
 
 interface Notification {
   id: string;
@@ -281,7 +283,14 @@ function resolveTarget(notif: Notification, role: string): NotificationTarget | 
   switch (refType) {
     case 'SERVICE_TICKET':
     case 'SERVICE':
-      return fromTable(SERVICE_PAGE, 'Go to service tickets');
+      return resolveServiceNotificationTarget(
+        {
+          referenceId: notif.data?.referenceId,
+          estimateId: notif.data?.estimateId,
+          revisionId: notif.data?.revisionId,
+        },
+        role,
+      );
     case 'SERVICE_CONTRACT': {
       const base = pick(role, SERVICE_CONTRACT_PAGE);
       if (!base) return null;
@@ -394,14 +403,14 @@ export default function NotificationsPage({ role }: { role: string }) {
   // navigation button both live there (the list row keeps its 2-line preview).
   const openNotification = (notif: Notification) => {
     setSelected(notif);
-    if (!notif.is_read) markAsRead(notif.id);
+    if (!notif.is_read && shouldMarkNotificationRead('detail-open')) markAsRead(notif.id);
   };
 
   const goToTarget = () => {
     if (!selected) return;
     const target = resolveTarget(selected, role);
     if (!target) return;
-    if (!selected.is_read) markAsRead(selected.id);
+    if (!selected.is_read && shouldMarkNotificationRead('navigate')) markAsRead(selected.id);
     setSelected(null);
     router.push(target.path);
   };

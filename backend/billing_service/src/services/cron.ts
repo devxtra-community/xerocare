@@ -32,6 +32,7 @@ const EXCHANGE = 'domain_events';
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
+import { sendEmployeeInternalNotification } from '../utils/employeeInternalNotification';
 
 export async function expireContractsJob() {
   logger.info('[CRON] Running daily Contract Expiry & Status Update Job...');
@@ -911,17 +912,12 @@ async function sendChequeReminderNotification(
   chequeId: string,
 ) {
   try {
-    const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
-    await fetch(`${employeeServiceUrl}/notifications/internal`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-service': 'billing' },
-      body: JSON.stringify({
-        employee_id: employeeId,
-        title,
-        message,
-        type: 'INFO',
-        data: { referenceId: chequeId, referenceType: 'CHEQUE' },
-      }),
+    await sendEmployeeInternalNotification({
+      employee_id: employeeId,
+      title,
+      message,
+      type: 'INFO',
+      data: { referenceId: chequeId, referenceType: 'CHEQUE' },
     });
   } catch (err) {
     logger.warn('[CRON] Cheque reminder notification send failed (non-fatal):', err);

@@ -40,6 +40,8 @@ import { EmployeeTarget } from '../entities/employeeTargetEntity';
 import { EmployeeTargetAchievement } from '../entities/employeeTargetAchievementEntity';
 import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity';
 import { Cheque } from '../entities/chequeEntity';
+
+class SchemaMigrationBlockedError extends Error {}
 import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
 import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { GuaranteeCheque } from '../entities/guaranteeChequeEntity';
@@ -157,8 +159,9 @@ async function runPreMigrations() {
       return;
     }
 
-    // Drop the old broken enum type if it exists from failed TypeORM synchronize attempts
-    await client.query(`DROP TYPE IF EXISTS invoices_status_enum_old CASCADE;`);
+    // Remove the abandoned legacy enum only when PostgreSQL confirms it has no
+    // dependencies; never cascade-delete dependent schema objects during startup.
+    await client.query(`DROP TYPE IF EXISTS invoices_status_enum_old RESTRICT;`);
 
     // Ensure status enum type exists
     await client.query(`
@@ -2435,9 +2438,162 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         logger.info('Ensuring customerId column is nullable...');
         await Source.query(`ALTER TABLE invoices ALTER COLUMN "customerId" DROP NOT NULL;`);
         logger.info('customerId column is now nullable.');
+
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS billing_service_estimate_revision_links (
+            submission_correlation_id UUID PRIMARY KEY,
+            invoice_id UUID NOT NULL,
+            service_ticket_id UUID NOT NULL,
+            vendor_revision_id UUID NOT NULL,
+            billing_revision INTEGER NOT NULL,
+            request_hash VARCHAR(64) NOT NULL,
+            request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+          CREATE TABLE IF NOT EXISTS billing_service_estimate_decision_outbox (
+            event_id UUID PRIMARY KEY,
+            invoice_id UUID NOT NULL,
+            payload JSONB NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            available_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            lease_until TIMESTAMP NULL,
+            delivered_at TIMESTAMP NULL,
+            last_error TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_service_estimate_decision_outbox_pending
+            ON billing_service_estimate_decision_outbox (available_at, created_at)
+            WHERE delivered_at IS NULL;
+        `);
+        await Source.query(`
+          ALTER TABLE billing_service_estimate_revision_links
+            ADD COLUMN IF NOT EXISTS submission_correlation_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS invoice_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS service_ticket_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS vendor_revision_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS billing_revision INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS request_hash VARCHAR(64) NULL,
+            ADD COLUMN IF NOT EXISTS request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW();
+          ALTER TABLE billing_service_estimate_decision_outbox
+            ADD COLUMN IF NOT EXISTS event_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS invoice_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS payload JSONB NULL,
+            ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS available_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS lease_until TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS last_error TEXT NULL,
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW();
+        `);
+        const invalidLinks = await Source.query(`
+          SELECT COUNT(*)::int AS count FROM billing_service_estimate_revision_links
+          WHERE submission_correlation_id IS NULL OR invoice_id IS NULL OR service_ticket_id IS NULL
+             OR vendor_revision_id IS NULL OR billing_revision IS NULL OR request_hash IS NULL
+        `);
+        if (invalidLinks[0]?.count > 0)
+          throw new SchemaMigrationBlockedError(
+            `billing_service_estimate_revision_links contains ${invalidLinks[0].count} incomplete historical rows; manual reconciliation is required before constraints can be applied`,
+          );
+        const linkDuplicates = await Source.query(`
+          SELECT 'submission_correlation_id' AS key, submission_correlation_id::text AS value, ARRAY_AGG(ctid::text) AS rows
+            FROM billing_service_estimate_revision_links GROUP BY submission_correlation_id HAVING COUNT(*) > 1
+          UNION ALL
+          SELECT 'invoice_id,billing_revision', invoice_id::text || ',' || billing_revision::text, ARRAY_AGG(ctid::text)
+            FROM billing_service_estimate_revision_links GROUP BY invoice_id,billing_revision HAVING COUNT(*) > 1
+          UNION ALL
+          SELECT 'vendor_revision_id', vendor_revision_id::text, ARRAY_AGG(ctid::text)
+            FROM billing_service_estimate_revision_links GROUP BY vendor_revision_id HAVING COUNT(*) > 1
+          LIMIT 20
+        `);
+        if (linkDuplicates.length)
+          throw new SchemaMigrationBlockedError(
+            `billing_service_estimate_revision_links has duplicate historical keys requiring manual reconciliation: ${JSON.stringify(linkDuplicates)}`,
+          );
+        const invalidOutbox = await Source.query(
+          `SELECT COUNT(*)::int AS count FROM billing_service_estimate_decision_outbox WHERE event_id IS NULL OR invoice_id IS NULL OR payload IS NULL`,
+        );
+        if (invalidOutbox[0]?.count > 0)
+          throw new SchemaMigrationBlockedError(
+            `billing_service_estimate_decision_outbox contains ${invalidOutbox[0].count} incomplete historical rows; manual reconciliation is required before constraints can be applied`,
+          );
+        await Source.query(`
+          ALTER TABLE billing_service_estimate_revision_links
+            ALTER COLUMN submission_correlation_id SET NOT NULL,
+            ALTER COLUMN invoice_id SET NOT NULL,
+            ALTER COLUMN service_ticket_id SET NOT NULL,
+            ALTER COLUMN vendor_revision_id SET NOT NULL,
+            ALTER COLUMN billing_revision SET NOT NULL,
+            ALTER COLUMN request_hash SET NOT NULL;
+          ALTER TABLE billing_service_estimate_decision_outbox
+            ALTER COLUMN event_id SET NOT NULL,
+            ALTER COLUMN invoice_id SET NOT NULL,
+            ALTER COLUMN payload SET NOT NULL;
+          CREATE INDEX IF NOT EXISTS idx_service_estimate_decision_outbox_pending
+            ON billing_service_estimate_decision_outbox (available_at, created_at)
+            WHERE delivered_at IS NULL;
+          DO $migration$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_indexes WHERE schemaname=current_schema()
+                AND tablename='billing_service_estimate_revision_links'
+                AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+                AND indexdef LIKE '%(submission_correlation_id)%'
+            ) THEN
+              CREATE UNIQUE INDEX uq_billing_service_estimate_link_submission
+                ON billing_service_estimate_revision_links (submission_correlation_id);
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_indexes WHERE schemaname=current_schema()
+                AND tablename='billing_service_estimate_revision_links'
+                AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+                AND indexdef LIKE '%(invoice_id, billing_revision)%'
+            ) THEN
+              CREATE UNIQUE INDEX uq_billing_service_estimate_link_invoice_revision
+                ON billing_service_estimate_revision_links (invoice_id,billing_revision);
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_indexes WHERE schemaname=current_schema()
+                AND tablename='billing_service_estimate_revision_links'
+                AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+                AND indexdef LIKE '%(vendor_revision_id)%'
+            ) THEN
+              CREATE UNIQUE INDEX uq_billing_service_estimate_link_vendor_revision
+                ON billing_service_estimate_revision_links (vendor_revision_id);
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_indexes WHERE schemaname=current_schema()
+                AND tablename='billing_service_estimate_decision_outbox'
+                AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+                AND indexdef LIKE '%(event_id)%'
+            ) THEN
+              CREATE UNIQUE INDEX uq_billing_service_estimate_outbox_event
+                ON billing_service_estimate_decision_outbox (event_id);
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conrelid='billing_service_estimate_revision_links'::regclass AND contype='f'
+                AND pg_get_constraintdef(oid) LIKE 'FOREIGN KEY (invoice_id) REFERENCES invoices(id)%'
+            ) THEN
+              ALTER TABLE billing_service_estimate_revision_links
+                ADD CONSTRAINT fk_estimate_revision_links_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE NOT VALID;
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conrelid='billing_service_estimate_decision_outbox'::regclass AND contype='f'
+                AND pg_get_constraintdef(oid) LIKE 'FOREIGN KEY (invoice_id) REFERENCES invoices(id)%'
+            ) THEN
+              ALTER TABLE billing_service_estimate_decision_outbox
+                ADD CONSTRAINT fk_estimate_decision_outbox_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE NOT VALID;
+            END IF;
+          END $migration$;
+          ALTER TABLE billing_service_estimate_revision_links VALIDATE CONSTRAINT fk_estimate_revision_links_invoice;
+          ALTER TABLE billing_service_estimate_decision_outbox VALIDATE CONSTRAINT fk_estimate_decision_outbox_invoice;
+        `);
       }
       return Source;
     } catch (error: unknown) {
+      if (error instanceof SchemaMigrationBlockedError) throw error;
       const err = error as Error & { code?: string };
       logger.error(
         `Database connection failed on attempt ${attempt}: ${err.code} - ${err.message}`,

@@ -9,6 +9,7 @@ import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { sign } from 'jsonwebtoken';
 import { Cheque } from '../entities/chequeEntity';
+import { sendEmployeeInternalNotification } from '../utils/employeeInternalNotification';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -87,22 +88,12 @@ async function sendNotification(
   link?: string,
 ) {
   try {
-    const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
-    const token = makeServiceToken();
-    await fetch(`${empUrl}/notifications/internal`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        'x-internal-service': 'billing',
-      },
-      body: JSON.stringify({
-        employee_id: employeeId,
-        title,
-        message,
-        type,
-        data: link ? { link } : null,
-      }),
+    await sendEmployeeInternalNotification({
+      employee_id: employeeId,
+      title,
+      message,
+      type,
+      data: link ? { link } : null,
     });
   } catch (err) {
     logger.warn('[ExpenseRequest] Notification failed (non-critical):', err);

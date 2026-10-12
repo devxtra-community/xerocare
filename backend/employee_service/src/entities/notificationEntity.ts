@@ -34,6 +34,10 @@ export class Notification {
   @Column({ type: 'boolean', default: false })
   is_read!: boolean;
 
+  /** Stable AMQP message/event identity; null for legacy and direct HTTP notices. */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  event_id!: string | null;
+
   @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt!: Date;
 

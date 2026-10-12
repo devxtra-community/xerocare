@@ -68,6 +68,7 @@ export interface ServiceTicket {
   assignedTechnicianId?: string;
   diagnosisNotes?: string;
   serviceQuotationId?: string;
+  financeRejectionReason?: string | null;
   completionNotes?: string;
   completedAt?: string;
   created_at: string;
@@ -424,6 +425,10 @@ export interface ServiceEstimateRevision {
   reason?: string | null;
   submittedAt?: string;
   itemsSnapshot?: Record<string, unknown> | unknown[] | null;
+  invoiceId?: string | null;
+  billingRevision?: number | null;
+  submissionCorrelationId?: string | null;
+  customerApprovedAt?: string | null;
 }
 
 export interface FinancePendingServiceEstimates {
@@ -879,6 +884,7 @@ export const reviseServiceEstimate = async (
     discountAmount: number;
     technicianNoteToFinance: string;
     revisionType: string;
+    submissionCorrelationId: string;
   },
 ): Promise<unknown> => {
   const response = await api.patch(`/i/service/tickets/${id}/revise-estimate`, payload);

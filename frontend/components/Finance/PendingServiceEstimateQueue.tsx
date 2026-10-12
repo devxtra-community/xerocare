@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, ClipboardList, Eye, Loader2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -121,7 +121,33 @@ export default function PendingServiceEstimateQueue({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [technicians, setTechnicians] = useState<ServiceTechnicianInfo[]>([]);
+  const openedNotificationRef = useRef(false);
   const records = useMemo(() => normalizeQueue(data), [data]);
+
+  useEffect(() => {
+    if (openedNotificationRef.current || records.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const ticketId = params.get('ticketId');
+    if (
+      !ticketId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ticketId)
+    ) {
+      return;
+    }
+    const estimateId = params.get('estimateId');
+    const revisionId = params.get('revisionId');
+    const target = records.find(
+      (record) =>
+        record.ticket.id === ticketId &&
+        (estimateId
+          ? record.sourceType === 'SERVICE_ESTIMATE' && record.sourceId === estimateId
+          : revisionId
+            ? record.sourceType === 'SERVICE_ESTIMATE_REVISION' && record.sourceId === revisionId
+            : true),
+    );
+    openedNotificationRef.current = true;
+    if (target) setSelected(target);
+  }, [records]);
   const filtered = records.filter((record) => {
     const query = search.toLowerCase();
     return (

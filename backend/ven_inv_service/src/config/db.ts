@@ -45,6 +45,8 @@ import { ContractMeterReading } from '../entities/contractMeterReadingEntity';
 import { StockTransfer } from '../entities/stockTransferEntity';
 import { StockTransferItem } from '../entities/stockTransferItemEntity';
 
+class SchemaMigrationBlockedError extends Error {}
+
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.VENDOR_DATABASE_URL,
@@ -729,15 +731,26 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed service_estimates table exists.');
 
-        // Check if old service_estimate_revisions table needs replacement
+        // Preserve historical revision rows when the legacy table lacks invoice_id.
+        // The association cannot be inferred safely, so add it as NULL and leave
+        // reconciliation to an operator rather than dropping the table.
         const tableCheck = await Source.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'service_estimate_revisions' AND column_name = 'invoice_id'
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'service_estimate_revisions'
+            AND column_name = 'invoice_id'
         `);
-        if (tableCheck.length === 0) {
-          logger.info('Dropping old service_estimate_revisions table...');
-          await Source.query(`DROP TABLE IF EXISTS service_estimate_revisions CASCADE;`);
+        const revisionTableExists = await Source.query(
+          `SELECT to_regclass(current_schema() || '.service_estimate_revisions') AS table_name`,
+        );
+        if (revisionTableExists[0]?.table_name && tableCheck.length === 0) {
+          logger.warn(
+            'service_estimate_revisions has no invoice_id; adding nullable invoice_id and preserving unassociated historical rows for reconciliation.',
+          );
+          await Source.query(
+            `ALTER TABLE service_estimate_revisions ADD COLUMN invoice_id UUID NULL`,
+          );
         }
 
         // The ServiceEstimateRevision entity declares `ticketId` with no name override,
@@ -762,7 +775,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_estimate_revisions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            invoice_id UUID NOT NULL,
+            invoice_id UUID NULL,
             "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
             revision_number INTEGER NOT NULL,
             revision_type VARCHAR(50) NOT NULL,
@@ -807,6 +820,81 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           UPDATE service_estimate_revisions
              SET version = revision_number
            WHERE version = 1 AND revision_number IS NOT NULL AND revision_number <> 1;
+        `);
+        // The entity and the revision workflow both allow a local submission to exist
+        // before Billing accepts it. Earlier bootstrap SQL accidentally made invoice_id
+        // NOT NULL; dropping that constraint is additive and keeps existing links intact.
+        await Source.query(`
+          ALTER TABLE service_estimate_revisions
+            ALTER COLUMN invoice_id DROP NOT NULL,
+            ADD COLUMN IF NOT EXISTS submission_correlation_id UUID NULL,
+            ADD COLUMN IF NOT EXISTS billing_revision INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS submission_payload JSONB NULL,
+            ADD COLUMN IF NOT EXISTS customer_approved_by UUID NULL,
+            ADD COLUMN IF NOT EXISTS customer_approved_at TIMESTAMP NULL;
+          CREATE TABLE IF NOT EXISTS billing_decision_inbox (
+            event_id UUID PRIMARY KEY,
+            invoice_id UUID NOT NULL,
+            service_ticket_id UUID NOT NULL,
+            vendor_revision_id UUID NOT NULL,
+            billing_revision INTEGER NOT NULL,
+            outcome VARCHAR(24) NOT NULL,
+            received_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            processed_at TIMESTAMP NULL,
+            error TEXT NULL
+          );
+          CREATE TABLE IF NOT EXISTS service_decision_notification_outbox (
+            event_id UUID PRIMARY KEY,
+            recipient_ids JSONB NOT NULL,
+            payload JSONB NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            available_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            lease_until TIMESTAMP NULL,
+            delivered_at TIMESTAMP NULL,
+            last_error TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_service_decision_notification_pending
+            ON service_decision_notification_outbox (available_at, created_at)
+            WHERE delivered_at IS NULL;
+        `);
+        const duplicateSubmissionIds = await Source.query(`
+          SELECT submission_correlation_id, COUNT(*)::int AS row_count,
+                 ARRAY_AGG(id ORDER BY id) AS revision_ids
+          FROM service_estimate_revisions
+          WHERE submission_correlation_id IS NOT NULL
+          GROUP BY submission_correlation_id HAVING COUNT(*) > 1
+          LIMIT 20
+        `);
+        if (duplicateSubmissionIds.length > 0) {
+          throw new SchemaMigrationBlockedError(
+            `Cannot create uq_service_estimate_revision_submission: duplicate historical submission IDs require manual reconciliation: ${JSON.stringify(duplicateSubmissionIds)}`,
+          );
+        }
+        await Source.query(`
+          DO $migration$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_indexes
+              WHERE schemaname = current_schema()
+                AND tablename = 'service_estimate_revisions'
+                AND indexdef ~ '\\(submission_correlation_id\\)$'
+                AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+            ) THEN
+              CREATE UNIQUE INDEX uq_service_estimate_revision_submission
+                ON service_estimate_revisions (submission_correlation_id);
+            END IF;
+          END $migration$;
+        `);
+        await Source.query(
+          `ALTER TYPE service_tickets_status_enum ADD VALUE IF NOT EXISTS 'ESTIMATE_REVISION_REQUIRED';`,
+        );
+        await Source.query(`
+          ALTER TABLE service_estimates
+            ADD COLUMN IF NOT EXISTS finance_decision_by UUID NULL,
+            ADD COLUMN IF NOT EXISTS finance_decision_at TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS finance_decision_note TEXT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS finance_rejection_reason TEXT NULL;
         `);
         logger.info('Guaranteed service_estimate_revisions table exists.');
 
@@ -882,6 +970,9 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             // Ignore if already exists
           }
         }
+        await Source.query(
+          `ALTER TYPE service_tickets_status_enum ADD VALUE IF NOT EXISTS 'ESTIMATE_REVISION_REQUIRED';`,
+        );
 
         // 2. Add columns to service_tickets
         await Source.query(`
@@ -961,18 +1052,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
-        // 3. Drop and recreate machine_service_history to support new redesign structure
-        // We check if "totalPartsSpend" column exists; if not, we drop it.
-        const checkHistoryCol = await Source.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name='machine_service_history' AND column_name='totalPartsSpend';
-        `);
-        if (checkHistoryCol.length === 0) {
-          logger.info('Upgrading machine_service_history table to new design...');
-          await Source.query(`DROP TABLE IF EXISTS machine_service_history CASCADE;`);
-        }
-
+        // 3. Create or extend machine_service_history without discarding historical rows.
         await Source.query(`
           CREATE TABLE IF NOT EXISTS machine_service_history (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -987,6 +1067,19 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             "totalLifetimeCost" DECIMAL(12,2) DEFAULT 0,
             "updatedAt" TIMESTAMP DEFAULT NOW()
           );
+        `);
+        await Source.query(`
+          ALTER TABLE machine_service_history
+            ADD COLUMN IF NOT EXISTS "productId" UUID NULL,
+            ADD COLUMN IF NOT EXISTS "serialNumber" VARCHAR(255) NULL,
+            ADD COLUMN IF NOT EXISTS "totalServiceVisits" INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS "totalPreventativeVisits" INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS "lastServiceDate" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "nextScheduledMaintenanceDate" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "totalPartsSpend" DECIMAL(12,2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS "totalLabourSpend" DECIMAL(12,2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS "totalLifetimeCost" DECIMAL(12,2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP DEFAULT NOW();
         `);
         logger.info('Guaranteed machine_service_history table exists (new redesign).');
 
@@ -1046,15 +1139,52 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed service_part_usage_logs table exists.');
 
-        // 5. Drop and recreate inventory_reservations to support new redesign structure
-        const checkReservationCol = await Source.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name='inventory_reservations' AND column_name='reservedQuantity';
-        `);
-        if (checkReservationCol.length === 0) {
-          logger.info('Upgrading inventory_reservations table to new design...');
-          await Source.query(`DROP TABLE IF EXISTS inventory_reservations CASCADE;`);
+        // 5. Migrate inventory_reservations additively. Known snake_case variants
+        // are renamed in place; unknown populated shapes fail without deleting data.
+        const reservationTable = await Source.query(
+          `SELECT to_regclass(current_schema() || '.inventory_reservations') AS table_name`,
+        );
+        if (reservationTable[0]?.table_name) {
+          const reservationColumns = await Source.query(`
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema=current_schema() AND table_name='inventory_reservations'
+          `);
+          const existingColumns = new Set(
+            reservationColumns.map((row: { column_name: string }) => row.column_name),
+          );
+          const legacyNames: Array<[string, string]> = [
+            ['ticket_id', 'ticketId'],
+            ['spare_part_id', 'sparePartId'],
+            ['reserved_quantity', 'reservedQuantity'],
+            ['reserved_at', 'reservedAt'],
+            ['consumed_at', 'consumedAt'],
+          ];
+          for (const [legacyName, entityName] of legacyNames) {
+            if (existingColumns.has(legacyName) && !existingColumns.has(entityName)) {
+              await Source.query(
+                `ALTER TABLE inventory_reservations RENAME COLUMN "${legacyName}" TO "${entityName}"`,
+              );
+              existingColumns.delete(legacyName);
+              existingColumns.add(entityName);
+            }
+          }
+          const requiredReservationColumns = [
+            'id',
+            'ticketId',
+            'sparePartId',
+            'reservedQuantity',
+            'status',
+            'reservedAt',
+            'consumedAt',
+          ];
+          const missingReservationColumns = requiredReservationColumns.filter(
+            (column) => !existingColumns.has(column),
+          );
+          if (missingReservationColumns.length > 0) {
+            throw new SchemaMigrationBlockedError(
+              `Unexpected inventory_reservations schema; missing required columns ${missingReservationColumns.join(', ')}. Data was preserved; manual migration is required.`,
+            );
+          }
         }
 
         await Source.query(`
@@ -1067,6 +1197,27 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             "reservedAt" TIMESTAMP DEFAULT NOW(),
             "consumedAt" TIMESTAMP NULL
           );
+        `);
+        await Source.query(
+          `ALTER TABLE inventory_reservations ADD COLUMN IF NOT EXISTS revision_id UUID NULL`,
+        );
+        const duplicateReservations = await Source.query(`
+          SELECT revision_id, "sparePartId", COUNT(*)::int AS row_count,
+                 ARRAY_AGG(id ORDER BY id) AS reservation_ids
+          FROM inventory_reservations
+          WHERE revision_id IS NOT NULL AND status = 'RESERVED'
+          GROUP BY revision_id, "sparePartId" HAVING COUNT(*) > 1
+          LIMIT 20
+        `);
+        if (duplicateReservations.length > 0) {
+          throw new SchemaMigrationBlockedError(
+            `Cannot create uq_revision_reservation_part: duplicate active reservations require manual reconciliation: ${JSON.stringify(duplicateReservations)}`,
+          );
+        }
+        await Source.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS uq_revision_reservation_part
+            ON inventory_reservations (revision_id, "sparePartId")
+            WHERE revision_id IS NOT NULL AND status = 'RESERVED'
         `);
         logger.info('Guaranteed inventory_reservations table exists (new redesign).');
 
@@ -1233,7 +1384,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
 
         // --- Stock Transfer Module Schema (lot-integrated redesign) ---
         try {
-          // Recreate when tables predate the current design (marker column: items.model_id).
+          // Refuse an unsupported historical shape without deleting tables or rows.
           const staleCheck = await Source.query(`
             SELECT 1 FROM information_schema.tables WHERE table_name = 'stock_transfers'
             AND NOT EXISTS (
@@ -1242,11 +1393,9 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             )
           `);
           if (staleCheck.length > 0) {
-            logger.info('Dropping outdated stock_transfers tables and recreating (new design)...');
-            await Source.query(`DROP TABLE IF EXISTS stock_transfer_items CASCADE`);
-            await Source.query(`DROP TABLE IF EXISTS stock_transfers CASCADE`);
-            await Source.query(`DROP TYPE IF EXISTS stock_transfers_status_enum`);
-            await Source.query(`DROP TYPE IF EXISTS stock_transfer_items_item_status_enum`);
+            throw new SchemaMigrationBlockedError(
+              'Unexpected legacy stock_transfers schema; manual additive migration is required. Existing tables and rows were preserved.',
+            );
           }
           await Source.query(`
             DO $$
@@ -1461,6 +1610,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.info('Guaranteed purchase_costs.attachment_url column exists.');
         } catch (stockTransferErr) {
           logger.error('Failed to create stock_transfers schema:', stockTransferErr);
+          throw stockTransferErr;
         }
 
         // ─── Tax Report: vendor vat_number ────────────────────────────────────
@@ -1577,6 +1727,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
       }
       return Source;
     } catch (error: unknown) {
+      if (error instanceof SchemaMigrationBlockedError) throw error;
       const err = error as Error & { code?: string };
       logger.error(`Database connection failed on attempt ${attempt}: ${err.code || err.message}`);
       logger.info(`Waiting ${delay / 1000} seconds before retrying...`);

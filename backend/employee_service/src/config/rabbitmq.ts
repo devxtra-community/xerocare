@@ -1,11 +1,11 @@
 import amqp from 'amqplib';
 import { logger } from './logger';
 
-let channel: amqp.Channel;
+let channel: amqp.ConfirmChannel;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let connection: any;
 
-export const getRabbitChannel = async () => {
+export const getRabbitChannel = async (): Promise<amqp.ConfirmChannel> => {
   if (channel) return channel;
 
   let attempt = 1;
@@ -19,33 +19,36 @@ export const getRabbitChannel = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       connection.on('error', (err: any) => {
         logger.error('RabbitMQ connection error', err);
-        channel = null as unknown as amqp.Channel;
+        channel = null as unknown as amqp.ConfirmChannel;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         connection = null as any;
       });
 
       connection.on('close', () => {
         logger.warn('RabbitMQ connection closed');
-        channel = null as unknown as amqp.Channel;
+        channel = null as unknown as amqp.ConfirmChannel;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         connection = null as any;
       });
 
-      channel = await connection.createChannel();
+      // A confirm channel is also a normal consumer channel, while giving
+      // publishers an acknowledgement from RabbitMQ before they report success.
+      channel = await connection.createConfirmChannel();
 
       channel.on('error', (err) => {
         logger.error('RabbitMQ channel error', err);
-        channel = null as unknown as amqp.Channel;
+        channel = null as unknown as amqp.ConfirmChannel;
       });
 
       channel.on('close', () => {
         logger.warn('RabbitMQ channel closed');
-        channel = null as unknown as amqp.Channel;
+        channel = null as unknown as amqp.ConfirmChannel;
       });
 
       // Assert queue and exchange
       await channel.assertQueue('email_queue', { durable: true });
       await channel.assertQueue('notification_queue', { durable: true }); // NEW: Dedicated queue for notifications
+      await channel.assertQueue('notification_dead_letter_queue', { durable: true });
       await channel.assertExchange('domain_events', 'topic', { durable: true });
 
       // Bind queue to exchange for specific routing keys

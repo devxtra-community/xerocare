@@ -66,12 +66,10 @@ export class NotificationController {
     }
   }
 
-  // Internal endpoint — called by billing_service with x-internal-service header
+  // Internal endpoint — service-authenticated as billing_service by the JWT middleware.
   static async createInternal(req: Request, res: Response) {
     try {
-      const internalHeader = req.headers['x-internal-service'];
-      const expectedSecret = process.env.INTERNAL_SERVICE_SECRET;
-      if (!internalHeader || !expectedSecret || internalHeader !== expectedSecret) {
+      if (req.user?.userId !== 'billing_service' || req.user.role !== 'ADMIN') {
         return res.status(403).json({ message: 'Forbidden' });
       }
 

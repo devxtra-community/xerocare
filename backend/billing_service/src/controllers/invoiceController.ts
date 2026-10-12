@@ -287,7 +287,13 @@ export const financeApproveQuotation = async (req: Request, res: Response, next:
     const id = req.params.id as string;
     if (!req.user || !req.user.userId) throw new AppError('User context missing', 401);
 
-    const invoice = await billingService.financeApproveQuotation(id, req.user.userId, req.body);
+    const invoice = await billingService.financeApproveQuotation(
+      id,
+      req.user.userId,
+      req.body,
+      req.user.branchId,
+      req.user.role,
+    );
 
     return res.status(200).json({
       success: true,
@@ -503,7 +509,13 @@ export const financeReject = async (req: Request, res: Response, next: NextFunct
       throw new AppError('Rejection reason is required', 400);
     }
 
-    const invoice = await billingService.financeReject(id, req.user.userId, reason);
+    const invoice = await billingService.financeReject(
+      id,
+      req.user.userId,
+      reason,
+      req.user.branchId,
+      req.user.role,
+    );
 
     return res.status(200).json({
       success: true,
@@ -1947,13 +1959,30 @@ export const getEmployeeRecentActivity = async (
 export const reviseEstimate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const { items, visitChargeAmount, visitChargeMethod, discountAmount, technicianNoteToFinance } =
-      req.body;
+    const {
+      items,
+      visitChargeAmount,
+      visitChargeMethod,
+      discountAmount,
+      technicianNoteToFinance,
+      submissionCorrelationId,
+      vendorRevisionId,
+      labourCost,
+    } = req.body;
     const userId = req.user?.userId || 'SYSTEM';
 
     const result = await billingService.reviseEstimate(
       id,
-      { items, visitChargeAmount, visitChargeMethod, discountAmount, technicianNoteToFinance },
+      {
+        items,
+        visitChargeAmount,
+        visitChargeMethod,
+        discountAmount,
+        technicianNoteToFinance,
+        submissionCorrelationId,
+        vendorRevisionId,
+        labourCost,
+      },
       userId,
     );
 

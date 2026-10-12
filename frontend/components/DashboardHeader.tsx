@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { getProfile, logout, getUserFromToken } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { shouldMarkNotificationRead } from '@/lib/notificationReadPolicy';
 import { toast } from 'sonner';
 import { formatNotificationTime } from '@/lib/format';
 import {
@@ -164,16 +165,21 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   };
 
   const handleNotificationClick = (notification: Notification) => {
-    markAsRead(notification.id);
-
     if (notification.type === 'SALARY_PAID') {
       const payrollId = (notification.data as { payroll_id?: string } | undefined)?.payroll_id;
 
       if (payrollId) {
+        if (shouldMarkNotificationRead('detail-open')) markAsRead(notification.id);
         setSelectedPayrollId(payrollId);
         setIsSalaryDialogOpen(true);
+        return;
       }
     }
+
+    // Header preview does not clear unread state before opening the full feed.
+    if (shouldMarkNotificationRead('header-preview')) markAsRead(notification.id);
+    const role = user.role.toLowerCase() || rawRole.toLowerCase();
+    if (role) router.push(`/${role}/notifications`);
   };
 
   const handleSeeProfile = () => {

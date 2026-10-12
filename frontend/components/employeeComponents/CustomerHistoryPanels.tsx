@@ -34,6 +34,7 @@ export const getStatusColor = (status: string) => {
     case 'QUOTED':
       return 'bg-warning/10 text-warning border-warning/30';
     case 'FINANCE_REJECTED':
+    case 'ESTIMATE_REVISION_REQUIRED':
       return 'bg-destructive/10 text-destructive border-destructive/30';
     case 'CUSTOMER_APPROVED':
       return 'bg-success/10 text-success border-success/30';

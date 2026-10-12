@@ -234,6 +234,7 @@ export default function ServiceDashboardPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createTicketError, setCreateTicketError] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<ServiceTicket | null>(null);
+  const notificationTargetHandled = useRef(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDiagnoseModal, setShowDiagnoseModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -257,8 +258,37 @@ export default function ServiceDashboardPage() {
   const [newRevLabour, setNewRevLabour] = useState<number>(0);
   const [newRevItems, setNewRevItems] = useState<Partial<ServiceEstimateItem>[]>([]);
   const [ticketRevisions, setTicketRevisions] = useState<ServiceEstimateRevision[]>([]);
+  const [financeRejectionNote, setFinanceRejectionNote] = useState('');
   const [loadingRevisions, setLoadingRevisions] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'revisions'>('info');
+
+  useEffect(() => {
+    if (!showDiagnoseModal || !selectedTicket) {
+      setFinanceRejectionNote('');
+      return;
+    }
+    let active = true;
+    getEstimateRevisions(selectedTicket.id)
+      .then((rows) => {
+        if (!active) return;
+        const rejected = (rows as ServiceEstimateRevision[])
+          .filter((revision) => revision.financeDecision === 'REJECTED')
+          .sort(
+            (a, b) =>
+              new Date(b.financeDecisionAt || b.submittedAt || 0).getTime() -
+              new Date(a.financeDecisionAt || a.submittedAt || 0).getTime(),
+          )[0];
+        setFinanceRejectionNote(
+          selectedTicket.financeRejectionReason || rejected?.financeDecisionNote || '',
+        );
+      })
+      .catch(() => {
+        if (active) setFinanceRejectionNote(selectedTicket.financeRejectionReason || '');
+      });
+    return () => {
+      active = false;
+    };
+  }, [showDiagnoseModal, selectedTicket?.id, selectedTicket?.financeRejectionReason]);
 
   const [showMachineIntelModal, setShowMachineIntelModal] = useState(false);
   const [selectedMachineSerial, setSelectedMachineSerial] = useState('');
@@ -1128,6 +1158,7 @@ export default function ServiceDashboardPage() {
     const isRevision =
       selectedTicket.status === 'REVISED' ||
       selectedTicket.status === 'FINANCE_REJECTED' ||
+      selectedTicket.status === 'ESTIMATE_REVISION_REQUIRED' ||
       (selectedTicket.additionalEstimateCount && selectedTicket.additionalEstimateCount > 0);
     if (isRevision && !diagnosisForm.technicianNoteToFinance?.trim()) {
       toast.error('Technician note to finance is required explaining the reason for revision.');
@@ -1165,6 +1196,9 @@ export default function ServiceDashboardPage() {
     try {
       setSubmitting(true);
       if (isRevision) {
+        const correlationKey = `service-estimate-revision:${selectedTicket.id}`;
+        const submissionCorrelationId = localStorage.getItem(correlationKey) || crypto.randomUUID();
+        localStorage.setItem(correlationKey, submissionCorrelationId);
         await reviseServiceEstimate(selectedTicket.id, {
           items: diagnosisForm.items.map((it) => ({
             itemSource: it.itemSource,
@@ -1184,7 +1218,9 @@ export default function ServiceDashboardPage() {
           discountAmount: Number(diagnosisForm.discountAmount) || 0,
           technicianNoteToFinance: diagnosisForm.technicianNoteToFinance,
           revisionType: 'REVISION',
+          submissionCorrelationId,
         });
+        localStorage.removeItem(correlationKey);
         toastSuccess('Estimate revision submitted successfully!');
       } else {
         await diagnoseServiceTicket(selectedTicket.id, {
@@ -1428,6 +1464,28 @@ export default function ServiceDashboardPage() {
     setNewRevItems([]);
     setShowEstimatesModal(true);
   };
+
+  // Notification references select a ticket only from the authorized ticket
+  // list already loaded for this user. Invalid or inaccessible IDs are ignored.
+  useEffect(() => {
+    if (notificationTargetHandled.current || tickets.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const ticketId = params.get('ticketId');
+    if (
+      !ticketId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ticketId)
+    ) {
+      return;
+    }
+    notificationTargetHandled.current = true;
+    const ticket = tickets.find((candidate) => candidate.id === ticketId);
+    if (!ticket) return;
+
+    setSelectedTicket(ticket);
+    setActiveDetailTab(params.has('revisionId') ? 'revisions' : 'info');
+    setShowDetailsModal(true);
+    if (params.has('revisionId')) fetchTicketRevisions(ticket.id);
+  }, [tickets]);
 
   const fetchMachineIntel = async (serial: string, productId?: string) => {
     try {
@@ -2202,6 +2260,7 @@ export default function ServiceDashboardPage() {
               <option value="WAITING_FINANCE_APPROVAL">Waiting Finance Approval</option>
               <option value="FINANCE_APPROVED">Finance Approved</option>
               <option value="FINANCE_REJECTED">Finance Rejected</option>
+              <option value="ESTIMATE_REVISION_REQUIRED">Estimate Revision Required</option>
               <option value="QUOTED">Quote Sent</option>
               <option value="CUSTOMER_APPROVED">Customer Approved</option>
               <option value="CUSTOMER_REJECTED">Customer Rejected</option>
@@ -2616,6 +2675,7 @@ export default function ServiceDashboardPage() {
                               ticket.status === 'WAITING_FINANCE_APPROVAL' ||
                               ticket.status === 'FINANCE_APPROVED' ||
                               ticket.status === 'FINANCE_REJECTED' ||
+                              ticket.status === 'ESTIMATE_REVISION_REQUIRED' ||
                               ticket.status === 'CUSTOMER_APPROVED' ||
                               ticket.status === 'CUSTOMER_REJECTED') && (
                               <Button
@@ -2631,6 +2691,7 @@ export default function ServiceDashboardPage() {
 
                           {(isTechnician || isManagerOrAdmin) &&
                             (ticket.status === 'FINANCE_REJECTED' ||
+                              ticket.status === 'ESTIMATE_REVISION_REQUIRED' ||
                               ticket.status === 'REVISED') && (
                               <Button
                                 size="sm"
@@ -4993,12 +5054,25 @@ export default function ServiceDashboardPage() {
                       );
                     })()}
 
+                    {financeRejectionNote &&
+                      ['FINANCE_REJECTED', 'ESTIMATE_REVISION_REQUIRED'].includes(
+                        selectedTicket.status,
+                      ) && (
+                        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs">
+                          <div className="font-bold text-destructive">Finance rejection reason</div>
+                          <p className="mt-1 whitespace-pre-wrap text-foreground">
+                            {financeRejectionNote}
+                          </p>
+                        </div>
+                      )}
+
                     {/* Technician Note to Finance */}
                     <div>
                       <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                         Technician Note to Finance{' '}
                         {(selectedTicket.status === 'REVISED' ||
                           selectedTicket.status === 'FINANCE_REJECTED' ||
+                          selectedTicket.status === 'ESTIMATE_REVISION_REQUIRED' ||
                           (selectedTicket.additionalEstimateCount &&
                             selectedTicket.additionalEstimateCount > 0)) && (
                           <span className="text-destructive">* Required</span>
@@ -5857,6 +5931,7 @@ export default function ServiceDashboardPage() {
                           selectedTicket.status === 'FINANCE_APPROVED' ||
                           selectedTicket.status === 'QUOTED' ||
                           selectedTicket.status === 'FINANCE_REJECTED' ||
+                          selectedTicket.status === 'ESTIMATE_REVISION_REQUIRED' ||
                           selectedTicket.status === 'CUSTOMER_APPROVED' ||
                           selectedTicket.status === 'CUSTOMER_REJECTED') && (
                           <Button

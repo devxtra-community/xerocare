@@ -59,6 +59,15 @@ export class ServiceEstimate {
   @Column({ type: 'integer', default: 1 })
   version!: number;
 
+  @Column({ name: 'finance_decision_by', type: 'uuid', nullable: true })
+  financeDecisionBy?: string | null;
+
+  @Column({ name: 'finance_decision_at', type: 'timestamp', nullable: true })
+  financeDecisionAt?: Date | null;
+
+  @Column({ name: 'finance_decision_note', type: 'text', nullable: true })
+  financeDecisionNote?: string | null;
+
   @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
   currencyCode?: string;
 

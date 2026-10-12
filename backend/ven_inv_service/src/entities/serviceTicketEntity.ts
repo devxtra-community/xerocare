@@ -29,6 +29,7 @@ export enum ServiceTicketStatus {
   ADDITIONAL_ESTIMATE_PENDING = 'ADDITIONAL_ESTIMATE_PENDING',
   WAITING_FINANCE_APPROVAL_2 = 'WAITING_FINANCE_APPROVAL_2',
   FINANCE_APPROVED_2 = 'FINANCE_APPROVED_2',
+  ESTIMATE_REVISION_REQUIRED = 'ESTIMATE_REVISION_REQUIRED',
 }
 
 export enum ServiceContext {
@@ -116,6 +117,9 @@ export class ServiceTicket {
 
   @Column({ type: 'uuid', nullable: true })
   serviceQuotationId?: string | null;
+
+  @Column({ type: 'text', nullable: true, name: 'finance_rejection_reason' })
+  financeRejectionReason?: string | null;
 
   @Column({ type: 'text', nullable: true })
   diagnosisNotes?: string | null;

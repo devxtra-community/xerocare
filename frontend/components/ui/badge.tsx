@@ -38,6 +38,10 @@ export const STATUS_MAP = {
     label: 'Add. Work Approved',
     className: 'bg-info/10 text-info border-info/30 dark:bg-info/30 dark:text-info',
   },
+  ESTIMATE_REVISION_REQUIRED: {
+    label: 'REVISION REQUIRED',
+    className: 'bg-destructive/10 text-destructive border-destructive/30',
+  },
   ESTIMATE_RECORDED: {
     label: 'Estimate Recorded',
     className: 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/30 dark:text-primary',

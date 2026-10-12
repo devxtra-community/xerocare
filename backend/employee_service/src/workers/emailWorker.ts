@@ -12,9 +12,35 @@ import {
 } from '../utils/mailer';
 
 import { logger } from '../config/logger';
+import { publishConfirmed } from '../utils/confirmedPublish';
+import {
+  MAX_NOTIFICATION_RETRIES,
+  NOTIFICATION_ROUTING_KEYS,
+  notificationRetryDelay,
+  quarantineNotification,
+  retryNotificationDelivery,
+  shouldRetryNotification,
+  validateNotificationJob,
+} from './notificationDelivery';
+import { persistInAppNotifications } from '../services/notificationPersistence';
+
+type EmailAttachment = { filename: string; content: Buffer | string; encoding?: string };
+type NotificationJob = Record<string, unknown> & {
+  recipient?: string;
+  subject?: string;
+  body?: string;
+  text?: string;
+  attachmentUrl?: string;
+  attachments?: EmailAttachment[];
+  recipients?: string[];
+  notifyAdmins?: boolean;
+  title?: string;
+  message?: string;
+  type?: string;
+  data?: Record<string, unknown> | null;
+};
 
 const MAX_EMAIL_RETRIES = 5;
-const MAX_NOTIFICATION_RETRIES = 5;
 
 export const startWorker = async () => {
   const channel = await getRabbitChannel();
@@ -153,10 +179,23 @@ export const startWorker = async () => {
   channel.consume('notification_queue', async (msg) => {
     if (!msg) return;
 
-    const job = JSON.parse(msg.content.toString());
+    let job: NotificationJob;
+    try {
+      job = JSON.parse(msg.content.toString());
+      if (!job || typeof job !== 'object' || Array.isArray(job)) {
+        throw new Error('Notification payload must be a JSON object');
+      }
+      job = job as NotificationJob;
+    } catch (error) {
+      logger.error('Malformed notification JSON', error);
+      if (!(await quarantineNotification(channel, msg, 'Malformed JSON payload'))) {
+        logger.error('Malformed notification was requeued because dead-lettering failed');
+      }
+      return;
+    }
     const routingKey = msg.fields.routingKey;
 
-    logger.info(`[Notification Worker] Received message`, { routingKey, job });
+    logger.info(`[Notification Worker] Received message`, { routingKey });
 
     // Email/WhatsApp jobs carry a singular `recipient`; in-app jobs carry a
     // `recipients` array (and/or a `notifyAdmins` broadcast flag) instead — this
@@ -168,8 +207,24 @@ export const startWorker = async () => {
       (Array.isArray(job.recipients) && job.recipients.length > 0) ||
       job.notifyAdmins === true;
     if (!hasRecipient) {
-      logger.error('Invalid notification job: Missing recipient', { job });
-      channel.ack(msg);
+      if (!(await quarantineNotification(channel, msg, 'Missing recipient'))) {
+        logger.error('Notification was requeued because dead-lettering failed');
+      }
+      return;
+    }
+
+    if (!(NOTIFICATION_ROUTING_KEYS as readonly string[]).includes(routingKey)) {
+      if (!(await quarantineNotification(channel, msg, `Unknown routing key: ${routingKey}`))) {
+        logger.error('Unknown notification route was requeued because dead-lettering failed');
+      }
+      return;
+    }
+
+    const invalidReason = validateNotificationJob(routingKey, job, msg.properties.messageId);
+    if (invalidReason) {
+      if (!(await quarantineNotification(channel, msg, invalidReason))) {
+        logger.error('Invalid notification was requeued because dead-lettering failed');
+      }
       return;
     }
 
@@ -227,10 +282,11 @@ export const startWorker = async () => {
         logger.info(`[Notification Worker] WhatsApp sent to ${recipient}`);
       } else if (routingKey === 'notification.in_app.request') {
         const { recipients, notifyAdmins, title, message, type, data } = job;
+        if (typeof title !== 'string' || typeof message !== 'string') {
+          throw new Error('Invalid in-app notification content');
+        }
 
         const { Source } = await import('../config/dataSource');
-        const { Notification } = await import('../entities/notificationEntity');
-        const repo = Source.getRepository(Notification);
 
         let targetIds: string[] = [];
         if (recipients && Array.isArray(recipients)) {
@@ -246,16 +302,14 @@ export const startWorker = async () => {
         targetIds = [...new Set(targetIds)];
 
         if (targetIds.length > 0) {
-          const notifications = targetIds.map((empId: string) =>
-            repo.create({
-              employee_id: empId,
+          await Source.transaction((manager) =>
+            persistInAppNotifications(manager, msg.properties.messageId!, targetIds, {
               title,
               message,
-              type: type || 'INFO',
+              type,
               data: data || null,
             }),
           );
-          await repo.save(notifications);
           logger.info(
             `[Notification Worker] In-app notifications saved for ${targetIds.length} users.`,
           );
@@ -286,22 +340,24 @@ export const startWorker = async () => {
 
       const retryCount = Number(msg.properties.headers?.['x-retry-count'] || 0);
 
-      if (isTransient && retryCount < MAX_NOTIFICATION_RETRIES) {
-        const delayMs = Math.min(30_000, 1000 * 2 ** retryCount);
+      if (isTransient && shouldRetryNotification(retryCount)) {
+        const delayMs = notificationRetryDelay(retryCount);
         logger.info(
           `Transient notification failure, retrying in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_NOTIFICATION_RETRIES})`,
           { routingKey, recipient: job.recipient, errorCode: error.code },
         );
-        setTimeout(() => {
+        setTimeout(async () => {
           try {
-            channel.sendToQueue('notification_queue', msg.content, {
-              persistent: true,
-              headers: { ...(msg.properties.headers || {}), 'x-retry-count': retryCount + 1 },
-            });
-            channel.ack(msg);
-          } catch (republishErr) {
-            logger.error('Failed to requeue notification job, nacking instead', republishErr);
-            channel.nack(msg, false, true);
+            const retried = await retryNotificationDelivery(channel, msg, routingKey, retryCount);
+            if (!retried)
+              logger.error('Retry was not confirmed; original notification was requeued');
+          } catch (retryErr) {
+            logger.error('Unexpected retry processing failure', retryErr);
+            try {
+              channel.nack(msg, false, true);
+            } catch {
+              /* Channel close requeues unacked messages. */
+            }
           }
         }, delayMs);
         return;
@@ -313,8 +369,16 @@ export const startWorker = async () => {
       await notifySenderOfDeliveryFailure(channel, job, routingKey, err).catch((notifyErr) =>
         logger.error('Failed to report notification delivery failure', notifyErr),
       );
-
-      channel.ack(msg);
+      const failureCode = (err as { code?: string }).code || 'unclassified';
+      if (
+        !(await quarantineNotification(
+          channel,
+          msg,
+          `Notification processing failed (${failureCode})`,
+        ))
+      ) {
+        logger.error('Failed notification was requeued because dead-lettering failed');
+      }
     }
   });
 
@@ -345,7 +409,8 @@ async function notifySenderOfDeliveryFailure(
   const reason = err instanceof Error ? err.message : String(err);
   const subject = job.subject ? ` (${job.subject})` : '';
 
-  await channel.publish(
+  await publishConfirmed(
+    channel,
     'domain_events',
     'notification.in_app.request',
     Buffer.from(
@@ -357,6 +422,5 @@ async function notifySenderOfDeliveryFailure(
         data: { channel: channelName, recipient: job.recipient },
       }),
     ),
-    { persistent: true },
   );
 }

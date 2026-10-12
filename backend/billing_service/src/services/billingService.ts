@@ -47,6 +47,12 @@ import { PaymentTiming } from '../entities/enums/paymentTiming';
 import { getBranchCurrencyInfo, generatePaymentReference } from './billingHelpers';
 import { createSalePaymentRequest } from './salePaymentRequestService';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
+import { AuditLog } from '../entities/auditLogEntity';
+import { createHash } from 'crypto';
+import {
+  createServiceEstimateDecisionEvent,
+  canDecideServiceQuotation,
+} from './serviceEstimateDecision';
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
   excessRate: number | undefined,
@@ -72,6 +78,110 @@ export class BillingService {
   private usageService = new UsageService();
   private returnCreditRepo = new ReturnCreditRepository();
   private notificationService = new NotificationService();
+
+  private async commitFinanceDecision(
+    id: string,
+    userId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    reason?: string,
+    payload?: { effectiveTo?: Date },
+    actorBranchId?: string,
+    actorRole?: string,
+  ): Promise<{ invoice: Invoice; linkedRevision: boolean }> {
+    return Source.transaction(async (manager) => {
+      const invoiceRepo = manager.getRepository(Invoice);
+      const invoice = await invoiceRepo.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!invoice) throw new AppError('Quotation not found', 404);
+      if (actorRole !== 'ADMIN' && (!actorBranchId || invoice.branchId !== actorBranchId)) {
+        throw new AppError('You are not authorized to decide quotations for this branch', 403);
+      }
+      if (!canDecideServiceQuotation(invoice.status)) {
+        throw new AppError('Quotation must be in a pending Finance approval state', 409);
+      }
+      if (decision === 'REJECTED' && !reason?.trim()) {
+        throw new AppError('Rejection reason is required', 400);
+      }
+
+      let link:
+        | { service_ticket_id: string; vendor_revision_id: string; billing_revision: number }
+        | undefined;
+      if (invoice.billType === BillType.SERVICE && Number(invoice.revisionCount) > 0) {
+        const links = await manager.query(
+          `SELECT service_ticket_id, vendor_revision_id, billing_revision
+             FROM billing_service_estimate_revision_links
+            WHERE invoice_id = $1 AND billing_revision = $2
+            FOR UPDATE`,
+          [invoice.id, invoice.revisionCount],
+        );
+        link = links[0];
+        if (!link)
+          throw new AppError(
+            'Service estimate revision correlation is missing; Finance decision was not recorded',
+            409,
+          );
+      }
+
+      const oldStatus = invoice.status;
+      const decidedAt = new Date();
+      invoice.status =
+        decision === 'APPROVED' ? InvoiceStatus.FINANCE_APPROVED : InvoiceStatus.FINANCE_REJECTED;
+      invoice.financeApprovedBy = userId;
+      invoice.financeApprovedAt = decidedAt;
+      if (decision === 'REJECTED') invoice.financeRemarks = reason!.trim();
+      if (decision === 'APPROVED' && payload?.effectiveTo) {
+        invoice.expiryDate = new Date(payload.effectiveTo);
+        if (invoice.saleType !== SaleType.RENT && invoice.saleType !== SaleType.LEASE) {
+          invoice.effectiveTo = payload.effectiveTo;
+        }
+      }
+      if (decision === 'APPROVED' && invoice.billType === BillType.SERVICE) {
+        const validUntil = new Date();
+        validUntil.setDate(validUntil.getDate() + 30);
+        invoice.estimateValidUntil = validUntil;
+        invoice.estimateExpired = false;
+      }
+      const saved = await invoiceRepo.save(invoice);
+      await manager.getRepository(AuditLog).save(
+        manager.getRepository(AuditLog).create({
+          entityId: invoice.id,
+          action: 'STATUS_CHANGE',
+          performedBy: userId,
+          oldValue: String(oldStatus),
+          newValue: String(invoice.status),
+          details:
+            decision === 'APPROVED'
+              ? 'Finance approved quotation pricing.'
+              : `Finance rejected quotation/invoice. Reason: ${reason!.trim()}`,
+        }),
+      );
+
+      if (link) {
+        const event = createServiceEstimateDecisionEvent({
+          invoiceId: invoice.id,
+          serviceTicketId: link.service_ticket_id,
+          vendorRevisionId: link.vendor_revision_id,
+          billingRevision: Number(link.billing_revision),
+          decision,
+          decidedBy: userId,
+          decidedAt: decidedAt.toISOString(),
+          reason: decision === 'REJECTED' ? reason!.trim() : null,
+          invoiceStatus: decision === 'APPROVED' ? 'FINANCE_APPROVED' : 'FINANCE_REJECTED',
+          estimateValidUntil: invoice.estimateValidUntil
+            ? new Date(invoice.estimateValidUntil).toISOString()
+            : null,
+        });
+        await manager.query(
+          `INSERT INTO billing_service_estimate_decision_outbox (event_id, invoice_id, payload)
+           VALUES ($1, $2, $3::jsonb)`,
+          [event.eventId, invoice.id, JSON.stringify(event)],
+        );
+      }
+      return { invoice: saved, linkedRevision: !!link };
+    });
+  }
 
   /**
    * Rejects quotation lines priced outside the catalogue.
@@ -1579,47 +1689,25 @@ export class BillingService {
   /**
    * Finance approves the quotation pricing.
    */
-  async financeApproveQuotation(id: string, userId: string, payload?: { effectiveTo?: Date }) {
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) throw new AppError('Quotation not found', 404);
-
-    if (
-      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
-      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
-    ) {
-      throw new AppError('Quotation must be in a pending approval state', 400);
-    }
-
-    const oldStatus = invoice.status;
-    invoice.status = InvoiceStatus.FINANCE_APPROVED;
-    invoice.financeApprovedBy = userId;
-    invoice.financeApprovedAt = new Date();
-
-    if (payload?.effectiveTo) {
-      // Validity extension: the date extends the quotation's validity window.
-      // effectiveTo is the contract period end for RENT/LEASE — never overwrite it there.
-      invoice.expiryDate = new Date(payload.effectiveTo);
-      if (invoice.saleType !== SaleType.RENT && invoice.saleType !== SaleType.LEASE) {
-        invoice.effectiveTo = payload.effectiveTo;
-      }
-    }
-
-    if (invoice.billType === 'SERVICE') {
-      const validUntil = new Date();
-      validUntil.setDate(validUntil.getDate() + 30);
-      invoice.estimateValidUntil = validUntil;
-      invoice.estimateExpired = false;
-    }
-
-    const saved = await this.invoiceRepo.save(invoice);
-    await logAudit(
-      invoice.id,
-      'STATUS_CHANGE',
+  async financeApproveQuotation(
+    id: string,
+    userId: string,
+    payload?: { effectiveTo?: Date },
+    actorBranchId?: string,
+    actorRole?: string,
+  ) {
+    const initial = await this.invoiceRepo.findById(id);
+    if (!initial) throw new AppError('Quotation not found', 404);
+    const { invoice, linkedRevision } = await this.commitFinanceDecision(
+      id,
       userId,
-      `Finance approved quotation pricing.`,
-      oldStatus,
-      InvoiceStatus.FINANCE_APPROVED,
+      'APPROVED',
+      undefined,
+      payload,
+      actorBranchId,
+      actorRole,
     );
+    const saved = invoice;
 
     // Notify Submitting Employee
     if (invoice.createdBy) {
@@ -1669,7 +1757,7 @@ export class BillingService {
     }
 
     // Callback to ven_inv_service for Service Tickets
-    if (invoice.serviceTicketId) {
+    if (invoice.serviceTicketId && !linkedRevision) {
       try {
         const { sign } = await import('jsonwebtoken');
         const token = sign(
@@ -1706,6 +1794,7 @@ export class BillingService {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
               },
+              body: JSON.stringify({ decidedBy: userId, decidedAt: invoice.financeApprovedAt }),
             },
           );
         }
@@ -2655,36 +2744,23 @@ export class BillingService {
   /**
    * Finance rejects the quotation.
    */
-  async financeReject(id: string, userId: string, reason: string) {
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) throw new AppError('Quotation not found', 404);
-
-    if (
-      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
-      (invoice.status as string) !== 'TRANSACTION_COMPLETED' &&
-      invoice.status !== InvoiceStatus.FINANCE_APPROVED &&
-      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
-    ) {
-      throw new AppError(
-        'Only Employee Approved, Finance Approved, Waiting Finance Approval, or Converted quotations can be rejected by Finance',
-        400,
-      );
-    }
-
-    const oldStatus = invoice.status;
-    invoice.status = InvoiceStatus.FINANCE_REJECTED;
-    invoice.financeApprovedBy = userId; // Record who rejected
-    invoice.financeApprovedAt = new Date();
-    invoice.financeRemarks = reason;
-
-    await this.invoiceRepo.save(invoice);
-    await logAudit(
-      invoice.id,
-      'STATUS_CHANGE',
+  async financeReject(
+    id: string,
+    userId: string,
+    reason: string,
+    actorBranchId?: string,
+    actorRole?: string,
+  ) {
+    const initial = await this.invoiceRepo.findById(id);
+    if (!initial) throw new AppError('Quotation not found', 404);
+    const { invoice, linkedRevision } = await this.commitFinanceDecision(
+      id,
       userId,
-      `Finance rejected quotation/invoice. Reason: ${reason}`,
-      oldStatus,
-      InvoiceStatus.FINANCE_REJECTED,
+      'REJECTED',
+      reason,
+      undefined,
+      actorBranchId,
+      actorRole,
     );
 
     // Notify Submitting Employee
@@ -2756,7 +2832,7 @@ export class BillingService {
             billType: 'RETURNED',
             invoiceId: invoice.id,
             approvedBy: userId,
-            approvedAt: invoice.financeApprovedAt,
+            approvedAt: invoice.financeApprovedAt!,
             customerId: null,
           });
         } catch (e) {
@@ -2769,7 +2845,7 @@ export class BillingService {
     }
 
     // Callback to ven_inv_service for Service Tickets
-    if (invoice.serviceTicketId) {
+    if (invoice.serviceTicketId && !linkedRevision) {
       try {
         const { sign } = await import('jsonwebtoken');
         const token = sign(
@@ -2806,7 +2882,11 @@ export class BillingService {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({ reason }),
+              body: JSON.stringify({
+                reason,
+                decidedBy: userId,
+                decidedAt: invoice.financeApprovedAt,
+              }),
             },
           );
         }
@@ -5154,74 +5234,200 @@ export class BillingService {
       visitChargeMethod: string;
       discountAmount: number;
       technicianNoteToFinance: string;
+      submissionCorrelationId: string;
+      vendorRevisionId: string;
+      labourCost?: number;
     },
     userId: string,
   ): Promise<Invoice> {
     logger.info(`Estimate ${id} revised by user ${userId}`);
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) throw new AppError('Quotation not found', 404);
-
-    if (invoice.billType !== BillType.SERVICE) {
-      throw new AppError('Only service quotations can be revised', 400);
+    if (payload.submissionCorrelationId == null || payload.vendorRevisionId == null) {
+      throw new AppError('Submission correlation and service revision IDs are required', 400);
     }
+    const requestHash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          invoiceId: id,
+          vendorRevisionId: payload.vendorRevisionId,
+          items: payload.items,
+          visitChargeAmount: payload.visitChargeAmount,
+          visitChargeMethod: payload.visitChargeMethod,
+          discountAmount: payload.discountAmount,
+          technicianNoteToFinance: payload.technicianNoteToFinance,
+          labourCost: Number(payload.labourCost) || 0,
+        }),
+      )
+      .digest('hex');
 
-    if (
-      invoice.status === InvoiceStatus.CUSTOMER_ACCEPTED ||
-      invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
-      invoice.status === InvoiceStatus.PAID
-    ) {
-      throw new AppError(
-        'Cannot revise an estimate that has already been approved by the customer',
-        400,
+    const submissionResult = await Source.transaction(async (manager) => {
+      const existingLinks = await manager.query(
+        `SELECT invoice_id, vendor_revision_id, request_hash
+           FROM billing_service_estimate_revision_links
+          WHERE submission_correlation_id = $1
+          FOR UPDATE`,
+        [payload.submissionCorrelationId],
       );
-    }
+      if (existingLinks[0]) {
+        const existing = existingLinks[0];
+        if (
+          existing.invoice_id !== id ||
+          existing.vendor_revision_id !== payload.vendorRevisionId ||
+          existing.request_hash !== requestHash
+        ) {
+          throw new AppError(
+            'Submission correlation ID was already used for different estimate data',
+            409,
+          );
+        }
+        const invoice = await manager
+          .getRepository(Invoice)
+          .findOne({ where: { id }, relations: ['items'] });
+        if (!invoice) throw new AppError('Quotation not found', 404);
+        return { invoice, created: false };
+      }
 
-    // Clear existing items
-    await this.invoiceRepo.clearItems(invoice.id);
+      const invoiceRepo = manager.getRepository(Invoice);
+      const invoice = await invoiceRepo.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!invoice) throw new AppError('Quotation not found', 404);
+      // A concurrent request with the same correlation may have committed while this
+      // request waited for the invoice lock. Re-check after acquiring the lock.
+      const committedLink = await manager.query(
+        `SELECT invoice_id, vendor_revision_id, request_hash
+           FROM billing_service_estimate_revision_links
+          WHERE submission_correlation_id = $1`,
+        [payload.submissionCorrelationId],
+      );
+      if (committedLink[0]) {
+        const existing = committedLink[0];
+        if (
+          existing.invoice_id !== id ||
+          existing.vendor_revision_id !== payload.vendorRevisionId ||
+          existing.request_hash !== requestHash
+        ) {
+          throw new AppError(
+            'Submission correlation ID was already used for different estimate data',
+            409,
+          );
+        }
+        return {
+          invoice: (await invoiceRepo.findOne({ where: { id }, relations: ['items'] })) || invoice,
+          created: false,
+        };
+      }
+      if (invoice.billType !== BillType.SERVICE)
+        throw new AppError('Only service quotations can be revised', 400);
+      if (invoice.status !== InvoiceStatus.FINANCE_REJECTED) {
+        throw new AppError(
+          'A service estimate can only be resubmitted after Finance rejection',
+          409,
+        );
+      }
+      if (
+        [
+          InvoiceStatus.CUSTOMER_ACCEPTED,
+          InvoiceStatus.ACTIVE_CONTRACT,
+          InvoiceStatus.PAID,
+        ].includes(invoice.status)
+      ) {
+        throw new AppError(
+          'Cannot revise an estimate that has already been approved by the customer',
+          400,
+        );
+      }
 
-    const invoiceItemRepo = Source.getRepository(InvoiceItem);
-    const invoiceItems = payload.items.map((it) => {
-      const invItem = new InvoiceItem();
-      invItem.invoice = invoice;
-      invItem.itemType = ItemType.PRODUCT;
-      invItem.description = it.description;
-      invItem.quantity = it.quantity;
-      invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
-      // What the line is worth, even when covered — display only, never totalled.
-      invItem.listUnitPrice = Number(it.listUnitPrice) || Number(it.unitPrice) || null;
-      return invItem;
+      const oldStatus = invoice.status;
+      const billingRevision = (Number(invoice.revisionCount) || 0) + 1;
+      const invoiceItemRepo = manager.getRepository(InvoiceItem);
+      await invoiceItemRepo
+        .createQueryBuilder()
+        .delete()
+        .where('"invoiceId" = :id', { id })
+        .execute();
+      const invoiceItems = payload.items.map((it) =>
+        invoiceItemRepo.create({
+          invoice,
+          itemType: ItemType.PRODUCT,
+          description: it.description,
+          quantity: it.quantity,
+          unitPrice: it.isFree ? 0 : it.unitPrice,
+          listUnitPrice: Number(it.listUnitPrice) || Number(it.unitPrice) || null,
+        }),
+      );
+      if (Number(payload.labourCost) > 0)
+        invoiceItems.push(
+          invoiceItemRepo.create({
+            invoice,
+            itemType: ItemType.PRODUCT,
+            description: 'Labor Cost / Service Charge',
+            quantity: 1,
+            unitPrice: Number(payload.labourCost),
+            listUnitPrice: Number(payload.labourCost),
+          }),
+        );
+      await invoiceItemRepo.save(invoiceItems);
+
+      const itemsTotal =
+        payload.items.reduce(
+          (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
+          0,
+        ) + (Number(payload.labourCost) || 0);
+      const visitCharge = Number(payload.visitChargeAmount) || 0;
+      const discount = Number(payload.discountAmount) || 0;
+      invoice.visitChargeAmount = visitCharge;
+      invoice.visitChargeMethod = payload.visitChargeMethod || null;
+      invoice.totalDiscountAmount = discount;
+      invoice.technicianNoteToFinance = payload.technicianNoteToFinance;
+      invoice.totalAmount =
+        itemsTotal +
+        (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) -
+        discount;
+      invoice.status = InvoiceStatus.WAITING_FINANCE_APPROVAL;
+      invoice.financeRemarks = undefined;
+      invoice.estimateExpired = false;
+      invoice.revisionCount = billingRevision;
+      const persisted = await invoiceRepo.save(invoice);
+
+      await manager.query(
+        `INSERT INTO billing_service_estimate_revision_links
+          (submission_correlation_id, invoice_id, service_ticket_id, vendor_revision_id, billing_revision, request_hash, request_payload)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+        [
+          payload.submissionCorrelationId,
+          id,
+          invoice.serviceTicketId,
+          payload.vendorRevisionId,
+          billingRevision,
+          requestHash,
+          JSON.stringify({
+            items: payload.items,
+            visitChargeAmount: visitCharge,
+            visitChargeMethod: payload.visitChargeMethod,
+            discountAmount: discount,
+            technicianNoteToFinance: payload.technicianNoteToFinance,
+            labourCost: Number(payload.labourCost) || 0,
+            totalAmount: Number(persisted.totalAmount),
+          }),
+        ],
+      );
+      await manager.getRepository(AuditLog).save(
+        manager.getRepository(AuditLog).create({
+          entityId: id,
+          action: 'SERVICE_ESTIMATE_REVISED',
+          performedBy: userId,
+          oldValue: String(oldStatus),
+          newValue: InvoiceStatus.WAITING_FINANCE_APPROVAL,
+          details: `Service estimate revision ${billingRevision} submitted for Finance approval; vendor revision ${payload.vendorRevisionId}.`,
+        }),
+      );
+      return { invoice: persisted, created: true };
     });
-    await invoiceItemRepo.save(invoiceItems);
-
-    const itemsTotal = payload.items.reduce(
-      (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
-      0,
-    );
-    const visitCharge = Number(payload.visitChargeAmount) || 0;
-    const discount = Number(payload.discountAmount) || 0;
-    const finalTotal =
-      itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
-
-    invoice.visitChargeAmount = visitCharge;
-    invoice.visitChargeMethod = payload.visitChargeMethod || null;
-    invoice.totalDiscountAmount = discount;
-    invoice.technicianNoteToFinance = payload.technicianNoteToFinance;
-    invoice.totalAmount = finalTotal;
-
-    invoice.status = InvoiceStatus.WAITING_FINANCE_APPROVAL;
-    invoice.estimateExpired = false;
-    invoice.revisionCount = (invoice.revisionCount || 0) + 1;
-
-    const saved = await this.invoiceRepo.save(invoice);
-
-    // Break circular reference
-    invoiceItems.forEach((item) => {
-      delete (item as { invoice?: unknown }).invoice;
-    });
-    saved.items = invoiceItems;
+    const saved = submissionResult.invoice;
 
     // Notify Finance Staff
-    if (saved.branchId) {
+    if (submissionResult.created && saved.branchId) {
       try {
         const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
         const { SERVICE_ESTIMATE_REVISED } = await import('../constants/notificationTypes');
@@ -5233,7 +5439,7 @@ export class BillingService {
         await NotificationPublisher.publishInAppRequest({
           recipientIds: actionRequiredNotificationRecipients(financeIds, saved.createdBy),
           title: 'Estimate Revision Submitted',
-          message: `A revised service estimate for customer ${customerName} (ticket ${invoice.serviceTicketId}) has been submitted for finance review.`,
+          message: `A revised service estimate for customer ${customerName} (ticket ${saved.serviceTicketId}) has been submitted for finance review.`,
           type: SERVICE_ESTIMATE_REVISED,
           referenceId: saved.id,
           referenceType: 'QUOTATION',
@@ -5296,61 +5502,138 @@ export class BillingService {
     },
     userId: string,
   ): Promise<Invoice> {
-    const invoice = await this.invoiceRepo.findById(id);
-    if (!invoice) throw new AppError('Quotation not found', 404);
-
-    if (
-      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
-      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
-    ) {
-      throw new AppError('Quotation must be in a pending approval state', 400);
-    }
+    const currentInvoice = await this.invoiceRepo.findById(id);
+    if (!currentInvoice) throw new AppError('Quotation not found', 404);
 
     const days = Number(payload.extensionDays) || 0;
     const fee = Number(payload.extensionFee) || 0;
-
-    const baseValidUntil = new Date();
     const totalDays = 30 + days;
+    const baseValidUntil = new Date();
     baseValidUntil.setDate(baseValidUntil.getDate() + totalDays);
+    let linkedRevision = false;
+    let saved: Invoice;
 
-    invoice.estimateValidUntil = baseValidUntil;
-    invoice.estimateExpired = false;
-    invoice.validityExtensionDays = days;
-    invoice.validityExtensionFee = fee;
-    invoice.expiryDate = baseValidUntil;
-    invoice.validityDays = totalDays;
+    if (currentInvoice.billType === BillType.SERVICE && Number(currentInvoice.revisionCount) > 0) {
+      saved = await Source.transaction(async (manager) => {
+        const repo = manager.getRepository(Invoice);
+        const invoice = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+        if (!invoice) throw new AppError('Quotation not found', 404);
+        if (!canDecideServiceQuotation(invoice.status))
+          throw new AppError('Quotation must be in a pending approval state', 409);
+        const links = await manager.query(
+          `SELECT service_ticket_id, vendor_revision_id, billing_revision FROM billing_service_estimate_revision_links
+            WHERE invoice_id=$1 AND billing_revision=$2 FOR UPDATE`,
+          [invoice.id, invoice.revisionCount],
+        );
+        const link = links[0];
+        if (!link)
+          throw new AppError(
+            'Service estimate revision correlation is missing; validity decision was not recorded',
+            409,
+          );
+        const oldStatus = invoice.status;
+        const decidedAt = new Date();
+        invoice.estimateValidUntil = baseValidUntil;
+        invoice.estimateExpired = false;
+        invoice.validityExtensionDays = days;
+        invoice.validityExtensionFee = fee;
+        invoice.expiryDate = baseValidUntil;
+        invoice.validityDays = totalDays;
+        invoice.status = InvoiceStatus.FINANCE_APPROVED;
+        invoice.financeApprovedBy = userId;
+        invoice.financeApprovedAt = decidedAt;
+        if (fee > 0) {
+          invoice.validityExtensionFeeAdded = true;
+          invoice.totalAmount = Number(invoice.totalAmount || 0) + fee;
+          await manager.getRepository(InvoiceItem).save(
+            manager.getRepository(InvoiceItem).create({
+              invoice,
+              itemType: ItemType.PRICING_RULE,
+              description: `Validity Extension Fee (${days} Days)`,
+              quantity: 1,
+              unitPrice: fee,
+            }),
+          );
+        }
+        const persisted = await repo.save(invoice);
+        await manager.getRepository(AuditLog).save(
+          manager.getRepository(AuditLog).create({
+            entityId: invoice.id,
+            action: 'STATUS_CHANGE',
+            performedBy: userId,
+            oldValue: String(oldStatus),
+            newValue: InvoiceStatus.FINANCE_APPROVED,
+            details: `Finance approved quotation validity extension. Days: ${days}, Fee: ${fee}.`,
+          }),
+        );
+        const event = createServiceEstimateDecisionEvent({
+          invoiceId: invoice.id,
+          serviceTicketId: link.service_ticket_id,
+          vendorRevisionId: link.vendor_revision_id,
+          billingRevision: Number(link.billing_revision),
+          decision: 'APPROVED',
+          decidedBy: userId,
+          decidedAt: decidedAt.toISOString(),
+          reason: null,
+          invoiceStatus: 'FINANCE_APPROVED',
+          estimateValidUntil: baseValidUntil.toISOString(),
+        });
+        await manager.query(
+          `INSERT INTO billing_service_estimate_decision_outbox (event_id, invoice_id, payload) VALUES ($1,$2,$3::jsonb)`,
+          [event.eventId, invoice.id, JSON.stringify(event)],
+        );
+        return persisted;
+      });
+      linkedRevision = true;
+    } else {
+      const invoice = currentInvoice;
 
-    const oldStatus = invoice.status;
-    invoice.status = InvoiceStatus.FINANCE_APPROVED;
-    invoice.financeApprovedBy = userId;
-    invoice.financeApprovedAt = new Date();
+      if (
+        invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+        invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
+      ) {
+        throw new AppError('Quotation must be in a pending approval state', 400);
+      }
 
-    if (fee > 0) {
-      invoice.validityExtensionFeeAdded = true;
-      const invoiceItemRepo = Source.getRepository(InvoiceItem);
-      const feeItem = new InvoiceItem();
-      feeItem.invoice = invoice;
-      feeItem.itemType = ItemType.PRICING_RULE;
-      feeItem.description = `Validity Extension Fee (${days} Days)`;
-      feeItem.quantity = 1;
-      feeItem.unitPrice = fee;
-      await invoiceItemRepo.save(feeItem);
+      invoice.estimateValidUntil = baseValidUntil;
+      invoice.estimateExpired = false;
+      invoice.validityExtensionDays = days;
+      invoice.validityExtensionFee = fee;
+      invoice.expiryDate = baseValidUntil;
+      invoice.validityDays = totalDays;
 
-      invoice.totalAmount = Number(invoice.totalAmount || 0) + fee;
+      const oldStatus = invoice.status;
+      invoice.status = InvoiceStatus.FINANCE_APPROVED;
+      invoice.financeApprovedBy = userId;
+      invoice.financeApprovedAt = new Date();
+
+      if (fee > 0) {
+        invoice.validityExtensionFeeAdded = true;
+        const invoiceItemRepo = Source.getRepository(InvoiceItem);
+        const feeItem = new InvoiceItem();
+        feeItem.invoice = invoice;
+        feeItem.itemType = ItemType.PRICING_RULE;
+        feeItem.description = `Validity Extension Fee (${days} Days)`;
+        feeItem.quantity = 1;
+        feeItem.unitPrice = fee;
+        await invoiceItemRepo.save(feeItem);
+
+        invoice.totalAmount = Number(invoice.totalAmount || 0) + fee;
+      }
+
+      saved = await this.invoiceRepo.save(invoice);
+      await logAudit(
+        invoice.id,
+        'STATUS_CHANGE',
+        userId,
+        `Finance approved quotation with validity extension. Days: ${days}, Fee: ${fee}.`,
+        oldStatus,
+        InvoiceStatus.FINANCE_APPROVED,
+      );
     }
 
-    const saved = await this.invoiceRepo.save(invoice);
-    await logAudit(
-      invoice.id,
-      'STATUS_CHANGE',
-      userId,
-      `Finance approved quotation with validity extension. Days: ${days}, Fee: ${fee}.`,
-      oldStatus,
-      InvoiceStatus.FINANCE_APPROVED,
-    );
-
     // Callbacks to ven_inv_service
-    if (invoice.serviceTicketId) {
+    if (saved.serviceTicketId && !linkedRevision) {
       try {
         const { sign } = await import('jsonwebtoken');
         const token = sign(
@@ -5361,7 +5644,7 @@ export class BillingService {
 
         const venInvUrl = process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
         await globalThis.fetch(
-          `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/quotation-link`,
+          `${venInvUrl}/service/tickets/${saved.serviceTicketId}/quotation-link`,
           {
             method: 'PATCH',
             headers: {
@@ -5369,18 +5652,18 @@ export class BillingService {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              serviceQuotationId: invoice.id,
+              serviceQuotationId: saved.id,
               status: 'FINANCE_APPROVED',
             }),
           },
         );
         logger.info(
-          `[BillingService] Sent finance approval callback for service ticket ${invoice.serviceTicketId}`,
+          `[BillingService] Sent finance approval callback for service ticket ${saved.serviceTicketId}`,
         );
 
-        if (invoice.billType === 'SERVICE') {
+        if (saved.billType === 'SERVICE') {
           await globalThis.fetch(
-            `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/finance-approved`,
+            `${venInvUrl}/service/tickets/${saved.serviceTicketId}/finance-approved`,
             {
               method: 'PATCH',
               headers: {

@@ -92,6 +92,9 @@ const startServer = async () => {
 
     // Open the communication channel (RabbitMQ)
     await getRabbitChannel();
+    const { startServiceEstimateDecisionOutbox } =
+      await import('./services/serviceEstimateDecisionOutbox');
+    startServiceEstimateDecisionOutbox();
 
     // Start Contract Expiry Scheduler
     const { startContractExpiryScheduler, startReminderCronJobs, startTargetFinalizationCron } =

@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
-import { IsNull, FindOptionsWhere, In, Not, Between } from 'typeorm';
+import { IsNull, FindOptionsWhere, In, Not, Between, EntityManager } from 'typeorm';
 import {
   generateServiceQuotationPdf,
   generateServiceCompletionBillPdf,
@@ -53,6 +53,11 @@ import {
 } from '../helpers/contractCoverageHelper';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
+import {
+  canReviewServiceEstimateBranch,
+  serviceAssignmentRecipients,
+  serviceEstimateDecisionRecipients,
+} from '../helpers/notificationRecipientPolicy';
 import axios from 'axios';
 import { sign } from 'jsonwebtoken';
 import { logger } from '../config/logger';
@@ -69,7 +74,7 @@ import {
   WarrantyEvaluation,
 } from '../helpers/warrantyHelper';
 import { deleteCached } from '../utils/cacheUtil';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { recordMeterReading, totalFromCounters } from '../helpers/meterReadingHelper';
 import { calculateCatalogServicePartCost } from '../helpers/servicePartCost';
 
@@ -218,11 +223,12 @@ export class ServiceController {
         | 'STOCK_TRANSFER'
         | 'CUSTOM_PART_REQUEST';
     },
+    excludedRecipientIds: string[] = [],
   ): Promise<void> {
     try {
       const branchRepo = Source.getRepository(Branch);
       const branch = await branchRepo.findOne({ where: { id: branchId } });
-      if (branch?.manager_id) {
+      if (branch?.manager_id && !excludedRecipientIds.includes(branch.manager_id)) {
         await NotificationPublisher.publishInAppRequest({
           recipientId: branch.manager_id,
           ...notification,
@@ -231,6 +237,46 @@ export class ServiceController {
     } catch (err) {
       logger.error('Failed to notify branch manager:', err);
     }
+  }
+
+  private async notifyCustomerEstimateDecision(
+    ticket: ServiceTicket,
+    decision: 'APPROVED' | 'REJECTED',
+    reason?: string,
+    estimate?: Pick<ServiceEstimate, 'id' | 'version'>,
+  ): Promise<void> {
+    let branchManagerId: string | null | undefined;
+    if (decision === 'REJECTED') {
+      try {
+        const branch = await Source.getRepository(Branch).findOne({
+          where: { id: ticket.branchId },
+        });
+        branchManagerId = branch?.manager_id;
+      } catch (err) {
+        logger.warn('Could not resolve branch manager for customer estimate decision notice:', err);
+      }
+    }
+    const recipients = serviceEstimateDecisionRecipients(
+      ticket.assignedTechnicianId,
+      ticket.createdBy,
+      decision === 'REJECTED' ? branchManagerId : undefined,
+    );
+    if (recipients.length === 0) return;
+
+    await NotificationPublisher.publishInAppRequest({
+      recipientIds: recipients,
+      title: decision === 'APPROVED' ? 'Customer Approved Service' : 'Customer Rejected Estimate',
+      message:
+        decision === 'APPROVED'
+          ? `Customer approved the service estimate for ticket ${ticket.ticketNumber}. Repair work can start.`
+          : `Customer rejected the service estimate for ticket ${ticket.ticketNumber}.${reason ? ` Reason: ${reason}.` : ''}`,
+      type: decision === 'APPROVED' ? 'TASK' : 'WARNING',
+      referenceId: ticket.id,
+      referenceType: 'SERVICE_TICKET',
+      referenceData: estimate
+        ? { estimateId: estimate.id, estimateVersion: estimate.version }
+        : undefined,
+    });
   }
 
   /**
@@ -340,6 +386,52 @@ export class ServiceController {
       throw error;
     } finally {
       await runner.release();
+    }
+  }
+
+  private async reserveRevisionPart(
+    manager: EntityManager,
+    ticketId: string,
+    revisionId: string,
+    sparePartId: string,
+    quantity: number,
+  ): Promise<void> {
+    if (!Number.isInteger(quantity) || quantity <= 0)
+      throw new AppError('Reserved part quantity must be a positive whole number', 400);
+    const part = await manager.findOne(SparePart, {
+      where: { id: sparePartId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!part) throw new AppError(`Spare part not found: ${sparePartId}`, 404);
+    const reservationRepo = manager.getRepository(InventoryReservation);
+    const reservation = await reservationRepo.findOne({
+      where: { ticketId, revisionId, sparePartId, status: 'RESERVED' },
+      lock: { mode: 'pessimistic_write' },
+    });
+    const alreadyReserved = reservation?.reservedQuantity || 0;
+    const delta = Math.max(0, quantity - alreadyReserved);
+    if (delta === 0) return;
+    if (part.quantity < delta)
+      throw new AppError(
+        `Insufficient inventory for part: ${part.part_name}. Available: ${part.quantity}, Requested: ${delta}`,
+        400,
+      );
+    part.quantity -= delta;
+    part.reserved_quantity += delta;
+    await manager.save(SparePart, part);
+    if (reservation) {
+      reservation.reservedQuantity += delta;
+      await reservationRepo.save(reservation);
+    } else {
+      await reservationRepo.save(
+        reservationRepo.create({
+          ticketId,
+          revisionId,
+          sparePartId,
+          reservedQuantity: delta,
+          status: 'RESERVED',
+        }),
+      );
     }
   }
 
@@ -515,19 +607,7 @@ export class ServiceController {
       opts.actorId,
     );
 
-    const recipients = new Set<string>();
-    if (ticket.assignedTechnicianId) recipients.add(ticket.assignedTechnicianId);
-    if (ticket.createdBy) recipients.add(ticket.createdBy);
-    for (const recipientId of recipients) {
-      await NotificationPublisher.publishInAppRequest({
-        recipientId,
-        title: 'Customer Approved Service',
-        message: `Customer approved the service estimate for ticket ${ticket.ticketNumber}. Repair work can start.`,
-        type: 'TASK',
-        referenceId: ticket.id,
-        referenceType: 'SERVICE',
-      });
-    }
+    await this.notifyCustomerEstimateDecision(ticket, 'APPROVED', undefined, estimate);
   }
 
   /**
@@ -571,26 +651,7 @@ export class ServiceController {
       opts.actorId,
     );
 
-    const recipients = new Set<string>();
-    if (ticket.assignedTechnicianId) recipients.add(ticket.assignedTechnicianId);
-    if (ticket.createdBy) recipients.add(ticket.createdBy);
-    for (const recipientId of recipients) {
-      await NotificationPublisher.publishInAppRequest({
-        recipientId,
-        title: 'Customer Rejected Estimate',
-        message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
-        type: 'WARNING',
-        referenceId: ticket.id,
-        referenceType: 'SERVICE',
-      });
-    }
-    await this.notifyBranchManager(ticket.branchId, {
-      title: 'Customer Rejected Estimate',
-      message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
-      type: 'WARNING',
-      referenceId: ticket.id,
-      referenceType: 'SERVICE',
-    });
+    await this.notifyCustomerEstimateDecision(ticket, 'REJECTED', reason, estimate);
   }
 
   /**
@@ -714,7 +775,7 @@ export class ServiceController {
   }
 
   private assertFinanceBranchAccess(req: Request, ticket: ServiceTicket) {
-    if (req.user?.role !== 'ADMIN' && req.user?.branchId && req.user.branchId !== ticket.branchId) {
+    if (!canReviewServiceEstimateBranch(req.user?.role, req.user?.branchId, ticket.branchId)) {
       throw new AppError('You are not authorized to review estimates for this branch', 403);
     }
   }
@@ -1474,9 +1535,14 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
-      if (isReassignment && previousTechnicianId) {
+      const assignmentRecipients = serviceAssignmentRecipients(
+        assignedTechnicianId,
+        previousTechnicianId,
+      );
+      const assignmentChanged = previousTechnicianId !== assignedTechnicianId;
+      if (assignmentChanged && isReassignment && assignmentRecipients.previous.length > 0) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: previousTechnicianId,
+          recipientIds: assignmentRecipients.previous,
           title: 'Reassigned from Service Job',
           message: `Ticket ${ticket.ticketNumber} has been reassigned to another technician.`,
           type: 'INFO',
@@ -1485,26 +1551,31 @@ Xerocare Technical Services`;
         });
       }
 
-      await NotificationPublisher.publishInAppRequest({
-        recipientId: assignedTechnicianId,
-        title: isReassignment ? 'Service Job Reassigned to You' : 'New Service Job Assigned',
-        message: `You have been assigned to service ticket ${ticket.ticketNumber}. Scheduled visit: ${ticket.scheduledVisitDate?.toLocaleDateString() || 'N/A'}.`,
-        type: 'TASK',
-        referenceId: ticket.id,
-        referenceType: 'SERVICE',
-      });
+      if (assignmentChanged && assignmentRecipients.assigned.length > 0)
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: assignmentRecipients.assigned,
+          title: isReassignment ? 'Service Job Reassigned to You' : 'New Service Job Assigned',
+          message: `You have been assigned to service ticket ${ticket.ticketNumber}. Scheduled visit: ${ticket.scheduledVisitDate?.toLocaleDateString() || 'N/A'}.`,
+          type: 'TASK',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
 
       // Skip when the Manager themselves made the assignment — no need to tell
       // them what they just did. Admin/Service Help Desk assignments still
       // notify the branch Manager, since they may not be the one who acted.
-      if (req.user?.role !== 'MANAGER') {
-        await this.notifyBranchManager(ticket.branchId, {
-          title: isReassignment ? 'Service Ticket Reassigned' : 'Technician Assigned to Ticket',
-          message: `Ticket ${ticket.ticketNumber} has been ${isReassignment ? 'reassigned' : 'assigned'} to a technician.`,
-          type: 'INFO',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
+      if (assignmentChanged && req.user?.role !== 'MANAGER') {
+        await this.notifyBranchManager(
+          ticket.branchId,
+          {
+            title: isReassignment ? 'Service Ticket Reassigned' : 'Technician Assigned to Ticket',
+            message: `Ticket ${ticket.ticketNumber} has been ${isReassignment ? 'reassigned' : 'assigned'} to a technician.`,
+            type: 'INFO',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE',
+          },
+          [...assignmentRecipients.assigned, ...assignmentRecipients.previous],
+        );
       }
 
       res.status(200).json({ success: true, data: ticket });
@@ -2140,117 +2211,113 @@ Xerocare Technical Services`;
   submitEstimateForApproval = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id as string;
-      const estimateRepo = Source.getRepository(ServiceEstimate);
-      const estimate = await estimateRepo.findOne({
-        where: { ticketId: String(id), status: ServiceEstimateStatus.DRAFT },
-        relations: ['items'],
-      });
-      if (!estimate) {
-        const alreadySubmitted = await estimateRepo.findOne({
-          where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
+      const runner = Source.createQueryRunner();
+      let ticket: ServiceTicket;
+      let estimate: ServiceEstimate;
+      try {
+        await runner.connect();
+        await runner.startTransaction();
+        // Serialize submissions for this ticket. A waiter re-reads the estimate
+        // after acquiring the row lock and returns the already-pending record.
+        ticket = (await runner.manager.findOne(ServiceTicket, {
+          where: { id: String(id) },
+          lock: { mode: 'pessimistic_write' },
+        })) as ServiceTicket;
+        if (!ticket) throw new AppError('Service ticket not found', 404);
+
+        const estimateRepo = runner.manager.getRepository(ServiceEstimate);
+        const draft = await estimateRepo.findOne({
+          where: { ticketId: String(id), status: ServiceEstimateStatus.DRAFT },
           relations: ['items'],
-          order: { version: 'DESC', created_at: 'DESC' },
         });
-        if (alreadySubmitted) {
+        if (!draft) {
+          const alreadySubmitted = await estimateRepo.findOne({
+            where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
+            relations: ['items'],
+            order: { version: 'DESC', created_at: 'DESC' },
+          });
+          if (!alreadySubmitted) throw new Error('Draft estimate not found');
+          await runner.commitTransaction();
           return res.status(200).json({ success: true, data: alreadySubmitted });
         }
-        throw new Error('Draft estimate not found');
-      }
 
-      estimate.status = ServiceEstimateStatus.WAITING_FINANCE_APPROVAL;
-      await estimateRepo.save(estimate);
+        estimate = draft;
+        estimate.status = ServiceEstimateStatus.WAITING_FINANCE_APPROVAL;
+        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+        await estimateRepo.save(estimate);
+        await runner.manager.getRepository(ServiceTicket).save(ticket);
+        await runner.commitTransaction();
+      } catch (error) {
+        if (runner.isTransactionActive) await runner.rollbackTransaction();
+        throw error;
+      } finally {
+        await runner.release();
+      }
 
       const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
-      if (ticket) {
-        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
-
-        // Post the Track B estimate to the billing service to generate a service quotation
-        const billingItems = (estimate.items || [])
-          .filter((it) => it.isApproved && !it.isFree && Number(it.totalPrice) > 0)
-          .map((it) => ({
-            description: it.partName || it.sku || 'Spare Part',
-            quantity: Number(it.quantity) || 1,
-            unitPrice: Number(it.unitPrice) || 0,
-            isFree: !!it.isFree,
-          }));
-
-        if (Number(estimate.labourCost) > 0) {
-          billingItems.push({
-            description: 'Labour Charges',
-            quantity: 1,
-            unitPrice: Number(estimate.labourCost),
-            isFree: false,
-          });
-        }
-
-        try {
-          if (Number(estimate.totalCost) > 0) {
-            const token = sign(
-              { userId: 'ven_inv_service', role: 'ADMIN' },
-              ACCESS_SECRET as string,
-              {
-                expiresIn: '1m',
-              },
-            );
-
-            const response = await axios.post(
-              `${BILLING_SERVICE_URL}/invoices/service-quotation`,
-              {
-                customerId: ticket.customerId,
-                branchId: ticket.branchId,
-                createdBy: req.user?.userId || 'SYSTEM',
-                serviceTicketId: ticket.id,
-                items: billingItems,
-                saleType: 'SERVICE',
-                status: 'WAITING_FINANCE_APPROVAL',
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              },
-            );
-
-            if (response.data?.success) {
-              ticket.serviceQuotationId = response.data.data.id;
-              ticket.estimateSentToFinance = true;
-            }
+      const billingItems = (estimate.items || [])
+        .filter((it) => it.isApproved && !it.isFree && Number(it.totalPrice) > 0)
+        .map((it) => ({
+          description: it.partName || it.sku || 'Spare Part',
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          isFree: !!it.isFree,
+        }));
+      if (Number(estimate.labourCost) > 0)
+        billingItems.push({
+          description: 'Labour Charges',
+          quantity: 1,
+          unitPrice: Number(estimate.labourCost),
+          isFree: false,
+        });
+      try {
+        if (Number(estimate.totalCost) > 0) {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            { expiresIn: '1m' },
+          );
+          const response = await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
+            {
+              customerId: ticket.customerId,
+              branchId: ticket.branchId,
+              createdBy: req.user?.userId || 'SYSTEM',
+              serviceTicketId: ticket.id,
+              items: billingItems,
+              saleType: 'SERVICE',
+              status: 'WAITING_FINANCE_APPROVAL',
+            },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (response.data?.success) {
+            ticket.serviceQuotationId = response.data.data.id;
+            ticket.estimateSentToFinance = true;
           }
-        } catch (billingErr) {
-          logger.error('Failed to post Track B estimate to billing service:', billingErr);
         }
-
-        await ticketRepo.save(ticket);
+      } catch (billingErr) {
+        logger.error('Failed to post Track B estimate to billing service:', billingErr);
       }
-
+      await ticketRepo.save(ticket);
       await this.logActivity(
         id,
         'ESTIMATE_SUBMITTED',
-        `Estimate submitted for internal finance approval.`,
+        'Estimate submitted for internal finance approval.',
         req.user?.userId,
       );
-
       try {
-        const branchId = ticket?.branchId;
-        const financeEmployees = await getFinanceEmployeesByBranch(branchId);
-        const customerName = await getCustomerName(ticket?.customerId || undefined);
-        const totalCost = estimate.totalCost;
-
-        for (const financeEmployeeId of financeEmployees) {
-          try {
-            await NotificationPublisher.publishInAppRequest({
-              recipientId: financeEmployeeId,
-              title: 'Service Estimate Pending Approval',
-              message: `Service estimate for ticket ${ticket?.ticketNumber} (${customerName} — ${ticket?.productBrand} ${ticket?.productModel}) requires your review. Total: QAR ${totalCost}. Please approve or reject.`,
-              type: 'SERVICE_QUOTE_PENDING_FINANCE',
-              referenceId: ticket?.id || '',
-              referenceType: 'SERVICE_TICKET',
-            });
-          } catch (err) {
-            console.error('Notification failed (non-blocking):', err);
-          }
-        }
+        const financeEmployees = await getFinanceEmployeesByBranch(ticket.branchId);
+        const customerName = await getCustomerName(ticket.customerId || undefined);
+        if (financeEmployees.length > 0)
+          await NotificationPublisher.publishInAppRequest({
+            recipientIds: financeEmployees,
+            title: 'Service Estimate Pending Approval',
+            message: `Service estimate v${estimate.version} for ticket ${ticket.ticketNumber} (${customerName} — ${ticket.productBrand} ${ticket.productModel}) requires your review. Total: QAR ${estimate.totalCost}. Please approve or reject.`,
+            type: 'SERVICE_QUOTE_PENDING_FINANCE',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE_TICKET',
+            referenceData: { estimateId: estimate.id, estimateVersion: estimate.version },
+          });
       } catch (e) {
         logger.warn('Failed to notify finance users:', e);
       }
@@ -2305,16 +2372,33 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
-      await this.notifyBranchManager(ticket.branchId, {
-        title: 'Estimate Approved by Finance',
-        message:
-          Number(estimate.totalCost) <= 0
-            ? `Covered service for ticket ${ticket.ticketNumber} approved by Finance. Parts reserved; ready for repair.`
-            : `Service Estimate for ticket ${ticket.ticketNumber} approved by Finance. Ready for customer review.`,
-        type: 'INFO',
-        referenceId: ticket.id,
-        referenceType: 'SERVICE',
-      });
+      let branchManagerId: string | null | undefined;
+      try {
+        const branch = await Source.getRepository(Branch).findOne({
+          where: { id: ticket.branchId },
+        });
+        branchManagerId = branch?.manager_id;
+      } catch (err) {
+        logger.warn('Could not resolve branch manager for Finance estimate decision notice:', err);
+      }
+      const recipients = serviceEstimateDecisionRecipients(
+        ticket.assignedTechnicianId,
+        ticket.createdBy,
+        branchManagerId,
+      );
+      if (recipients.length > 0)
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: recipients,
+          title: 'Estimate Approved by Finance',
+          message:
+            Number(estimate.totalCost) <= 0
+              ? `Estimate v${estimate.version} for ticket ${ticket.ticketNumber} approved by Finance. Covered parts reserved; ready for repair.`
+              : `Estimate v${estimate.version} for ticket ${ticket.ticketNumber} approved by Finance. Ready for customer review.`,
+          type: 'INFO',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE_TICKET',
+          referenceData: { estimateId: estimate.id, estimateVersion: estimate.version },
+        });
 
       res.status(200).json({ success: true, data: estimate });
     } catch (error) {
@@ -2389,14 +2473,19 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
-      if (ticket.assignedTechnicianId) {
+      const recipients = serviceEstimateDecisionRecipients(
+        ticket.assignedTechnicianId,
+        ticket.createdBy,
+      );
+      if (recipients.length > 0) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: ticket.assignedTechnicianId,
+          recipientIds: recipients,
           title: 'Estimate Rejected by Finance',
-          message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${remarks}. Please revise.`,
+          message: `Estimate v${estimate.version} for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${remarks}. Please revise.`,
           type: 'TASK',
           referenceId: ticket.id,
-          referenceType: 'SERVICE',
+          referenceType: 'SERVICE_TICKET',
+          referenceData: { estimateId: estimate.id, estimateVersion: estimate.version },
         });
       }
 
@@ -2787,23 +2876,12 @@ Xerocare Technical Services`;
           req.user?.userId,
         );
 
-        if (ticket.assignedTechnicianId) {
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: ticket.assignedTechnicianId,
-            title: 'Customer Rejected Estimate',
-            message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
-            type: 'WARNING',
-            referenceId: ticket.id,
-            referenceType: 'SERVICE',
-          });
-        }
-        await this.notifyBranchManager(ticket.branchId, {
-          title: 'Customer Rejected Estimate',
-          message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
-          type: 'WARNING',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
+        await this.notifyCustomerEstimateDecision(
+          ticket,
+          'REJECTED',
+          String(reason).trim(),
+          estimate,
+        );
       }
 
       res.status(200).json({ success: true, data: estimate });
@@ -2816,15 +2894,37 @@ Xerocare Technical Services`;
    * POST /service/tickets/:id/estimates/revisions
    */
   createEstimateRevision = async (req: Request, res: Response, next: NextFunction) => {
+    const runner = Source.createQueryRunner();
+    let ticket: ServiceTicket | null = null;
+    let revision: ServiceEstimateRevision | null = null;
+    let hasCustomItem = false;
     try {
       const { labourCost, items } = req.body;
       const ticketId = req.params.id as string;
-
-      const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: String(ticketId) } });
+      await runner.connect();
+      await runner.startTransaction();
+      const ticketRepo = runner.manager.getRepository(ServiceTicket);
+      const revisionRepo = runner.manager.getRepository(ServiceEstimateRevision);
+      const estimateRepo = runner.manager.getRepository(ServiceEstimate);
+      const estItemRepo = runner.manager.getRepository(ServiceEstimateItem);
+      ticket = await ticketRepo.findOne({
+        where: { id: String(ticketId) },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!ticket) throw new Error('Ticket not found');
 
-      const estimateRepo = Source.getRepository(ServiceEstimate);
+      // A row lock serializes attempts for this ticket, including the pending
+      // check and all revision writes. Later, legitimate revisions are allowed
+      // after Finance/customer decisions clear the pending state.
+      const pendingRevision = await revisionRepo.findOne({
+        where: { ticketId: String(ticketId), status: 'WAITING_ADDITIONAL_APPROVAL' },
+        order: { version: 'DESC', revisionNumber: 'DESC', submittedAt: 'DESC' },
+      });
+      if (pendingRevision) {
+        await runner.commitTransaction();
+        return res.status(200).json({ success: true, data: pendingRevision });
+      }
+
       const activeEstimate = await estimateRepo.findOne({
         where: { ticketId: String(ticketId), status: ServiceEstimateStatus.CUSTOMER_APPROVED },
       });
@@ -2832,14 +2932,10 @@ Xerocare Technical Services`;
         throw new Error('Cannot create estimate revision without an approved baseline estimate');
       }
 
-      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
       const version = activeEstimate.version + 1;
-
       let revisionTotal = Number(labourCost) || 0;
-      const estItemRepo = Source.getRepository(ServiceEstimateItem);
       const revisionItems: ServiceEstimateItem[] = [];
-
-      const revision = revisionRepo.create({
+      revision = revisionRepo.create({
         estimateId: activeEstimate.id,
         ticketId: String(ticketId),
         version,
@@ -2849,9 +2945,7 @@ Xerocare Technical Services`;
       });
       await revisionRepo.save(revision);
 
-      const sparePartRepo = Source.getRepository(SparePart);
       const revisionCoverage = await this.resolveItemCoverage(ticket);
-      let hasCustomItem = false;
       if (items && Array.isArray(items)) {
         for (const it of items) {
           let partName = it.partName || '';
@@ -2861,14 +2955,14 @@ Xerocare Technical Services`;
           let unitCost = 0;
 
           if (it.sparePartId) {
-            const part = await sparePartRepo.findOne({ where: { id: String(it.sparePartId) } });
+            const part = await runner.manager.getRepository(SparePart).findOne({
+              where: { id: String(it.sparePartId) },
+            });
             if (part) {
               partName = part.part_name;
               sku = part.sku;
               partCategory = part.part_category || null;
-              if (basePrice === 0) {
-                basePrice = Number(part.base_price) || 0;
-              }
+              if (basePrice === 0) basePrice = Number(part.base_price) || 0;
               unitCost = calculateCatalogServicePartCost(part.base_price, 1).unitCost;
             }
           } else {
@@ -2885,28 +2979,35 @@ Xerocare Technical Services`;
           const quantity = it.quantity || 1;
           const itemTotal = finalPrice * quantity;
           revisionTotal += itemTotal;
-
-          const revItem = estItemRepo.create({
-            revisionId: revision.id,
-            itemSource: it.sparePartId
-              ? ServiceEstimateItemSource.SPARE_PART
-              : ServiceEstimateItemSource.CUSTOM,
-            sparePartId: it.sparePartId || null,
-            sku,
-            partName,
-            quantity,
-            unitPrice: finalPrice,
-            totalPrice: itemTotal,
-            isFree: isItemFree,
-            isApproved: false,
-            unitCost,
-            totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
-            listUnitPrice: basePrice,
-            listTotalPrice: basePrice * quantity,
-          });
-          revisionItems.push(revItem);
+          revisionItems.push(
+            estItemRepo.create({
+              revisionId: revision.id,
+              itemSource: it.sparePartId
+                ? ServiceEstimateItemSource.SPARE_PART
+                : ServiceEstimateItemSource.CUSTOM,
+              sparePartId: it.sparePartId || null,
+              sku,
+              partName,
+              quantity,
+              unitPrice: finalPrice,
+              totalPrice: itemTotal,
+              isFree: isItemFree,
+              isApproved: false,
+              unitCost,
+              totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
+              listUnitPrice: basePrice,
+              listTotalPrice: basePrice * quantity,
+            }),
+          );
         }
       }
+
+      revision.totalCost = revisionTotal;
+      revision.items = revisionItems;
+      await revisionRepo.save(revision);
+      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2;
+      await ticketRepo.save(ticket);
+      await runner.commitTransaction();
 
       if (hasCustomItem) {
         await this.notifyBranchManager(ticket.branchId, {
@@ -2918,14 +3019,6 @@ Xerocare Technical Services`;
         });
       }
 
-      revision.totalCost = revisionTotal;
-      revision.items = revisionItems;
-      await revisionRepo.save(revision);
-
-      // Transition ticket status to WAITING_FINANCE_APPROVAL_2
-      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2;
-      await ticketRepo.save(ticket);
-
       await this.logActivity(
         String(ticketId),
         'ESTIMATE_REVISION_CREATED',
@@ -2935,14 +3028,15 @@ Xerocare Technical Services`;
 
       try {
         const financeEmployees = await getFinanceEmployeesByBranch(ticket.branchId);
-        for (const financeEmployeeId of financeEmployees) {
+        if (financeEmployees.length > 0) {
           await NotificationPublisher.publishInAppRequest({
-            recipientId: financeEmployeeId,
+            recipientIds: financeEmployees,
             title: 'Estimate Revision Approval Required',
-            message: `Service Estimate Revision v${version} for ticket ${ticket.ticketNumber} is waiting finance approval.`,
-            type: 'TASK',
-            referenceId: revision.id,
-            referenceType: 'SERVICE',
+            message: `Service estimate revision v${version} for ticket ${ticket.ticketNumber} is waiting Finance approval.`,
+            type: 'SERVICE_QUOTE_PENDING_FINANCE',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE_TICKET',
+            referenceData: { revisionId: revision.id, revisionVersion: revision.version },
           });
         }
       } catch (e) {
@@ -2951,7 +3045,10 @@ Xerocare Technical Services`;
 
       res.status(201).json({ success: true, data: revision });
     } catch (error) {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
       next(error);
+    } finally {
+      if (!runner.isReleased) await runner.release();
     }
   };
 
@@ -3007,6 +3104,21 @@ Xerocare Technical Services`;
         `Revision Version ${revision.version} approved by Finance.`,
         req.user?.userId,
       );
+
+      const recipients = serviceEstimateDecisionRecipients(
+        ticket.assignedTechnicianId,
+        ticket.createdBy,
+      );
+      if (recipients.length > 0)
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: recipients,
+          title: 'Estimate Revision Approved by Finance',
+          message: `Additional estimate revision v${revision.version} for ticket ${ticket.ticketNumber} was approved by Finance. Work can proceed.`,
+          type: 'INFO',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE_TICKET',
+          referenceData: { revisionId: revision.id, revisionVersion: revision.version },
+        });
 
       res.status(200).json({ success: true, data: revision });
     } catch (error) {
@@ -3067,6 +3179,21 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
+      const recipients = serviceEstimateDecisionRecipients(
+        ticket.assignedTechnicianId,
+        ticket.createdBy,
+      );
+      if (recipients.length > 0)
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: recipients,
+          title: 'Estimate Revision Rejected by Finance',
+          message: `Additional estimate revision v${revision.version} for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${remarks}.`,
+          type: 'TASK',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE_TICKET',
+          referenceData: { revisionId: revision.id, revisionVersion: revision.version },
+        });
+
       return res.status(200).json({ success: true, data: revision });
     } catch (error) {
       next(error);
@@ -3077,57 +3204,155 @@ Xerocare Technical Services`;
    * POST /service/estimates/revisions/:revisionId/approve-customer
    */
   approveRevisionCustomer = async (req: Request, res: Response, next: NextFunction) => {
+    const runner = Source.createQueryRunner();
     try {
       const revisionId = req.params.revisionId as string;
-      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      await runner.connect();
+      await runner.startTransaction();
+      const revisionRepo = runner.manager.getRepository(ServiceEstimateRevision);
       const revision = await revisionRepo.findOne({
         where: { id: String(revisionId) },
-        relations: ['items'],
+        lock: { mode: 'pessimistic_write' },
       });
-      if (!revision) throw new Error('Revision not found');
-
-      revision.status = 'APPROVED';
-      await revisionRepo.save(revision);
-
-      const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: revision.ticketId } });
-      if (ticket) {
-        ticket.status = ServiceTicketStatus.IN_PROGRESS;
-        await ticketRepo.save(ticket);
+      if (!revision) throw new AppError('Revision not found', 404);
+      revision.items = await runner.manager
+        .getRepository(ServiceEstimateItem)
+        .find({ where: { revisionId: revision.id } });
+      if (revision.status === 'APPROVED' && revision.customerApprovedAt) {
+        await runner.commitTransaction();
+        return res.status(200).json({ success: true, data: revision });
       }
-
-      const estimateRepo = Source.getRepository(ServiceEstimate);
-      const activeEstimate = await estimateRepo.findOne({
-        where: { id: String(revision.estimateId) },
+      if (revision.financeDecision !== 'APPROVED' || revision.status !== 'FINANCE_APPROVED') {
+        throw new AppError(
+          'Customer approval requires Finance approval for this exact revision',
+          409,
+        );
+      }
+      if (revision.billingRevision != null) {
+        const newer = await runner.manager.query(
+          `SELECT id FROM service_estimate_revisions WHERE "ticketId"=$1 AND billing_revision > $2 LIMIT 1`,
+          [revision.ticketId, revision.billingRevision],
+        );
+        if (newer.length) throw new AppError('This estimate revision has been superseded', 409);
+      }
+      const ticket = await runner.manager.findOne(ServiceTicket, {
+        where: { id: revision.ticketId },
+        lock: { mode: 'pessimistic_write' },
       });
-      if (activeEstimate) {
-        activeEstimate.version = revision.version;
-        activeEstimate.labourCost = Number(activeEstimate.labourCost) + Number(revision.labourCost);
-        activeEstimate.totalCost = Number(activeEstimate.totalCost) + Number(revision.totalCost);
-        await estimateRepo.save(activeEstimate);
+      if (!ticket) throw new AppError('Ticket not found', 404);
+      const estimateRepo = runner.manager.getRepository(ServiceEstimate);
+      const activeEstimate = revision.estimateId
+        ? await estimateRepo.findOne({
+            where: { id: revision.estimateId },
+            lock: { mode: 'pessimistic_write' },
+          })
+        : await estimateRepo.findOne({
+            where: { ticketId: revision.ticketId, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
+            lock: { mode: 'pessimistic_write' },
+          });
+      if (!activeEstimate) throw new AppError('The approved baseline estimate was not found', 409);
 
-        const estItemRepo = Source.getRepository(ServiceEstimateItem);
-        for (const item of revision.items) {
-          item.estimateId = activeEstimate.id;
-          item.isApproved = true;
-          await estItemRepo.save(item);
+      const estimateItemRepo = runner.manager.getRepository(ServiceEstimateItem);
+      const ticketItemRepo = runner.manager.getRepository(ServiceTicketItem);
+      const isBillingRevision = revision.billingRevision != null;
+      if (isBillingRevision) {
+        await estimateItemRepo.delete({ estimateId: activeEstimate.id });
+        await ticketItemRepo.delete({ ticketId: ticket.id });
+      }
+      for (const item of revision.items || []) {
+        await estimateItemRepo.save(
+          estimateItemRepo.create({
+            estimateId: activeEstimate.id,
+            itemSource: item.itemSource,
+            sparePartId: item.sparePartId || null,
+            sku: item.sku || null,
+            partName: item.partName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            isFree: item.isFree,
+            isApproved: true,
+            unitCost: item.unitCost,
+            totalCost: item.totalCost,
+            listUnitPrice: item.listUnitPrice,
+            listTotalPrice: item.listTotalPrice,
+          }),
+        );
+      }
+      activeEstimate.version = revision.version;
+      activeEstimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
+      activeEstimate.labourCost = isBillingRevision
+        ? Number(revision.labourCost)
+        : Number(activeEstimate.labourCost) + Number(revision.labourCost);
+      activeEstimate.totalCost = isBillingRevision
+        ? Number(revision.totalCost)
+        : Number(activeEstimate.totalCost) + Number(revision.totalCost);
+      await estimateRepo.save(activeEstimate);
 
-          if (item.itemSource === ServiceEstimateItemSource.SPARE_PART && item.sparePartId) {
-            await this.reserveSparePart(revision.ticketId, item.sparePartId, item.quantity);
-          }
+      const activeTicketItems = (revision.items || []).map((item) =>
+        ticketItemRepo.create({
+          ticketId: ticket.id,
+          itemSource:
+            item.itemSource === ServiceEstimateItemSource.SPARE_PART
+              ? ServiceItemSource.SPARE_PART
+              : ServiceItemSource.CUSTOM,
+          sparePartId: item.sparePartId || null,
+          sku: item.sku || null,
+          partName: item.partName,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice) || 0,
+          totalPrice: Number(item.totalPrice) || 0,
+          isFree: item.isFree,
+          unitCost: Number(item.unitCost) || 0,
+          totalCost: Number(item.totalCost) || 0,
+          listUnitPrice: item.listUnitPrice,
+          listTotalPrice: item.listTotalPrice,
+        }),
+      );
+      if (activeTicketItems.length) await ticketItemRepo.save(activeTicketItems);
+
+      const reserveQuantities = new Map<string, number>();
+      for (const item of revision.items || []) {
+        if (item.itemSource === ServiceEstimateItemSource.SPARE_PART && item.sparePartId) {
+          reserveQuantities.set(
+            item.sparePartId,
+            (reserveQuantities.get(item.sparePartId) || 0) + item.quantity,
+          );
         }
       }
-
-      await this.logActivity(
-        revision.ticketId,
-        'REVISION_CUSTOMER_APPROVED',
-        `Revision Version ${revision.version} approved by Customer. New parts reserved.`,
-        req.user?.userId,
+      for (const [sparePartId, quantity] of reserveQuantities) {
+        await this.reserveRevisionPart(
+          runner.manager,
+          ticket.id,
+          revision.id,
+          sparePartId,
+          quantity,
+        );
+      }
+      revision.status = 'APPROVED';
+      revision.customerApprovedBy = req.user?.userId || null;
+      revision.customerApprovedAt = new Date();
+      await revisionRepo.save(revision);
+      ticket.status = ServiceTicketStatus.IN_PROGRESS;
+      ticket.financeRejectionReason = null;
+      await runner.manager.getRepository(ServiceTicket).save(ticket);
+      await runner.manager.getRepository(ServiceTicketActivity).save(
+        runner.manager.create(ServiceTicketActivity, {
+          ticketId: revision.ticketId,
+          activityType: 'REVISION_CUSTOMER_APPROVED',
+          description: `Revision Version ${revision.version} approved by Customer. New parts reserved.`,
+          performedBy: req.user?.userId || null,
+        }),
       );
-
-      res.status(200).json({ success: true, data: revision });
+      await runner.commitTransaction();
+      for (const item of revision.items || [])
+        if (item.sparePartId) await deleteCached(`sparepart:${item.sparePartId}`);
+      return res.status(200).json({ success: true, data: revision });
     } catch (error) {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
       next(error);
+    } finally {
+      if (!runner.isReleased) await runner.release();
     }
   };
 
@@ -4594,6 +4819,52 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Ticket revisions use the durable Billing decision event. A legacy callback
+      // has no revision identity, so it must not attach an invoice or alter the
+      // workflow state while the ticket is in the additional-approval stage.
+      if (
+        [
+          ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2,
+          ServiceTicketStatus.FINANCE_APPROVED_2,
+          ServiceTicketStatus.ESTIMATE_REVISION_REQUIRED,
+        ].includes(ticket.status)
+      ) {
+        throw new AppError(
+          'Linked estimate decisions must arrive through the Billing decision handoff',
+          409,
+        );
+      }
+
+      const incomingLinkedRevision = serviceQuotationId
+        ? await Source.getRepository(ServiceEstimateRevision).findOne({
+            where: {
+              ticketId: ticket.id,
+              invoiceId: serviceQuotationId,
+              billingRevision: Not(IsNull()),
+            },
+          })
+        : null;
+      const existingLinkedRevision = ticket.serviceQuotationId
+        ? await Source.getRepository(ServiceEstimateRevision).findOne({
+            where: {
+              ticketId: ticket.id,
+              invoiceId: ticket.serviceQuotationId,
+              billingRevision: Not(IsNull()),
+            },
+          })
+        : null;
+      if (existingLinkedRevision && ticket.serviceQuotationId !== serviceQuotationId) {
+        throw new AppError(
+          'A stale quotation callback cannot replace a quotation with linked revisions',
+          409,
+        );
+      }
+      if (incomingLinkedRevision) {
+        ticket.serviceQuotationId = serviceQuotationId;
+        await ticketRepo.save(ticket);
+        return res.status(200).json({ success: true, data: ticket });
+      }
+
       ticket.serviceQuotationId = serviceQuotationId;
       if (status) {
         ticket.status = status;
@@ -4620,6 +4891,34 @@ Xerocare Technical Services`;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
+
+      if (
+        [
+          ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2,
+          ServiceTicketStatus.FINANCE_APPROVED_2,
+          ServiceTicketStatus.ESTIMATE_REVISION_REQUIRED,
+        ].includes(ticket.status)
+      ) {
+        throw new AppError(
+          'Linked estimate decisions must arrive through the Billing decision handoff',
+          409,
+        );
+      }
+
+      const linkedRevision = ticket.serviceQuotationId
+        ? await Source.getRepository(ServiceEstimateRevision).findOne({
+            where: {
+              ticketId: ticket.id,
+              invoiceId: ticket.serviceQuotationId,
+              billingRevision: Not(IsNull()),
+            },
+          })
+        : null;
+      if (linkedRevision)
+        throw new AppError(
+          'Linked estimate decisions must arrive through the Billing decision handoff',
+          409,
+        );
 
       if (
         [
@@ -4657,7 +4956,13 @@ Xerocare Technical Services`;
         where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
         relations: ['items'],
       });
+      ticket.financeRejectionReason = null;
       if (estimate) {
+        estimate.financeDecisionBy = String(req.body?.decidedBy || 'FINANCE');
+        estimate.financeDecisionAt = req.body?.decidedAt
+          ? new Date(req.body.decidedAt)
+          : new Date();
+        estimate.financeDecisionNote = null;
         await this.applyFinanceApproval(estimate, ticket);
       } else {
         ticket.status =
@@ -4665,49 +4970,6 @@ Xerocare Technical Services`;
             ? ServiceTicketStatus.FINANCE_APPROVED_2
             : ServiceTicketStatus.FINANCE_APPROVED;
         await ticketRepo.save(ticket);
-      }
-
-      // Update the latest pending revision for the ticket
-      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
-      const latestRevision = await revisionRepo.findOne({
-        where: { ticketId: String(id), financeDecision: IsNull() },
-        order: { submittedAt: 'DESC' },
-      });
-      if (latestRevision) {
-        latestRevision.financeDecision = 'APPROVED';
-        latestRevision.financeDecisionBy = req.user?.userId || 'FINANCE';
-        latestRevision.financeDecisionAt = new Date();
-
-        let validUntilDate = new Date();
-        validUntilDate.setDate(validUntilDate.getDate() + 30);
-
-        try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-          const approveRes = await axios.post(
-            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-approve-quotation`,
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-          const invoice = approveRes.data.data;
-          if (invoice && invoice.estimateValidUntil) {
-            validUntilDate = new Date(invoice.estimateValidUntil);
-          }
-        } catch (err) {
-          logger.error('Failed to approve invoice in billing service:', err);
-        }
-
-        latestRevision.validUntil = validUntilDate;
-        await revisionRepo.save(latestRevision);
       }
 
       await this.logActivity(
@@ -4770,40 +5032,50 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
-      await ticketRepo.save(ticket);
-
-      // Update the latest pending revision for the ticket
-      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
-      const latestRevision = await revisionRepo.findOne({
-        where: { ticketId: String(id), financeDecision: IsNull() },
-        order: { submittedAt: 'DESC' },
-      });
-      if (latestRevision) {
-        latestRevision.financeDecision = 'REJECTED';
-        latestRevision.financeDecisionBy = req.user?.userId || 'FINANCE';
-        latestRevision.financeDecisionAt = new Date();
-        latestRevision.financeDecisionNote = reason;
-        await revisionRepo.save(latestRevision);
-      }
-
-      // Call billing service to reject invoice
-      try {
-        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
-          expiresIn: '1m',
-        });
-        await axios.post(
-          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-reject`,
-          { reason },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
+      if (
+        [
+          ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2,
+          ServiceTicketStatus.FINANCE_APPROVED_2,
+          ServiceTicketStatus.ESTIMATE_REVISION_REQUIRED,
+        ].includes(ticket.status)
+      ) {
+        throw new AppError(
+          'Linked estimate decisions must arrive through the Billing decision handoff',
+          409,
         );
-      } catch (err) {
-        logger.error('Failed to reject invoice in billing service:', err);
       }
+
+      const linkedRevision = ticket.serviceQuotationId
+        ? await Source.getRepository(ServiceEstimateRevision).findOne({
+            where: {
+              ticketId: ticket.id,
+              invoiceId: ticket.serviceQuotationId,
+              billingRevision: Not(IsNull()),
+            },
+          })
+        : null;
+      if (linkedRevision)
+        throw new AppError(
+          'Linked estimate decisions must arrive through the Billing decision handoff',
+          409,
+        );
+
+      const decisionAt = req.body?.decidedAt ? new Date(req.body.decidedAt) : new Date();
+      const actorId = String(req.body?.decidedBy || 'FINANCE');
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const pendingEstimate = await estimateRepo.findOne({
+        where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
+      });
+      if (pendingEstimate) {
+        pendingEstimate.status = ServiceEstimateStatus.REJECTED;
+        pendingEstimate.financeDecisionBy = actorId;
+        pendingEstimate.financeDecisionAt = decisionAt;
+        pendingEstimate.financeDecisionNote = String(reason).trim();
+        await estimateRepo.save(pendingEstimate);
+      }
+      ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
+      ticket.financeRejectionReason = String(reason).trim();
+      await ticketRepo.save(ticket);
 
       await this.logActivity(
         id,
@@ -4858,7 +5130,7 @@ Xerocare Technical Services`;
         const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
           expiresIn: '1m',
         });
-        await axios.post(
+        const extensionRes = await axios.post(
           `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/finance-extend-validity`,
           { extensionDays, extensionFee: 0 },
           {
@@ -4867,7 +5139,26 @@ Xerocare Technical Services`;
             },
           },
         );
+
+        const billingRevision = Number(extensionRes.data?.data?.revisionCount) || 0;
+        if (billingRevision > 0) {
+          const exactLinkedRevision = await Source.getRepository(ServiceEstimateRevision).findOne({
+            where: { ticketId: ticket.id, invoiceId: ticket.serviceQuotationId, billingRevision },
+          });
+          if (exactLinkedRevision) {
+            return res.status(200).json({
+              success: true,
+              message:
+                'Validity extension approved; linked estimate decision is being synchronized from Billing',
+            });
+          }
+          throw new AppError(
+            'Billing approved a revision without an exact local revision association; reconciliation is required',
+            409,
+          );
+        }
       } catch (err) {
+        if (err instanceof AppError) throw err;
         logger.error('Failed to extend validity in billing service:', err);
         throw new Error('Failed to extend validity in billing service');
       }
@@ -7287,13 +7578,22 @@ For queries contact us at +974 4455 6677`;
       const id = req.params.id as string;
       const {
         items: rawItems,
+        labourCost,
         visitChargeAmount,
         visitChargeMethod,
         discountAmount,
         technicianNoteToFinance,
         revisionType,
+        submissionCorrelationId,
       } = req.body;
       const items = rawItems as ReviseEstimateItem[];
+
+      if (
+        typeof submissionCorrelationId !== 'string' ||
+        !/^[0-9a-f-]{36}$/i.test(submissionCorrelationId)
+      ) {
+        throw new AppError('A stable submission correlation ID is required', 400);
+      }
 
       if (!technicianNoteToFinance) {
         throw new AppError(
@@ -7327,7 +7627,8 @@ For queries contact us at +974 4455 6677`;
         expiresIn: '1m',
       });
 
-      // 1. Fetch current invoice to create a revision snapshot
+      // 1. Fetch Billing before creating the local submission record. The correlation
+      // record is persisted before the Billing request; ticket items remain untouched.
       const getInvoiceRes = await axios.get(
         `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
         {
@@ -7337,27 +7638,96 @@ For queries contact us at +974 4455 6677`;
         },
       );
       const invoice = getInvoiceRes.data.data;
-
-      // Create new ServiceEstimateRevision record (snapshot current state before update)
-      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
-      const newRevision = revisionRepo.create({
-        invoiceId: invoice.id,
-        ticketId: ticket.id,
-        revisionNumber: invoice.revisionCount || 0,
-        revisionType: revisionType || 'DISCOUNT',
-        itemsSnapshot: invoice.items || {},
-        totalAmount: Number(invoice.totalAmount) || 0,
-        discountApplied: Number(invoice.totalDiscountAmount) || 0,
-        visitChargeAmount: Number(invoice.visitChargeAmount) || 0,
-        technicianNoteToFinance: invoice.technicianNoteToFinance || null,
-        submittedBy: userId || 'SYSTEM',
-        financeDecision: null,
-        financeDecisionBy: null,
-        financeDecisionNote: null,
-        financeDecisionAt: null,
-        validUntil: invoice.estimateValidUntil ? new Date(invoice.estimateValidUntil) : null,
+      const submissionPayload = {
+        items,
+        labourCost: Number(labourCost) || 0,
+        visitChargeAmount: Number(visitChargeAmount) || 0,
+        visitChargeMethod: visitChargeMethod || null,
+        discountAmount: Number(discountAmount) || 0,
+        technicianNoteToFinance: String(technicianNoteToFinance),
+        revisionType: revisionType || 'REVISION',
+      };
+      const requestHash = createHash('sha256')
+        .update(JSON.stringify(submissionPayload))
+        .digest('hex');
+      let newRevision = await Source.transaction(async (manager) => {
+        await manager.findOne(ServiceTicket, {
+          where: { id: ticket.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const repo = manager.getRepository(ServiceEstimateRevision);
+        const existing = await repo.findOne({
+          where: { submissionCorrelationId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (existing) {
+          if (
+            existing.ticketId !== ticket.id ||
+            existing.submissionPayload?.requestHash !== requestHash
+          ) {
+            throw new AppError(
+              'Submission correlation ID was already used for different estimate data',
+              409,
+            );
+          }
+          return existing;
+        }
+        const pending = await repo.findOne({
+          where: {
+            ticketId: ticket.id,
+            status: In(['SUBMISSION_PENDING', 'WAITING_ADDITIONAL_APPROVAL']),
+          },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (pending)
+          throw new AppError('A service estimate revision is already pending for this ticket', 409);
+        const baseEstimate =
+          (await manager.getRepository(ServiceEstimate).findOne({
+            where: { ticketId: ticket.id, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
+            order: { version: 'DESC' },
+          })) ||
+          (await manager.getRepository(ServiceEstimate).findOne({
+            where: { ticketId: ticket.id },
+            order: { version: 'DESC', created_at: 'DESC' },
+          }));
+        const submission = repo.create({
+          invoiceId: invoice.id,
+          submissionCorrelationId,
+          billingRevision: null,
+          submissionPayload: { ...submissionPayload, requestHash },
+          ticketId: ticket.id,
+          estimateId: baseEstimate?.id || null,
+          version: (baseEstimate?.version || 0) + 1,
+          revisionNumber: (Number(invoice.revisionCount) || 0) + 1,
+          revisionType: revisionType || 'REVISION',
+          itemsSnapshot: submissionPayload,
+          totalAmount: 0,
+          labourCost: Number(labourCost) || 0,
+          discountApplied: Number(discountAmount) || 0,
+          visitChargeAmount: Number(visitChargeAmount) || 0,
+          technicianNoteToFinance: String(technicianNoteToFinance),
+          submittedBy: userId || 'SYSTEM',
+          financeDecision: null,
+          financeDecisionBy: null,
+          financeDecisionNote: null,
+          financeDecisionAt: null,
+          status: 'SUBMISSION_PENDING',
+        });
+        return repo.save(submission);
       });
-      await revisionRepo.save(newRevision);
+      if (newRevision.status !== 'SUBMISSION_PENDING') {
+        const currentInvoice = await axios.get(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        return res.status(200).json({
+          success: true,
+          data: { ticket, invoice: currentInvoice.data.data, revision: newRevision },
+          message: 'Estimate revision was already submitted',
+        });
+      }
 
       // Computed BEFORE any mutation so validation can reject early.
       const reviseCoverage = await this.resolveItemCoverage(ticket);
@@ -7408,6 +7778,7 @@ For queries contact us at +974 4455 6677`;
       );
       const reviseGrandTotal =
         reviseItemsTotal +
+        (Number(labourCost) || 0) +
         (visitChargeMethod === 'ADDED_TO_ESTIMATE' ? reviseEffectiveVisitCharge : 0);
       if (Number(discountAmount || 0) > reviseGrandTotal) {
         throw new AppError(
@@ -7416,70 +7787,16 @@ For queries contact us at +974 4455 6677`;
         );
       }
 
-      // Update service ticket items in local db
-      const ticketItemRepo = Source.getRepository(ServiceTicketItem);
-      await ticketItemRepo.delete({ ticketId: ticket.id });
-
-      let reviseHasCustomItem = false;
-      const newTicketItems = items.map((it: ReviseEstimateItem) => {
-        const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
-        const quantity = Number(it.quantity) || 1;
-        let unitCost = part ? calculateCatalogServicePartCost(part.base_price, 1).unitCost : 0;
-        if (!part) {
-          unitCost = Number(it.customPartCost) || 0;
-          reviseHasCustomItem = true;
-        }
-        return ticketItemRepo.create({
-          ticketId: ticket.id,
-          itemSource: it.itemSource || ServiceItemSource.SPARE_PART,
-          sparePartId: it.sparePartId || null,
-          sku: it.sku || null,
-          partName: it.partName || it.description || 'Spare Part',
-          partBrand: part?.brand || it.customPartBrand || null,
-          mpn: part?.mpn || it.mpn || null,
-          quantity,
-          unitPrice: Number(it.unitPrice) || 0,
-          totalPrice: quantity * (Number(it.unitPrice) || 0),
-          isFree: !!it.isFree,
-          unitCost,
-          totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
-          listUnitPrice: Number(it.unitPrice) || Number(part?.base_price) || 0,
-          listTotalPrice: quantity * (Number(it.unitPrice) || Number(part?.base_price) || 0),
-        });
-      });
-      await ticketItemRepo.save(newTicketItems);
-
-      if (reviseHasCustomItem) {
-        await this.notifyBranchManager(ticket.branchId, {
-          title: 'Spare Part Procurement Needed',
-          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
-          type: 'ACTION_REQUIRED',
-          referenceId: ticket.id,
-          referenceType: 'CUSTOM_PART_REQUEST',
-        });
-      }
-
-      // Update ticket fields
-      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
-      ticket.visitChargeAmount = reviseEffectiveVisitCharge;
-      ticket.visitChargeMethod = visitChargeMethod || null;
-      ticket.discountAmount = Number(discountAmount) || 0;
-      await ticketRepo.save(ticket);
-
-      // Log activity
-      await this.logActivity(
-        ticket.id,
-        'ESTIMATE_REVISED',
-        `Estimate revised by technician. Revision number: ${newRevision.revisionNumber}. Reason: ${technicianNoteToFinance}`,
-        userId,
-      );
-
+      const reviseHasCustomItem = items.some((it) => !it.sparePartId);
       const billingPayload = {
         items: billingItems,
+        labourCost: Number(labourCost) || 0,
         visitChargeAmount: reviseEffectiveVisitCharge,
         visitChargeMethod: visitChargeMethod || null,
         discountAmount: Number(discountAmount) || 0,
         technicianNoteToFinance,
+        submissionCorrelationId,
+        vendorRevisionId: newRevision.id,
       };
 
       const reviseRes = await axios.patch(
@@ -7491,6 +7808,97 @@ For queries contact us at +974 4455 6677`;
           },
         },
       );
+
+      // Billing has accepted this exact revision. Commit its line snapshots and
+      // ticket workflow state together; the active ticket items stay unchanged
+      // until customer approval.
+      const runner = Source.createQueryRunner();
+      try {
+        await runner.connect();
+        await runner.startTransaction();
+        const lockedTicket = await runner.manager.findOne(ServiceTicket, {
+          where: { id: ticket.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const lockedRevision = await runner.manager.findOne(ServiceEstimateRevision, {
+          where: { id: newRevision.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!lockedTicket || !lockedRevision)
+          throw new AppError('Revision submission record disappeared', 409);
+        if (lockedRevision.status === 'SUBMISSION_PENDING') {
+          const revisionItemRepo = runner.manager.getRepository(ServiceEstimateItem);
+          const itemRecords = items.map((it, index) => {
+            const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
+            const quantity = Number(it.quantity) || 1;
+            const billingItem = billingItems[index];
+            const isFree = !!billingItem?.isFree;
+            const unitPrice = Number(billingItem?.unitPrice) || 0;
+            const unitCost = part
+              ? calculateCatalogServicePartCost(part.base_price, 1).unitCost
+              : Number(it.customPartCost) || 0;
+            return revisionItemRepo.create({
+              revisionId: lockedRevision.id,
+              itemSource: it.sparePartId
+                ? ServiceEstimateItemSource.SPARE_PART
+                : ServiceEstimateItemSource.CUSTOM,
+              sparePartId: it.sparePartId || null,
+              sku: it.sku || null,
+              partName: it.partName || it.description || 'Spare Part',
+              quantity,
+              unitPrice,
+              totalPrice: unitPrice * quantity,
+              isFree,
+              isApproved: false,
+              unitCost,
+              totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
+              listUnitPrice: Number(it.unitPrice) || Number(part?.base_price) || 0,
+              listTotalPrice: quantity * (Number(it.unitPrice) || Number(part?.base_price) || 0),
+            });
+          });
+          await revisionItemRepo.save(itemRecords);
+          lockedRevision.invoiceId = invoice.id;
+          lockedRevision.billingRevision = Number(reviseRes.data.data.revisionCount);
+          lockedRevision.revisionNumber =
+            lockedRevision.billingRevision || lockedRevision.revisionNumber;
+          lockedRevision.totalAmount = Number(reviseRes.data.data.totalAmount) || 0;
+          lockedRevision.status = 'WAITING_ADDITIONAL_APPROVAL';
+          await runner.manager.getRepository(ServiceEstimateRevision).save(lockedRevision);
+          lockedTicket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2;
+          lockedTicket.visitChargeAmount = reviseEffectiveVisitCharge;
+          lockedTicket.visitChargeMethod = visitChargeMethod || null;
+          lockedTicket.discountAmount = Number(discountAmount) || 0;
+          await runner.manager.getRepository(ServiceTicket).save(lockedTicket);
+          await runner.manager.getRepository(ServiceTicketActivity).save(
+            runner.manager.create(ServiceTicketActivity, {
+              ticketId: lockedTicket.id,
+              activityType: 'ESTIMATE_REVISED',
+              description: `Estimate revision ${lockedRevision.billingRevision} submitted for Finance approval. Reason: ${technicianNoteToFinance}`,
+              performedBy: userId || null,
+            }),
+          );
+        }
+        await runner.commitTransaction();
+        newRevision =
+          (await Source.getRepository(ServiceEstimateRevision).findOne({
+            where: { id: newRevision.id },
+            relations: ['items'],
+          })) || newRevision;
+      } catch (error) {
+        if (runner.isTransactionActive) await runner.rollbackTransaction();
+        throw error;
+      } finally {
+        await runner.release();
+      }
+
+      if (reviseHasCustomItem)
+        await this.notifyBranchManager(ticket.branchId, {
+          title: 'Spare Part Procurement Needed',
+          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
+          type: 'ACTION_REQUIRED',
+          referenceId: ticket.id,
+          referenceType: 'CUSTOM_PART_REQUEST',
+        });
 
       return res.status(200).json({
         success: true,

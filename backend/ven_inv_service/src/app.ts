@@ -115,6 +115,12 @@ const startServer = async () => {
     await startProductStatusConsumer();
     await startProductAllocationConsumer();
     await startSparePartReductionConsumer();
+    const { startBillingServiceEstimateDecisionConsumer } =
+      await import('./events/consumers/billingServiceEstimateDecisionConsumer');
+    await startBillingServiceEstimateDecisionConsumer();
+    const { startServiceDecisionNotificationOutbox } =
+      await import('./services/serviceDecisionNotificationOutbox');
+    startServiceDecisionNotificationOutbox();
 
     // Start polling Dead Letter Queue
     const { startDLQMonitor } = await import('./services/dlqMonitorService');
