@@ -335,9 +335,14 @@ export const processDirectSaleCardSettlement = async (
     if (!['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
       throw new AppError('Only Finance can process card settlements', 403);
     }
-    const { transactionId, cashAccountId, commissionRatePercent } = req.body ?? {};
+    const { transactionId, cashAccountId, commissionRatePercent, commissionAmount } =
+      req.body ?? {};
     if (!transactionId || !cashAccountId) throw new AppError('Select a bank account', 400);
+    if (commissionRatePercent != null && commissionAmount != null) {
+      throw new AppError('Enter either a commission percentage or a commission amount', 400);
+    }
     const rateOverride = commissionRatePercent == null ? undefined : Number(commissionRatePercent);
+    const amountOverride = commissionAmount == null ? undefined : Number(commissionAmount);
     if (
       rateOverride !== undefined &&
       (!Number.isFinite(rateOverride) || rateOverride < 0 || rateOverride > 100)
@@ -373,12 +378,27 @@ export const processDirectSaleCardSettlement = async (
     });
     const currency = txn.currencyCode || 'AED';
     const gross = Number(txn.amount);
+    if (
+      amountOverride !== undefined &&
+      (!Number.isFinite(amountOverride) || amountOverride < 0 || amountOverride > gross)
+    ) {
+      throw new AppError('Commission amount must be between 0 and the gross payment', 400);
+    }
     let commission: number;
     let rate: number;
     let fixedFee = 0;
     let ruleId: string | undefined;
     let ruleVersion: number | undefined;
-    if (rateOverride !== undefined) {
+    if (amountOverride !== undefined) {
+      const grossMinor = toMinor(gross, currency);
+      const commissionMinor = toMinor(amountOverride, currency);
+      if (commissionMinor > grossMinor) {
+        throw new AppError('Commission amount cannot exceed the gross payment', 400);
+      }
+      commission = fromMinor(commissionMinor, currency);
+      fixedFee = commission;
+      rate = grossMinor > 0 ? (commissionMinor / grossMinor) * 100 : 0;
+    } else if (rateOverride !== undefined) {
       rate = rateOverride;
       commission = fromMinor(
         Math.min(percentOfMinor(toMinor(gross, currency), rate), toMinor(gross, currency)),

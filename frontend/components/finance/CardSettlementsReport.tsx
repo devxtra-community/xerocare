@@ -93,8 +93,12 @@ export default function CardSettlementsReport() {
   const [settlementAccountId, setSettlementAccountId] = useState('');
   const [settlementRate, setSettlementRate] = useState('');
   const [commissionPromptFor, setCommissionPromptFor] = useState<SettlementRow | null>(null);
-  const [commissionPromptRate, setCommissionPromptRate] = useState('');
+  const [commissionPromptMode, setCommissionPromptMode] = useState<'PERCENTAGE' | 'AMOUNT'>(
+    'PERCENTAGE',
+  );
+  const [commissionPromptValue, setCommissionPromptValue] = useState('');
   const [processingId, setProcessingId] = useState('');
+  const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,29 +148,45 @@ export default function CardSettlementsReport() {
       .catch(() => undefined);
   }, []);
 
-  const processSettlement = async (transactionId: string, rateOverride = settlementRate) => {
+  const processSettlement = async (
+    transactionId: string,
+    override?: { mode: 'PERCENTAGE' | 'AMOUNT'; value: string },
+  ) => {
     if (!settlementAccountId) {
       toast.error('Select the bank account for settlement');
       return;
     }
+    const commissionOverride =
+      override ??
+      (settlementRate !== '' ? { mode: 'PERCENTAGE' as const, value: settlementRate } : undefined);
     setProcessingId(transactionId);
     try {
-      await api.post('/b/card-fees/settlements/process-direct-sale', {
-        transactionId,
-        cashAccountId: settlementAccountId,
-        ...(rateOverride !== '' ? { commissionRatePercent: Number(rateOverride) } : {}),
-      });
+      await api.post(
+        '/b/card-fees/settlements/process-direct-sale',
+        {
+          transactionId,
+          cashAccountId: settlementAccountId,
+          ...(commissionOverride?.mode === 'PERCENTAGE'
+            ? { commissionRatePercent: Number(commissionOverride.value) }
+            : {}),
+          ...(commissionOverride?.mode === 'AMOUNT'
+            ? { commissionAmount: Number(commissionOverride.value) }
+            : {}),
+        },
+        { skipErrorToast: true },
+      );
       setCommissionPromptFor(null);
       toast.success('Card settlement processed');
       await load();
     } catch (err: unknown) {
       const message = getApiErrorMessage(err, 'Could not process card settlement');
       if (
-        rateOverride === '' &&
+        !commissionOverride &&
         message.toLowerCase().includes('no commission rule is configured')
       ) {
         const row = rows.find((candidate) => candidate.id === transactionId) ?? null;
-        setCommissionPromptRate('');
+        setCommissionPromptMode('PERCENTAGE');
+        setCommissionPromptValue('');
         setCommissionPromptFor(row);
       } else {
         toast.error(message);
@@ -177,15 +197,48 @@ export default function CardSettlementsReport() {
   };
 
   const confirmCommissionRate = () => {
-    const rate = Number(commissionPromptRate);
-    if (!commissionPromptRate.trim() || !Number.isFinite(rate) || rate < 0 || rate > 100) {
-      toast.error('Enter a commission rate between 0 and 100');
+    const value = Number(commissionPromptValue);
+    const gross = Number(commissionPromptFor?.gross ?? 0);
+    if (
+      !commissionPromptValue.trim() ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      (commissionPromptMode === 'PERCENTAGE' && value > 100) ||
+      (commissionPromptMode === 'AMOUNT' && value > gross)
+    ) {
+      toast.error(
+        commissionPromptMode === 'PERCENTAGE'
+          ? 'Enter a commission percentage between 0 and 100'
+          : 'Commission amount cannot exceed the gross payment',
+      );
       return;
     }
-    if (commissionPromptFor) void processSettlement(commissionPromptFor.id, commissionPromptRate);
+    if (commissionPromptFor) {
+      void processSettlement(commissionPromptFor.id, {
+        mode: commissionPromptMode,
+        value: commissionPromptValue,
+      });
+    }
   };
 
-  const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
+  const promptGross = Number(commissionPromptFor?.gross ?? 0);
+  const promptInput = Number(commissionPromptValue);
+  const promptCommission =
+    commissionPromptValue.trim() && Number.isFinite(promptInput)
+      ? commissionPromptMode === 'PERCENTAGE'
+        ? (promptGross * promptInput) / 100
+        : promptInput
+      : null;
+  const promptCurrency = commissionPromptFor?.currency ?? currency;
+  const promptMoney = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: promptCurrency,
+  });
+  const promptCommissionRounded =
+    promptCommission === null
+      ? null
+      : Number(promptCommission.toFixed(promptMoney.resolvedOptions().maximumFractionDigits));
+
   const fmt = (n: number | string | null | undefined) =>
     Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
@@ -493,26 +546,68 @@ export default function CardSettlementsReport() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enter commission rate</DialogTitle>
+            <DialogTitle>Enter commission</DialogTitle>
             <DialogDescription>
-              No fee rule is configured for this card. Enter the agreed commission rate to process
+              No fee rule is configured for this card. Enter the agreed commission to process
               {commissionPromptFor ? ` ${commissionPromptFor.invoiceNumber}` : ' this settlement'}.
-              This rate will apply to this receipt only.
+              This commission will apply to this receipt only.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="settlement-commission-rate">Commission rate (%)</Label>
-            <Input
-              id="settlement-commission-rate"
-              type="number"
-              min="0"
-              max="100"
-              step="0.0001"
-              autoFocus
-              value={commissionPromptRate}
-              onChange={(event) => setCommissionPromptRate(event.target.value)}
-              placeholder="e.g. 1.95"
-            />
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="settlement-commission-mode">Commission type</Label>
+              <Select
+                value={commissionPromptMode}
+                onValueChange={(value) => {
+                  setCommissionPromptMode(value as 'PERCENTAGE' | 'AMOUNT');
+                  setCommissionPromptValue('');
+                }}
+              >
+                <SelectTrigger id="settlement-commission-mode" className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PERCENTAGE">Percentage</SelectItem>
+                  <SelectItem value="AMOUNT">Fixed amount</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="settlement-commission-value">
+                {commissionPromptMode === 'PERCENTAGE'
+                  ? 'Commission percentage (%)'
+                  : `Commission amount (${promptCurrency})`}
+              </Label>
+              <Input
+                id="settlement-commission-value"
+                type="number"
+                min="0"
+                max={commissionPromptMode === 'PERCENTAGE' ? 100 : promptGross}
+                step="0.0001"
+                autoFocus
+                value={commissionPromptValue}
+                onChange={(event) => setCommissionPromptValue(event.target.value)}
+                placeholder={commissionPromptMode === 'PERCENTAGE' ? 'e.g. 1.95' : 'e.g. 100.00'}
+              />
+            </div>
+            {promptCommissionRounded !== null && (
+              <div className="space-y-1 rounded-lg border border-border bg-muted p-3 text-sm">
+                <div className="flex justify-between">
+                  <span>Gross payment</span>
+                  <span>{promptMoney.format(promptGross)}</span>
+                </div>
+                <div className="flex justify-between text-destructive">
+                  <span>Commission deducted</span>
+                  <span>− {promptMoney.format(promptCommissionRounded)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-1 font-semibold">
+                  <span>Net settlement</span>
+                  <span>
+                    {promptMoney.format(Math.max(0, promptGross - promptCommissionRounded))}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
