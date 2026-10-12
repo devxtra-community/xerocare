@@ -1,7 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, ArrowRightLeft, Send, Copy, ClipboardList, Printer } from 'lucide-react';
+import {
+  Loader2,
+  ArrowRightLeft,
+  Send,
+  Copy,
+  ClipboardList,
+  Printer,
+  Download,
+} from 'lucide-react';
 import { GmailMark, WhatsAppMark } from '@/components/ui/BrandMarks';
 import { useRouter } from 'next/navigation';
 import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
@@ -34,6 +42,7 @@ import { toast } from 'sonner';
 import { getActiveCurrency } from '@/lib/currency';
 import { resolveImageUrl } from '@/lib/imageUrl';
 import { printDocument } from '@/lib/printDocument';
+import { generateDocPdf } from '@/components/shared/documentTemplate';
 
 interface ProductMeta {
   brandRelation?: { name?: string };
@@ -84,6 +93,7 @@ export function QuotationViewDialog({
 }: QuotationViewDialogProps) {
   const [sending, setSending] = useState(false);
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isRequestingExtension, setIsRequestingExtension] = useState(false);
   // Which Finance decision is in flight. These buttons had no in-flight state at all,
   // so a double click fired Approve/Reject twice against the same quotation. Set
@@ -439,6 +449,24 @@ export function QuotationViewDialog({
       });
     } finally {
       setIsSendingCustomer(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('quotation-print-content');
+    if (!element) {
+      toast.error('Quotation document not found');
+      return;
+    }
+    setIsDownloadingPdf(true);
+    try {
+      const pdf = await generateDocPdf(element);
+      pdf.save(`Quotation-${quotation.invoiceNumber || quotation.id}.pdf`);
+      toast.success('Quotation PDF downloaded');
+    } catch {
+      toast.error('Failed to generate quotation PDF');
+    } finally {
+      setIsDownloadingPdf(false);
     }
   };
 
@@ -1516,6 +1544,20 @@ export function QuotationViewDialog({
                 className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted hover:border-border gap-2"
               >
                 <Printer size={16} className="shrink-0" /> Print
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted hover:border-border gap-2"
+              >
+                {isDownloadingPdf ? (
+                  <Loader2 size={16} className="shrink-0 animate-spin" />
+                ) : (
+                  <Download size={16} className="shrink-0" />
+                )}
+                PDF
               </Button>
               <Button
                 variant="ghost"
@@ -2987,6 +3029,20 @@ export function QuotationViewDialog({
                 className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted hover:border-border gap-2"
               >
                 <Printer size={16} className="shrink-0" /> Print
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-border text-foreground hover:bg-muted hover:border-border gap-2"
+              >
+                {isDownloadingPdf ? (
+                  <Loader2 size={16} className="shrink-0 animate-spin" />
+                ) : (
+                  <Download size={16} className="shrink-0" />
+                )}
+                PDF
               </Button>
               <Button
                 variant="ghost"

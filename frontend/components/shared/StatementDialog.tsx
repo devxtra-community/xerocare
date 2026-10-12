@@ -143,15 +143,23 @@ function RunningBalanceDocument({
         </div>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8 }}>
+      <table
+        style={{
+          width: '100%',
+          tableLayout: 'fixed',
+          borderCollapse: 'collapse',
+          fontSize: 12,
+          marginBottom: 8,
+        }}
+      >
         <thead>
           <tr>
-            <th style={thStyle('left')}>Date</th>
-            <th style={thStyle('left')}>Reference</th>
+            <th style={{ ...thStyle('left'), width: '12%' }}>Date</th>
+            <th style={{ ...thStyle('left'), width: '18%' }}>Reference</th>
             <th style={{ ...thStyle('left'), width: '30%' }}>Description</th>
-            <th style={thStyle('right')}>Debit</th>
-            <th style={thStyle('right')}>Credit</th>
-            <th style={thStyle('right')}>Balance</th>
+            <th style={{ ...thStyle('right'), width: '13%' }}>Debit</th>
+            <th style={{ ...thStyle('right'), width: '13%' }}>Credit</th>
+            <th style={{ ...thStyle('right'), width: '14%' }}>Balance</th>
           </tr>
         </thead>
         <tbody>
@@ -175,9 +183,15 @@ function RunningBalanceDocument({
                   <td style={tdStyle('left')}>{fmtDate(r.date)}</td>
                   <td style={tdStyle('left')}>{r.reference ?? '—'}</td>
                   <td style={tdStyle('left')}>{r.description}</td>
-                  <td style={tdStyle('right')}>{r.debit ? fmt(r.debit) : ''}</td>
-                  <td style={tdStyle('right')}>{r.credit ? fmt(r.credit) : ''}</td>
-                  <td style={{ ...tdStyle('right'), fontWeight: 500 }}>{fmt(running)}</td>
+                  <td style={{ ...tdStyle('right'), whiteSpace: 'nowrap' }}>
+                    {r.debit ? fmt(r.debit) : ''}
+                  </td>
+                  <td style={{ ...tdStyle('right'), whiteSpace: 'nowrap' }}>
+                    {r.credit ? fmt(r.credit) : ''}
+                  </td>
+                  <td style={{ ...tdStyle('right'), fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    {fmt(running)}
+                  </td>
                 </tr>
               );
             })

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Copy,
   Printer,
+  Download,
   Link2,
   Mail,
   ThumbsDown,
@@ -39,6 +40,7 @@ import { Invoice } from '@/lib/invoice';
 import { BillDocumentBody } from './BillDocumentBody';
 import { getActiveCurrency } from '@/lib/currency';
 import { printDocument } from '@/lib/printDocument';
+import { generateDocPdf } from '@/components/shared/documentTemplate';
 
 interface BillModalProps {
   usageRecordId: string;
@@ -73,6 +75,7 @@ export function BillModal({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [bill, setBill] = useState<Bill | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [advancePayment, setAdvancePayment] = useState<SalePaymentRequest | null>(null);
@@ -205,6 +208,20 @@ export function BillModal({
 
   const handlePrint = () => printDocument(printRef.current);
 
+  const handleDownloadPdf = async () => {
+    if (!printRef.current || !bill) return;
+    setIsDownloadingPdf(true);
+    try {
+      const pdf = await generateDocPdf(printRef.current);
+      pdf.save(`Bill-${invoice?.invoiceNumber || bill.id}.pdf`);
+      toast.success('Bill PDF downloaded');
+    } catch {
+      toast.error('Failed to generate bill PDF');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   const status = bill ? STATUS_META[bill.billStatus] : null;
 
   return (
@@ -314,23 +331,41 @@ export function BillModal({
                       )}
                     </div>
                   )}
-                  <div ref={printRef}>
-                    <BillDocumentBody
-                      invoice={invoice}
-                      bill={bill}
-                      currency={currency}
-                      advancePayment={advancePayment}
-                      depositPayment={depositPayment}
-                      previousBill={previousBill}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePrint}
-                      className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-8 w-full border border-border mt-4 print:hidden"
-                    >
-                      <Printer size={12} className="mr-1" /> Print / Save PDF
-                    </Button>
+                  <div>
+                    <div ref={printRef}>
+                      <BillDocumentBody
+                        invoice={invoice}
+                        bill={bill}
+                        currency={currency}
+                        advancePayment={advancePayment}
+                        depositPayment={depositPayment}
+                        previousBill={previousBill}
+                      />
+                    </div>
+                    <div className="mt-4 flex gap-2 print:hidden">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePrint}
+                        className="flex-1 text-[10px] font-black uppercase tracking-widest h-9"
+                      >
+                        <Printer size={13} className="mr-1" /> Print
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadPdf}
+                        disabled={isDownloadingPdf}
+                        className="flex-1 text-[10px] font-black uppercase tracking-widest h-9"
+                      >
+                        {isDownloadingPdf ? (
+                          <Loader2 size={13} className="mr-1 animate-spin" />
+                        ) : (
+                          <Download size={13} className="mr-1" />
+                        )}
+                        PDF
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
