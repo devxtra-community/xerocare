@@ -19,6 +19,9 @@ import {
   DocFooter,
   TotalsBlock,
   generateDocPdf,
+  LETTERHEAD_TOP_SRC,
+  LETTERHEAD_FOOTER_SRC,
+  LETTERHEAD_WATERMARK_SRC,
   type BranchInfo,
 } from './documentTemplate';
 
@@ -86,45 +89,89 @@ const fmtDate = (d?: string | null) =>
 const fmtDateTime = () =>
   new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 
+const loadImageDataUrl = (src: string) =>
+  new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('Could not prepare statement artwork'));
+        return;
+      }
+      context.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    image.onerror = () => reject(new Error(`Could not load statement artwork: ${src}`));
+    image.src = src;
+  });
+
 async function generateRunningBalancePdf(data: RunningBalanceStatementData, branch: BranchInfo) {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF('landscape', 'mm', 'a4');
+  const [letterheadTop, letterheadFooter, watermark] = await Promise.all([
+    loadImageDataUrl(LETTERHEAD_TOP_SRC),
+    loadImageDataUrl(LETTERHEAD_FOOTER_SRC),
+    loadImageDataUrl(LETTERHEAD_WATERMARK_SRC),
+  ]);
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 12;
   const tableWidth = pageWidth - margin * 2;
+  const topHeight = (pageWidth * 620) / 4960;
+  const footerHeight = (pageWidth * 736) / 4960;
+  const footerY = pageHeight - footerHeight;
   const columnWidths = [25, 39, 100, 34, 34, 41];
   const columnTitles = ['DATE', 'REFERENCE', 'DESCRIPTION', 'DEBIT', 'CREDIT', 'BALANCE'];
   const rightAligned = new Set([3, 4, 5]);
   const fmt = (amount: number) => formatCurrency(amount, data.currency);
 
   const drawPageHeader = () => {
+    pdf.addImage(letterheadTop, 'PNG', 0, 0, pageWidth, topHeight);
+    const watermarkWidth = pageWidth * 0.78;
+    const watermarkHeight = (watermarkWidth * 1000) / 4960;
+    pdf.addImage(
+      watermark,
+      'PNG',
+      (pageWidth - watermarkWidth) / 2,
+      (pageHeight - watermarkHeight) / 2,
+      watermarkWidth,
+      watermarkHeight,
+    );
+    pdf.addImage(letterheadFooter, 'PNG', 0, footerY, pageWidth, footerHeight);
+
     pdf.setTextColor(20, 20, 20);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(15);
-    pdf.text(data.title.toUpperCase(), pageWidth / 2, 15, { align: 'center' });
+    pdf.text(data.title.toUpperCase(), pageWidth / 2, topHeight + 14, { align: 'center' });
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
-    pdf.text(data.subjectName, pageWidth / 2, 21, { align: 'center' });
+    pdf.text(data.subjectName, pageWidth / 2, topHeight + 20, { align: 'center' });
     pdf.setFontSize(10);
-    pdf.text(branch.name, margin, 30);
+    pdf.text(branch.name, margin, topHeight + 32);
     pdf.setFontSize(8);
-    if (branch.address) pdf.text(pdf.splitTextToSize(branch.address, 110), margin, 35);
+    if (branch.address) pdf.text(pdf.splitTextToSize(branch.address, 110), margin, topHeight + 37);
     if (branch.tax_registration_number) {
-      pdf.text(`TRN: ${branch.tax_registration_number}`, margin, branch.address ? 44 : 35);
+      pdf.text(
+        `TRN: ${branch.tax_registration_number}`,
+        margin,
+        branch.address ? topHeight + 45 : topHeight + 37,
+      );
     }
     pdf.setFontSize(8);
     pdf.text(
       `Period: ${fmtDate(data.periodFrom)} – ${fmtDate(data.periodTo)}`,
       pageWidth - margin,
-      31,
+      topHeight + 33,
       {
         align: 'right',
       },
     );
-    pdf.text(`Generated: ${fmtDateTime()}`, pageWidth - margin, 36, { align: 'right' });
+    pdf.text(`Generated: ${fmtDateTime()}`, pageWidth - margin, topHeight + 38, { align: 'right' });
 
-    const headerY = 49;
+    const headerY = topHeight + 54;
     pdf.setFillColor(245, 246, 248);
     pdf.rect(margin, headerY - 5, tableWidth, 9, 'F');
     pdf.setDrawColor(40, 40, 40);
@@ -154,7 +201,7 @@ async function generateRunningBalancePdf(data: RunningBalanceStatementData, bran
     const lineCount = Math.max(...wrapped.map((lines) => lines.length));
     const rowHeight = Math.max(8, lineCount * 4 + 4);
 
-    if (y + rowHeight > pageHeight - margin) {
+    if (y + rowHeight > footerY - 8) {
       pdf.addPage();
       y = drawPageHeader();
     }
@@ -174,7 +221,23 @@ async function generateRunningBalancePdf(data: RunningBalanceStatementData, bran
     pdf.line(margin, y, pageWidth - margin, y);
   };
 
-  addRow(['Opening Balance', '', '', '', '', fmt(data.openingBalance)], true, true);
+  const addBalanceRow = (label: string, amount: number, italic = false) => {
+    const rowHeight = 9;
+    if (y + rowHeight > footerY - 8) {
+      pdf.addPage();
+      y = drawPageHeader();
+    }
+    pdf.setFont('helvetica', italic ? 'italic' : 'bold');
+    pdf.setFontSize(8);
+    pdf.text(label, margin + 2, y + 5);
+    pdf.text(fmt(amount), pageWidth - margin - 2, y + 5, { align: 'right' });
+    y += rowHeight;
+    pdf.setDrawColor(225, 225, 225);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin, y, pageWidth - margin, y);
+  };
+
+  addBalanceRow('Opening Balance', data.openingBalance, true);
   let running = data.openingBalance;
   for (const row of data.rows) {
     running += (row.debit ?? 0) - (row.credit ?? 0);
@@ -187,17 +250,8 @@ async function generateRunningBalancePdf(data: RunningBalanceStatementData, bran
       fmt(running),
     ]);
   }
-  addRow([data.balanceLabel ?? 'Closing Balance', '', '', '', '', fmt(data.closingBalance)], true);
+  addBalanceRow(data.balanceLabel ?? 'Closing Balance', data.closingBalance);
 
-  for (let page = 1; page <= pdf.getNumberOfPages(); page += 1) {
-    pdf.setPage(page);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(`Page ${page} of ${pdf.getNumberOfPages()}`, pageWidth - margin, pageHeight - 5, {
-      align: 'right',
-    });
-  }
   return pdf;
 }
 
