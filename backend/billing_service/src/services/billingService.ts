@@ -3715,6 +3715,34 @@ export class BillingService {
     warrantyDurationUnit?: string;
     warrantyCopyLimit?: number;
   }) {
+    // Validate card metadata before creating the invoice. The payment request is
+    // recorded after the invoice commits; relying only on that later validation could
+    // leave a sale behind with no usable card details if the request is rejected.
+    if (Number(payload.paymentAmount) > 0 && String(payload.paymentMode) === 'ONLINE_PAYMENT') {
+      const cardType = (payload.cardType || '').toUpperCase();
+      const cardNetwork = (payload.cardNetwork || '').toUpperCase();
+      const issuerCountry = (payload.issuerCountry || '').toUpperCase();
+      const issuerBank = (payload.issuerBank || '').trim();
+      const cardLast4 = (payload.cardLast4 || '').trim();
+      const cardHolderName = (payload.cardHolderName || '').trim();
+      if (!['DEBIT', 'CREDIT'].includes(cardType)) {
+        throw new AppError('Select whether this is a Debit Card or a Credit Card', 400);
+      }
+      if (
+        !['VISA', 'MASTERCARD', 'AMEX', 'UNIONPAY', 'MADA', 'KNET', 'OTHER'].includes(cardNetwork)
+      ) {
+        throw new AppError('Select the card network', 400);
+      }
+      if (!['AE', 'SA', 'QA', 'KW', 'OM', 'BH'].includes(issuerCountry)) {
+        throw new AppError('Select the country that issued the card', 400);
+      }
+      if (!issuerBank) throw new AppError('Select the issuing bank / card', 400);
+      if (!cardHolderName) throw new AppError("Enter the card holder's name", 400);
+      if (!/^[0-9]{4}$/.test(cardLast4)) {
+        throw new AppError('Enter the last four digits of the card', 400);
+      }
+    }
+
     if (payload.items) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       payload.items.forEach((item: any) => {

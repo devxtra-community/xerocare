@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CreditCard, Loader2, Search, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -69,10 +69,17 @@ interface DayRow {
   count: number;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const localDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const today = () => localDateInputValue(new Date());
 const monthStart = () => {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return localDateInputValue(new Date(d.getFullYear(), d.getMonth(), 1));
 };
 
 export default function CardSettlementsReport() {
@@ -99,8 +106,10 @@ export default function CardSettlementsReport() {
   const [commissionPromptValue, setCommissionPromptValue] = useState('');
   const [processingId, setProcessingId] = useState('');
   const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
+  const requestSequence = useRef(0);
 
   const load = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     setLoading(true);
     try {
       const res = await api.get('/b/card-fees/settlements', {
@@ -114,17 +123,21 @@ export default function CardSettlementsReport() {
         },
       });
       const d = res.data?.data ?? {};
+      if (sequence !== requestSequence.current) return;
       setRows(d.transactions ?? []);
       setTotals(d.totals ?? null);
       setDays(d.bySettlementDate ?? []);
     } catch {
-      toast.error('Could not load card settlements');
+      if (sequence === requestSequence.current) toast.error('Could not load card settlements');
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [dateFrom, dateTo, cardType, cardNetwork, issuerCountry, search]);
 
   useEffect(() => {
+    // Invalidate an in-flight response as soon as any filter changes, before the
+    // debounce timer starts the replacement request.
+    requestSequence.current += 1;
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, [load]);
@@ -495,10 +508,26 @@ export default function CardSettlementsReport() {
                     </td>
                     <td className="px-3 py-2 font-bold text-foreground">{r.invoiceNumber}</td>
                     <td className="px-3 py-2 text-xs">
-                      <span className="font-bold text-foreground">{r.issuerBank ?? '—'}</span>
+                      <span className="font-bold text-foreground">
+                        {r.issuerBank ||
+                          (r.cardNetwork
+                            ? (CARD_NETWORK_LABEL[r.cardNetwork as CardNetwork] ?? r.cardNetwork)
+                            : 'Card details unavailable')}
+                      </span>
                       <span className="block text-muted-foreground">
-                        {r.cardNetwork} {r.cardType === 'DEBIT' ? 'Debit' : 'Credit'}
-                        {r.cardLast4 ? ` ••••${r.cardLast4}` : ''}
+                        {[
+                          r.issuerBank && r.cardNetwork
+                            ? (CARD_NETWORK_LABEL[r.cardNetwork as CardNetwork] ?? r.cardNetwork)
+                            : '',
+                          r.cardType === 'DEBIT'
+                            ? 'Debit'
+                            : r.cardType === 'CREDIT'
+                              ? 'Credit'
+                              : '',
+                          r.cardLast4 ? `••••${r.cardLast4}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs uppercase text-foreground">

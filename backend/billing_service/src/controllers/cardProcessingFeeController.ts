@@ -226,6 +226,7 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
     const qb = Source.getRepository(PaymentTransaction)
       .createQueryBuilder('t')
       .innerJoin(Invoice, 'i', 'i.id = t.invoice_id')
+      .leftJoin(SalePaymentRequest, 'spr', 'spr."paymentTransactionId" = t.id')
       .where("t.payment_mode = 'ONLINE_PAYMENT'");
 
     // Admins see every branch; everyone else is scoped to their own, same as the rest
@@ -233,22 +234,40 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
     if (!['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())) {
       qb.andWhere('i."branchId" = :branchId', { branchId });
     }
-    if (dateFrom) qb.andWhere('t.transaction_date >= :dateFrom', { dateFrom });
-    if (dateTo) qb.andWhere('t.transaction_date <= :dateTo', { dateTo: `${dateTo} 23:59:59` });
-    if (cardType) qb.andWhere('t.card_type = :cardType', { cardType: cardType.toUpperCase() });
+    if (dateFrom) {
+      qb.andWhere('t.transaction_date >= CAST(:dateFrom AS date)', { dateFrom });
+    }
+    if (dateTo) {
+      const [year, month, day] = dateTo.split('-').map(Number);
+      const dayAfterEnd = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+      qb.andWhere('t.transaction_date < CAST(:dateToExclusive AS date)', {
+        dateToExclusive: dayAfterEnd,
+      });
+    }
+    if (cardType)
+      qb.andWhere('UPPER(COALESCE(t.card_type, spr."cardType")) = :cardType', {
+        cardType: cardType.toUpperCase(),
+      });
     if (cardNetwork)
-      qb.andWhere('t.card_network = :cardNetwork', { cardNetwork: cardNetwork.toUpperCase() });
-    if (issuerBank) qb.andWhere('t.issuer_bank = :issuerBank', { issuerBank });
+      qb.andWhere('UPPER(COALESCE(t.card_network, spr."cardNetwork")) = :cardNetwork', {
+        cardNetwork: cardNetwork.toUpperCase(),
+      });
+    if (issuerBank)
+      qb.andWhere('COALESCE(t.issuer_bank, spr."issuerBank") = :issuerBank', { issuerBank });
     if (issuerCountry)
-      qb.andWhere('t.issuer_country = :issuerCountry', {
+      qb.andWhere('UPPER(COALESCE(t.issuer_country, spr."issuerCountry")) = :issuerCountry', {
         issuerCountry: issuerCountry.toUpperCase(),
       });
     // Free text spans the issuer, the network, the approval reference, the invoice and
     // the last four — never the PAN, which does not exist to be searched.
     if (search) {
       qb.andWhere(
-        `(t.issuer_bank ILIKE :q OR t.card_network ILIKE :q OR t.transaction_reference ILIKE :q
-          OR t.card_last4 ILIKE :q OR i."invoiceNumber" ILIKE :q OR t.card_holder_name ILIKE :q)`,
+        `(COALESCE(t.issuer_bank, spr."issuerBank") ILIKE :q
+          OR COALESCE(t.card_network, spr."cardNetwork") ILIKE :q
+          OR COALESCE(t.transaction_reference, spr."transactionReference") ILIKE :q
+          OR COALESCE(t.card_last4, spr."cardLast4") ILIKE :q
+          OR i."invoiceNumber" ILIKE :q
+          OR COALESCE(t.card_holder_name, spr."cardHolderName") ILIKE :q)`,
         { q: `%${search}%` },
       );
     }
@@ -260,13 +279,13 @@ export const getCardSettlements = async (req: Request, res: Response, next: Next
       't.commission_amount AS commission',
       't.commission_rate_applied AS "ratePercent"',
       't.net_settlement_amount AS net',
-      't.card_type AS "cardType"',
-      't.card_network AS "cardNetwork"',
-      't.issuer_country AS "issuerCountry"',
-      't.issuer_bank AS "issuerBank"',
-      't.card_last4 AS "cardLast4"',
-      't.card_holder_name AS "cardHolderName"',
-      't.transaction_reference AS "transactionReference"',
+      'COALESCE(t.card_type, spr."cardType") AS "cardType"',
+      'COALESCE(t.card_network, spr."cardNetwork") AS "cardNetwork"',
+      'COALESCE(t.issuer_country, spr."issuerCountry") AS "issuerCountry"',
+      'COALESCE(t.issuer_bank, spr."issuerBank") AS "issuerBank"',
+      'COALESCE(t.card_last4, spr."cardLast4") AS "cardLast4"',
+      'COALESCE(t.card_holder_name, spr."cardHolderName") AS "cardHolderName"',
+      'COALESCE(t.transaction_reference, spr."transactionReference") AS "transactionReference"',
       't.currency_code AS currency',
       'i."invoiceNumber" AS "invoiceNumber"',
       'i."isDirectSale" AS "isDirectSale"',
@@ -378,6 +397,16 @@ export const processDirectSaleCardSettlement = async (
     });
     const currency = txn.currencyCode || 'AED';
     const gross = Number(txn.amount);
+    const request = await runner.manager.findOne(SalePaymentRequest, {
+      where: { paymentTransactionId: txn.id },
+    });
+    const cardType = txn.cardType || request?.cardType;
+    const cardNetwork = txn.cardNetwork || request?.cardNetwork;
+    const issuerBank = txn.issuerBank || request?.issuerBank;
+    const issuerCountry = txn.issuerCountry || request?.issuerCountry;
+    const cardLast4 = txn.cardLast4 || request?.cardLast4;
+    const cardHolderName = txn.cardHolderName || request?.cardHolderName;
+    const transactionReference = txn.transactionReference || request?.transactionReference;
     if (
       amountOverride !== undefined &&
       (!Number.isFinite(amountOverride) || amountOverride < 0 || amountOverride > gross)
@@ -409,10 +438,10 @@ export const processDirectSaleCardSettlement = async (
         await import('../services/cardProcessingFeeService');
       const rule = await findApplicableRule({
         branchId: invoice.branchId,
-        issuerCountry: txn.issuerCountry || '',
-        issuerBank: txn.issuerBank,
-        cardType: txn.cardType || '',
-        cardNetwork: txn.cardNetwork,
+        issuerCountry: issuerCountry || '',
+        issuerBank,
+        cardType: cardType || '',
+        cardNetwork,
         paymentGateway: undefined,
         currency,
         grossAmount: gross,
@@ -431,14 +460,18 @@ export const processDirectSaleCardSettlement = async (
       ruleVersion = priced.ruleVersion;
     }
     const net = Math.max(0, gross - commission);
+    txn.cardType = cardType;
+    txn.cardNetwork = cardNetwork;
+    txn.issuerBank = issuerBank;
+    txn.issuerCountry = issuerCountry;
+    txn.cardLast4 = cardLast4;
+    txn.cardHolderName = cardHolderName;
+    txn.transactionReference = transactionReference;
     txn.commissionRateApplied = rate;
     txn.commissionRuleId = ruleId;
     txn.commissionAmount = commission;
     txn.netSettlementAmount = net;
     await runner.manager.save(PaymentTransaction, txn);
-    const request = await runner.manager.findOne(SalePaymentRequest, {
-      where: { paymentTransactionId: txn.id },
-    });
     if (request) {
       request.commissionRateApplied = rate;
       request.commissionFixedApplied = fixedFee;
