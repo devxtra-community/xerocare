@@ -9,14 +9,14 @@ export default async function ManagerLayout({ children }: { children: React.Reac
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full" suppressHydrationWarning>
+      <div className="flex h-dvh w-full overflow-hidden" suppressHydrationWarning>
         {/* An admin reaching a manager page keeps the admin sidebar; managers
             fall through to their own. */}
         <RoleAwareSidebar fallback="employee" initialRole={user?.role ?? 'MANAGER'} />
 
-        <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
+        <SidebarInset className="bg-background min-h-0 w-full flex flex-1 flex-col overflow-hidden">
           <DashboardHeader />
-          <div className="flex-1 overflow-auto">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </SidebarInset>
       </div>
     </SidebarProvider>

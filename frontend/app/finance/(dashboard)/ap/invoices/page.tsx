@@ -75,7 +75,7 @@ export default function APInvoiceListPage() {
   const pendingApproval = filteredInvoices.filter((i) => i.status === 'Pending_Approval').length;
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 bg-muted/50 min-h-screen">
+    <div className="p-4 sm:p-8 space-y-8 bg-card min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-medium tracking-tight text-foreground">

@@ -19,6 +19,9 @@ import {
   DocFooter,
   TotalsBlock,
   generateDocPdf,
+  LETTERHEAD_TOP_SRC,
+  LETTERHEAD_FOOTER_SRC,
+  LETTERHEAD_WATERMARK_SRC,
   type BranchInfo,
 } from './documentTemplate';
 
@@ -86,6 +89,172 @@ const fmtDate = (d?: string | null) =>
 const fmtDateTime = () =>
   new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 
+const loadImageDataUrl = (src: string) =>
+  new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('Could not prepare statement artwork'));
+        return;
+      }
+      context.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    image.onerror = () => reject(new Error(`Could not load statement artwork: ${src}`));
+    image.src = src;
+  });
+
+async function generateRunningBalancePdf(data: RunningBalanceStatementData, branch: BranchInfo) {
+  const { jsPDF } = await import('jspdf');
+  const pdf = new jsPDF('landscape', 'mm', 'a4');
+  const [letterheadTop, letterheadFooter, watermark] = await Promise.all([
+    loadImageDataUrl(LETTERHEAD_TOP_SRC),
+    loadImageDataUrl(LETTERHEAD_FOOTER_SRC),
+    loadImageDataUrl(LETTERHEAD_WATERMARK_SRC),
+  ]);
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 12;
+  const tableWidth = pageWidth - margin * 2;
+  const topHeight = (pageWidth * 620) / 4960;
+  const footerHeight = (pageWidth * 736) / 4960;
+  const footerY = pageHeight - footerHeight;
+  const columnWidths = [25, 39, 100, 34, 34, 41];
+  const columnTitles = ['DATE', 'REFERENCE', 'DESCRIPTION', 'DEBIT', 'CREDIT', 'BALANCE'];
+  const rightAligned = new Set([3, 4, 5]);
+  const fmt = (amount: number) => formatCurrency(amount, data.currency);
+
+  const drawPageHeader = () => {
+    pdf.addImage(letterheadTop, 'PNG', 0, 0, pageWidth, topHeight);
+    const watermarkWidth = pageWidth * 0.78;
+    const watermarkHeight = (watermarkWidth * 1000) / 4960;
+    pdf.addImage(
+      watermark,
+      'PNG',
+      (pageWidth - watermarkWidth) / 2,
+      (pageHeight - watermarkHeight) / 2,
+      watermarkWidth,
+      watermarkHeight,
+    );
+    pdf.addImage(letterheadFooter, 'PNG', 0, footerY, pageWidth, footerHeight);
+
+    pdf.setTextColor(20, 20, 20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(15);
+    pdf.text(data.title.toUpperCase(), pageWidth / 2, topHeight + 14, { align: 'center' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(data.subjectName, pageWidth / 2, topHeight + 20, { align: 'center' });
+    pdf.setFontSize(10);
+    pdf.text(branch.name, margin, topHeight + 32);
+    pdf.setFontSize(8);
+    if (branch.address) pdf.text(pdf.splitTextToSize(branch.address, 110), margin, topHeight + 37);
+    if (branch.tax_registration_number) {
+      pdf.text(
+        `TRN: ${branch.tax_registration_number}`,
+        margin,
+        branch.address ? topHeight + 45 : topHeight + 37,
+      );
+    }
+    pdf.setFontSize(8);
+    pdf.text(
+      `Period: ${fmtDate(data.periodFrom)} – ${fmtDate(data.periodTo)}`,
+      pageWidth - margin,
+      topHeight + 33,
+      {
+        align: 'right',
+      },
+    );
+    pdf.text(`Generated: ${fmtDateTime()}`, pageWidth - margin, topHeight + 38, { align: 'right' });
+
+    const headerY = topHeight + 54;
+    pdf.setFillColor(245, 246, 248);
+    pdf.rect(margin, headerY - 5, tableWidth, 9, 'F');
+    pdf.setDrawColor(40, 40, 40);
+    pdf.setLineWidth(0.25);
+    pdf.line(margin, headerY - 5, pageWidth - margin, headerY - 5);
+    pdf.line(margin, headerY + 4, pageWidth - margin, headerY + 4);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    let x = margin;
+    columnTitles.forEach((title, index) => {
+      const textX = rightAligned.has(index) ? x + columnWidths[index] - 2 : x + 2;
+      pdf.text(title, textX, headerY + 1, {
+        align: rightAligned.has(index) ? 'right' : 'left',
+      });
+      x += columnWidths[index];
+    });
+    pdf.setFont('helvetica', 'normal');
+    return headerY + 5;
+  };
+
+  let y = drawPageHeader();
+  const addRow = (cells: string[], bold = false, italic = false) => {
+    const fontSize = 8;
+    pdf.setFont('helvetica', bold ? 'bold' : italic ? 'italic' : 'normal');
+    pdf.setFontSize(fontSize);
+    const wrapped = cells.map((cell, index) => pdf.splitTextToSize(cell, columnWidths[index] - 4));
+    const lineCount = Math.max(...wrapped.map((lines) => lines.length));
+    const rowHeight = Math.max(8, lineCount * 4 + 4);
+
+    if (y + rowHeight > footerY - 8) {
+      pdf.addPage();
+      y = drawPageHeader();
+    }
+
+    let x = margin;
+    wrapped.forEach((lines, index) => {
+      const textX = rightAligned.has(index) ? x + columnWidths[index] - 2 : x + 2;
+      pdf.text(lines, textX, y + 4, {
+        align: rightAligned.has(index) ? 'right' : 'left',
+        lineHeightFactor: 1.15,
+      });
+      x += columnWidths[index];
+    });
+    y += rowHeight;
+    pdf.setDrawColor(225, 225, 225);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin, y, pageWidth - margin, y);
+  };
+
+  const addBalanceRow = (label: string, amount: number, italic = false) => {
+    const rowHeight = 9;
+    if (y + rowHeight > footerY - 8) {
+      pdf.addPage();
+      y = drawPageHeader();
+    }
+    pdf.setFont('helvetica', italic ? 'italic' : 'bold');
+    pdf.setFontSize(8);
+    pdf.text(label, margin + 2, y + 5);
+    pdf.text(fmt(amount), pageWidth - margin - 2, y + 5, { align: 'right' });
+    y += rowHeight;
+    pdf.setDrawColor(225, 225, 225);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin, y, pageWidth - margin, y);
+  };
+
+  addBalanceRow('Opening Balance', data.openingBalance, true);
+  let running = data.openingBalance;
+  for (const row of data.rows) {
+    running += (row.debit ?? 0) - (row.credit ?? 0);
+    addRow([
+      fmtDate(row.date),
+      row.reference ?? '—',
+      row.description,
+      row.debit ? fmt(row.debit) : '',
+      row.credit ? fmt(row.credit) : '',
+      fmt(running),
+    ]);
+  }
+  addBalanceRow(data.balanceLabel ?? 'Closing Balance', data.closingBalance);
+
+  return pdf;
+}
+
 // ─── Running-balance layout ────────────────────────────────────────────────
 
 function RunningBalanceDocument({
@@ -143,15 +312,23 @@ function RunningBalanceDocument({
         </div>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8 }}>
+      <table
+        style={{
+          width: '100%',
+          tableLayout: 'fixed',
+          borderCollapse: 'collapse',
+          fontSize: 12,
+          marginBottom: 8,
+        }}
+      >
         <thead>
           <tr>
-            <th style={thStyle('left')}>Date</th>
-            <th style={thStyle('left')}>Reference</th>
+            <th style={{ ...thStyle('left'), width: '12%' }}>Date</th>
+            <th style={{ ...thStyle('left'), width: '18%' }}>Reference</th>
             <th style={{ ...thStyle('left'), width: '30%' }}>Description</th>
-            <th style={thStyle('right')}>Debit</th>
-            <th style={thStyle('right')}>Credit</th>
-            <th style={thStyle('right')}>Balance</th>
+            <th style={{ ...thStyle('right'), width: '13%' }}>Debit</th>
+            <th style={{ ...thStyle('right'), width: '13%' }}>Credit</th>
+            <th style={{ ...thStyle('right'), width: '14%' }}>Balance</th>
           </tr>
         </thead>
         <tbody>
@@ -175,9 +352,15 @@ function RunningBalanceDocument({
                   <td style={tdStyle('left')}>{fmtDate(r.date)}</td>
                   <td style={tdStyle('left')}>{r.reference ?? '—'}</td>
                   <td style={tdStyle('left')}>{r.description}</td>
-                  <td style={tdStyle('right')}>{r.debit ? fmt(r.debit) : ''}</td>
-                  <td style={tdStyle('right')}>{r.credit ? fmt(r.credit) : ''}</td>
-                  <td style={{ ...tdStyle('right'), fontWeight: 500 }}>{fmt(running)}</td>
+                  <td style={{ ...tdStyle('right'), whiteSpace: 'nowrap' }}>
+                    {r.debit ? fmt(r.debit) : ''}
+                  </td>
+                  <td style={{ ...tdStyle('right'), whiteSpace: 'nowrap' }}>
+                    {r.credit ? fmt(r.credit) : ''}
+                  </td>
+                  <td style={{ ...tdStyle('right'), fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    {fmt(running)}
+                  </td>
                 </tr>
               );
             })
@@ -340,7 +523,8 @@ export default function StatementDialog({
   const generatePdf = async () => {
     const element = printRef.current;
     if (!element) throw new Error('Document not found');
-    return generateDocPdf(element);
+    if (data.kind === 'running-balance') return generateRunningBalancePdf(data, branch);
+    return generateDocPdf(element, { orientation: 'landscape', targetWidth: 1200 });
   };
 
   const filenameBase = () =>
@@ -364,7 +548,7 @@ export default function StatementDialog({
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(
-      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}body{margin:0;padding:0;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
+      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}@page{size:A4 landscape;margin:10mm;}html,body{width:277mm;margin:0;padding:0;}.print-document{width:277mm!important;max-width:none!important;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
     );
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
@@ -409,14 +593,14 @@ export default function StatementDialog({
           of the viewport instead of scrolling. The doc-preview div below is the
           flex-1/overflow-y-auto child that actually scrolls, so only ONE region
           scrolls internally and the dialog chrome (footer) stays put. */}
-      <DialogContent className="sm:max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
+      <DialogContent className="w-[96vw] max-w-[1400px] sm:max-w-[1400px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
         {/* Document preview — the scrollable region */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide bg-muted p-6">
+        <div className="flex-1 overflow-auto scrollbar-hide bg-muted p-4 md:p-6">
           <div
             ref={printRef}
             id="statement-print-content"
             className="mx-auto shadow-xl"
-            style={{ maxWidth: 900 }}
+            style={{ width: '100%', maxWidth: 1200 }}
           >
             {data.kind === 'running-balance' ? (
               <RunningBalanceDocument data={data} branch={branch} />

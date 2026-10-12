@@ -631,31 +631,38 @@ export default function AccountsReceivablePage() {
 
   const filtered = useMemo(
     () =>
-      allReceivables.filter((r) => {
-        const matchType = typeFilter === 'ALL' || r.type === typeFilter;
-        const matchAging = agingFilter === 'ALL' || r.aging === agingFilter;
-        const matchSource = sourceFilter === 'ALL' || r.source === sourceFilter;
-        const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
-        const matchSearch =
-          !search ||
-          r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-          r.referenceNo?.toLowerCase().includes(search.toLowerCase());
-        const matchAmountMin = !amountMin || (r.outstanding ?? 0) >= Number(amountMin);
-        const matchAmountMax = !amountMax || (r.outstanding ?? 0) <= Number(amountMax);
-        const matchDateFrom = !dateFrom || (r.issueDate?.slice(0, 10) ?? '') >= dateFrom;
-        const matchDateTo = !dateTo || (r.issueDate?.slice(0, 10) ?? '') <= dateTo;
-        return (
-          matchType &&
-          matchAging &&
-          matchSource &&
-          matchStatus &&
-          matchSearch &&
-          matchAmountMin &&
-          matchAmountMax &&
-          matchDateFrom &&
-          matchDateTo
-        );
-      }),
+      allReceivables
+        .filter((r) => {
+          const matchType = typeFilter === 'ALL' || r.type === typeFilter;
+          const matchAging = agingFilter === 'ALL' || r.aging === agingFilter;
+          const matchSource = sourceFilter === 'ALL' || r.source === sourceFilter;
+          const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
+          const matchSearch =
+            !search ||
+            r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+            r.referenceNo?.toLowerCase().includes(search.toLowerCase());
+          const matchAmountMin = !amountMin || (r.outstanding ?? 0) >= Number(amountMin);
+          const matchAmountMax = !amountMax || (r.outstanding ?? 0) <= Number(amountMax);
+          const matchDateFrom = !dateFrom || (r.issueDate?.slice(0, 10) ?? '') >= dateFrom;
+          const matchDateTo = !dateTo || (r.issueDate?.slice(0, 10) ?? '') <= dateTo;
+          return (
+            matchType &&
+            matchAging &&
+            matchSource &&
+            matchStatus &&
+            matchSearch &&
+            matchAmountMin &&
+            matchAmountMax &&
+            matchDateFrom &&
+            matchDateTo
+          );
+        })
+        .sort((a, b) =>
+          (a.referenceNo ?? '').localeCompare(b.referenceNo ?? '', undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          }),
+        ),
     [
       allReceivables,
       typeFilter,
@@ -731,7 +738,7 @@ export default function AccountsReceivablePage() {
 
   if (isLoading) {
     return (
-      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
+      <div className="bg-card min-h-full p-6 flex items-center justify-center">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -739,7 +746,7 @@ export default function AccountsReceivablePage() {
 
   if (isError) {
     return (
-      <div className="bg-primary/10 min-h-full p-6 flex items-center justify-center">
+      <div className="bg-card min-h-full p-6 flex items-center justify-center">
         <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-8 text-center space-y-3 max-w-sm w-full">
           <p className="text-destructive font-medium">Failed to load receivables. Please retry.</p>
           <button
@@ -754,7 +761,7 @@ export default function AccountsReceivablePage() {
   }
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-card min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Page header + tab switcher */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -843,56 +850,66 @@ export default function AccountsReceivablePage() {
                 )}
               </button>
               {chartsOpen && (
-                <div className="px-4 pb-4 space-y-4">
-                  {/* Aging bar */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                      AR Aging Analysis
-                    </h4>
-                    <SimpleBarChart
-                      data={agingTotals}
-                      xKey="bucket"
-                      bars={[
-                        { key: 'total', color: 'var(--chart-blue-mid)', label: 'Outstanding' },
-                      ]}
-                      height={220}
-                      currency={currency}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                        Collection Rate Trend
+                <div className="space-y-4 px-4 pb-4">
+                  <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                        AR Aging Analysis
                       </h4>
-                      <SimpleLineChart
-                        data={rcvCharts?.collectionRate ?? []}
-                        xKey="month"
-                        lines={[
-                          { key: 'issued', color: 'var(--chart-blue-mid)', label: 'Issued' },
-                          { key: 'collected', color: 'var(--chart-profit)', label: 'Collected' },
-                        ]}
-                        height={220}
+                      <SimpleBarChart
+                        data={agingTotals}
+                        xKey="bucket"
+                        bars={[{ key: 'total', color: 'var(--chart-blue)', label: 'Outstanding' }]}
+                        height={260}
                         currency={currency}
                       />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                    </section>
+                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                         By Type
                       </h4>
-                      <DonutChart data={rcvCharts?.byType ?? []} height={220} currency={currency} />
-                    </div>
+                      <DonutChart
+                        data={rcvCharts?.byType ?? []}
+                        height={280}
+                        colors={[
+                          'var(--chart-blue)',
+                          'var(--destructive)',
+                          'var(--lease)',
+                          'var(--chart-indigo)',
+                          'var(--chart-blue-soft)',
+                          'var(--chart-slate-dark)',
+                        ]}
+                        currency={currency}
+                      />
+                    </section>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                  <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Collection Rate Trend
+                    </h4>
+                    <SimpleLineChart
+                      data={rcvCharts?.collectionRate ?? []}
+                      xKey="month"
+                      lines={[
+                        { key: 'issued', color: 'var(--chart-blue)', label: 'Issued' },
+                        { key: 'collected', color: 'var(--destructive)', label: 'Collected' },
+                      ]}
+                      height={320}
+                      currency={currency}
+                      showArea
+                    />
+                  </section>
+                  <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                       Top 10 Customers by Amount
                     </h4>
                     <HorizontalBarChart
                       data={rcvCharts?.topCustomers ?? []}
-                      height={240}
-                      color="var(--chart-blue-mid)"
+                      height={320}
+                      color="var(--lease)"
                       currency={currency}
                     />
-                  </div>
+                  </section>
                 </div>
               )}
             </div>
@@ -1179,43 +1196,47 @@ export default function AccountsReceivablePage() {
                                   id: r.id,
                                 })
                               }
-                              className={`${ACTION_BTN} hover:bg-muted hover:ring-1 hover:ring-ring`}
+                              className={`${ACTION_BTN} border border-secondary bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80`}
                               title="View full details"
                               aria-label="View full details"
                             >
                               <Eye className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
                             </button>
                             {r.isInvoice && (r.type === 'RENT' || r.type === 'LEASE') && (
-                              <button
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="default"
                                 onClick={() =>
                                   setViewingBillsFor({
                                     contractId: r.id,
                                     invoiceNumber: r.referenceNo,
                                   })
                                 }
-                                className={`${ACTION_BTN} hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
+                                className="h-8 gap-1.5 whitespace-nowrap px-2.5 text-xs font-semibold shadow-sm"
                                 title={`View bills raised on ${r.referenceNo}`}
-                                aria-label="View bills"
+                                aria-label="View raised bills"
                               >
-                                <BillsMark size={22} />
-                              </button>
+                                <BillsMark size={16} />
+                                <span>Raised Bills</span>
+                              </Button>
                             )}
                             {r.isInvoice &&
                               r.type === 'SERVICE' &&
                               (r.outstanding ?? 0) > 0.004 && (
                                 <button
                                   onClick={() => setCollectingServiceInvoiceId(r.id)}
-                                  className={`${ACTION_BTN} hover:bg-success/10 hover:ring-1 hover:ring-success/30`}
+                                  className={`${ACTION_BTN} border border-success bg-success text-success-foreground shadow-sm hover:bg-success/90`}
                                   title="Record service collection for Accounts approval"
                                   aria-label="Collect service invoice"
                                 >
-                                  <DollarSign className="h-4 w-4 text-success transition-colors group-hover:text-success" />
+                                  <DollarSign className="h-4 w-4" />
                                 </button>
                               )}
                             {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => setPayingFor(r as ManualReceivable)}
-                                className={`${ACTION_BTN} hover:bg-primary/10 hover:ring-1 hover:ring-primary/30`}
+                                className={`${ACTION_BTN} border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90`}
                                 title="Record Payment"
                                 aria-label="Record payment"
                               >

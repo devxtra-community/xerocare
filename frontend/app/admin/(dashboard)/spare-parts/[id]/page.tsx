@@ -28,6 +28,7 @@ import { getSparePartById, getSparePartStock, SparePart, SparePartStock } from '
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 export default function SparePartDetailPage() {
   const currency = useBranchCurrency();
@@ -70,8 +71,11 @@ export default function SparePartDetailPage() {
     }
   };
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, field: string) => {
+    if (!(await copyTextToClipboard(text))) {
+      toast.error(`Could not copy ${field.toLowerCase()}`);
+      return;
+    }
     setCopiedField(field);
     toast.success(`${field} copied`);
     setTimeout(() => setCopiedField(null), 2000);
@@ -79,7 +83,7 @@ export default function SparePartDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm font-medium text-muted-foreground">Loading spare part details...</p>
       </div>
@@ -88,7 +92,7 @@ export default function SparePartDetailPage() {
 
   if (!part) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-primary/10 gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card gap-4">
         <Settings className="h-12 w-12 text-muted-foreground" />
         <p className="text-lg font-bold text-foreground">Spare part not found</p>
         <Button onClick={() => router.back()} className="bg-primary text-primary-foreground">
@@ -114,7 +118,7 @@ export default function SparePartDetailPage() {
         : 'Universal / Multiple Models');
 
   return (
-    <div className="min-h-screen bg-primary/10 p-4 sm:p-6 md:p-8 space-y-6">
+    <div className="min-h-screen bg-card p-4 sm:p-6 md:p-8 space-y-6">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-2xl border border-border shadow-sm">
         <div className="flex items-center gap-4">

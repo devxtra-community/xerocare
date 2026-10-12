@@ -73,7 +73,7 @@ export default function InstallationSigningPage() {
 
   if (state === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted">
+      <div className="flex min-h-screen items-center justify-center bg-card">
         <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
       </div>
     );
@@ -81,7 +81,7 @@ export default function InstallationSigningPage() {
 
   if (state === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted p-6">
+      <div className="flex min-h-screen items-center justify-center bg-card p-6">
         <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
           <AlertTriangle size={28} className="mx-auto mb-3 text-warning" />
           <p className="text-base font-black text-foreground">This link cannot be opened</p>
@@ -92,7 +92,7 @@ export default function InstallationSigningPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted py-8">
+    <div className="min-h-screen bg-card py-8">
       <div className="mx-auto w-full max-w-2xl px-4">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">

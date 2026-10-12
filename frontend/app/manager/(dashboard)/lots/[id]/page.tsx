@@ -464,7 +464,7 @@ export default function LotDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted">
+      <div className="min-h-screen flex items-center justify-center bg-card">
         <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
       </div>
     );
@@ -472,7 +472,7 @@ export default function LotDetailPage() {
 
   if (!lot) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-muted gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-card gap-4">
         <p className="text-muted-foreground">Lot not found.</p>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft size={16} className="mr-2" /> Go Back
@@ -500,7 +500,7 @@ export default function LotDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-muted/50 pb-16">
+    <div className="min-h-screen bg-card pb-16">
       {/* Header */}
       <div className="bg-card border-b sticky top-0 z-10">
         <div className="max-w-[1400px] mx-auto px-6 py-5 flex items-center justify-between gap-4">

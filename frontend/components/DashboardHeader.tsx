@@ -210,7 +210,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-card text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+    <header className="sticky top-0 z-50 w-full shrink-0 border-b border-border bg-card text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <div
         className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2"
         suppressHydrationWarning
@@ -227,7 +227,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-muted dark:border-border dark:bg-foreground dark:text-warning dark:hover:bg-foreground"
+            className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-muted"
             onClick={toggleTheme}
             aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             aria-pressed={isDarkMode}

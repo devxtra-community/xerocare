@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Search, Filter, BookMarked, Eye, FileText } from 'lucide-react';
 import {
-  fetchARInvoices,
+  fetchLedgerInvoices,
   fetchPayments,
   fetchPurchases,
   fetchPayroll,
@@ -98,7 +98,7 @@ function GeneralLedgerContent() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
-  // fetchARInvoices/fetchPayments/fetchPurchases/fetchPayroll/getMyExpenseRequests
+  // fetchLedgerInvoices/fetchPayments/fetchPurchases/fetchPayroll/getMyExpenseRequests
   // only accept a single branchId (no IN-list support server-side) — same
   // single-branch-only convention already used by `activeBranch` below.
   const singleBranchId = branchIds && !branchIds.includes(',') ? branchIds : undefined;
@@ -144,7 +144,7 @@ function GeneralLedgerContent() {
     refetch: refetchInv,
   } = useQuery<InvoiceSummary[]>({
     queryKey: ['admin-gl-invoices', branchIds],
-    queryFn: () => fetchARInvoices({ branchId: singleBranchId }),
+    queryFn: () => fetchLedgerInvoices({ branchId: singleBranchId }),
     ...queryOptions,
   });
   const {
@@ -269,15 +269,31 @@ function GeneralLedgerContent() {
     [entries, fromDate, toDate, accountFilter, search],
   );
 
+  const searchNeedle = search.trim().toLowerCase();
+  const matchedCustomers = searchNeedle
+    ? customerList.filter((customer) => customer.name.toLowerCase().includes(searchNeedle))
+    : [];
+  const matchedVendors = searchNeedle
+    ? vendorList.filter((vendor) => vendor.name.toLowerCase().includes(searchNeedle))
+    : [];
+  const isCustomerLedgerSearch = matchedCustomers.length === 1 && matchedVendors.length === 0;
+  const isVendorLedgerSearch = matchedVendors.length === 1 && matchedCustomers.length === 0;
+
   const withBalance = useMemo(() => {
     const result = [];
     let balance = 0;
     for (const e of filtered) {
-      balance += e.debit - e.credit;
+      if (isCustomerLedgerSearch) {
+        if (e.accountCode === '1003') balance += e.debit - e.credit;
+      } else if (isVendorLedgerSearch) {
+        if (e.accountCode === '2001') balance += e.credit - e.debit;
+      } else {
+        balance += e.debit - e.credit;
+      }
       result.push({ ...e, runningBalance: balance });
     }
     return result;
-  }, [filtered]);
+  }, [filtered, isCustomerLedgerSearch, isVendorLedgerSearch]);
 
   // View action — pairs every line of the same transaction together regardless of
   // the current filters, so the detail modal always shows the complete double
@@ -287,13 +303,18 @@ function GeneralLedgerContent() {
   );
   const viewingData = useMemo(() => {
     if (!viewingGroup) return null;
+    const selectedPayment = payments.find((p) => p.id === viewingGroup.sourceId);
     const pairedRows = entries.filter(
       (e) => e.source === viewingGroup.source && e.sourceId === viewingGroup.sourceId,
     );
     return {
       pairedRows,
-      invoice: invoices.find((i) => i.id === viewingGroup.sourceId),
-      payment: payments.find((p) => p.id === viewingGroup.sourceId),
+      invoice: invoices.find(
+        (i) =>
+          i.id ===
+          (viewingGroup.source === 'Payment' ? selectedPayment?.invoiceId : viewingGroup.sourceId),
+      ),
+      payment: selectedPayment,
       purchase: purchases.find((p) => p.id === viewingGroup.sourceId),
       payroll: payroll.find((p) => p.id === viewingGroup.sourceId),
       vendorPayment: vendorPaymentRequests.find((r) => r.id === viewingGroup.sourceId),
@@ -312,6 +333,15 @@ function GeneralLedgerContent() {
 
   const totalDebit = filtered.reduce((s, e) => s + Number(e.debit || 0), 0);
   const totalCredit = filtered.reduce((s, e) => s + Number(e.credit || 0), 0);
+  const closingBalance = withBalance[withBalance.length - 1]?.runningBalance ?? 0;
+  const showEntityClosingBalance = isCustomerLedgerSearch || isVendorLedgerSearch;
+  const closingBalanceSide = isVendorLedgerSearch
+    ? closingBalance >= 0
+      ? 'Cr'
+      : 'Dr'
+    : closingBalance >= 0
+      ? 'Dr'
+      : 'Cr';
 
   const uniqueAccounts = useMemo(() => {
     const set = new Set(entries.map((e) => e.account.slice(0, 4)));
@@ -613,7 +643,13 @@ function GeneralLedgerContent() {
                       className={`text-right font-bold text-sm ${e.runningBalance < 0 ? 'text-destructive' : 'text-foreground'}`}
                     >
                       {formatCurrency(Math.abs(e.runningBalance), currency)}
-                      {e.runningBalance < 0 ? ' Cr' : ' Dr'}
+                      {isVendorLedgerSearch
+                        ? e.runningBalance >= 0
+                          ? ' Cr'
+                          : ' Dr'
+                        : e.runningBalance < 0
+                          ? ' Cr'
+                          : ' Dr'}
                     </TableCell>
                     <TableCell className="pr-4">
                       <button
@@ -632,7 +668,7 @@ function GeneralLedgerContent() {
           {withBalance.length > 0 && (
             <div className="border-t bg-muted/30 px-4 py-3 flex items-center gap-8 rounded-b-xl">
               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex-1">
-                Totals
+                {showEntityClosingBalance ? 'Closing Balance' : 'Totals'}
               </span>
               <span className="text-sm font-black text-primary w-28 text-right">
                 {formatCurrency(totalDebit, currency)}
@@ -641,7 +677,9 @@ function GeneralLedgerContent() {
                 {formatCurrency(totalCredit, currency)}
               </span>
               <span className="text-sm font-black text-foreground w-32 text-right pr-4">
-                {formatCurrency(Math.abs(totalDebit - totalCredit), currency)}
+                {showEntityClosingBalance
+                  ? `${formatCurrency(Math.abs(closingBalance), currency)} ${closingBalanceSide}`
+                  : formatCurrency(Math.abs(totalDebit - totalCredit), currency)}
               </span>
             </div>
           )}
@@ -678,7 +716,7 @@ function GeneralLedgerContent() {
 
 export default function AdminGeneralLedgerPage() {
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-6">
+    <div className="bg-card min-h-full p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="text-xl sm:text-2xl font-medium text-foreground tracking-tight">

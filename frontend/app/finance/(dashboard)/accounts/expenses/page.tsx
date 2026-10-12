@@ -1254,7 +1254,7 @@ export default function ExpenseManagementPage() {
   };
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-card min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Tab switcher */}
       <div className="flex gap-1 bg-card border border-border rounded-xl p-1 w-fit shadow-sm">
         <button

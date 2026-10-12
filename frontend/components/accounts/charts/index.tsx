@@ -803,9 +803,17 @@ interface LineProps {
   lines: { key: string; color?: string; label?: string }[];
   height?: number;
   currency?: string;
+  showArea?: boolean;
 }
 
-export function SimpleLineChart({ data, xKey, lines, height = 300, currency = 'AED' }: LineProps) {
+export function SimpleLineChart({
+  data,
+  xKey,
+  lines,
+  height = 300,
+  currency = 'AED',
+  showArea = false,
+}: LineProps) {
   const fmt = makeFmt(currency);
   if (isBlank((data ?? []).flatMap((row) => lines.map((l) => Number(row[l.key])))))
     return <Blank height={height} />;
@@ -850,6 +858,21 @@ export function SimpleLineChart({ data, xKey, lines, height = 300, currency = 'A
         />
         <Tooltip content={<ChartTooltip fmt={fmt} />} cursor={LINE_CURSOR} />
         {lines.length > 1 && <Legend {...LEGEND_PROPS} />}
+        {showArea &&
+          lines.map((l, i) => (
+            <Area
+              key={`${l.key}-area`}
+              type="monotone"
+              dataKey={l.key}
+              name={l.label ?? l.key}
+              stroke="none"
+              fill={l.color ?? COLORS[i]}
+              fillOpacity={0.12}
+              legendType="none"
+              tooltipType="none"
+              {...NO_MOUNT_ANIMATION}
+            />
+          ))}
         {lines.map((l, i) => {
           const stroke = l.color ?? COLORS[i];
           return (

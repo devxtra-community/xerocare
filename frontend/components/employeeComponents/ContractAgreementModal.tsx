@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Copy,
   Printer,
+  Download,
   PenLine,
   User,
   Link2,
@@ -42,6 +43,8 @@ import { ContractDocumentBody, defaultTermsForType } from './ContractDocumentBod
 import { Invoice } from '@/lib/invoice';
 import { Customer } from '@/lib/customer';
 import { getActiveCurrency } from '@/lib/currency';
+import { printDocument } from '@/lib/printDocument';
+import { generateDocPdf } from '@/components/shared/documentTemplate';
 
 interface ContractAgreementModalProps {
   invoice: Invoice;
@@ -75,6 +78,7 @@ export function ContractAgreementModal({
   const [remoteLink, setRemoteLink] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [sendingAgreementVia, setSendingAgreementVia] = useState<'email' | 'whatsapp' | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // Upload method state
   const [customerSignMethod, setCustomerSignMethod] = useState<'CAPTURE' | 'UPLOAD'>('CAPTURE');
@@ -212,12 +216,30 @@ export function ContractAgreementModal({
     if (ok) {
       toast.success('Copied! Link copied to clipboard');
     } else {
-      toast.error('Could not copy the link. Please copy it manually.');
+      const manualCopy = window.prompt(
+        'Clipboard access is unavailable. Copy this agreement link manually:',
+        remoteLink,
+      );
+      if (manualCopy !== null) {
+        toast.info('Select the link in the prompt and press Ctrl+C or ⌘+C.');
+      }
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = () => printDocument(printRef.current);
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current || !agreement) return;
+    setIsDownloadingPdf(true);
+    try {
+      const pdf = await generateDocPdf(printRef.current);
+      pdf.save(`Agreement-${agreement.agreementNumber || invoice.invoiceNumber}.pdf`);
+      toast.success('Agreement PDF downloaded');
+    } catch {
+      toast.error('Failed to generate agreement PDF');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   // Available from any tab, not just Remote Link — Finance/Employee shouldn't have
@@ -327,20 +349,38 @@ export function ContractAgreementModal({
             <>
               {/* ── View Tab ──────────────────────────────────── */}
               {tab === 'view' && (
-                <div ref={printRef}>
-                  <ContractDocumentBody
-                    invoice={invoice}
-                    agreement={agreement}
-                    currency={currency}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handlePrint}
-                    className="text-[10px] font-black uppercase tracking-widest text-muted-foreground h-8 w-full border border-border mt-4"
-                  >
-                    <Printer size={12} className="mr-1" /> Print / Save PDF
-                  </Button>
+                <div>
+                  <div ref={printRef}>
+                    <ContractDocumentBody
+                      invoice={invoice}
+                      agreement={agreement}
+                      currency={currency}
+                    />
+                  </div>
+                  <div className="mt-4 flex gap-2 print:hidden">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrint}
+                      className="flex-1 text-[10px] font-black uppercase tracking-widest h-9"
+                    >
+                      <Printer size={13} className="mr-1" /> Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadPdf}
+                      disabled={isDownloadingPdf}
+                      className="flex-1 text-[10px] font-black uppercase tracking-widest h-9"
+                    >
+                      {isDownloadingPdf ? (
+                        <Loader2 size={13} className="mr-1 animate-spin" />
+                      ) : (
+                        <Download size={13} className="mr-1" />
+                      )}
+                      PDF
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -634,6 +674,8 @@ export function ContractAgreementModal({
                               variant="ghost"
                               size="sm"
                               onClick={copyLink}
+                              aria-label="Copy agreement signing link"
+                              title="Copy agreement signing link"
                               className="shrink-0 h-8 w-8 p-0 text-muted-foreground"
                             >
                               <Copy size={14} />

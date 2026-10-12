@@ -1,11 +1,20 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CreditCard, Loader2, Search, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -16,6 +25,8 @@ import {
 import api from '@/lib/api';
 import { GCC_COUNTRIES, CARD_NETWORK_LABEL, CardNetwork } from '@/lib/payments/gccCards';
 import StatCard from '@/components/StatCard';
+import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import { getApiErrorMessage } from '@/lib/apiError';
 
 /**
  * Card settlement reconciliation.
@@ -41,6 +52,7 @@ interface SettlementRow {
   transactionReference?: string;
   currency?: string;
   invoiceNumber: string;
+  isDirectSale?: boolean;
 }
 
 interface Totals {
@@ -57,10 +69,17 @@ interface DayRow {
   count: number;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const localDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const today = () => localDateInputValue(new Date());
 const monthStart = () => {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return localDateInputValue(new Date(d.getFullYear(), d.getMonth(), 1));
 };
 
 export default function CardSettlementsReport() {
@@ -75,8 +94,22 @@ export default function CardSettlementsReport() {
   const [cardNetwork, setCardNetwork] = useState('');
   const [issuerCountry, setIssuerCountry] = useState('');
   const [search, setSearch] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<
+    { id: string; name: string; isDefault?: boolean }[]
+  >([]);
+  const [settlementAccountId, setSettlementAccountId] = useState('');
+  const [settlementRate, setSettlementRate] = useState('');
+  const [commissionPromptFor, setCommissionPromptFor] = useState<SettlementRow | null>(null);
+  const [commissionPromptMode, setCommissionPromptMode] = useState<'PERCENTAGE' | 'AMOUNT'>(
+    'PERCENTAGE',
+  );
+  const [commissionPromptValue, setCommissionPromptValue] = useState('');
+  const [processingId, setProcessingId] = useState('');
+  const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
+  const requestSequence = useRef(0);
 
   const load = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     setLoading(true);
     try {
       const res = await api.get('/b/card-fees/settlements', {
@@ -90,22 +123,135 @@ export default function CardSettlementsReport() {
         },
       });
       const d = res.data?.data ?? {};
+      if (sequence !== requestSequence.current) return;
       setRows(d.transactions ?? []);
       setTotals(d.totals ?? null);
       setDays(d.bySettlementDate ?? []);
     } catch {
-      toast.error('Could not load card settlements');
+      if (sequence === requestSequence.current) toast.error('Could not load card settlements');
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [dateFrom, dateTo, cardType, cardNetwork, issuerCountry, search]);
 
   useEffect(() => {
+    // Invalidate an in-flight response as soon as any filter changes, before the
+    // debounce timer starts the replacement request.
+    requestSequence.current += 1;
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, [load]);
 
-  const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
+  useEffect(() => {
+    fetchCashBankAccounts()
+      .then((accounts) => {
+        const activeBanks = accounts
+          .filter((a) => a.type === 'BANK' && a.isActive)
+          .map((a) => ({ id: a.id, name: a.name, isDefault: a.isDefault }));
+        setBankAccounts(activeBanks);
+
+        // A configured default account is the intended settlement destination. If
+        // there is only one active bank account, choosing it avoids leaving Process
+        // disabled for the common single-account setup.
+        const preferred =
+          activeBanks.find((a) => a.isDefault) ??
+          (activeBanks.length === 1 ? activeBanks[0] : undefined);
+        if (preferred) setSettlementAccountId((current) => current || preferred.id);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const processSettlement = async (
+    transactionId: string,
+    override?: { mode: 'PERCENTAGE' | 'AMOUNT'; value: string },
+  ) => {
+    if (!settlementAccountId) {
+      toast.error('Select the bank account for settlement');
+      return;
+    }
+    const commissionOverride =
+      override ??
+      (settlementRate !== '' ? { mode: 'PERCENTAGE' as const, value: settlementRate } : undefined);
+    setProcessingId(transactionId);
+    try {
+      await api.post(
+        '/b/card-fees/settlements/process-direct-sale',
+        {
+          transactionId,
+          cashAccountId: settlementAccountId,
+          ...(commissionOverride?.mode === 'PERCENTAGE'
+            ? { commissionRatePercent: Number(commissionOverride.value) }
+            : {}),
+          ...(commissionOverride?.mode === 'AMOUNT'
+            ? { commissionAmount: Number(commissionOverride.value) }
+            : {}),
+        },
+        { skipErrorToast: true },
+      );
+      setCommissionPromptFor(null);
+      toast.success('Card settlement processed');
+      await load();
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(err, 'Could not process card settlement');
+      if (
+        !commissionOverride &&
+        message.toLowerCase().includes('no commission rule is configured')
+      ) {
+        const row = rows.find((candidate) => candidate.id === transactionId) ?? null;
+        setCommissionPromptMode('PERCENTAGE');
+        setCommissionPromptValue('');
+        setCommissionPromptFor(row);
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setProcessingId('');
+    }
+  };
+
+  const confirmCommissionRate = () => {
+    const value = Number(commissionPromptValue);
+    const gross = Number(commissionPromptFor?.gross ?? 0);
+    if (
+      !commissionPromptValue.trim() ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      (commissionPromptMode === 'PERCENTAGE' && value > 100) ||
+      (commissionPromptMode === 'AMOUNT' && value > gross)
+    ) {
+      toast.error(
+        commissionPromptMode === 'PERCENTAGE'
+          ? 'Enter a commission percentage between 0 and 100'
+          : 'Commission amount cannot exceed the gross payment',
+      );
+      return;
+    }
+    if (commissionPromptFor) {
+      void processSettlement(commissionPromptFor.id, {
+        mode: commissionPromptMode,
+        value: commissionPromptValue,
+      });
+    }
+  };
+
+  const promptGross = Number(commissionPromptFor?.gross ?? 0);
+  const promptInput = Number(commissionPromptValue);
+  const promptCommission =
+    commissionPromptValue.trim() && Number.isFinite(promptInput)
+      ? commissionPromptMode === 'PERCENTAGE'
+        ? (promptGross * promptInput) / 100
+        : promptInput
+      : null;
+  const promptCurrency = commissionPromptFor?.currency ?? currency;
+  const promptMoney = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: promptCurrency,
+  });
+  const promptCommissionRounded =
+    promptCommission === null
+      ? null
+      : Number(promptCommission.toFixed(promptMoney.resolvedOptions().maximumFractionDigits));
+
   const fmt = (n: number | string | null | undefined) =>
     Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
@@ -121,6 +267,53 @@ export default function CardSettlementsReport() {
           therefore have reached the bank. Group totals are per settlement day, so a single deposit
           on the bank statement can be matched to the receipts behind it.
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-3">
+        <div className="min-w-56">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">
+            Settlement bank account
+          </Label>
+          <Select value={settlementAccountId} onValueChange={setSettlementAccountId}>
+            <SelectTrigger className="mt-1 h-9">
+              <SelectValue
+                placeholder={bankAccounts.length ? 'Select bank account' : 'No active bank account'}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {bankAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-36">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground">
+            Optional commission %
+          </Label>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.0001"
+            className="mt-1 h-9"
+            value={settlementRate}
+            onChange={(e) => setSettlementRate(e.target.value)}
+            placeholder="Use configured rate"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Applies when processing a Direct Sale card receipt with no configured rate.
+        </p>
+        {!settlementAccountId && (
+          <p className="w-full text-xs text-amber-700">
+            {bankAccounts.length
+              ? 'Select a settlement bank account to enable Process.'
+              : 'Add or activate a bank account in Cash & Bank to process card settlements.'}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted p-4 md:grid-cols-6">
@@ -304,6 +497,7 @@ export default function CardSettlementsReport() {
                   <th className="px-3 py-2 text-right">Rate</th>
                   <th className="px-3 py-2 text-right">Fee</th>
                   <th className="px-3 py-2 text-right">Net</th>
+                  <th className="px-3 py-2 text-right">Settlement</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -314,10 +508,26 @@ export default function CardSettlementsReport() {
                     </td>
                     <td className="px-3 py-2 font-bold text-foreground">{r.invoiceNumber}</td>
                     <td className="px-3 py-2 text-xs">
-                      <span className="font-bold text-foreground">{r.issuerBank ?? '—'}</span>
+                      <span className="font-bold text-foreground">
+                        {r.issuerBank ||
+                          (r.cardNetwork
+                            ? (CARD_NETWORK_LABEL[r.cardNetwork as CardNetwork] ?? r.cardNetwork)
+                            : 'Card details unavailable')}
+                      </span>
                       <span className="block text-muted-foreground">
-                        {r.cardNetwork} {r.cardType === 'DEBIT' ? 'Debit' : 'Credit'}
-                        {r.cardLast4 ? ` ••••${r.cardLast4}` : ''}
+                        {[
+                          r.issuerBank && r.cardNetwork
+                            ? (CARD_NETWORK_LABEL[r.cardNetwork as CardNetwork] ?? r.cardNetwork)
+                            : '',
+                          r.cardType === 'DEBIT'
+                            ? 'Debit'
+                            : r.cardType === 'CREDIT'
+                              ? 'Credit'
+                              : '',
+                          r.cardLast4 ? `••••${r.cardLast4}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs uppercase text-foreground">
@@ -336,6 +546,21 @@ export default function CardSettlementsReport() {
                     <td className="px-3 py-2 text-right font-mono font-black text-success">
                       {fmt(r.net ?? r.gross)}
                     </td>
+                    <td className="px-3 py-2 text-right">
+                      {r.isDirectSale && r.commission == null ? (
+                        <button
+                          className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                          disabled={!settlementAccountId || processingId === r.id}
+                          onClick={() => processSettlement(r.id)}
+                        >
+                          {processingId === r.id ? 'Processing…' : 'Process'}
+                        </button>
+                      ) : r.isDirectSale ? (
+                        <span className="text-xs font-bold text-success">Processed</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -343,6 +568,90 @@ export default function CardSettlementsReport() {
           </div>
         </>
       )}
+
+      <Dialog
+        open={!!commissionPromptFor}
+        onOpenChange={(open) => !open && !processingId && setCommissionPromptFor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter commission</DialogTitle>
+            <DialogDescription>
+              No fee rule is configured for this card. Enter the agreed commission to process
+              {commissionPromptFor ? ` ${commissionPromptFor.invoiceNumber}` : ' this settlement'}.
+              This commission will apply to this receipt only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="settlement-commission-mode">Commission type</Label>
+              <Select
+                value={commissionPromptMode}
+                onValueChange={(value) => {
+                  setCommissionPromptMode(value as 'PERCENTAGE' | 'AMOUNT');
+                  setCommissionPromptValue('');
+                }}
+              >
+                <SelectTrigger id="settlement-commission-mode" className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PERCENTAGE">Percentage</SelectItem>
+                  <SelectItem value="AMOUNT">Fixed amount</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="settlement-commission-value">
+                {commissionPromptMode === 'PERCENTAGE'
+                  ? 'Commission percentage (%)'
+                  : `Commission amount (${promptCurrency})`}
+              </Label>
+              <Input
+                id="settlement-commission-value"
+                type="number"
+                min="0"
+                max={commissionPromptMode === 'PERCENTAGE' ? 100 : promptGross}
+                step="0.0001"
+                autoFocus
+                value={commissionPromptValue}
+                onChange={(event) => setCommissionPromptValue(event.target.value)}
+                placeholder={commissionPromptMode === 'PERCENTAGE' ? 'e.g. 1.95' : 'e.g. 100.00'}
+              />
+            </div>
+            {promptCommissionRounded !== null && (
+              <div className="space-y-1 rounded-lg border border-border bg-muted p-3 text-sm">
+                <div className="flex justify-between">
+                  <span>Gross payment</span>
+                  <span>{promptMoney.format(promptGross)}</span>
+                </div>
+                <div className="flex justify-between text-destructive">
+                  <span>Commission deducted</span>
+                  <span>− {promptMoney.format(promptCommissionRounded)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-1 font-semibold">
+                  <span>Net settlement</span>
+                  <span>
+                    {promptMoney.format(Math.max(0, promptGross - promptCommissionRounded))}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={!!processingId}
+              onClick={() => setCommissionPromptFor(null)}
+            >
+              Cancel
+            </Button>
+            <Button disabled={!!processingId} onClick={confirmCommissionRate}>
+              {processingId ? 'Processing…' : 'Process settlement'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

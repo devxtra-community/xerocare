@@ -110,7 +110,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   if (loading) {
     return (
-      <div className="bg-primary/10 min-h-full flex items-center justify-center p-6">
+      <div className="bg-card min-h-full flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -118,7 +118,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   if (!customer) {
     return (
-      <div className="bg-primary/10 min-h-full flex flex-col items-center justify-center gap-4 p-6">
+      <div className="bg-card min-h-full flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-primary font-bold">Customer not found</div>
         <Button onClick={() => router.back()}>Go Back</Button>
       </div>
@@ -140,7 +140,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <ProtectedRoute requiredModules={['customers']}>
-      <div className="bg-primary/10 min-h-full p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+      <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">

@@ -12,11 +12,11 @@ export default async function FinanceLayout({ children }: { children: React.Reac
   return (
     <AuthGuard loginUrl="/login">
       <SidebarProvider>
-        <div className="flex min-h-screen w-full" suppressHydrationWarning>
+        <div className="flex h-dvh w-full overflow-hidden" suppressHydrationWarning>
           <RoleAwareSidebar fallback="finance" initialRole={user?.role ?? null} />
 
           <SidebarInset
-            className="bg-background min-h-screen w-full flex flex-col"
+            className="bg-background min-h-0 w-full flex flex-1 flex-col overflow-hidden"
             suppressHydrationWarning
           >
             <div className="relative" suppressHydrationWarning>
@@ -28,7 +28,7 @@ export default async function FinanceLayout({ children }: { children: React.Reac
                 <ChequeNotificationBell />
               </div>
             </div>
-            <div className="flex-1 overflow-auto" suppressHydrationWarning>
+            <div className="min-h-0 flex-1 overflow-y-auto" suppressHydrationWarning>
               {children}
             </div>
           </SidebarInset>

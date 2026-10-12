@@ -299,11 +299,14 @@ export function TotalsBlock({
 
 // ─── PDF generation — paginated toPng + jsPDF capture of a print element ─────
 
-export async function generateDocPdf(element: HTMLElement) {
+export async function generateDocPdf(
+  element: HTMLElement,
+  options: { orientation?: 'portrait' | 'landscape'; targetWidth?: number } = {},
+) {
   const { toPng } = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
 
-  const TARGET_WIDTH = 900;
+  const TARGET_WIDTH = options.targetWidth ?? 900;
   const orig = element.getAttribute('style') || '';
   element.setAttribute(
     'style',
@@ -323,7 +326,7 @@ export async function generateDocPdf(element: HTMLElement) {
     element.setAttribute('style', orig);
   }
 
-  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pdf = new jsPDF(options.orientation === 'landscape' ? 'l' : 'p', 'mm', 'a4');
   const imgProps = pdf.getImageProperties(dataUrl);
   const pdfW = pdf.internal.pageSize.getWidth();
   const pdfH = pdf.internal.pageSize.getHeight();

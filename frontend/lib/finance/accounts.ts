@@ -343,6 +343,20 @@ export async function fetchARInvoices(params?: {
   return res.data?.data ?? res.data ?? [];
 }
 
+/**
+ * Full invoice set for General Ledger construction. Paid invoices are needed to
+ * resolve customer names on their cashbook receipts; the AR helper intentionally
+ * excludes those invoices because its other callers only need open receivables.
+ */
+export async function fetchLedgerInvoices(params?: {
+  branchId?: string;
+}): Promise<InvoiceSummary[]> {
+  const res = await api.get('/b/invoices', { params });
+  const invoices: InvoiceSummary[] = res.data?.data ?? res.data ?? [];
+  const postedStatuses = new Set(['ACTIVE_CONTRACT', 'INVOICED', 'PARTIAL', 'PAID']);
+  return invoices.filter((invoice) => postedStatuses.has(invoice.status));
+}
+
 // ─────────────────────────────────────────────
 // PAYMENTS — for cash flow + AR
 // ─────────────────────────────────────────────

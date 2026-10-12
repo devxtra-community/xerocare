@@ -50,7 +50,7 @@ export default function BranchDeepDivePage() {
   });
 
   return (
-    <div className="bg-muted min-h-full p-6 space-y-6">
+    <div className="bg-card min-h-full p-6 space-y-6">
       <div className="flex items-center gap-3">
         <Link
           href="/admin/accounts"

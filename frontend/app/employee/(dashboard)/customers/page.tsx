@@ -7,7 +7,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 export default function EmployeeCustomersPage() {
   return (
     <ProtectedRoute requiredModules={['customers']}>
-      <div className="bg-primary/10 min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
+      <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-6 sm:space-y-8">
         <div className="flex flex-col space-y-4 sm:space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xl sm:text-2xl font-medium text-foreground">Customer Management</h3>

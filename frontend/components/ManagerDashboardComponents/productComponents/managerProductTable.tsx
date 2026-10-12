@@ -21,6 +21,7 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import { getUserFromToken } from '@/lib/auth';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 /**
  * Manager Product Management Page.
@@ -234,10 +235,11 @@ export default function ManagerProduct() {
                 <span className="font-mono text-[11px]">{p.lot?.lotNumber || '-'}</span>
                 {p.lot?.lotNumber && (
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(p.lot?.lotNumber || '');
-                      toast.success('Copied to clipboard');
+                      if (await copyTextToClipboard(p.lot?.lotNumber || '')) {
+                        toast.success('Copied to clipboard');
+                      } else toast.error('Could not copy to clipboard');
                     }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                     title="Copy Lot ID"
@@ -256,10 +258,11 @@ export default function ManagerProduct() {
                 <span className="font-mono text-[11px]">{p.serial_no || '-'}</span>
                 {p.serial_no && (
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(p.serial_no);
-                      toast.success('Copied to clipboard');
+                      if (await copyTextToClipboard(p.serial_no))
+                        toast.success('Copied to clipboard');
+                      else toast.error('Could not copy to clipboard');
                     }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                     title="Copy Serial No"

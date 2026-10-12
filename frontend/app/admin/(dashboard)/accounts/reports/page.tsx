@@ -137,7 +137,7 @@ function ReportsContent() {
   ];
 
   return (
-    <div className="bg-muted min-h-full p-6 space-y-6">
+    <div className="bg-card min-h-full p-6 space-y-6">
       <div>
         <h1 className="text-xl sm:text-2xl font-medium text-foreground">Financial Reports Hub</h1>
         <p className="text-sm text-muted-foreground">

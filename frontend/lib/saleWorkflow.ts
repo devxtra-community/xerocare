@@ -82,6 +82,7 @@ export interface InstallationRequest {
 }
 
 export interface SalePaymentRequest {
+  isDirectSale?: boolean;
   id: string;
   requestNo: string;
   invoiceId: string;

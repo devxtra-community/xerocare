@@ -24,6 +24,7 @@ import {
   UpdateModelData,
 } from '@/lib/model';
 import { toast } from 'sonner';
+import { copyTextToClipboard } from '@/lib/clipboard';
 import { ModelFormModal } from './ModelFormModal';
 import {
   AlertDialog,
@@ -194,10 +195,11 @@ export default function ManagerModel() {
                     <div className="flex items-center justify-center gap-2 group">
                       <span className="font-mono text-[13px]">{m.model_no}</span>
                       <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          navigator.clipboard.writeText(m.model_no || '');
-                          toast.success('Copied to clipboard');
+                          if (await copyTextToClipboard(m.model_no || '')) {
+                            toast.success('Copied to clipboard');
+                          } else toast.error('Could not copy to clipboard');
                         }}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-primary"
                         title="Copy Model ID"

@@ -81,6 +81,15 @@ interface Props {
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const CARD_NETWORKS: CardNetwork[] = [
+  'VISA',
+  'MASTERCARD',
+  'AMEX',
+  'UNIONPAY',
+  'MADA',
+  'KNET',
+  'OTHER',
+];
 
 export default function OnlinePaymentFields({
   value,
@@ -127,13 +136,6 @@ export default function OnlinePaymentFields({
       .replace(/\s+/g, '_')
       .toUpperCase();
   }, [value.issuerBank, value.cardType, value.issuerCountry]);
-
-  const availableNetworks = React.useMemo(() => {
-    const opt = cardOptionsFor((value.cardType || 'DEBIT') as CardType).find(
-      (o) => o.id === selectedCardId,
-    );
-    return opt?.networks ?? [];
-  }, [selectedCardId, value.cardType]);
 
   // ── Fee quote ───────────────────────────────────────────────────────────────
   // Asks the SAME engine the approval path uses, rather than computing a rate here.
@@ -289,40 +291,35 @@ export default function OnlinePaymentFields({
               emptyText="No matching card found."
               onValueChange={() => {}}
               onSelect={(o) => {
-                const networks = (o.networks as CardNetwork[]) ?? [];
                 set({
                   issuerBank: o.issuerBank as string,
                   issuerCountry: o.country as string,
-                  // Only ask for the network when the bank genuinely issues on several.
-                  cardNetwork: networks.length === 1 ? networks[0] : '',
                 });
               }}
             />
           </div>
 
-          {availableNetworks.length > 1 && (
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-foreground">
-                Card Network *
-              </label>
-              <Select
-                disabled={disabled}
-                value={value.cardNetwork || undefined}
-                onValueChange={(v) => set({ cardNetwork: v as CardNetwork })}
-              >
-                <SelectTrigger className="bg-card text-sm">
-                  <SelectValue placeholder="Select network…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableNetworks.map((n) => (
-                    <SelectItem key={n} value={n}>
-                      {CARD_NETWORK_LABEL[n]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-foreground">
+              Card Network *
+            </label>
+            <Select
+              disabled={disabled}
+              value={value.cardNetwork || undefined}
+              onValueChange={(v) => set({ cardNetwork: v as CardNetwork })}
+            >
+              <SelectTrigger className="bg-card text-sm">
+                <SelectValue placeholder="Select network…" />
+              </SelectTrigger>
+              <SelectContent>
+                {CARD_NETWORKS.map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {CARD_NETWORK_LABEL[n]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>

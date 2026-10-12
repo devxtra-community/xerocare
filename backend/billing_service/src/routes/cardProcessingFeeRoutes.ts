@@ -7,6 +7,7 @@ import {
   updateCardProcessingFeeRule,
   deactivateCardProcessingFeeRule,
   getCardSettlements,
+  processDirectSaleCardSettlement,
 } from '../controllers/cardProcessingFeeController';
 
 const router = Router();
@@ -18,6 +19,7 @@ router.post('/preview', authMiddleware, previewCardProcessingFee);
 // Merchant agreement administration — role-checked inside the controller.
 // Reconciliation: card receipts with their fee and net, filterable and batched by day.
 router.get('/settlements', authMiddleware, getCardSettlements);
+router.post('/settlements/process-direct-sale', authMiddleware, processDirectSaleCardSettlement);
 
 router.get('/rules', authMiddleware, listCardProcessingFeeRules);
 router.post('/rules', authMiddleware, createCardProcessingFeeRule);

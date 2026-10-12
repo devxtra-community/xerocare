@@ -1,9 +1,11 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useRef } from 'react';
 import { apInvoices, vendors } from '@/lib/finance/ap';
 import StatusBadge from '@/components/Finance/statusBadge';
 import { Button } from '@/components/ui/button'; // Assuming standard Shadcn components
+import { printDocument } from '@/lib/printDocument';
 import {
   Table,
   TableBody,
@@ -29,6 +31,7 @@ import {
 export default function APInvoiceViewPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const invoicePrintRef = useRef<HTMLDivElement>(null);
   const invoice = apInvoices.find((i) => i.id === id);
 
   if (!invoice) return <div className="p-12 text-center">Invoice not found</div>;
@@ -37,7 +40,7 @@ export default function APInvoiceViewPage() {
   const balanceDue = (invoice.totalAmount ?? 0) - (invoice.paidAmount ?? 0);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6 bg-muted/50 min-h-screen">
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6 bg-card min-h-screen">
       {/* 1. Sticky Action Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 rounded-xl border shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -50,7 +53,12 @@ export default function APInvoiceViewPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 sm:flex-none print:hidden"
+            onClick={() => printDocument(invoicePrintRef.current)}
+          >
             <Printer className="w-4 h-4 mr-2" /> Print
           </Button>
           <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
@@ -80,7 +88,16 @@ export default function APInvoiceViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 2. Primary Invoice Column */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
+          <div
+            ref={invoicePrintRef}
+            className="bg-card border rounded-xl shadow-sm overflow-hidden"
+          >
+            <div className="hidden print:block p-8 pb-0">
+              <h1 className="text-xl font-bold">{invoice.invoiceNumber}</h1>
+              <p className="text-sm">
+                Invoice date: {invoice.invoiceDate} · Due: {invoice.dueDate}
+              </p>
+            </div>
             {/* Vendor & Header Branding */}
             <div className="p-8 border-b flex justify-between items-start">
               <div className="space-y-1">

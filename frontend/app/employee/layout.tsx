@@ -9,16 +9,16 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex h-dvh w-full overflow-hidden">
         <RoleAwareSidebar
           fallback="employee"
           initialRole={user?.role ?? null}
           initialEmployeeJob={user?.employeeJob ?? null}
         />
 
-        <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
+        <SidebarInset className="bg-background min-h-0 w-full flex flex-1 flex-col overflow-hidden">
           <DashboardHeader />
-          <div className="flex-1 overflow-auto">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </SidebarInset>
       </div>
     </SidebarProvider>

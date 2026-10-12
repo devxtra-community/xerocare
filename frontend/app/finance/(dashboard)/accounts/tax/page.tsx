@@ -1080,7 +1080,7 @@ export default function TaxReportPage() {
   };
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-card min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

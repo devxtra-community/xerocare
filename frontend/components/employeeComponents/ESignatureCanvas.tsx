@@ -65,9 +65,12 @@ export function ESignatureCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = 'var(--card)';
+    // CanvasRenderingContext2D does not resolve CSS custom properties, so values such
+    // as `var(--card)` are ignored and the canvas can inherit a dark/transparent look.
+    // Paint an opaque white sheet and use black ink for signatures.
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = 'var(--foreground)';
+    ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -155,7 +158,7 @@ export function ESignatureCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = 'var(--card)';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     setIsEmpty(true);
     setSaved(false);
@@ -187,8 +190,8 @@ export function ESignatureCanvas({
       <div
         className={`border-2 rounded-xl overflow-hidden ${
           readOnly
-            ? 'border-border bg-muted'
-            : 'border-dashed border-border bg-card cursor-crosshair'
+            ? 'border-border bg-white'
+            : 'border-dashed border-border bg-white cursor-crosshair'
         }`}
         style={{ width: '100%', aspectRatio: `${width}/${height}` }}
       >

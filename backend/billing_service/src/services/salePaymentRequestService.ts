@@ -126,7 +126,15 @@ function validateCardDetails(params: CreateSalePaymentRequestParams) {
       400,
     );
   }
-  return { cardType, cardNetwork, issuerCountry, issuerBank, cardLast4, cardHolderName };
+  return {
+    cardType,
+    cardNetwork,
+    issuerCountry,
+    issuerBank,
+    cardLast4,
+    cardHolderName,
+    transactionReference: params.transactionReference,
+  };
 }
 
 /**
@@ -205,6 +213,11 @@ export async function createSalePaymentRequest(
 
   if (paymentMode === 'ONLINE_PAYMENT') {
     card = validateCardDetails(params);
+  }
+
+  if (paymentMode === 'ONLINE_PAYMENT' && invoice.isDirectSale !== true) {
+    const validatedCard = card;
+    if (!validatedCard) throw new AppError('Card details are required', 400);
     // Price the card if the rate is already on file, but never block the collection on
     // it. The salesperson takes the money at the counter and has no way of knowing what
     // the acquirer charges — the commission is Accounts' business, settled when Finance
@@ -215,10 +228,10 @@ export async function createSalePaymentRequest(
     const { findApplicableRule, applyRule } = await import('./cardProcessingFeeService');
     const rule = await findApplicableRule({
       branchId,
-      issuerCountry: card.issuerCountry,
-      issuerBank: card.issuerBank,
-      cardType: card.cardType,
-      cardNetwork: card.cardNetwork,
+      issuerCountry: validatedCard.issuerCountry,
+      issuerBank: validatedCard.issuerBank,
+      cardType: validatedCard.cardType,
+      cardNetwork: validatedCard.cardNetwork,
       paymentGateway: params.paymentGateway,
       transactionChannel: params.transactionChannel,
       currency: invoice.currencyCode || 'AED',
@@ -286,7 +299,6 @@ export async function createSalePaymentRequest(
     ...(card ? { ...card, gatewayToken: params.gatewayToken } : {}),
     ...(fee
       ? {
-          transactionReference: params.transactionReference,
           paymentGateway: params.paymentGateway,
           commissionRateApplied: fee.ratePercentApplied,
           commissionFixedApplied: fee.fixedFeeApplied,

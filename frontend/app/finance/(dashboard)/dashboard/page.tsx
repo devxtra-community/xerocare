@@ -15,7 +15,7 @@ import { YearSelector } from '@/components/ui/YearSelector';
 export default function FinanceDashboard() {
   const [selectedYear, setSelectedYear] = React.useState<number | 'all'>(new Date().getFullYear());
   return (
-    <div className="bg-muted min-h-full p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="bg-card min-h-full p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* HEADER */}
       <header className="flex items-center justify-between gap-4">
         <div>

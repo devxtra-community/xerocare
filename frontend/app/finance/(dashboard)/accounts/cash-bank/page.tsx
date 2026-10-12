@@ -1947,7 +1947,7 @@ export default function CashBankPage() {
   ];
 
   return (
-    <div className="bg-primary/10 min-h-full p-6 space-y-5">
+    <div className="bg-card min-h-full p-6 space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
