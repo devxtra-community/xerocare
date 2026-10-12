@@ -86,6 +86,121 @@ const fmtDate = (d?: string | null) =>
 const fmtDateTime = () =>
   new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 
+async function generateRunningBalancePdf(data: RunningBalanceStatementData, branch: BranchInfo) {
+  const { jsPDF } = await import('jspdf');
+  const pdf = new jsPDF('landscape', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 12;
+  const tableWidth = pageWidth - margin * 2;
+  const columnWidths = [25, 39, 100, 34, 34, 41];
+  const columnTitles = ['DATE', 'REFERENCE', 'DESCRIPTION', 'DEBIT', 'CREDIT', 'BALANCE'];
+  const rightAligned = new Set([3, 4, 5]);
+  const fmt = (amount: number) => formatCurrency(amount, data.currency);
+
+  const drawPageHeader = () => {
+    pdf.setTextColor(20, 20, 20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(15);
+    pdf.text(data.title.toUpperCase(), pageWidth / 2, 15, { align: 'center' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(data.subjectName, pageWidth / 2, 21, { align: 'center' });
+    pdf.setFontSize(10);
+    pdf.text(branch.name, margin, 30);
+    pdf.setFontSize(8);
+    if (branch.address) pdf.text(pdf.splitTextToSize(branch.address, 110), margin, 35);
+    if (branch.tax_registration_number) {
+      pdf.text(`TRN: ${branch.tax_registration_number}`, margin, branch.address ? 44 : 35);
+    }
+    pdf.setFontSize(8);
+    pdf.text(
+      `Period: ${fmtDate(data.periodFrom)} – ${fmtDate(data.periodTo)}`,
+      pageWidth - margin,
+      31,
+      {
+        align: 'right',
+      },
+    );
+    pdf.text(`Generated: ${fmtDateTime()}`, pageWidth - margin, 36, { align: 'right' });
+
+    const headerY = 49;
+    pdf.setFillColor(245, 246, 248);
+    pdf.rect(margin, headerY - 5, tableWidth, 9, 'F');
+    pdf.setDrawColor(40, 40, 40);
+    pdf.setLineWidth(0.25);
+    pdf.line(margin, headerY - 5, pageWidth - margin, headerY - 5);
+    pdf.line(margin, headerY + 4, pageWidth - margin, headerY + 4);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    let x = margin;
+    columnTitles.forEach((title, index) => {
+      const textX = rightAligned.has(index) ? x + columnWidths[index] - 2 : x + 2;
+      pdf.text(title, textX, headerY + 1, {
+        align: rightAligned.has(index) ? 'right' : 'left',
+      });
+      x += columnWidths[index];
+    });
+    pdf.setFont('helvetica', 'normal');
+    return headerY + 5;
+  };
+
+  let y = drawPageHeader();
+  const addRow = (cells: string[], bold = false, italic = false) => {
+    const fontSize = 8;
+    pdf.setFont('helvetica', bold ? 'bold' : italic ? 'italic' : 'normal');
+    pdf.setFontSize(fontSize);
+    const wrapped = cells.map((cell, index) => pdf.splitTextToSize(cell, columnWidths[index] - 4));
+    const lineCount = Math.max(...wrapped.map((lines) => lines.length));
+    const rowHeight = Math.max(8, lineCount * 4 + 4);
+
+    if (y + rowHeight > pageHeight - margin) {
+      pdf.addPage();
+      y = drawPageHeader();
+    }
+
+    let x = margin;
+    wrapped.forEach((lines, index) => {
+      const textX = rightAligned.has(index) ? x + columnWidths[index] - 2 : x + 2;
+      pdf.text(lines, textX, y + 4, {
+        align: rightAligned.has(index) ? 'right' : 'left',
+        lineHeightFactor: 1.15,
+      });
+      x += columnWidths[index];
+    });
+    y += rowHeight;
+    pdf.setDrawColor(225, 225, 225);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin, y, pageWidth - margin, y);
+  };
+
+  addRow(['Opening Balance', '', '', '', '', fmt(data.openingBalance)], true, true);
+  let running = data.openingBalance;
+  for (const row of data.rows) {
+    running += (row.debit ?? 0) - (row.credit ?? 0);
+    addRow([
+      fmtDate(row.date),
+      row.reference ?? '—',
+      row.description,
+      row.debit ? fmt(row.debit) : '',
+      row.credit ? fmt(row.credit) : '',
+      fmt(running),
+    ]);
+  }
+  addRow([data.balanceLabel ?? 'Closing Balance', '', '', '', '', fmt(data.closingBalance)], true);
+
+  for (let page = 1; page <= pdf.getNumberOfPages(); page += 1) {
+    pdf.setPage(page);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(`Page ${page} of ${pdf.getNumberOfPages()}`, pageWidth - margin, pageHeight - 5, {
+      align: 'right',
+    });
+  }
+  return pdf;
+}
+
 // ─── Running-balance layout ────────────────────────────────────────────────
 
 function RunningBalanceDocument({
@@ -354,6 +469,7 @@ export default function StatementDialog({
   const generatePdf = async () => {
     const element = printRef.current;
     if (!element) throw new Error('Document not found');
+    if (data.kind === 'running-balance') return generateRunningBalancePdf(data, branch);
     return generateDocPdf(element, { orientation: 'landscape', targetWidth: 1200 });
   };
 
