@@ -529,7 +529,7 @@ export const sendContractAgreementWhatsApp = async (
         ? `Your fully signed contract agreement with ${agreement.dealerName} is ready.\n\n`
         : `Your contract agreement with ${agreement.dealerName} is ready for review${agreement.customerSignatureData ? '' : ' and signature'}.\n\n`) +
       `Agreement No: ${agreement.agreementNumber}\n\n` +
-      `${isFullySigned ? 'View' : 'Review & sign'}: ${link}\n\n` +
+      `${isFullySigned ? 'View' : 'Review & sign'} your agreement:\n${link}\n\n` +
       `Link valid for 72 hours.`;
 
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
@@ -1205,7 +1205,7 @@ export const sendBillWhatsApp = async (req: Request, res: Response, next: NextFu
       `Dear ${invoice.customerName || 'Customer'},\n\n` +
       `Your bill for ${periodLabel} is ready for review — total amount ${Number(usage.totalCharge).toFixed(2)}.\n\n` +
       `Invoice: ${invoice.invoiceNumber}\n\n` +
-      `Review & approve: ${link}\n\n` +
+      `Review & approve your bill:\n${link}\n\n` +
       `Link valid for 72 hours.`;
 
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');

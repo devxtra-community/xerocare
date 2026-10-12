@@ -15,8 +15,14 @@ import { logger } from '../config/logger';
  * they are consolidated here.
  */
 function resolveBase(): string {
-  const base = process.env.PUBLIC_APP_URL?.trim();
-  if (base) return base.replace(/\/+$/, '');
+  const configuredBase = process.env.PUBLIC_APP_URL?.trim();
+  if (configuredBase) {
+    // A bare host (for example, "app.example.com") is not recognized as a
+    // tappable URL by WhatsApp and is treated as a relative URL by browsers.
+    // Always return an absolute HTTP(S) URL before placing it in messages.
+    const base = /^https?:\/\//i.test(configuredBase) ? configuredBase : `http://${configuredBase}`;
+    return base.replace(/\/+$/, '');
+  }
   logger.error(
     'PUBLIC_APP_URL is not set — customer-facing links would fall back to localhost, which ' +
       'is unreachable from anywhere but this machine. Set PUBLIC_APP_URL to the public ' +

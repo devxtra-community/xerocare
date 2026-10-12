@@ -12,63 +12,60 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   const value = typeof text === 'string' ? text : String(text ?? '');
   if (!value) return false;
 
-  // Chrome exposes or partially exposes the Clipboard API on some insecure
-  // origins. Waiting for that request to reject can consume the click's user
-  // activation, making the legacy fallback report success without copying.
-  // On HTTP, skip that request and run execCommand synchronously in this click.
-  const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
-  if (isSecureContext) {
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-        return true;
-      }
-    } catch {
-      // Try the synchronous fallback if the browser rejects the API write.
-    }
-  }
-
-  // execCommand remains the available path on the app's plain HTTP deployment.
+  // Try the synchronous path first. Clipboard API failures can consume the
+  // browser's click activation, which then prevents execCommand from copying.
+  // Keeping this attempt before any await makes it reliable on HTTP and on
+  // browsers that deny clipboard permissions even over HTTPS.
   try {
-    if (typeof document === 'undefined' || !document.execCommand || !document.body) return false;
+    if (typeof document !== 'undefined' && document.execCommand && document.body) {
+      const textarea = document.createElement('textarea');
+      textarea.value = value;
+      textarea.setAttribute('readonly', '');
+      textarea.setAttribute('aria-hidden', 'true');
+      Object.assign(textarea.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '1px',
+        height: '1px',
+        padding: '0',
+        border: '0',
+        opacity: '0.01',
+        pointerEvents: 'none',
+        zIndex: '2147483647',
+        fontSize: '16px',
+        userSelect: 'text',
+      });
+      document.body.appendChild(textarea);
 
-    const textarea = document.createElement('textarea');
-    textarea.value = value;
-    textarea.setAttribute('readonly', '');
-    textarea.setAttribute('aria-hidden', 'true');
-    Object.assign(textarea.style, {
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: '1px',
-      height: '1px',
-      padding: '0',
-      border: '0',
-      opacity: '0.01',
-      pointerEvents: 'none',
-      zIndex: '2147483647',
-      fontSize: '16px',
-      userSelect: 'text',
-    });
-    document.body.appendChild(textarea);
-
-    const selection = document.getSelection();
-    const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    try {
-      textarea.focus({ preventScroll: true });
-      textarea.select();
-      textarea.setSelectionRange(0, value.length);
-      return document.execCommand('copy');
-    } finally {
-      textarea.remove();
-      if (previousRange && selection) {
-        try {
-          selection.removeAllRanges();
-          selection.addRange(previousRange);
-        } catch {
-          // The original selection can become stale while the copy field is focused.
+      const selection = document.getSelection();
+      const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      try {
+        textarea.focus({ preventScroll: true });
+        textarea.select();
+        textarea.setSelectionRange(0, value.length);
+        if (document.execCommand('copy')) return true;
+      } finally {
+        textarea.remove();
+        if (previousRange && selection) {
+          try {
+            selection.removeAllRanges();
+            selection.addRange(previousRange);
+          } catch {
+            // The original selection can become stale while the copy field is focused.
+          }
         }
       }
+    }
+  } catch {
+    // Try the Clipboard API below when the browser rejects the legacy command.
+  }
+
+  // HTTPS and localhost can use the asynchronous Clipboard API as a fallback.
+  try {
+    if (typeof window !== 'undefined' && window.isSecureContext && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
     }
   } catch {
     // Report failure to the caller; never show a success toast on an exception.

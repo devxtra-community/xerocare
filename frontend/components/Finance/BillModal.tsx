@@ -380,6 +380,8 @@ export function BillModal({
                           variant="ghost"
                           size="sm"
                           onClick={copyLink}
+                          aria-label="Copy bill signing link"
+                          title="Copy bill signing link"
                           className="shrink-0 h-8 w-8 p-0 text-muted-foreground"
                         >
                           <Copy size={14} />

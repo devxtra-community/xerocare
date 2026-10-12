@@ -212,7 +212,13 @@ export function ContractAgreementModal({
     if (ok) {
       toast.success('Copied! Link copied to clipboard');
     } else {
-      toast.error('Could not copy the link. Please copy it manually.');
+      const manualCopy = window.prompt(
+        'Clipboard access is unavailable. Copy this agreement link manually:',
+        remoteLink,
+      );
+      if (manualCopy !== null) {
+        toast.info('Select the link in the prompt and press Ctrl+C or ⌘+C.');
+      }
     }
   };
 
@@ -634,6 +640,8 @@ export function ContractAgreementModal({
                               variant="ghost"
                               size="sm"
                               onClick={copyLink}
+                              aria-label="Copy agreement signing link"
+                              title="Copy agreement signing link"
                               className="shrink-0 h-8 w-8 p-0 text-muted-foreground"
                             >
                               <Copy size={14} />

@@ -16,7 +16,10 @@
  */
 export function publicAppBase(): string {
   const configured = process.env.NEXT_PUBLIC_PUBLIC_APP_URL?.trim();
-  if (configured) return configured.replace(/\/$/, '');
+  if (configured) {
+    const absolute = /^https?:\/\//i.test(configured) ? configured : `http://${configured}`;
+    return absolute.replace(/\/+$/, '');
+  }
   if (typeof window !== 'undefined') return window.location.origin;
   return '';
 }
