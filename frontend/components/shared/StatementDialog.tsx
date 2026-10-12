@@ -340,7 +340,7 @@ export default function StatementDialog({
   const generatePdf = async () => {
     const element = printRef.current;
     if (!element) throw new Error('Document not found');
-    return generateDocPdf(element);
+    return generateDocPdf(element, { orientation: 'landscape', targetWidth: 1200 });
   };
 
   const filenameBase = () =>
@@ -364,7 +364,7 @@ export default function StatementDialog({
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(
-      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}body{margin:0;padding:0;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
+      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}@page{size:A4 landscape;margin:10mm;}html,body{width:277mm;margin:0;padding:0;}.print-document{width:277mm!important;max-width:none!important;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
     );
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
@@ -409,14 +409,14 @@ export default function StatementDialog({
           of the viewport instead of scrolling. The doc-preview div below is the
           flex-1/overflow-y-auto child that actually scrolls, so only ONE region
           scrolls internally and the dialog chrome (footer) stays put. */}
-      <DialogContent className="sm:max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
+      <DialogContent className="w-[96vw] max-w-[1400px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
         {/* Document preview — the scrollable region */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide bg-muted p-6">
+        <div className="flex-1 overflow-auto scrollbar-hide bg-muted p-4 md:p-6">
           <div
             ref={printRef}
             id="statement-print-content"
             className="mx-auto shadow-xl"
-            style={{ maxWidth: 900 }}
+            style={{ width: '100%', maxWidth: 1200 }}
           >
             {data.kind === 'running-balance' ? (
               <RunningBalanceDocument data={data} branch={branch} />
