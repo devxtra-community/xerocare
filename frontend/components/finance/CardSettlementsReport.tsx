@@ -6,6 +6,15 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -78,9 +87,14 @@ export default function CardSettlementsReport() {
   const [cardNetwork, setCardNetwork] = useState('');
   const [issuerCountry, setIssuerCountry] = useState('');
   const [search, setSearch] = useState('');
-  const [bankAccounts, setBankAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<
+    { id: string; name: string; isDefault?: boolean }[]
+  >([]);
   const [settlementAccountId, setSettlementAccountId] = useState('');
   const [settlementRate, setSettlementRate] = useState('');
+  const [commissionPromptFor, setCommissionPromptFor] = useState<SettlementRow | null>(null);
+  const [commissionPromptRate, setCommissionPromptRate] = useState('');
+  const [processingId, setProcessingId] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,30 +127,62 @@ export default function CardSettlementsReport() {
 
   useEffect(() => {
     fetchCashBankAccounts()
-      .then((accounts) =>
-        setBankAccounts(
-          accounts.filter((a) => a.type === 'BANK').map((a) => ({ id: a.id, name: a.name })),
-        ),
-      )
+      .then((accounts) => {
+        const activeBanks = accounts
+          .filter((a) => a.type === 'BANK' && a.isActive)
+          .map((a) => ({ id: a.id, name: a.name, isDefault: a.isDefault }));
+        setBankAccounts(activeBanks);
+
+        // A configured default account is the intended settlement destination. If
+        // there is only one active bank account, choosing it avoids leaving Process
+        // disabled for the common single-account setup.
+        const preferred =
+          activeBanks.find((a) => a.isDefault) ??
+          (activeBanks.length === 1 ? activeBanks[0] : undefined);
+        if (preferred) setSettlementAccountId((current) => current || preferred.id);
+      })
       .catch(() => undefined);
   }, []);
 
-  const processSettlement = async (transactionId: string) => {
+  const processSettlement = async (transactionId: string, rateOverride = settlementRate) => {
     if (!settlementAccountId) {
       toast.error('Select the bank account for settlement');
       return;
     }
+    setProcessingId(transactionId);
     try {
       await api.post('/b/card-fees/settlements/process-direct-sale', {
         transactionId,
         cashAccountId: settlementAccountId,
-        ...(settlementRate !== '' ? { commissionRatePercent: Number(settlementRate) } : {}),
+        ...(rateOverride !== '' ? { commissionRatePercent: Number(rateOverride) } : {}),
       });
+      setCommissionPromptFor(null);
       toast.success('Card settlement processed');
       await load();
     } catch (err: unknown) {
-      toast.error(getApiErrorMessage(err, 'Could not process card settlement'));
+      const message = getApiErrorMessage(err, 'Could not process card settlement');
+      if (
+        rateOverride === '' &&
+        message.toLowerCase().includes('no commission rule is configured')
+      ) {
+        const row = rows.find((candidate) => candidate.id === transactionId) ?? null;
+        setCommissionPromptRate('');
+        setCommissionPromptFor(row);
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setProcessingId('');
     }
+  };
+
+  const confirmCommissionRate = () => {
+    const rate = Number(commissionPromptRate);
+    if (!commissionPromptRate.trim() || !Number.isFinite(rate) || rate < 0 || rate > 100) {
+      toast.error('Enter a commission rate between 0 and 100');
+      return;
+    }
+    if (commissionPromptFor) void processSettlement(commissionPromptFor.id, commissionPromptRate);
   };
 
   const currency = useMemo(() => rows[0]?.currency ?? 'AED', [rows]);
@@ -164,7 +210,9 @@ export default function CardSettlementsReport() {
           </Label>
           <Select value={settlementAccountId} onValueChange={setSettlementAccountId}>
             <SelectTrigger className="mt-1 h-9">
-              <SelectValue placeholder="Select bank account" />
+              <SelectValue
+                placeholder={bankAccounts.length ? 'Select bank account' : 'No active bank account'}
+              />
             </SelectTrigger>
             <SelectContent>
               {bankAccounts.map((a) => (
@@ -193,6 +241,13 @@ export default function CardSettlementsReport() {
         <p className="text-xs text-muted-foreground">
           Applies when processing a Direct Sale card receipt with no configured rate.
         </p>
+        {!settlementAccountId && (
+          <p className="w-full text-xs text-amber-700">
+            {bankAccounts.length
+              ? 'Select a settlement bank account to enable Process.'
+              : 'Add or activate a bank account in Cash & Bank to process card settlements.'}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted p-4 md:grid-cols-6">
@@ -413,10 +468,10 @@ export default function CardSettlementsReport() {
                       {r.isDirectSale && r.commission == null ? (
                         <button
                           className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-                          disabled={!settlementAccountId}
+                          disabled={!settlementAccountId || processingId === r.id}
                           onClick={() => processSettlement(r.id)}
                         >
-                          Process
+                          {processingId === r.id ? 'Processing…' : 'Process'}
                         </button>
                       ) : r.isDirectSale ? (
                         <span className="text-xs font-bold text-success">Processed</span>
@@ -431,6 +486,48 @@ export default function CardSettlementsReport() {
           </div>
         </>
       )}
+
+      <Dialog
+        open={!!commissionPromptFor}
+        onOpenChange={(open) => !open && !processingId && setCommissionPromptFor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter commission rate</DialogTitle>
+            <DialogDescription>
+              No fee rule is configured for this card. Enter the agreed commission rate to process
+              {commissionPromptFor ? ` ${commissionPromptFor.invoiceNumber}` : ' this settlement'}.
+              This rate will apply to this receipt only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="settlement-commission-rate">Commission rate (%)</Label>
+            <Input
+              id="settlement-commission-rate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.0001"
+              autoFocus
+              value={commissionPromptRate}
+              onChange={(event) => setCommissionPromptRate(event.target.value)}
+              placeholder="e.g. 1.95"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={!!processingId}
+              onClick={() => setCommissionPromptFor(null)}
+            >
+              Cancel
+            </Button>
+            <Button disabled={!!processingId} onClick={confirmCommissionRate}>
+              {processingId ? 'Processing…' : 'Process settlement'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
