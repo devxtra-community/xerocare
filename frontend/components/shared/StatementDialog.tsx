@@ -409,7 +409,7 @@ export default function StatementDialog({
           of the viewport instead of scrolling. The doc-preview div below is the
           flex-1/overflow-y-auto child that actually scrolls, so only ONE region
           scrolls internally and the dialog chrome (footer) stays put. */}
-      <DialogContent className="w-[96vw] max-w-[1400px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
+      <DialogContent className="w-[96vw] max-w-[1400px] sm:max-w-[1400px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-card flex flex-col max-h-[95vh]">
         {/* Document preview — the scrollable region */}
         <div className="flex-1 overflow-auto scrollbar-hide bg-muted p-4 md:p-6">
           <div
