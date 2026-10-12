@@ -7,7 +7,6 @@ import {
   rejectSalePayment,
   refundSecurityDeposit,
   applySecurityDepositToBill,
-  reverseDepositApplication,
   getBillsForContract,
   type BillForContract,
   recordSalePayment,
@@ -96,7 +95,6 @@ import {
   ShieldCheck,
   Undo2,
   Wallet,
-  RotateCcw,
 } from 'lucide-react';
 import { SalePaymentReceiptView } from '@/components/finance/SalePaymentReceiptView';
 import { formatCurrency, autoReferencePreview } from '@/lib/format';
@@ -751,21 +749,6 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       loadData();
     } catch (err) {
       toast.error('Failed to apply deposit', { description: getApiErrorMessage(err) });
-    } finally {
-      setIsActing(false);
-    }
-  };
-
-  const handleReverseApplication = async (pmt: SalePaymentRequest) => {
-    setIsActing(true);
-    try {
-      const res = await reverseDepositApplication(pmt.id);
-      toast.success('Deposit application reversed', {
-        description: `${pmt.currency} ${res.reversed.toFixed(2)} released back to the deposit.`,
-      });
-      loadData();
-    } catch (err) {
-      toast.error('Could not reverse the application', { description: getApiErrorMessage(err) });
     } finally {
       setIsActing(false);
     }
@@ -1783,20 +1766,6 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                               </Button>
                             </>
                           )}
-                          {pmt.isSecurityDeposit &&
-                            pmt.status === 'APPROVED' &&
-                            Number(pmt.appliedAmount ?? 0) > 0.001 && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={isActing}
-                                onClick={() => handleReverseApplication(pmt)}
-                                className={`${ACTION_BTN} text-warning hover:bg-warning/10 hover:ring-1 hover:ring-warning/30`}
-                                title={`Reverse the ${pmt.currency} ${Number(pmt.appliedAmount).toFixed(2)} applied from this deposit`}
-                              >
-                                <RotateCcw size={18} />
-                              </Button>
-                            )}
                           {pmt.isSecurityDeposit &&
                             pmt.status === 'APPROVED' &&
                             !pmt.isRefunded &&

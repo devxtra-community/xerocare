@@ -187,12 +187,13 @@ export default function CompletedCollectionsTable({
                   <TableCell>
                     <Button
                       size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
+                      variant="default"
+                      className="h-8 whitespace-nowrap gap-1.5 px-2.5 text-xs shadow-sm"
                       onClick={() => handleShowHistory(collection.contractId)}
-                      title="View Usage History"
+                      aria-label="View bills and history"
                     >
-                      <HistoryIcon className="h-3.5 w-3.5" />
+                      <HistoryIcon className="h-4 w-4" />
+                      <span>Bills &amp; History</span>
                     </Button>
                   </TableCell>
                   <TableCell className="text-right">

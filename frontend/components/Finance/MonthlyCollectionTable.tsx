@@ -492,7 +492,7 @@ export default function MonthlyCollectionTable({
               variant="ghost"
               onClick={() => handleGenerateOrViewAdvanceBill(alertItem)}
               disabled={generatingAdvanceBillFor === alertItem.contractId}
-              className="h-9 w-9 rounded-md border border-success bg-success p-0 text-success-foreground shadow-sm transition-colors hover:bg-success/90"
+              className="h-9 whitespace-nowrap gap-1.5 rounded-md border border-success bg-success px-2.5 text-xs text-success-foreground shadow-sm transition-colors hover:bg-success/90"
               aria-label="View or generate advance bill"
               title={
                 advanceBillStatusMap[alertItem.contractId]?.advanceBillId
@@ -511,6 +511,11 @@ export default function MonthlyCollectionTable({
                 // one action looks the same wherever Finance meets it.
                 <SecurityBillMark size={18} />
               )}
+              <span>
+                {securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment
+                  ? 'Advance & Security Bill'
+                  : 'Advance Bill'}
+              </span>
             </Button>
           )}
 
@@ -524,7 +529,7 @@ export default function MonthlyCollectionTable({
                 variant="ghost"
                 onClick={() => handleGenerateOrViewSecurityDepositBill(alertItem)}
                 disabled={generatingSecurityDepositBillFor === alertItem.contractId}
-                className="h-9 w-9 rounded-md border border-success bg-success p-0 text-success-foreground shadow-sm transition-colors hover:bg-success/90"
+                className="h-9 whitespace-nowrap gap-1.5 rounded-md border border-success bg-success px-2.5 text-xs text-success-foreground shadow-sm transition-colors hover:bg-success/90"
                 aria-label="View or generate security deposit bill"
                 title={
                   securityDepositBillStatusMap[alertItem.contractId]?.securityDepositBillId
@@ -537,6 +542,7 @@ export default function MonthlyCollectionTable({
                 ) : (
                   <SecurityBillMark size={18} />
                 )}
+                <span>Security Deposit Bill</span>
               </Button>
             )}
 
