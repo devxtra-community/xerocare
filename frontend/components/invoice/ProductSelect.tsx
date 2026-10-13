@@ -131,7 +131,12 @@ export function ProductSelect({
       price = item.sale_price || 0;
       type = 'Product';
 
-      const isAvailable = !item.product_status || item.product_status === ProductStatus.AVAILABLE;
+      // Returned units are sellable/rentable inventory. Damaged and otherwise
+      // allocated units remain visible for context but cannot be selected.
+      const isAvailable =
+        !item.product_status ||
+        item.product_status === ProductStatus.AVAILABLE ||
+        item.product_status === ProductStatus.RETURNED;
       if (!isAvailable) {
         availableStock = 0;
       } else {

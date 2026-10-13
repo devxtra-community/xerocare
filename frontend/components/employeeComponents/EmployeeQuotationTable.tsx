@@ -1929,7 +1929,8 @@ function QuotationFormModal({
             }),
           )
         : [];
-      const isAvailable = !pr.product_status || pr.product_status === 'AVAILABLE';
+      const isAvailable =
+        !pr.product_status || pr.product_status === 'AVAILABLE' || pr.product_status === 'RETURNED';
       if (!isAvailable) {
         availableStock = 0;
       } else {
