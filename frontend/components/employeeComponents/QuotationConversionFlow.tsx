@@ -309,13 +309,11 @@ export function QuotationConversionFlow({
         });
       }
 
-      // 4 + 5. Advance and Security Deposit are two independent records against the
-      // same invoice. They were submitted one after the other, so every conversion paid
-      // for two sequential round-trips that have nothing to do with each other; they now
-      // go out together. Both are allowed to settle before anything is reported, so a
-      // failure message reflects what actually happened rather than which request
-      // happened to reject first.
-      const paymentSubmissions: Promise<unknown>[] = [];
+      // Advance and Security Deposit are separate records, but submit them in order.
+      // The backend generates SPAY numbers from the current row count, so concurrent
+      // requests for these two records can generate the same number and one will fail
+      // with a unique constraint error.
+      const paymentSubmissions: Array<() => Promise<unknown>> = [];
 
       // Skip the RENT advance for Arrears billing — no rent is collected upfront there —
       // but accessories are a separate, one-time charge unrelated to the rent-timing
@@ -324,7 +322,7 @@ export function QuotationConversionFlow({
       const rentAdvancePortion = isArrears ? 0 : Number(advanceAmount || 0);
       if (rentAdvancePortion > 0 || accessoryTotal > 0) {
         const mode = paymentMode === 'CREDIT_CARD' ? 'BANK_TRANSFER' : paymentMode;
-        paymentSubmissions.push(
+        paymentSubmissions.push(() =>
           recordSalePayment(quotation.id, {
             amount: rentAdvancePortion + accessoryTotal,
             paymentMode: mode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
@@ -351,7 +349,7 @@ export function QuotationConversionFlow({
       const hasCautionDeposit = cautionAmount && Number(cautionAmount) > 0;
       if (hasCautionDeposit) {
         const cautionPayMode = cautionMode === 'CREDIT_CARD' ? 'BANK_TRANSFER' : cautionMode;
-        paymentSubmissions.push(
+        paymentSubmissions.push(() =>
           recordSalePayment(quotation.id, {
             amount: Number(cautionAmount),
             paymentMode: cautionPayMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
@@ -369,11 +367,7 @@ export function QuotationConversionFlow({
         );
       }
 
-      if (paymentSubmissions.length > 0) {
-        const settled = await Promise.allSettled(paymentSubmissions);
-        const failed = settled.find((r) => r.status === 'rejected');
-        if (failed && failed.status === 'rejected') throw failed.reason;
-      }
+      for (const submitPayment of paymentSubmissions) await submitPayment();
 
       let successMsg =
         quotation.saleType === 'RENT' || quotation.saleType === 'LEASE'
