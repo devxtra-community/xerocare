@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { publicAppLink } from '@/lib/publicAppUrl';
-import { copyTextToClipboard } from '@/lib/clipboard';
+import { copyLinkToClipboard } from '@/lib/clipboard';
 import {
   Bill,
   getBill,
@@ -151,7 +151,7 @@ export function BillModal({
   // origins, so the await below stays direct — no intermediate setState round-trip.
   const copyLink = async () => {
     if (!remoteLink) return;
-    const ok = await copyTextToClipboard(remoteLink);
+    const ok = await copyLinkToClipboard(remoteLink, 'Open bill');
     if (ok) {
       toast.success('Copied! Link copied to clipboard');
     } else {

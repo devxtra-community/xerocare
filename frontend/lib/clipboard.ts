@@ -5,10 +5,11 @@
  * Prefer the Clipboard API when available. On plain HTTP, use the synchronous
  * `execCommand` fallback while the click's user gesture is still active.
  *
- * The text is copied verbatim — never trimmed or reformatted — so what lands
- * on the clipboard is exactly what is displayed in the UI.
+ * Plain text is copied verbatim. Callers may also supply HTML for rich-text
+ * destinations; chat apps still receive the plain URL and email editors can
+ * paste it as a clickable link.
  */
-export async function copyTextToClipboard(text: string): Promise<boolean> {
+export async function copyTextToClipboard(text: string, html?: string): Promise<boolean> {
   const value = typeof text === 'string' ? text : String(text ?? '');
   if (!value) return false;
 
@@ -17,6 +18,15 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   // On HTTPS, prefer the Clipboard API, which reports an actual write failure.
   if (secureContext) {
     try {
+      if (html && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([value], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+          }),
+        ]);
+        return true;
+      }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(value);
         return true;
@@ -58,6 +68,7 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
     const handleCopy = (event: ClipboardEvent) => {
       if (!event.clipboardData) return;
       event.clipboardData.setData('text/plain', value);
+      if (html) event.clipboardData.setData('text/html', html);
       event.preventDefault();
       copyEventHandled = true;
     };
@@ -85,4 +96,17 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
     // Report failure so the caller can show its manual-copy fallback.
   }
   return false;
+}
+
+/** Copies a URL as plain text for chat apps and as a clickable link for rich email editors. */
+export function copyLinkToClipboard(url: string, label: string): Promise<boolean> {
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  const safeUrl = escapeHtml(url.trim());
+  const safeLabel = escapeHtml(label);
+  return copyTextToClipboard(url.trim(), `<a href="${safeUrl}">${safeLabel}</a>`);
 }
