@@ -851,7 +851,9 @@ export class InvoiceRepository {
     }
 
     const results = await qb.groupBy('invoice.saleType').addGroupBy('invoice.type').getRawMany();
-    logger.info('InvoiceRepo: getPendingCounts results', { results });
+    logger.debug('InvoiceRepo: pending invoice count groups loaded', {
+      groupCount: results.length,
+    });
 
     return results.map((r) => ({
       saleType: r.saleType || r.saletype,

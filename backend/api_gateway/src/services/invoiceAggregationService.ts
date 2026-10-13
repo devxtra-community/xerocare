@@ -229,12 +229,10 @@ const fetchCustomerDetails = async (
 
     return { name, phone, email, address };
   } catch (error: unknown) {
-    const err = error as { message?: string; response?: { status?: number; data?: unknown } };
-    logger.error(`Failed to fetch customer details for ID: ${id}`, {
-      message: err.message,
+    const err = error as { code?: string; response?: { status?: number } };
+    logger.error('Failed to fetch customer details from CRM', {
+      code: err.code,
       status: err.response?.status,
-      data: err.response?.data,
-      url: url,
     });
     return defaultRes;
   }
@@ -344,7 +342,6 @@ export class InvoiceAggregationService {
           message: error.message,
           code: error.code,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to fetch invoices',
@@ -402,7 +399,6 @@ export class InvoiceAggregationService {
           message: error.message,
           code: error.code,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
           url: error.config?.url,
         });
         throw new AppError(
@@ -410,7 +406,9 @@ export class InvoiceAggregationService {
           error.response?.status || 500,
         );
       }
-      logger.error('Unknown error in fetch my invoices', error);
+      logger.error('Unknown error in fetch my invoices', {
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
       throw new AppError('Failed to fetch my invoices', 500);
     }
   }
@@ -463,7 +461,6 @@ export class InvoiceAggregationService {
           message: error.message,
           code: error.code,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
           url: error.config?.url,
         });
         throw new AppError(
@@ -602,7 +599,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in create quotation', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to create quotation',
@@ -666,7 +662,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in create direct sale', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to create direct sale',
@@ -731,7 +726,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in update quotation', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to update quotation',
@@ -769,7 +763,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in record usage', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to record usage',
@@ -802,7 +795,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in approve quotation', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to approve quotation',
@@ -835,7 +827,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in finance approve quotation', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to approve quotation pricing',
@@ -866,7 +857,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error confirming service estimate to accounts', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to take the estimate into accounts',
@@ -892,7 +882,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in convert to transaction', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to convert quotation to transaction',
@@ -921,7 +910,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in employee approve', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to submit for finance approval',
@@ -955,7 +943,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in allocate machines', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to allocate machines',
@@ -992,7 +979,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in activate contract', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to activate contract',
@@ -1030,7 +1016,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in upload contract confirmation', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to upload contract confirmation document',
@@ -1059,7 +1044,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in finance reject', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to reject quotation',
@@ -1127,7 +1111,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in generate final invoice', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to generate final invoice',
@@ -1157,7 +1140,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in send email notification', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to send email notification',
@@ -1187,7 +1169,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in send whatsapp notification', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to send whatsapp notification',
@@ -1214,7 +1195,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in create next month invoice', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to create next month invoice',
@@ -1373,7 +1353,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in get pending counts', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to fetch pending counts',
@@ -1874,7 +1853,6 @@ export class InvoiceAggregationService {
         logger.error('Axios error in update status', {
           message: error.message,
           responseStatus: error.response?.status,
-          responseData: error.response?.data,
         });
         throw new AppError(
           error.response?.data?.message || 'Failed to update status',
