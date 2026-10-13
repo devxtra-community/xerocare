@@ -200,7 +200,7 @@ export function ContractAgreementModal({
       // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
       // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
       // which is unreachable for the customer the link is being sent to.
-      setRemoteLink(result.link || publicAppLink(`/public/contract/sign/${result.token}`));
+      setRemoteLink(result.link || publicAppLink(`/s/c/${result.token}`));
     } catch (err) {
       toast.error('Failed to generate signing link', { description: getApiErrorMessage(err) });
     } finally {

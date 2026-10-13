@@ -45,6 +45,7 @@ import {
   generateSalePaymentReceipt,
   sendSalePaymentReceiptEmail,
   sendSalePaymentReceiptWhatsApp,
+  redirectToPaymentReceipt,
   sendContractAgreementEmail,
   sendContractAgreementWhatsApp,
   getBill,
@@ -124,6 +125,7 @@ router.post(
 // Public (no auth) — customer remote signing
 router.get('/contract/sign/:token', getContractForSigning);
 router.post('/contract/sign/:token', signContractRemote);
+router.get('/public/payment-receipt/:id', redirectToPaymentReceipt);
 
 // ─── Installation Requests ────────────────────────────────────────────────────
 router.get('/installation-requests', authMiddleware, getInstallationRequestsForBranch);

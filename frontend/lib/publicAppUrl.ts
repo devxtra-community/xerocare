@@ -24,7 +24,7 @@ export function publicAppBase(): string {
   return '';
 }
 
-/** Full customer-facing URL for a signing/approval path, e.g. `/public/bill/sign/<token>`. */
+/** Full customer-facing URL for a signing/approval path. */
 export function publicAppLink(path: string): string {
   return `${publicAppBase()}${path.startsWith('/') ? path : `/${path}`}`;
 }

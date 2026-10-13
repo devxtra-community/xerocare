@@ -27,6 +27,24 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // Keep customer URLs short enough for WhatsApp's link detector while
+      // transparently serving the existing signing pages.
+      {
+        source: '/s/c/:token',
+        destination: '/public/contract/sign/:token',
+      },
+      {
+        source: '/s/b/:token',
+        destination: '/public/bill/sign/:token',
+      },
+      {
+        source: '/s/q/:id',
+        destination: 'http://localhost:3001/b/invoices/:id/respond',
+      },
+      {
+        source: '/s/p/:id',
+        destination: 'http://localhost:3001/b/public/payment-receipt/:id',
+      },
       {
         source: '/e/:path*',
         destination: 'http://localhost:3001/e/:path*',

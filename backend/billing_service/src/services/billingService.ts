@@ -49,6 +49,7 @@ import { createSalePaymentRequest } from './salePaymentRequestService';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { AuditLog } from '../entities/auditLogEntity';
 import { createHash } from 'crypto';
+import { publicAppUrl } from '../utils/publicAppUrl';
 import {
   createServiceEstimateDecisionEvent,
   canDecideServiceQuotation,
@@ -70,6 +71,17 @@ const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number 
   if (maxTo >= 999999) return ranges;
   return [...ranges, { from: maxTo + 1, to: 9999999, rate: Number(excessRate) } as T];
 };
+
+function customerQuotationResponseLink(invoiceId: string, action: 'accept' | 'reject'): string {
+  const appBase = publicAppUrl();
+  if (appBase) return `${appBase}/s/q/${encodeURIComponent(invoiceId)}?action=${action}`;
+
+  // Preserve the previous fallback for installations that have not configured
+  // PUBLIC_APP_URL yet. The configured customer app link is shorter and reachable.
+  const billingBase =
+    process.env.BILLING_SERVICE_PUBLIC_URL || `http://localhost:${process.env.PORT || 3004}`;
+  return `${billingBase}/invoices/${encodeURIComponent(invoiceId)}/respond?action=${action}`;
+}
 
 export class BillingService {
   private invoiceRepo = new InvoiceRepository();
@@ -3244,11 +3256,9 @@ export class BillingService {
       </tr>`;
     };
 
-    // Build Accept/Reject response URL (public endpoint, no auth needed)
-    const billingBaseUrl =
-      process.env.BILLING_SERVICE_PUBLIC_URL || `http://localhost:${process.env.PORT || 3004}`;
-    const acceptUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=accept`;
-    const rejectUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=reject`;
+    // Build short customer-facing Accept/Reject links.
+    const acceptUrl = customerQuotationResponseLink(contract.id, 'accept');
+    const rejectUrl = customerQuotationResponseLink(contract.id, 'reject');
 
     const htmlBody = `
       <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 24px; color: #1e293b; line-height: 1.5;">
@@ -3381,10 +3391,8 @@ export class BillingService {
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
 
     // Build Accept/Reject response URL (public endpoint, no auth needed)
-    const billingBaseUrl =
-      process.env.BILLING_SERVICE_PUBLIC_URL || `http://localhost:${process.env.PORT || 3004}`;
-    const acceptUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=accept`;
-    const rejectUrl = `${billingBaseUrl}/invoices/${contract.id}/respond?action=reject`;
+    const acceptUrl = customerQuotationResponseLink(contract.id, 'accept');
+    const rejectUrl = customerQuotationResponseLink(contract.id, 'reject');
 
     // Construct Detailed WhatsApp Message
     let details = `*Invoice:* ${contract.invoiceNumber}\n`;

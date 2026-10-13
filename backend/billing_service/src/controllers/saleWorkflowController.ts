@@ -389,7 +389,7 @@ function requirePublicBase(): string {
 }
 
 function signingLinkUrl(token: string): string {
-  return `${requirePublicBase()}/public/contract/sign/${token}`;
+  return `${requirePublicBase()}/s/c/${token}`;
 }
 
 export const generateSigningToken = async (req: Request, res: Response, next: NextFunction) => {
@@ -658,7 +658,7 @@ export const getContractForSigning = async (req: Request, res: Response, next: N
 // period's Bill) rather than a dedicated agreement entity.
 
 function billSigningLinkUrl(token: string): string {
-  return `${requirePublicBase()}/public/bill/sign/${token}`;
+  return `${requirePublicBase()}/s/b/${token}`;
 }
 
 async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: string }> {
@@ -3698,6 +3698,29 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
   return (await r2SignedGetUrl(receiptUrl, CUSTOMER_LINK_TTL)) ?? receiptUrl;
 }
 
+function paymentReceiptLink(paymentRequestId: string): string {
+  return `${requirePublicBase()}/s/p/${encodeURIComponent(paymentRequestId)}`;
+}
+
+/** Public short link used in customer messages; redirects to the private signed PDF URL. */
+export const redirectToPaymentReceipt = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const request = await Source.getRepository(SalePaymentRequest).findOne({
+      where: { id: req.params.id as string },
+    });
+    if (!request) throw new AppError('Payment receipt not found', 404);
+    if (request.status === 'REJECTED') {
+      throw new AppError('This payment receipt is no longer available', 410);
+    }
+
+    const receiptUrl = await ensureReceiptUrl(request);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.redirect(302, receiptUrl);
+  } catch (err) {
+    next(err);
+  }
+};
+
 async function fetchCustomerContact(
   customerId: string | null | undefined,
 ): Promise<{ email?: string; phone?: string; name?: string } | null> {
@@ -3744,7 +3767,8 @@ export const sendSalePaymentReceiptEmail = async (
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && request.branchId !== branchId)
       throw new AppError('Access denied', 403);
 
-    const receiptUrl = await ensureReceiptUrl(request);
+    await ensureReceiptUrl(request);
+    const customerReceiptLink = paymentReceiptLink(request.id);
 
     let recipient = recipientOverride?.trim();
     if (!recipient) {
@@ -3805,7 +3829,7 @@ export const sendSalePaymentReceiptEmail = async (
       <tr><td style="padding:6px 12px;color:#6b7280;font-weight:700">Approved by</td><td style="padding:6px 12px;font-weight:600">${request.reviewedByName || 'Finance'}</td></tr>
     </table>
     <div style="margin-top:24px;text-align:center">
-      <a href="${receiptUrl}" target="_blank" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:12px 28px;border-radius:8px">Download PDF Receipt</a>
+      <a href="${customerReceiptLink}" target="_blank" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:12px 28px;border-radius:8px">Download PDF Receipt</a>
     </div>
     <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;text-align:center">This is a system-generated receipt. Please retain it for your records.</p>
   </div>
@@ -3817,7 +3841,7 @@ export const sendSalePaymentReceiptEmail = async (
       subject: `Payment Receipt — ${request.requestNo} | Invoice ${request.invoiceNumber}`,
       body: htmlBody,
       invoiceId: request.invoiceId,
-      attachmentUrl: receiptUrl,
+      attachmentUrl: customerReceiptLink,
     });
 
     logger.info(`[SalePayment] Receipt email queued for ${request.requestNo} → ${recipient}`);
@@ -3847,7 +3871,8 @@ export const sendSalePaymentReceiptWhatsApp = async (
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && request.branchId !== branchId)
       throw new AppError('Access denied', 403);
 
-    const receiptUrl = await ensureReceiptUrl(request);
+    await ensureReceiptUrl(request);
+    const customerReceiptLink = paymentReceiptLink(request.id);
 
     let recipient = recipientOverride?.trim();
     if (!recipient) {
@@ -3883,7 +3908,7 @@ export const sendSalePaymentReceiptWhatsApp = async (
       `Date: ${paymentDate}\n` +
       `Type: ${contextLabel}\n` +
       `Approved by: ${request.reviewedByName || 'Finance'}\n\n` +
-      `Download your receipt: ${receiptUrl}\n\n` +
+      `Download your receipt:\n${customerReceiptLink}\n\n` +
       `Thank you for your business.`;
 
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');

@@ -257,6 +257,9 @@ app.all(
   '/b/invoices/:id/contract-agreement/notify/whatsapp',
   createServiceProxy(BILLING_SERVICE_URL),
 );
+// Customer acceptance links bypass the local invoice aggregator and stay on the
+// public billing handler, where no staff authentication is required.
+app.all('/b/invoices/:id/respond', createServiceProxy(BILLING_SERVICE_URL));
 app.all('/b/invoices/:id/sale-payments', createServiceProxy(BILLING_SERVICE_URL));
 app.all('/b/invoices/:id/installation-request', createServiceProxy(BILLING_SERVICE_URL));
 
