@@ -18,6 +18,7 @@ import { InvoiceType } from '../entities/enums/invoiceType';
 import { BillType } from '../entities/enums/billType';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { r2SignedGetUrl } from '../utils/r2Url';
+import { decodeShortPublicId } from '../utils/shortPublicId';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -1291,10 +1292,10 @@ export const processReturn = async (req: Request, res: Response, next: NextFunct
  */
 export const customerRespond = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = req.params.id as string;
+    const id = decodeShortPublicId(req.params.id as string);
     const action = req.query.action as string;
 
-    if (!id) throw new AppError('Quotation ID is required', 400);
+    if (!id) throw new AppError('Invalid quotation link', 400);
     if (action !== 'accept' && action !== 'reject') {
       throw new AppError('Invalid action. Must be "accept" or "reject"', 400);
     }

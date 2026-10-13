@@ -55,6 +55,7 @@ import { requireCashAccount, postCashbookEntry } from '../services/cashbookServi
 
 import { logger } from '../config/logger';
 import { publicAppUrl, isPublicAppUrlConfigured } from '../utils/publicAppUrl';
+import { decodeShortPublicId, encodeShortPublicId } from '../utils/shortPublicId';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
@@ -351,11 +352,13 @@ async function issueSigningToken(
     !!agreement.signingTokenExpiresAt &&
     agreement.signingTokenExpiresAt.getTime() > now;
 
-  if (opts.reuseValid && stillValid) {
+  if (opts.reuseValid && stillValid && agreement.signingToken!.length <= 22) {
     return { token: agreement.signingToken as string };
   }
 
-  const token = randomBytes(32).toString('hex');
+  // 128 random bits fit in a 22-character base64url path segment, short enough
+  // for WhatsApp to recognize the whole URL as one link.
+  const token = randomBytes(16).toString('base64url');
   const expiresAt = new Date(now + 72 * 60 * 60 * 1000); // 72 hours
 
   agreement.signingToken = token;
@@ -662,7 +665,7 @@ function billSigningLinkUrl(token: string): string {
 }
 
 async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: string }> {
-  const token = randomBytes(32).toString('hex');
+  const token = randomBytes(16).toString('base64url');
   const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
 
   usage.signingToken = token;
@@ -3699,14 +3702,16 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
 }
 
 function paymentReceiptLink(paymentRequestId: string): string {
-  return `${requirePublicBase()}/s/p/${encodeURIComponent(paymentRequestId)}`;
+  return `${requirePublicBase()}/p/${encodeShortPublicId(paymentRequestId)}`;
 }
 
 /** Public short link used in customer messages; redirects to the private signed PDF URL. */
 export const redirectToPaymentReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const paymentRequestId = decodeShortPublicId(req.params.id as string);
+    if (!paymentRequestId) throw new AppError('Invalid payment receipt link', 400);
     const request = await Source.getRepository(SalePaymentRequest).findOne({
-      where: { id: req.params.id as string },
+      where: { id: paymentRequestId },
     });
     if (!request) throw new AppError('Payment receipt not found', 404);
     if (request.status === 'REJECTED') {

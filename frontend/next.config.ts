@@ -45,6 +45,16 @@ const nextConfig: NextConfig = {
         source: '/s/p/:id',
         destination: 'http://localhost:3001/b/public/payment-receipt/:id',
       },
+      // Keep the complete WhatsApp-detected URL below its practical link limit.
+      // Public UUIDs are losslessly encoded by the billing service into 22 chars.
+      {
+        source: '/q/:id',
+        destination: 'http://localhost:3001/b/invoices/:id/respond',
+      },
+      {
+        source: '/p/:id',
+        destination: 'http://localhost:3001/b/public/payment-receipt/:id',
+      },
       {
         source: '/e/:path*',
         destination: 'http://localhost:3001/e/:path*',

@@ -50,6 +50,7 @@ import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { AuditLog } from '../entities/auditLogEntity';
 import { createHash } from 'crypto';
 import { publicAppUrl } from '../utils/publicAppUrl';
+import { encodeShortPublicId } from '../utils/shortPublicId';
 import {
   createServiceEstimateDecisionEvent,
   canDecideServiceQuotation,
@@ -74,7 +75,7 @@ const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number 
 
 function customerQuotationResponseLink(invoiceId: string, action: 'accept' | 'reject'): string {
   const appBase = publicAppUrl();
-  if (appBase) return `${appBase}/s/q/${encodeURIComponent(invoiceId)}?action=${action}`;
+  if (appBase) return `${appBase}/q/${encodeShortPublicId(invoiceId)}?action=${action}`;
 
   // Preserve the previous fallback for installations that have not configured
   // PUBLIC_APP_URL yet. The configured customer app link is shorter and reachable.
