@@ -94,6 +94,16 @@ export default function ReturnInvoiceLayout({
   const [returnedProductImage, setReturnedProductImage] = useState<string | null>(null);
   const [replacementProductDesc, setReplacementProductDesc] = useState<string | null>(null);
   const [returnedProductDesc, setReturnedProductDesc] = useState<string | null>(null);
+  const [returnedProductMeta, setReturnedProductMeta] = useState<{
+    brand?: string;
+    name?: string;
+    model?: string;
+  } | null>(null);
+  const [replacementProductMeta, setReplacementProductMeta] = useState<{
+    brand?: string;
+    name?: string;
+    model?: string;
+  } | null>(null);
   const [isSending, setIsSending] = useState(false);
 
   // Find the primary credit note (PRODUCT_REPLACED)
@@ -106,25 +116,29 @@ export default function ReturnInvoiceLayout({
     creditNote?.type === 'REPLACEMENT' || creditNote?.type === 'CREDIT_EXCHANGE';
   const isDirectRefund = creditNote?.type === 'DIRECT_REFUND';
 
-  const netVariation = isReplacement
-    ? (creditNote?.replacementAmount || 0) -
-      (creditNote?.productAmount || 0) -
-      (creditNote?.replacementDiscount || 0)
-    : 0;
-
   const returnDate = formatDate(creditNote?.createdAt || invoice.createdAt);
   const soldDate = formatDate(invoice.createdAt);
 
   // ── Fetch product images ──────────────────────────────────────────────────
   useEffect(() => {
     const fetchDetails = async () => {
-      const returnedItem = invoice.items?.[0];
-      if (returnedItem?.productId) {
+      setReturnedProductImage(null);
+      setReturnedProductDesc(null);
+      setReturnedProductMeta(null);
+      setReplacementProductImage(null);
+      setReplacementProductDesc(null);
+      setReplacementProductMeta(null);
+      if (creditNote?.productId) {
         try {
-          const p = await getProductById(returnedItem.productId).catch(() => null);
+          const p = await getProductById(creditNote.productId).catch(() => null);
           if (p) {
             setReturnedProductImage((p as { imageUrl?: string }).imageUrl || null);
             setReturnedProductDesc((p as { description?: string }).description || null);
+            setReturnedProductMeta({
+              brand: p.brand || p.model?.brandRelation?.name,
+              name: p.name || p.model?.product_name,
+              model: p.model?.model_name || p.model?.model_no,
+            });
           }
         } catch {
           /* silent */
@@ -136,6 +150,11 @@ export default function ReturnInvoiceLayout({
           if (p) {
             setReplacementProductImage((p as { imageUrl?: string }).imageUrl || null);
             setReplacementProductDesc((p as { description?: string }).description || null);
+            setReplacementProductMeta({
+              brand: p.brand || p.model?.brandRelation?.name,
+              name: p.name || p.model?.product_name,
+              model: p.model?.model_name || p.model?.model_no,
+            });
           }
         } catch {
           /* silent */
@@ -143,9 +162,21 @@ export default function ReturnInvoiceLayout({
       }
     };
     fetchDetails();
-  }, [creditNote?.replacementProductId, invoice.id, invoice.items]);
+  }, [creditNote?.productId, creditNote?.replacementProductId, invoice.id]);
 
   if (!creditNote) return null;
+
+  const oldAmount = Number(creditNote.productAmount) || 0;
+  const oldTax = Number(
+    creditNote.taxAmount ?? (oldAmount * (Number(creditNote.taxPercent) || 0)) / 100,
+  );
+  const replacementAmount = Number(creditNote.replacementAmount) || 0;
+  const replacementDiscount = Number(creditNote.replacementDiscount) || 0;
+  const replacementTaxable = Math.max(0, replacementAmount - replacementDiscount);
+  const replacementTax = (replacementTaxable * (Number(creditNote.taxPercent) || 0)) / 100;
+  const settlementBase = replacementAmount - oldAmount - replacementDiscount;
+  const settlementTax = (Math.abs(settlementBase) * (Number(creditNote.taxPercent) || 0)) / 100;
+  const settlementTotal = Math.abs(settlementBase) + settlementTax;
 
   // ── PDF + Send helper (same pattern as InvoiceViewDialog) ────────────────
   const handleSendCustomer = async (type: 'EMAIL' | 'WHATSAPP') => {
@@ -400,7 +431,12 @@ export default function ReturnInvoiceLayout({
                 letterSpacing: '1px',
               }}
             >
-              Sub: {isDirectRefund ? 'Credit Note for' : 'Return & Replacement — '}
+              Sub:{' '}
+              {isDirectRefund
+                ? 'Credit Note for'
+                : creditNote.type === 'CREDIT_EXCHANGE'
+                  ? 'Credit Exchange — '
+                  : 'Return & Replacement — '}
               {creditNote.productName}
             </div>
           </div>
@@ -418,13 +454,18 @@ export default function ReturnInvoiceLayout({
             <div style={{ marginBottom: '2px' }}>Dear Sir,</div>
             <div>
               {isDirectRefund
-                ? 'This document confirms the return of the product and issuance of a direct credit/refund as detailed below.'
-                : 'This document confirms the return of the original product and its replacement as detailed below. Please find the complete transaction summary.'}
+                ? 'This document confirms the returned product and the refund or credit issued, including applicable tax.'
+                : creditNote.type === 'CREDIT_EXCHANGE'
+                  ? 'This document records the returned product and the newly selected exchange product, with their prices, discounts and applicable tax.'
+                  : 'This document confirms the returned product and its replacement, with the corresponding prices and applicable tax.'}
             </div>
           </div>
 
           {/* ── RETURN REASON SECTION ─────────────────────────────────── */}
-          {(creditNote.notes || creditNote.damageReason || creditNote.financeNote) && (
+          {(creditNote.notes ||
+            creditNote.damageReason ||
+            creditNote.financeNote ||
+            creditNote.paymentMode) && (
             <div
               style={{
                 backgroundColor: '#f9f9f9',
@@ -492,15 +533,21 @@ export default function ReturnInvoiceLayout({
               >
                 <div>
                   <div style={labelStyle}>Brand</div>
-                  <div style={valueStyle}>{creditNote.brand || 'N/A'}</div>
+                  <div style={valueStyle}>
+                    {returnedProductMeta?.brand || creditNote.brand || 'N/A'}
+                  </div>
                 </div>
                 <div>
                   <div style={labelStyle}>Product Name</div>
-                  <div style={valueStyle}>{creditNote.productName || 'N/A'}</div>
+                  <div style={valueStyle}>
+                    {creditNote.productName || returnedProductMeta?.name || 'N/A'}
+                  </div>
                 </div>
                 <div>
                   <div style={labelStyle}>Model Name</div>
-                  <div style={valueStyle}>{creditNote.modelName || 'N/A'}</div>
+                  <div style={valueStyle}>
+                    {creditNote.modelName || returnedProductMeta?.model || 'N/A'}
+                  </div>
                 </div>
                 {creditNote.serialNumber && (
                   <div>
@@ -511,13 +558,21 @@ export default function ReturnInvoiceLayout({
                 <div>
                   <div style={labelStyle}>Original Sale Amount</div>
                   <div style={{ ...valueStyle, fontWeight: '600' }}>
-                    {getActiveCurrency()} {fmt(creditNote.productAmount)}
+                    {getActiveCurrency()} {fmt(oldAmount)}
                   </div>
                 </div>
                 <div>
-                  <div style={labelStyle}>Credit Issued</div>
+                  <div style={labelStyle}>
+                    {creditNote.taxName || 'VAT'} ({Number(creditNote.taxPercent) || 0}%)
+                  </div>
+                  <div style={valueStyle}>
+                    {getActiveCurrency()} {fmt(oldTax)}
+                  </div>
+                </div>
+                <div>
+                  <div style={labelStyle}>Returned Total Including Tax</div>
                   <div style={{ ...valueStyle, fontWeight: '600' }}>
-                    − {getActiveCurrency()} {fmt(creditNote.productAmount)}
+                    − {getActiveCurrency()} {fmt(oldAmount + oldTax)}
                   </div>
                 </div>
                 {returnedProductDesc && (
@@ -587,15 +642,17 @@ export default function ReturnInvoiceLayout({
                 >
                   <div>
                     <div style={labelStyle}>Brand</div>
-                    <div style={valueStyle}>{creditNote.brand || 'N/A'}</div>
+                    <div style={valueStyle}>{replacementProductMeta?.brand || 'N/A'}</div>
                   </div>
                   <div>
                     <div style={labelStyle}>Product Name</div>
-                    <div style={valueStyle}>{creditNote.replacementProductName || 'N/A'}</div>
+                    <div style={valueStyle}>
+                      {creditNote.replacementProductName || replacementProductMeta?.name || 'N/A'}
+                    </div>
                   </div>
                   <div>
                     <div style={labelStyle}>Model Name</div>
-                    <div style={valueStyle}>{creditNote.modelName || 'N/A'}</div>
+                    <div style={valueStyle}>{replacementProductMeta?.model || 'N/A'}</div>
                   </div>
                   {creditNote.replacementSerialNumber && (
                     <div>
@@ -604,9 +661,24 @@ export default function ReturnInvoiceLayout({
                     </div>
                   )}
                   <div>
-                    <div style={labelStyle}>New Product Price</div>
+                    <div style={labelStyle}>New Product Price (Before Discount)</div>
                     <div style={{ ...valueStyle, fontWeight: '600' }}>
                       {getActiveCurrency()} {fmt(creditNote.replacementAmount || 0)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStyle}>
+                      {creditNote.taxName || 'VAT'} on new product (
+                      {Number(creditNote.taxPercent) || 0}%)
+                    </div>
+                    <div style={valueStyle}>
+                      {getActiveCurrency()} {fmt(replacementTax)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStyle}>New Product Total After Discount &amp; Tax</div>
+                    <div style={{ ...valueStyle, fontWeight: '600' }}>
+                      {getActiveCurrency()} {fmt(replacementTaxable + replacementTax)}
                     </div>
                   </div>
                   {(creditNote.replacementDiscount || 0) > 0 && (
@@ -718,7 +790,7 @@ export default function ReturnInvoiceLayout({
               <tbody>
                 <tr style={{ backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '10px 10px', fontSize: '12px', fontWeight: '300' }}>
-                    Returned Product — {creditNote.productName}
+                    Returned product value — {creditNote.productName || 'Product'}
                   </td>
                   <td
                     style={{
@@ -728,12 +800,13 @@ export default function ReturnInvoiceLayout({
                       textAlign: 'right',
                     }}
                   >
-                    {fmt(creditNote.productAmount)}
+                    − {fmt(oldAmount)}
                   </td>
                 </tr>
                 <tr style={{ backgroundColor: '#f7f7f7', borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '10px 10px', fontSize: '12px', fontWeight: '300' }}>
-                    Credit Applied (Returned Product Value)
+                    Returned product {creditNote.taxName || 'VAT'} credit (
+                    {Number(creditNote.taxPercent) || 0}%)
                   </td>
                   <td
                     style={{
@@ -743,15 +816,20 @@ export default function ReturnInvoiceLayout({
                       textAlign: 'right',
                     }}
                   >
-                    − {fmt(creditNote.productAmount)}
+                    − {fmt(oldTax)}
                   </td>
                 </tr>
                 {isReplacement && (
                   <>
                     <tr style={{ backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
                       <td style={{ padding: '10px 10px', fontSize: '12px', fontWeight: '300' }}>
-                        {creditNote.type === 'CREDIT_EXCHANGE' ? 'Exchange' : 'Replacement'} Product
-                        — {creditNote.replacementProductName}
+                        {creditNote.type === 'CREDIT_EXCHANGE'
+                          ? 'New exchange product'
+                          : 'Replacement product'}
+                        {' — '}
+                        {creditNote.replacementProductName ||
+                          replacementProductMeta?.name ||
+                          'Product'}
                       </td>
                       <td
                         style={{
@@ -761,7 +839,7 @@ export default function ReturnInvoiceLayout({
                           textAlign: 'right',
                         }}
                       >
-                        {fmt(creditNote.replacementAmount || 0)}
+                        {fmt(replacementAmount)}
                       </td>
                     </tr>
                     {(creditNote.replacementDiscount || 0) > 0 && (
@@ -783,6 +861,17 @@ export default function ReturnInvoiceLayout({
                     )}
                   </>
                 )}
+                {isReplacement && (
+                  <tr style={{ backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '10px', fontSize: '12px', fontWeight: '300' }}>
+                      New product {creditNote.taxName || 'VAT'} (
+                      {Number(creditNote.taxPercent) || 0}%) after discount
+                    </td>
+                    <td style={{ padding: '10px', fontSize: '12px', textAlign: 'right' }}>
+                      {fmt(replacementTax)}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
 
@@ -801,7 +890,7 @@ export default function ReturnInvoiceLayout({
                     Returned Credit
                   </span>
                   <span style={{ fontSize: '14px', fontWeight: '300' }}>
-                    − {getActiveCurrency()} {fmt(creditNote.productAmount)}
+                    − {getActiveCurrency()} {fmt(isDirectRefund ? oldAmount + oldTax : oldAmount)}
                   </span>
                 </div>
                 {isReplacement && (
@@ -819,7 +908,7 @@ export default function ReturnInvoiceLayout({
                       New Product Price
                     </span>
                     <span style={{ fontSize: '14px', fontWeight: '300' }}>
-                      {getActiveCurrency()} {fmt(creditNote.replacementAmount || 0)}
+                      {getActiveCurrency()} {fmt(replacementAmount)}
                     </span>
                   </div>
                 )}
@@ -833,16 +922,16 @@ export default function ReturnInvoiceLayout({
                 >
                   <span style={{ fontSize: '13px', textTransform: 'uppercase' }}>
                     {isReplacement
-                      ? netVariation > 0
-                        ? 'Balance Due from Customer'
-                        : netVariation < 0
-                          ? 'Credit to Customer'
+                      ? settlementBase > 0
+                        ? 'Balance Due from Customer (including tax)'
+                        : settlementBase < 0
+                          ? 'Credit to Customer (including tax)'
                           : 'Net Balance'
-                      : 'Total Credit Issued'}
+                      : 'Total Credit Issued (including tax)'}
                   </span>
                   <span style={{ fontSize: '15px', color: ACCENT, fontWeight: '300' }}>
                     {getActiveCurrency()}{' '}
-                    {fmt(isReplacement ? Math.abs(netVariation) : creditNote.productAmount)}
+                    {fmt(isReplacement ? settlementTotal : oldAmount + oldTax)}
                   </span>
                 </div>
               </div>

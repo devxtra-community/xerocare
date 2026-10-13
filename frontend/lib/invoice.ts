@@ -247,6 +247,10 @@ export interface Invoice {
     type: string;
     status: string;
     productAmount: number;
+    productId?: string;
+    taxName?: string;
+    taxPercent?: number;
+    taxAmount?: number;
     replacementAmount?: number;
     replacementDiscount: number;
     productName: string;

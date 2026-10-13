@@ -259,11 +259,12 @@ export default function FinanceQuotationTable({
   };
 
   const getProductNames = (invoice: Invoice) => {
-    const completedExchange = invoice.creditNotes?.find(
-      (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
-    );
-    if (completedExchange?.replacementProductName) {
-      return completedExchange.replacementProductName;
+    const completedReturn = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+    if (completedReturn) {
+      if (completedReturn.type === 'CREDIT_EXCHANGE' || completedReturn.type === 'REPLACEMENT') {
+        return completedReturn.replacementProductName || completedReturn.productName || '';
+      }
+      return completedReturn.productName || '';
     }
 
     if (!invoice.items || invoice.items.length === 0) return '';
