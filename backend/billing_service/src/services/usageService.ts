@@ -1898,14 +1898,16 @@ export class UsageService {
       });
 
       if (!response.ok) {
-        logger.error(`Failed to fetch customer details for ${customerId}: ${response.statusText}`);
+        logger.warn('CRM customer lookup failed', { status: response.status });
         return null;
       }
 
       const data = await response.json();
       return data.data; // Assuming response structure { success: true, data: { ... } }
     } catch (error) {
-      logger.error(`Error fetching customer details for ${customerId}`, error);
+      logger.error('CRM customer lookup failed', {
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
       return null;
     }
   }

@@ -2,61 +2,41 @@ import { Request, Response, NextFunction } from 'express';
 import { logger } from '../config/logger';
 
 /**
- * Enhanced HTTP request/response logger middleware.
- * Logs incoming requests with their bodies (masked) and outgoing responses.
+ * Logs request/response metadata without retaining payloads or query values.
  */
 export const httpLogger = (req: Request, res: Response, next: NextFunction): void => {
   const start = Date.now();
+  const routeGroup = `/${req.path.split('/').filter(Boolean)[0] || ''}`;
+  const bodyFieldCount =
+    req.body && typeof req.body === 'object' ? Object.keys(req.body).length : 0;
+  const queryFieldCount = Object.keys(req.query).length;
 
-  // Mask sensitive information (like passwords) before logging
-  const maskedBody = { ...req.body };
-  const sensitiveFields = ['password', 'otp', 'token', 'newPassword', 'currentPassword'];
-  sensitiveFields.forEach((field) => {
-    if (maskedBody[field]) maskedBody[field] = '********';
-  });
-
-  // Log incoming request with details
-  logger.info(`→ [REQUEST] ${req.method} ${req.originalUrl}`, {
+  logger.info(`→ [REQUEST] ${req.method} ${routeGroup}`, {
     method: req.method,
-    url: req.originalUrl,
-    ip: req.ip,
-    userAgent: req.get('user-agent'),
-    body: Object.keys(maskedBody).length > 0 ? maskedBody : undefined,
-    query: Object.keys(req.query).length > 0 ? req.query : undefined,
+    routeGroup,
+    bodyFieldCount,
+    queryFieldCount,
   });
 
-  // Capture response body for logging
-  const oldSend = res.send;
-  let responseBody: unknown;
-
-  res.send = function (body: unknown): Response {
-    responseBody = body;
-    return oldSend.call(res, body);
-  } as typeof res.send;
-
-  // Intercept response finish
   res.on('finish', () => {
     const duration = Date.now() - start;
     const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    const contentLength = res.getHeader('content-length');
+    const responseBytes =
+      typeof contentLength === 'number'
+        ? contentLength
+        : typeof contentLength === 'string'
+          ? Number(contentLength) || undefined
+          : undefined;
 
-    let parsedResponseBody;
-    try {
-      parsedResponseBody =
-        typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody;
-    } catch {
-      parsedResponseBody = responseBody;
-    }
-
-    logger[level](
-      `← [RESPONSE] ${req.method} ${req.originalUrl} ${res.statusCode} (${duration}ms)`,
-      {
-        method: req.method,
-        url: req.originalUrl,
-        statusCode: res.statusCode,
-        duration: `${duration}ms`,
-        response: parsedResponseBody,
-      },
-    );
+    logger[level](`← [RESPONSE] ${req.method} ${routeGroup} ${res.statusCode} (${duration}ms)`, {
+      method: req.method,
+      routeGroup,
+      statusCode: res.statusCode,
+      durationMs: duration,
+      responseBytes,
+      contentType: res.getHeader('content-type'),
+    });
   });
 
   next();

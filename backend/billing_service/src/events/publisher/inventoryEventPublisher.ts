@@ -17,7 +17,7 @@ export const emitProductAllocate = async (payload: {
       persistent: true,
     });
 
-    logger.info('Emitted inventory.product.allocate event', { payload });
+    logger.info('Emitted inventory.product.allocate event');
   } catch (error) {
     logger.error('Failed to emit inventory.product.allocate event', error);
   }
@@ -37,7 +37,7 @@ export const emitSparePartReduce = async (payload: {
       persistent: true,
     });
 
-    logger.info('Emitted inventory.sparepart.reduce event', { payload });
+    logger.info('Emitted inventory.sparepart.reduce event');
   } catch (error) {
     logger.error('Failed to emit inventory.sparepart.reduce event', error);
   }
