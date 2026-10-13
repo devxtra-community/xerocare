@@ -141,7 +141,7 @@ export default function EmployeeCustomer360Page() {
       lead={lead}
       createdByName={createdByName}
       createdByRole={createdByEmployee?.role}
-      scopeNotice="Personal view — showing only quotations, contracts, bills, and payments you personally created or handled for this customer."
+      scopeNotice="Personal view — showing your quotations, contracts, and handled payments, plus all Rent/Lease bills for this customer in your branch."
       backHref="/employee/customers"
     />
   );

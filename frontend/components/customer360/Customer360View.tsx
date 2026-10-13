@@ -807,17 +807,18 @@ function BillsTab({
             className: 'bg-muted text-muted-foreground border-border',
           };
           const isAdvance = b.billType === 'ADVANCE';
+          const isSecurityDeposit = b.billType === 'SECURITY_DEPOSIT';
           return (
             <TableRow key={b.id} className="hover:bg-muted/50">
               <TableCell>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                    isAdvance
+                    isAdvance || isSecurityDeposit
                       ? 'bg-primary/10 text-primary border-primary/30'
                       : 'bg-muted text-foreground border-border'
                   }`}
                 >
-                  {isAdvance ? 'Advance' : 'Usage'}
+                  {isAdvance ? 'Advance' : isSecurityDeposit ? 'Security Deposit' : 'Usage'}
                 </span>
               </TableCell>
               <TableCell className="text-xs text-foreground">

@@ -4891,13 +4891,11 @@ async function resolveEmployeeInfoMap(
 
 // Shared by both the Manager/Finance/Admin branch-wide profile and the Employee
 // personal-only profile below. `employeeId` — when set — narrows EACH entity type by
-// its OWN creator/handler field (Invoice.createdBy, SalePaymentRequest
-// .recordedByEmployeeId, ContractAgreement.createdByEmployeeId, UsageRecord
-// .billCreatedByEmployeeId) independently, not by cascading through a personally-
-// filtered invoice-id list — so a payment this employee collected on a colleague's
-// contract for the same customer still counts as something they "personally handled",
-// matching the everyday meaning of that phrase rather than a stricter one nobody asked
-// for. branchFilter is always applied as the outer security boundary either way.
+// its own creator/handler field (Invoice.createdBy, SalePaymentRequest.recordedByEmployeeId,
+// ContractAgreement.createdByEmployeeId) independently, not by cascading through a
+// personally-filtered invoice-id list. Bills are customer-level records: every bill for
+// the customer's contracts in this branch is included because Finance or an automated
+// billing job may create it. branchFilter is always applied as the outer security boundary.
 async function buildCustomer360Profile(
   customerId: string,
   branchFilter: string[],
@@ -4954,10 +4952,13 @@ async function buildCustomer360Profile(
       .where('ca.invoiceId IN (:...invoiceIds)', { invoiceIds: allInvoiceIds });
     if (employeeId) agreementsQb.andWhere('ca.createdByEmployeeId = :employeeId', { employeeId });
 
+    // Rent/lease bills may be created by Finance or the billing job rather than the
+    // salesperson who owns the customer relationship. Show every bill for this
+    // customer's contracts in the employee's branch; the invoice IDs above keep the
+    // query customer- and branch-scoped without hiding bills by their creator.
     const billsQb = Source.getRepository(UsageRecord)
       .createQueryBuilder('ur')
       .where('ur."contractId" IN (:...invoiceIds)', { invoiceIds: allInvoiceIds });
-    if (employeeId) billsQb.andWhere('ur."billCreatedByEmployeeId" = :employeeId', { employeeId });
     billsQb.orderBy('ur."billingPeriodStart"', 'DESC');
 
     [payments, agreements, bills] = await Promise.all([
