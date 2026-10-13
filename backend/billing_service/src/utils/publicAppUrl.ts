@@ -21,21 +21,7 @@ function resolveBase(): string {
     // tappable URL by WhatsApp and is treated as a relative URL by browsers.
     // Always return an absolute HTTP(S) URL before placing it in messages.
     const base = /^https?:\/\//i.test(configuredBase) ? configuredBase : `http://${configuredBase}`;
-    const normalized = base.replace(/\/+$/, '');
-
-    // WhatsApp recognizes the numeric host in our legacy production URL, but
-    // treats its /path as plain text. Use the HTTPS hostname already configured
-    // for the production app so the complete path and signing token are linked.
-    try {
-      const parsed = new URL(normalized);
-      if (parsed.hostname === '15.252.52.227') {
-        return 'https://xerocare.apps.mastrovia.com';
-      }
-    } catch {
-      // Preserve the existing configured value; URL validation happens downstream.
-    }
-
-    return normalized;
+    return base.replace(/\/+$/, '');
   }
   logger.error(
     'PUBLIC_APP_URL is not set — customer-facing links would fall back to localhost, which ' +
