@@ -2,7 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { getProductById } from '@/lib/product';
-import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
+import {
+  Invoice,
+  getLatestCompletedCreditNote,
+  sendEmailNotification,
+  sendWhatsappNotification,
+} from '@/lib/invoice';
 import { Button } from '@/components/ui/button';
 import { Mail, Phone, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -106,8 +111,9 @@ export default function ReturnInvoiceLayout({
   } | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  // Find the primary credit note (PRODUCT_REPLACED)
-  const creditNote = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  // An invoice can have more than one completed return. The return invoice is for
+  // the latest completed credit note, which is also the one shown by the return row.
+  const creditNote = getLatestCompletedCreditNote(invoice.creditNotes);
 
   const returnInvoiceNo = creditNote
     ? formatReturnInvoiceNumber(creditNote.creditNoteNo)
@@ -685,7 +691,7 @@ export default function ReturnInvoiceLayout({
                     <div>
                       <div style={labelStyle}>Exchange Discount</div>
                       <div style={{ ...valueStyle, fontWeight: '600' }}>
-                        − {getActiveCurrency()} {fmt(creditNote.replacementDiscount)}
+                        − {getActiveCurrency()} {fmt(creditNote.replacementDiscount || 0)}
                       </div>
                     </div>
                   )}
@@ -855,7 +861,7 @@ export default function ReturnInvoiceLayout({
                             textAlign: 'right',
                           }}
                         >
-                          − {fmt(creditNote.replacementDiscount)}
+                          − {fmt(creditNote.replacementDiscount || 0)}
                         </td>
                       </tr>
                     )}

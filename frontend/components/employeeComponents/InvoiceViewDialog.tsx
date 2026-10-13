@@ -16,7 +16,12 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
 import { getAllSpareParts } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
-import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
+import {
+  Invoice,
+  getLatestCompletedCreditNote,
+  sendEmailNotification,
+  sendWhatsappNotification,
+} from '@/lib/invoice';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
@@ -168,7 +173,7 @@ export function InvoiceViewDialog({
   }, [invoice.serviceTicketId]);
 
   // Detect if this invoice has a completed return / replacement
-  const returnCreditNote = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  const returnCreditNote = getLatestCompletedCreditNote(invoice.creditNotes);
   const isReturnInvoice = !!returnCreditNote;
 
   useEffect(() => {

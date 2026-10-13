@@ -25,7 +25,13 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle, XCircle, Eye, Search, FilePlus2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getBranchInvoices, getInvoiceById, financeRejectInvoice, Invoice } from '@/lib/invoice';
+import {
+  getBranchInvoices,
+  getInvoiceById,
+  financeRejectInvoice,
+  getLatestCompletedCreditNote,
+  Invoice,
+} from '@/lib/invoice';
 import { ApproveQuotationDialog } from '../invoice/ApproveQuotationDialog';
 
 import { formatCurrency } from '@/lib/format';
@@ -259,7 +265,7 @@ export default function FinanceQuotationTable({
   };
 
   const getProductNames = (invoice: Invoice) => {
-    const completedReturn = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+    const completedReturn = getLatestCompletedCreditNote(invoice.creditNotes);
     if (completedReturn) {
       if (completedReturn.type === 'CREDIT_EXCHANGE' || completedReturn.type === 'REPLACEMENT') {
         return completedReturn.replacementProductName || completedReturn.productName || '';
@@ -450,7 +456,7 @@ export default function FinanceQuotationTable({
                       >
                         <span
                           title={(() => {
-                            const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                            const cn = getLatestCompletedCreditNote(q.creditNotes);
                             if (cn) {
                               const match = cn.creditNoteNo?.match(/(\d+)$/);
                               const num = match ? parseInt(match[1], 10) : 0;
@@ -464,7 +470,7 @@ export default function FinanceQuotationTable({
                           })()}
                         >
                           {(() => {
-                            const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
+                            const cn = getLatestCompletedCreditNote(q.creditNotes);
                             if (cn) {
                               const match = cn.creditNoteNo?.match(/(\d+)$/);
                               const num = match ? parseInt(match[1], 10) : 0;
@@ -489,9 +495,8 @@ export default function FinanceQuotationTable({
                       <TableCell>
                         <div className="font-semibold text-foreground whitespace-nowrap">
                           {(() => {
-                            const completedExchange = q.creditNotes?.find(
-                              (cn) =>
-                                cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
+                            const completedExchange = getLatestCompletedCreditNote(
+                              q.creditNotes?.filter((cn) => cn.type === 'CREDIT_EXCHANGE'),
                             );
                             if (
                               completedExchange &&

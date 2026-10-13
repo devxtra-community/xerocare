@@ -128,6 +128,18 @@ export interface CreditNoteRecord {
   invoice?: Invoice;
 }
 
+/** Return the most recently completed return attached to an invoice. */
+export function getLatestCompletedCreditNote<
+  T extends { status: string; createdAt?: string; creditNoteNo: string },
+>(creditNotes?: T[]) {
+  return creditNotes
+    ?.filter((creditNote) => creditNote.status === 'PRODUCT_REPLACED')
+    .sort((a, b) => {
+      const dateDiff = new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      return dateDiff || b.creditNoteNo.localeCompare(a.creditNoteNo);
+    })[0];
+}
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;

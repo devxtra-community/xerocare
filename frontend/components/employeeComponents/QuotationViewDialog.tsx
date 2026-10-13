@@ -33,6 +33,7 @@ import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/
 import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayout';
 import {
   Invoice,
+  getLatestCompletedCreditNote,
   sendEmailNotification,
   sendWhatsappNotification,
   requestValidityExtension,
@@ -133,7 +134,7 @@ export function QuotationViewDialog({
     }
   }, [quotation.serviceTicketId]);
 
-  const returnCreditNote = quotation.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
+  const returnCreditNote = getLatestCompletedCreditNote(quotation.creditNotes);
   const isReturnInvoice = !!returnCreditNote;
 
   // Quotation validity lives in expiryDate; effectiveTo is the contract period end
