@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "typecheck": "tsc --noEmit",
+    "migration:run": "typeorm migration:run -d dist/config/dataSource.js",
+    "migration:revert": "typeorm migration:revert -d dist/config/dataSource.js",
     "test": "npm run build && node --test test/passwordResetPolicy.test.cjs test/notificationRecipientPolicy.test.cjs test/notificationDelivery.test.cjs test/notificationPersistence.integration.test.cjs test/internalNotificationAuth.integration.test.cjs"
   },
   "keywords": [],

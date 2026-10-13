@@ -15,6 +15,7 @@ import { EmployeeDocument } from '../entities/employeeDocumentEntity';
 
 import { logger } from './logger';
 import { seedAdmin } from '../utils/seedAdmin';
+import { AddNotificationEventId1791763260000 } from '../migrations/1791763260000-AddNotificationEventId';
 
 const EMPLOYEE_DB_POOL_MAX = Number(process.env.EMPLOYEE_DB_POOL_MAX) || 10;
 
@@ -36,6 +37,8 @@ export const Source = new DataSource({
     LateMark,
     EmployeeDocument,
   ],
+  migrations: [AddNotificationEventId1791763260000],
+  migrationsTableName: 'employee_service_migrations',
   // A pool of 1 serializes every concurrent DB-backed request onto a single
   // connection — invoice-list enrichment alone fans out one employee lookup
   // per unique creator per page, and those all queue up behind this one slot.
