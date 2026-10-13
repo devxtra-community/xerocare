@@ -18,7 +18,15 @@ export function publicAppBase(): string {
   const configured = process.env.NEXT_PUBLIC_PUBLIC_APP_URL?.trim();
   if (configured) {
     const absolute = /^https?:\/\//i.test(configured) ? configured : `http://${configured}`;
-    return absolute.replace(/\/+$/, '');
+    const normalized = absolute.replace(/\/+$/, '');
+    try {
+      if (new URL(normalized).hostname === '15.252.52.227') {
+        return 'https://xerocare.apps.mastrovia.com';
+      }
+    } catch {
+      // Keep the configured value; callers can still surface the invalid URL.
+    }
+    return normalized;
   }
   if (typeof window !== 'undefined') return window.location.origin;
   return '';
