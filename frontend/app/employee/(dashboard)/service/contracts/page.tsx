@@ -2782,7 +2782,7 @@ export default function ServiceContractsPage() {
       />
 
       <Dialog open={!!billsContract} onOpenChange={(open) => !open && setBillsContract(null)}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-5xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{billsContract?.contractType} Bills</DialogTitle>
             <DialogDescription>
@@ -2813,82 +2813,98 @@ export default function ServiceContractsPage() {
                 : 'No monthly bills generated yet.'}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Bill</TableHead>
-                    <TableHead>Billing period</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Collected / pending approval</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contractBills.map((bill) => (
-                    <TableRow key={bill.invoiceId}>
-                      <TableCell className="font-mono text-xs">
+            <div className="space-y-3">
+              {contractBills.map((bill) => (
+                <article
+                  key={bill.invoiceId}
+                  className="min-w-0 rounded-lg border border-border bg-card p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Bill
+                      </div>
+                      <div className="break-all font-mono text-sm font-semibold">
                         {bill.invoiceNumber || '—'}
-                      </TableCell>
-                      <TableCell className="text-xs">
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Amount
+                      </div>
+                      <div className="text-base font-semibold">
+                        {getActiveCurrency()} {bill.amount.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="min-w-0">
+                      <div className="text-xs text-muted-foreground">Billing period</div>
+                      <div className="break-words text-sm">
                         {bill.periodStart?.slice(0, 10) || '—'} –{' '}
                         {bill.periodEnd?.slice(0, 10) || '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {getActiveCurrency()} {bill.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <div>
-                          Approved: {getActiveCurrency()} {Number(bill.paid || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Approved</div>
+                      <div className="text-sm">
+                        {getActiveCurrency()} {Number(bill.paid || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    {Number(bill.pendingApprovalCount || 0) > 0 && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Awaiting Finance</div>
+                        <div className="text-sm text-warning">
+                          {getActiveCurrency()} {Number(bill.pendingApprovalAmount || 0).toFixed(2)}
                         </div>
-                        {Number(bill.pendingApprovalCount || 0) > 0 && (
-                          <div className="text-warning">
-                            Awaiting Finance: {getActiveCurrency()}{' '}
-                            {Number(bill.pendingApprovalAmount || 0).toFixed(2)}
-                          </div>
-                        )}
-                        {bill.outstanding != null && (
-                          <div className="text-muted-foreground">
-                            Outstanding: {getActiveCurrency()} {Number(bill.outstanding).toFixed(2)}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>{bill.status || 'UNKNOWN'}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              openContractInvoice({ ...billsContract!, invoiceId: bill.invoiceId })
-                            }
-                          >
-                            <Eye className="mr-1 h-3.5 w-3.5" /> View bill
-                          </Button>
-                          {bill.status !== 'PAID' && bill.status !== 'CANCELLED' && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => openFsmaBillPayment(billsContract!, bill)}
-                              >
-                                <DollarSign className="mr-1 h-3.5 w-3.5" /> Collect amount
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openFsmaBillPayment(billsContract!, bill, true)}
-                              >
-                                Collect deposit
-                              </Button>
-                            </>
-                          )}
+                      </div>
+                    )}
+                    {bill.outstanding != null && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Outstanding</div>
+                        <div className="text-sm">
+                          {getActiveCurrency()} {Number(bill.outstanding).toFixed(2)}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-xs text-muted-foreground">Status</div>
+                      <div className="text-sm font-medium">{bill.status || 'UNKNOWN'}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="max-w-full"
+                      onClick={() =>
+                        openContractInvoice({ ...billsContract!, invoiceId: bill.invoiceId })
+                      }
+                    >
+                      <Eye className="mr-1 h-3.5 w-3.5 shrink-0" /> View bill
+                    </Button>
+                    {bill.status !== 'PAID' && bill.status !== 'CANCELLED' && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="max-w-full"
+                          onClick={() => openFsmaBillPayment(billsContract!, bill)}
+                        >
+                          <DollarSign className="mr-1 h-3.5 w-3.5 shrink-0" /> Collect amount
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="max-w-full"
+                          onClick={() => openFsmaBillPayment(billsContract!, bill, true)}
+                        >
+                          Collect deposit
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </DialogContent>
