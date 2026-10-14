@@ -33,6 +33,8 @@ The actual path depends on coverage and estimate track; not every ticket uses ev
 - `BRING_TO_CENTRE`: machine is brought to a service centre.
 - `WARRANTY_ONSITE`: on-site warranty service.
 
+Help Desk can choose any of these three modes for each ticket, regardless of the machine's coverage or contract. Coverage is still resolved server-side for pricing and service rules; it does not lock the work mode. Both on-site modes ask for a scheduled visit date and can capture a service location.
+
 ### Machine and ticket types
 
 - `machineType`: `PRINTER` (meter-based), `COMPUTER`, or `OTHER`. Computers and other machines skip meter readings and use time-only warranty evaluation.
@@ -60,7 +62,7 @@ Consumables are items consumed or worn through normal operation, such as toner/i
 
 ## End-to-end workflow
 
-1. **Create:** Help Desk, Manager or Admin creates a ticket for a customer/product or lead. Capture machine details, complaint, job type and printer meter reading. A machine cannot normally have multiple open service tickets. Coverage and service context are resolved by the server. Chargeable tickets start `OPEN`; covered tickets may start `FREE_SERVICE`.
+1. **Create:** Help Desk, Manager or Admin creates a ticket for a customer/product or lead. Capture machine details, complaint, chosen mode of work and printer meter reading. Either on-site mode can include a visit date and service location; a service-centre ticket does not use those fields. A machine cannot normally have multiple open service tickets. Coverage and service context are resolved by the server. Chargeable tickets start `OPEN`; covered tickets may start `FREE_SERVICE`.
 2. **Assign:** Help Desk assigns a technician and optionally a visit date. The ticket becomes `ASSIGNED`.
 3. **Claim and diagnose:** The technician starts diagnosis. The first technician or branch manager to open/claim the ticket is recorded in `diagnosisStartedBy`; conflicting users receive a conflict response. Reassignment releases a technician's claim but not a manager's claim. The technician records problem found, root cause, notes, service meter reading (printer), labour, parts and any applicable visit/transport charge details.
 4. **Estimate and finance:** Estimate lines are priced using server-calculated coverage. Covered lines have zero customer price; chargeable lines (for example AMC parts/consumables, SMA consumables, or uncovered work) are priced. Estimates go to finance approval. A zero-customer-charge estimate creates no billing quotation; after Finance approves it, inventory is reserved and the ticket is ready to start without customer approval. For a chargeable estimate, Billing receives only customer-chargeable lines; finance approval is followed by customer approval. Rejected estimates can be revised/resubmitted; later estimates use the additional-estimate flow.

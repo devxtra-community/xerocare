@@ -746,6 +746,7 @@ export default function ServiceDashboardPage() {
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isOnsiteMode = newTicket.jobType === 'ONSITE' || newTicket.jobType === 'WARRANTY_ONSITE';
 
     if (
       (creationPath === 'new' || isOtherMachine) &&
@@ -779,11 +780,11 @@ export default function ServiceDashboardPage() {
         toast.error('Issue description is required.');
         return;
       }
-      if (newTicket.jobType === 'ONSITE' && !newTicket.scheduledVisitDate) {
+      if (isOnsiteMode && !newTicket.scheduledVisitDate) {
         toast.error('Scheduled Visit Date is required for On-Site service.');
         return;
       }
-      if (newTicket.jobType === 'ONSITE' && newTicket.scheduledVisitDate < todayLocalISO()) {
+      if (isOnsiteMode && newTicket.scheduledVisitDate < todayLocalISO()) {
         toast.error('Scheduled Visit Date cannot be in the past.');
         return;
       }
@@ -825,12 +826,8 @@ export default function ServiceDashboardPage() {
             ? undefined
             : newTicket.contractReferenceId || undefined,
           jobType: newTicket.jobType,
-          scheduledVisitDate:
-            newTicket.jobType === 'ONSITE' ? newTicket.scheduledVisitDate : undefined,
-          serviceLocation:
-            newTicket.jobType === 'ONSITE'
-              ? newTicket.serviceLocation.trim() || undefined
-              : undefined,
+          scheduledVisitDate: isOnsiteMode ? newTicket.scheduledVisitDate : undefined,
+          serviceLocation: isOnsiteMode ? newTicket.serviceLocation.trim() || undefined : undefined,
           issueDescription: newTicket.issueDescription.trim(),
           meterReadingAtCreation:
             newTicket.machineType === 'PRINTER' && meterReadingInput !== ''
@@ -4041,54 +4038,26 @@ export default function ServiceDashboardPage() {
                       );
                     })()}
 
-                    {/* Job Type selection */}
+                    {/* Mode of work selection */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                          Job Type
+                          Mode of Work
                         </label>
-                        {(() => {
-                          const lockOnsite =
-                            creationPath === 'existing' &&
-                            !isOtherMachine &&
-                            selectedMachine &&
-                            [
-                              'RENT',
-                              'LEASE_CPC',
-                              'LEASE_UNDER_WARRANTY',
-                              'AMC',
-                              'FSMA',
-                              'SMA',
-                            ].includes(newTicket.serviceContext);
-
-                          if (lockOnsite) {
-                            return (
-                              <div className="h-9 px-3 border border-border rounded-xl bg-muted text-foreground text-xs font-bold flex items-center justify-between">
-                                <span>Warranty / On-Site</span>
-                                <span className="text-[9px] bg-muted text-foreground px-1.5 py-0.5 rounded font-extrabold uppercase">
-                                  LOCKED
-                                </span>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <select
-                              value={newTicket.jobType}
-                              onChange={(e) =>
-                                setNewTicket({ ...newTicket, jobType: e.target.value })
-                              }
-                              className="w-full h-9 text-xs border border-border rounded-xl px-3 outline-none focus:border-primary bg-muted text-foreground font-medium"
-                            >
-                              <option value="ONSITE">On-Site</option>
-                              <option value="BRING_TO_CENTRE">Service Centre</option>
-                            </select>
-                          );
-                        })()}
+                        <select
+                          value={newTicket.jobType}
+                          onChange={(e) => setNewTicket({ ...newTicket, jobType: e.target.value })}
+                          className="w-full h-9 text-xs border border-border rounded-xl px-3 outline-none focus:border-primary bg-muted text-foreground font-medium"
+                        >
+                          <option value="ONSITE">On-Site</option>
+                          <option value="BRING_TO_CENTRE">Service Centre</option>
+                          <option value="WARRANTY_ONSITE">Warranty On-Site</option>
+                        </select>
                       </div>
 
-                      {/* Scheduled visit date (only if ONSITE) */}
-                      {newTicket.jobType === 'ONSITE' && (
+                      {/* Scheduled visit date (for either on-site mode) */}
+                      {(newTicket.jobType === 'ONSITE' ||
+                        newTicket.jobType === 'WARRANTY_ONSITE') && (
                         <div>
                           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                             Scheduled Visit Date *
@@ -4106,8 +4075,9 @@ export default function ServiceDashboardPage() {
                       )}
                     </div>
 
-                    {/* Site location (only if ONSITE) — visit charge is priced from it */}
-                    {newTicket.jobType === 'ONSITE' && (
+                    {/* Site location (for either on-site mode) — visit charge is priced from it */}
+                    {(newTicket.jobType === 'ONSITE' ||
+                      newTicket.jobType === 'WARRANTY_ONSITE') && (
                       <div>
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                           Site Location (for visit charge)
