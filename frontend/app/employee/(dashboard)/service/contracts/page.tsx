@@ -217,6 +217,7 @@ export default function ServiceContractsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ServiceContract | null>(null);
+  const [savingContract, setSavingContract] = useState(false);
 
   // Form State
   const [formState, setFormState] = useState<ContractFormState>(emptyForm());
@@ -455,6 +456,7 @@ export default function ServiceContractsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingContract) return;
     if (!formState.customerId) {
       toast.error('Please select a customer.');
       return;
@@ -559,6 +561,7 @@ export default function ServiceContractsPage() {
           }
         : undefined;
 
+    setSavingContract(true);
     try {
       if (editingContract) {
         await updateServiceContract(editingContract.id, payload);
@@ -579,6 +582,8 @@ export default function ServiceContractsPage() {
         description: getApiErrorMessage(error),
         duration: 8000,
       });
+    } finally {
+      setSavingContract(false);
     }
   };
 
@@ -2253,9 +2258,10 @@ export default function ServiceContractsPage() {
               </Button>
               <Button
                 type="submit"
+                disabled={savingContract}
                 className="h-10 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs shadow-sm"
               >
-                Save Contract
+                {savingContract ? 'Saving...' : 'Save Contract'}
               </Button>
             </DialogFooter>
           </form>
