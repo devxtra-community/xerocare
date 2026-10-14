@@ -884,7 +884,7 @@ export class ServiceController {
     let contractReferenceId: string | null = null;
     let allocationId: string | null = null;
     let productId: string | null = null;
-    let jobType = JobType.ONSITE;
+    const jobType = JobType.ONSITE;
     let track: 'A' | 'B' = 'B';
     let linkedInvoiceId: string | null = null;
     let warrantyInfo: WarrantyEvaluation | null = null;
@@ -945,7 +945,6 @@ export class ServiceController {
       // Step 1 - Check if machine is on RENT
       if (rentInvoice) {
         serviceContext = ServiceContext.RENT;
-        jobType = JobType.WARRANTY_ONSITE;
         track = 'A';
         linkedInvoiceId = rentInvoice.id;
         allocationId = rentInvoice.allocationId || null;
@@ -1081,11 +1080,6 @@ export class ServiceController {
       }
     }
 
-    // Lock job type to WARRANTY_ONSITE for Track A
-    if (track === 'A') {
-      jobType = JobType.WARRANTY_ONSITE;
-    }
-
     return {
       serviceContext,
       contractReferenceId,
@@ -1130,6 +1124,13 @@ export class ServiceController {
         visitChargeChequeBankName,
         visitChargeChequeDate,
       } = req.body;
+
+      // Work mode is a help-desk choice, independent of the machine's coverage.
+      // Keep the resolver's default for older clients that omit jobType.
+      const requestedJobType = jobType as JobType | undefined;
+      if (requestedJobType && !Object.values(JobType).includes(requestedJobType)) {
+        throw new AppError('Invalid mode of work selected', 400);
+      }
 
       const reportedMeterReading =
         meterReadingAtCreation !== undefined &&
@@ -1229,8 +1230,7 @@ export class ServiceController {
 
       // Every ticket starts OPEN and goes through the same diagnose →
       // finance-approval → customer-approval → complete pipeline, regardless
-      // of whether it turns out to be free/covered — `track` only affects the
-      // WARRANTY_ONSITE jobType lock above, not the ticket lifecycle.
+      // of whether it turns out to be free/covered.
       const status = ServiceTicketStatus.OPEN;
 
       const branchId = req.user.branchId || req.body.branchId;
@@ -1300,7 +1300,7 @@ export class ServiceController {
         contractReferenceId,
         machineType,
         issueDescription,
-        jobType: finalJobType || jobType,
+        jobType: requestedJobType || finalJobType,
         status,
         scheduledVisitDate: scheduledVisitDate ? new Date(scheduledVisitDate) : null,
         createdBy: req.user.userId,
