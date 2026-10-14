@@ -113,6 +113,8 @@ export interface ContractMeterReading {
   notes?: string | null;
   recordedBy?: string | null;
   created_at: string;
+  billedAt?: string | null;
+  billingInvoiceId?: string | null;
 }
 
 export const getServiceContracts = async (
@@ -238,6 +240,11 @@ export interface ContractBill {
 export const getContractBills = async (contractId: string): Promise<ContractBill[]> => {
   const response = await api.get(`/i/service/contracts/${contractId}/bills`);
   return response.data.data;
+};
+
+/** Creates the current FSMA invoice from readings not included in an earlier bill. */
+export const generateContractBill = async (contractId: string): Promise<void> => {
+  await api.post(`/i/service/contracts/${contractId}/generate-bill`);
 };
 
 /** Emails an already-generated bill (or any invoice) to the customer. */
