@@ -1057,12 +1057,17 @@ export default function AccountsPayablePage() {
             matchDateTo
           );
         })
-        .sort((a, b) =>
-          (a.referenceNo ?? '').localeCompare(b.referenceNo ?? '', undefined, {
-            numeric: true,
-            sensitivity: 'base',
-          }),
-        ),
+        .sort((a, b) => {
+          const dateA = a.issueDate?.slice(0, 10) ?? '';
+          const dateB = b.issueDate?.slice(0, 10) ?? '';
+          return (
+            dateB.localeCompare(dateA) ||
+            (b.referenceNo ?? '').localeCompare(a.referenceNo ?? '', undefined, {
+              numeric: true,
+              sensitivity: 'base',
+            })
+          );
+        }),
     [
       allPayables,
       typeFilter,
@@ -1077,7 +1082,7 @@ export default function AccountsPayablePage() {
     ],
   );
 
-  // Six rows a page. resetKey carries every filter so changing one returns the reader to
+  // Ten rows a page. resetKey carries every filter so changing one returns the reader to
   // page 1 instead of stranding them past the end of a shorter result.
   const payablePaging = useTablePagination(
     filtered,

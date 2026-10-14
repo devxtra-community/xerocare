@@ -247,21 +247,23 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
 
   // Filtered purchase requests
   const filteredRequests = useMemo(() => {
-    return purchaseRequests.filter((r) => {
-      if (reqStatusFilter !== 'ALL' && r.status !== reqStatusFilter) return false;
-      if (dateFrom && (r.createdAt?.slice(0, 10) ?? '') < dateFrom) return false;
-      if (dateTo && (r.createdAt?.slice(0, 10) ?? '') > dateTo) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return (
-          r.vendorName?.toLowerCase().includes(q) ||
-          r.requestNo?.toLowerCase().includes(q) ||
-          r.purchaseRef?.toLowerCase().includes(q) ||
-          r.description?.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
+    return purchaseRequests
+      .filter((r) => {
+        if (reqStatusFilter !== 'ALL' && r.status !== reqStatusFilter) return false;
+        if (dateFrom && (r.createdAt?.slice(0, 10) ?? '') < dateFrom) return false;
+        if (dateTo && (r.createdAt?.slice(0, 10) ?? '') > dateTo) return false;
+        if (search) {
+          const q = search.toLowerCase();
+          return (
+            r.vendorName?.toLowerCase().includes(q) ||
+            r.requestNo?.toLowerCase().includes(q) ||
+            r.purchaseRef?.toLowerCase().includes(q) ||
+            r.description?.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }, [purchaseRequests, reqStatusFilter, dateFrom, dateTo, search]);
 
   const requestPaging = useTablePagination(

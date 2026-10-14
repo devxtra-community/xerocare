@@ -944,7 +944,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
   const filtered = useMemo(
     () =>
-      filteredBase.filter((p) => (tab === 'ALL' || tab === 'CUSTOMERS' ? true : p.status === tab)),
+      filteredBase
+        .filter((p) => (tab === 'ALL' || tab === 'CUSTOMERS' ? true : p.status === tab))
+        .sort((a, b) =>
+          (b.paymentDate || b.createdAt || '').localeCompare(a.paymentDate || a.createdAt || ''),
+        ),
     [filteredBase, tab],
   );
 
@@ -1016,8 +1020,8 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
         : filtered.map((payment) => ({ kind: 'payment' as const, payment })),
     [tab, pendingEstimates, acceptedEstimates, filtered],
   );
-  const receiptPagination = useTablePagination(receiptRows, paginationResetKey, 6);
-  const customerPagination = useTablePagination(filteredCustomerGroups, paginationResetKey, 6);
+  const receiptPagination = useTablePagination(receiptRows, paginationResetKey, 10);
+  const customerPagination = useTablePagination(filteredCustomerGroups, paginationResetKey, 10);
   const pagePendingEstimates = receiptPagination.pageRows
     .filter((row) => row.kind === 'pending-estimate')
     .map((row) => row.invoice);
