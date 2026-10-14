@@ -2209,6 +2209,7 @@ function receiptContextLabel(request: SalePaymentRequest): string | undefined {
     SERVICE_VISIT_CHARGE: 'Service — Visit Charge',
     SERVICE_COMPLETION: 'Service — Completion Payment',
     SERVICE_CONTRACT_FSMA_BILL: 'FSMA — Monthly Bill Collection',
+    SERVICE_CONTRACT_FSMA_ADVANCE: 'FSMA — Advance Payment',
     SERVICE_CONTRACT_SECURITY_DEPOSIT: 'FSMA — Security Deposit',
   };
   return map[ctx] ?? ctx.replace(/_/g, ' ');
@@ -2985,14 +2986,20 @@ export const applySecurityDepositToBill = async (
         const targetLedger = await m.findOne(InvoiceLedger, {
           where: { invoiceId: targetInvoice.id },
         });
-        if (targetLedger) {
-          targetLedger.paidAmount = Number(targetLedger.paidAmount) + applyAmount;
-          targetLedger.balanceAmount = Math.max(
-            0,
-            Number(targetLedger.totalAmount) - Number(targetLedger.paidAmount),
-          );
-          await m.save(InvoiceLedger, targetLedger);
-        }
+        const fsmaLedger =
+          targetLedger ??
+          m.create(InvoiceLedger, {
+            invoiceId: targetInvoice.id,
+            totalAmount: Number(targetInvoice.totalAmount),
+            paidAmount: 0,
+            balanceAmount: Number(targetInvoice.totalAmount),
+          });
+        fsmaLedger.paidAmount = Number(fsmaLedger.paidAmount) + applyAmount;
+        fsmaLedger.balanceAmount = Math.max(
+          0,
+          Number(fsmaLedger.totalAmount) - Number(fsmaLedger.paidAmount),
+        );
+        await m.save(InvoiceLedger, fsmaLedger);
         deposit.appliedAmount = Number(deposit.appliedAmount ?? 0) + applyAmount;
         deposit.appliedAt = new Date();
         deposit.appliedById = userId;

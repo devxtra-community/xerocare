@@ -6274,10 +6274,14 @@ Xerocare Technical Services`;
       });
       await contractRepo.save(contract);
 
-      // Every contract (AMC, SMA, FSMA) is invoiced in full for its contractValue at signing,
-      // so Finance can track paid/pending from day one. If an amount was collected at
-      // signing, record it against this same invoice immediately.
-      if (contract.contractValue > 0) {
+      // AMC/SMA are invoiced for their contract value. FSMA has no fixed value, but an
+      // amount collected at signing still needs its own FSMA advance invoice and a
+      // pending receipt request so Finance can approve it. That advance invoice is kept
+      // separate from monthly meter invoices and is not linked to monthly bill readings.
+      const initialPayment = req.body.initialPayment;
+      const fsmaAdvance =
+        fields.contractType === ServiceContractType.FSMA && Number(initialPayment?.amount) > 0;
+      if (contract.contractValue > 0 || fsmaAdvance) {
         if (branchId) {
           try {
             const token = sign(
@@ -6285,17 +6289,23 @@ Xerocare Technical Services`;
               ACCESS_SECRET as string,
               { expiresIn: '1m' },
             );
-            const initialPayment = req.body.initialPayment;
+            const invoiceAmount = fsmaAdvance
+              ? Number(initialPayment.amount)
+              : Number(contract.contractValue);
             const response = await axios.post(
               `${BILLING_SERVICE_URL}/invoices/service-contract`,
               {
                 customerId,
                 branchId,
                 createdBy: req.user?.userId || 'SYSTEM',
-                serviceContractId: contract.id,
+                // FSMA advance invoices remain separate from monthly meter bills.
+                serviceContractId: fsmaAdvance ? undefined : contract.id,
                 billType: fields.contractType,
-                description: `${fields.contractType} Service Contract (${start.toLocaleDateString()} – ${end.toLocaleDateString()})`,
-                amount: contract.contractValue,
+                description: fsmaAdvance
+                  ? `FSMA Advance Payment (${start.toLocaleDateString()})`
+                  : `${fields.contractType} Service Contract (${start.toLocaleDateString()} – ${end.toLocaleDateString()})`,
+                amount: invoiceAmount,
+                paymentContext: fsmaAdvance ? 'SERVICE_CONTRACT_FSMA_ADVANCE' : undefined,
                 initialPayment:
                   initialPayment && Number(initialPayment.amount) > 0
                     ? {

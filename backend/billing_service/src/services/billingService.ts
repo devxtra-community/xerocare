@@ -5187,7 +5187,7 @@ export class BillingService {
     customerId: string;
     branchId: string;
     createdBy: string;
-    serviceContractId: string;
+    serviceContractId?: string;
     billType: BillType;
     description: string;
     amount: number;
@@ -5198,6 +5198,7 @@ export class BillingService {
       referenceNumber?: string;
       remarks?: string;
       cashAccountId?: string;
+      paymentContext?: string;
     };
   }): Promise<Invoice> {
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
@@ -5216,7 +5217,7 @@ export class BillingService {
       customerId: payload.customerId,
       branchId: payload.branchId,
       createdBy: payload.createdBy,
-      serviceContractId: payload.serviceContractId,
+      serviceContractId: payload.serviceContractId ?? null,
       saleType: SaleType.SERVICE,
       billType: payload.billType,
       type: InvoiceType.FINAL,
@@ -5252,7 +5253,7 @@ export class BillingService {
         referenceNumber: payload.initialPayment.referenceNumber,
         remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
         cashAccountId: payload.initialPayment.cashAccountId,
-        paymentContext: 'SERVICE_CONTRACT_SIGNING',
+        paymentContext: payload.initialPayment.paymentContext ?? 'SERVICE_CONTRACT_SIGNING',
       });
     }
 

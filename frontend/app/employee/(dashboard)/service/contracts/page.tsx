@@ -1481,7 +1481,8 @@ export default function ServiceContractsPage() {
                               <Gauge className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                        {c.invoiceId &&
+                        {c.contractType !== 'FSMA' &&
+                          c.invoiceId &&
                           (contractPaymentSummaries[c.invoiceId]?.pendingBalance ?? 1) > 0 && (
                             <Button
                               variant="ghost"
@@ -1864,9 +1865,9 @@ export default function ServiceContractsPage() {
                     Payment Collected at Signing (optional)
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    An invoice for the full contract value is raised automatically. If the customer
-                    is paying now — in full or in part — record it here; it lands on that same
-                    invoice. Leave blank to invoice as pending and collect later.
+                    {formState.contractType === 'FSMA'
+                      ? 'FSMA has no fixed contract value. An amount collected now creates an FSMA advance invoice and a Finance approval request; meter charges are billed separately.'
+                      : 'An invoice for the full contract value is raised automatically. If the customer is paying now — in full or in part — record it here; it lands on that same invoice. Leave blank to invoice as pending and collect later.'}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col space-y-1">
