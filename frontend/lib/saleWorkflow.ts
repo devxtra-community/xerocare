@@ -83,6 +83,8 @@ export interface InstallationRequest {
 
 export interface SalePaymentRequest {
   isDirectSale?: boolean;
+  /** Contract subtype copied from the linked invoice for the Finance receipt badge. */
+  invoiceBillType?: string | null;
   id: string;
   requestNo: string;
   invoiceId: string;

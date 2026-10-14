@@ -348,9 +348,11 @@ const ACTION_BTN =
 
 function PaymentTypeBadges({
   paymentContext,
+  invoiceBillType,
   isSecurityDeposit,
 }: {
   paymentContext?: string | null;
+  invoiceBillType?: string | null;
   isSecurityDeposit?: boolean;
 }) {
   return (
@@ -366,7 +368,9 @@ function PaymentTypeBadges({
                 ? 'SMA'
                 : paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
                   ? 'FSMA DEPOSIT'
-                  : (ctxType(paymentContext) ?? '—')}
+                  : ['AMC', 'SMA', 'FSMA'].includes((invoiceBillType || '').toUpperCase())
+                    ? invoiceBillType!.toUpperCase()
+                    : (ctxType(paymentContext) ?? '—')}
       </span>
       {isSecurityDeposit && (
         <span
@@ -1449,6 +1453,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   <td className="py-1.5 pr-4">
                                     <PaymentTypeBadges
                                       paymentContext={pmt.paymentContext}
+                                      invoiceBillType={pmt.invoiceBillType}
                                       isSecurityDeposit={pmt.isSecurityDeposit}
                                     />
                                   </td>
@@ -1700,6 +1705,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <TableCell>
                         <PaymentTypeBadges
                           paymentContext={pmt.paymentContext}
+                          invoiceBillType={pmt.invoiceBillType}
                           isSecurityDeposit={pmt.isSecurityDeposit}
                         />
                       </TableCell>

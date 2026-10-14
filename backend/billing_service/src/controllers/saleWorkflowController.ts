@@ -1948,15 +1948,17 @@ export const getPendingSalePayments = async (req: Request, res: Response, next: 
     const invoices = invoiceIds.length
       ? await Source.getRepository(Invoice).find({
           where: { id: In(invoiceIds) },
-          select: ['id', 'isDirectSale'],
+          select: ['id', 'isDirectSale', 'billType'],
         })
       : [];
     const directSaleIds = new Set(invoices.filter((i) => i.isDirectSale).map((i) => i.id));
+    const invoiceBillTypes = new Map(invoices.map((i) => [i.id, i.billType ?? null]));
     res.json({
       success: true,
       data: (await attachAdvanceBillStatus(payments)).map((p) => ({
         ...p,
         isDirectSale: directSaleIds.has(p.invoiceId),
+        invoiceBillType: invoiceBillTypes.get(p.invoiceId) ?? null,
       })),
     });
   } catch (err) {
@@ -1997,15 +1999,17 @@ export const getAllSalePaymentsForBranch = async (
     const invoices = invoiceIds.length
       ? await Source.getRepository(Invoice).find({
           where: { id: In(invoiceIds) },
-          select: ['id', 'isDirectSale'],
+          select: ['id', 'isDirectSale', 'billType'],
         })
       : [];
     const directSaleIds = new Set(invoices.filter((i) => i.isDirectSale).map((i) => i.id));
+    const invoiceBillTypes = new Map(invoices.map((i) => [i.id, i.billType ?? null]));
     res.json({
       success: true,
       data: (await attachAdvanceBillStatus(payments)).map((p) => ({
         ...p,
         isDirectSale: directSaleIds.has(p.invoiceId),
+        invoiceBillType: invoiceBillTypes.get(p.invoiceId) ?? null,
       })),
     });
   } catch (err) {
