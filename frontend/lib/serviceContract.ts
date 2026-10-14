@@ -137,9 +137,12 @@ export const getServiceContractById = async (id: string): Promise<ServiceContrac
 
 export interface ContractInitialPayment {
   amount: number;
-  paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD';
+  paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
   paymentDate?: string;
   referenceNumber?: string;
+  chequeNumber?: string;
+  chequeBankName?: string;
+  chequeDate?: string;
   remarks?: string;
 }
 

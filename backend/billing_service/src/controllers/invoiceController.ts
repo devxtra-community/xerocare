@@ -1691,9 +1691,17 @@ export const createServiceContractInvoice = async (
       billType === BillType.FSMA &&
       paymentContext === 'SERVICE_CONTRACT_FSMA_ADVANCE' &&
       Number(initialPayment?.amount) > 0;
+    const isFsmaSecurityDeposit =
+      billType === BillType.FSMA &&
+      paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT' &&
+      initialPayment?.isSecurityDeposit === true &&
+      Number(initialPayment?.amount) > 0;
+    if (paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT' && !isFsmaSecurityDeposit) {
+      throw new AppError('FSMA security deposits require a matching deposit payment record.', 400);
+    }
     if (!customerId || !branchId || (!serviceContractId && !isFsmaAdvance) || !billType) {
       throw new AppError(
-        'customerId, branchId, serviceContractId and billType are required (except for an FSMA advance invoice).',
+        'customerId, branchId, serviceContractId and billType are required (except for a legacy FSMA advance invoice).',
         400,
       );
     }
@@ -1717,6 +1725,10 @@ export const createServiceContractInvoice = async (
               referenceNumber: initialPayment.referenceNumber,
               remarks: initialPayment.remarks,
               cashAccountId: initialPayment.cashAccountId,
+              chequeNumber: initialPayment.chequeNumber,
+              chequeBankName: initialPayment.chequeBankName,
+              chequeDate: initialPayment.chequeDate,
+              isSecurityDeposit: initialPayment.isSecurityDeposit,
               paymentContext,
             }
           : undefined,

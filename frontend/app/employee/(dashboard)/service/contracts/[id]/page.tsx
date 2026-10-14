@@ -440,7 +440,7 @@ export default function ServiceContractDetailPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="block text-[10px] uppercase font-bold text-muted-foreground">
-                {contract.contractType === 'FSMA' ? 'Advance Invoice Status' : 'Invoice Status'}
+                {contract.contractType === 'FSMA' ? 'Security Deposit Status' : 'Invoice Status'}
               </span>
               <div className="flex items-center gap-1">
                 {contract.invoiceId && (

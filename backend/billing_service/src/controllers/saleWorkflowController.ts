@@ -1459,10 +1459,18 @@ export const getBillsForContract = async (req: Request, res: Response, next: Nex
     // rows. Return them through this same picker so an approved refundable deposit can
     // settle an unpaid FSMA month from the Receipts queue.
     if (invoice.billType === 'FSMA' && invoice.serviceContractId) {
-      const fsmaInvoices = await Source.getRepository(Invoice).find({
-        where: { serviceContractId: invoice.serviceContractId, billType: BillType.FSMA },
-        order: { createdAt: 'DESC' },
-      });
+      const isSigningDepositInvoice = (
+        await Source.getRepository(InvoiceItem).find({
+          where: { invoice: { id: contractId } },
+          select: ['description'],
+        })
+      ).some((item) => item.description?.startsWith('FSMA Security Deposit ('));
+      const fsmaInvoices = (
+        await Source.getRepository(Invoice).find({
+          where: { serviceContractId: invoice.serviceContractId, billType: BillType.FSMA },
+          order: { createdAt: 'DESC' },
+        })
+      ).filter((row) => !isSigningDepositInvoice || row.id !== contractId);
       const ledgers = fsmaInvoices.length
         ? await Source.getRepository(InvoiceLedger).find({
             where: { invoiceId: In(fsmaInvoices.map((row) => row.id)) },

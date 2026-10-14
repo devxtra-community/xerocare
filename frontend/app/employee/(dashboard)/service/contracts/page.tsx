@@ -227,6 +227,9 @@ export default function ServiceContractsPage() {
     paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
     paymentDate: new Date().toISOString().split('T')[0],
     referenceNumber: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDate: '',
     remarks: '',
   });
 
@@ -242,6 +245,9 @@ export default function ServiceContractsPage() {
     paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
     paymentDate: new Date().toISOString().split('T')[0],
     referenceNumber: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDate: '',
     remarks: '',
   });
   const [savingPayment, setSavingPayment] = useState(false);
@@ -423,6 +429,9 @@ export default function ServiceContractsPage() {
       paymentMode: 'CASH',
       paymentDate: new Date().toISOString().split('T')[0],
       referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDate: '',
       remarks: '',
     });
     setIsModalOpen(true);
@@ -558,9 +567,17 @@ export default function ServiceContractsPage() {
             paymentMode: initialPaymentForm.paymentMode,
             paymentDate: initialPaymentForm.paymentDate,
             referenceNumber: initialPaymentForm.referenceNumber || undefined,
+            chequeNumber: initialPaymentForm.chequeNumber.trim() || undefined,
+            chequeBankName: initialPaymentForm.chequeBankName.trim() || undefined,
+            chequeDate: initialPaymentForm.chequeDate || undefined,
             remarks: initialPaymentForm.remarks || undefined,
           }
         : undefined;
+
+    if (initialPayment?.paymentMode === 'CHEQUE' && !initialPayment.chequeNumber) {
+      toast.error('Enter the cheque number for the payment collected at signing.');
+      return;
+    }
 
     setSavingContract(true);
     try {
@@ -570,9 +587,11 @@ export default function ServiceContractsPage() {
       } else {
         await createServiceContract({ ...payload, initialPayment });
         toast.success(
-          type === 'AMC'
-            ? 'AMC contract registered and invoice raised.'
-            : 'Service contract registered successfully.',
+          type === 'FSMA' && initialPayment
+            ? 'FSMA contract registered. Security deposit sent to Finance for approval.'
+            : type === 'AMC'
+              ? 'AMC contract registered and invoice raised.'
+              : 'Service contract registered successfully.',
         );
       }
       setIsModalOpen(false);
@@ -598,6 +617,9 @@ export default function ServiceContractsPage() {
       paymentMode: 'CASH',
       paymentDate: new Date().toISOString().split('T')[0],
       referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDate: '',
       remarks: '',
     });
   };
@@ -615,6 +637,9 @@ export default function ServiceContractsPage() {
       paymentMode: 'CASH',
       paymentDate: new Date().toISOString().split('T')[0],
       referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDate: '',
       remarks: `FSMA ${securityDeposit ? 'security deposit' : 'bill'} ${bill.invoiceNumber || ''} (${bill.periodStart?.slice(0, 10) || '—'} to ${bill.periodEnd?.slice(0, 10) || '—'})`,
     });
   };
@@ -686,6 +711,10 @@ export default function ServiceContractsPage() {
       toast.error('Enter a payment amount greater than 0.');
       return;
     }
+    if (payingForm.paymentMode === 'CHEQUE' && !payingForm.chequeNumber.trim()) {
+      toast.error('Enter the cheque number.');
+      return;
+    }
     setSavingPayment(true);
     try {
       await recordSalePayment(invoiceId, {
@@ -693,6 +722,9 @@ export default function ServiceContractsPage() {
         paymentMode: payingForm.paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
         paymentDate: payingForm.paymentDate,
         referenceNumber: payingForm.referenceNumber || undefined,
+        chequeNumber: payingForm.chequeNumber.trim() || undefined,
+        chequeBankName: payingForm.chequeBankName.trim() || undefined,
+        chequeDate: payingForm.chequeDate || undefined,
         remarks: payingForm.remarks || undefined,
         paymentContext: payingIsSecurityDeposit
           ? 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
@@ -1857,22 +1889,26 @@ export default function ServiceContractsPage() {
                 </div>
               </div>
 
-              {/* Every contract is invoiced in full at signing; optional amount collected on the spot */}
+              {/* Contract payment collected at signing; FSMA signing payments are refundable deposits. */}
               {!editingContract && (
                 <div className="col-span-2 border border-border rounded-2xl p-4 bg-success/10 space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-success">
                     <DollarSign className="h-3.5 w-3.5" />
-                    Payment Collected at Signing (optional)
+                    {formState.contractType === 'FSMA'
+                      ? 'Security Deposit Collected at Signing (optional)'
+                      : 'Payment Collected at Signing (optional)'}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {formState.contractType === 'FSMA'
-                      ? 'FSMA has no fixed contract value. An amount collected now creates an FSMA advance invoice and a Finance approval request; meter charges are billed separately.'
+                      ? 'FSMA has no fixed contract value. An amount collected now is recorded as a refundable security deposit and sent to Finance for approval. It can be refunded when the contract is completed; meter charges are billed separately.'
                       : 'An invoice for the full contract value is raised automatically. If the customer is paying now — in full or in part — record it here; it lands on that same invoice. Leave blank to invoice as pending and collect later.'}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        Amount Paid Now ({getActiveCurrency()})
+                        {formState.contractType === 'FSMA'
+                          ? `Security Deposit Amount (${getActiveCurrency()})`
+                          : `Amount Paid Now (${getActiveCurrency()})`}
                       </label>
                       <Input
                         type="number"
@@ -1904,7 +1940,6 @@ export default function ServiceContractsPage() {
                         <option value="CASH">Cash</option>
                         <option value="BANK_TRANSFER">Bank Transfer</option>
                         <option value="CHEQUE">Cheque</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
                       </select>
                     </div>
                     <div className="flex flex-col space-y-1">
@@ -1939,6 +1974,57 @@ export default function ServiceContractsPage() {
                         placeholder="Optional"
                       />
                     </div>
+                    {initialPaymentForm.paymentMode === 'CHEQUE' && (
+                      <>
+                        <div className="flex flex-col space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Cheque Number *
+                          </label>
+                          <Input
+                            value={initialPaymentForm.chequeNumber}
+                            onChange={(e) =>
+                              setInitialPaymentForm((prev) => ({
+                                ...prev,
+                                chequeNumber: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs bg-card border-border rounded-xl"
+                          />
+                        </div>
+                        <div className="flex flex-col space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Cheque Bank
+                          </label>
+                          <Input
+                            value={initialPaymentForm.chequeBankName}
+                            onChange={(e) =>
+                              setInitialPaymentForm((prev) => ({
+                                ...prev,
+                                chequeBankName: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs bg-card border-border rounded-xl"
+                            placeholder="Optional"
+                          />
+                        </div>
+                        <div className="flex flex-col space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Cheque Date
+                          </label>
+                          <Input
+                            type="date"
+                            value={initialPaymentForm.chequeDate}
+                            onChange={(e) =>
+                              setInitialPaymentForm((prev) => ({
+                                ...prev,
+                                chequeDate: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs bg-card border-border rounded-xl"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -2999,7 +3085,6 @@ export default function ServiceContractsPage() {
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="CHEQUE">Cheque</option>
-                  <option value="CREDIT_CARD">Credit Card</option>
                 </select>
               </div>
               <div className="flex flex-col space-y-1">
@@ -3024,6 +3109,42 @@ export default function ServiceContractsPage() {
                   placeholder="Optional"
                 />
               </div>
+              {payingForm.paymentMode === 'CHEQUE' && (
+                <>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-foreground">Cheque Number *</label>
+                    <Input
+                      value={payingForm.chequeNumber}
+                      onChange={(e) =>
+                        setPayingForm((prev) => ({ ...prev, chequeNumber: e.target.value }))
+                      }
+                      className="h-10 border-border focus-visible:ring-success"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-foreground">Cheque Bank</label>
+                    <Input
+                      value={payingForm.chequeBankName}
+                      onChange={(e) =>
+                        setPayingForm((prev) => ({ ...prev, chequeBankName: e.target.value }))
+                      }
+                      className="h-10 border-border focus-visible:ring-success"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-foreground">Cheque Date</label>
+                    <Input
+                      type="date"
+                      value={payingForm.chequeDate}
+                      onChange={(e) =>
+                        setPayingForm((prev) => ({ ...prev, chequeDate: e.target.value }))
+                      }
+                      className="h-10 border-border focus-visible:ring-success"
+                    />
+                  </div>
+                </>
+              )}
               <div className="col-span-2 flex flex-col space-y-1">
                 <label className="text-xs font-bold text-foreground">Remarks</label>
                 <Input
