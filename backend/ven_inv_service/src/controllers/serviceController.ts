@@ -6274,10 +6274,14 @@ Xerocare Technical Services`;
       });
       await contractRepo.save(contract);
 
-      // Every contract (AMC, SMA, FSMA) is invoiced in full for its contractValue at signing,
-      // so Finance can track paid/pending from day one. If an amount was collected at
-      // signing, record it against this same invoice immediately.
-      if (contract.contractValue > 0) {
+      // AMC/SMA are invoiced for their contract value. FSMA has no fixed value, but an
+      // amount collected at signing is a refundable security deposit. Keep its invoice
+      // separate from monthly meter invoices while linking it to this contract so the
+      // existing deposit refund/application workflow can identify the FSMA contract.
+      const initialPayment = req.body.initialPayment;
+      const fsmaSecurityDeposit =
+        fields.contractType === ServiceContractType.FSMA && Number(initialPayment?.amount) > 0;
+      if (contract.contractValue > 0 || fsmaSecurityDeposit) {
         if (branchId) {
           try {
             const token = sign(
@@ -6285,17 +6289,25 @@ Xerocare Technical Services`;
               ACCESS_SECRET as string,
               { expiresIn: '1m' },
             );
-            const initialPayment = req.body.initialPayment;
+            const invoiceAmount = fsmaSecurityDeposit
+              ? Number(initialPayment.amount)
+              : Number(contract.contractValue);
             const response = await axios.post(
               `${BILLING_SERVICE_URL}/invoices/service-contract`,
               {
                 customerId,
                 branchId,
                 createdBy: req.user?.userId || 'SYSTEM',
+                // The deposit invoice is linked to the contract but has no meter readings.
                 serviceContractId: contract.id,
                 billType: fields.contractType,
-                description: `${fields.contractType} Service Contract (${start.toLocaleDateString()} – ${end.toLocaleDateString()})`,
-                amount: contract.contractValue,
+                description: fsmaSecurityDeposit
+                  ? `FSMA Security Deposit (${start.toLocaleDateString()})`
+                  : `${fields.contractType} Service Contract (${start.toLocaleDateString()} – ${end.toLocaleDateString()})`,
+                amount: invoiceAmount,
+                paymentContext: fsmaSecurityDeposit
+                  ? 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
+                  : undefined,
                 initialPayment:
                   initialPayment && Number(initialPayment.amount) > 0
                     ? {
@@ -6303,7 +6315,11 @@ Xerocare Technical Services`;
                         paymentMode: initialPayment.paymentMode,
                         paymentDate: initialPayment.paymentDate,
                         referenceNumber: initialPayment.referenceNumber,
+                        chequeNumber: initialPayment.chequeNumber,
+                        chequeBankName: initialPayment.chequeBankName,
+                        chequeDate: initialPayment.chequeDate,
                         remarks: initialPayment.remarks,
+                        isSecurityDeposit: fsmaSecurityDeposit,
                       }
                     : undefined,
               },

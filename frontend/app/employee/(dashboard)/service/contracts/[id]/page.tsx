@@ -440,7 +440,7 @@ export default function ServiceContractDetailPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="block text-[10px] uppercase font-bold text-muted-foreground">
-                Invoice Status
+                {contract.contractType === 'FSMA' ? 'Security Deposit Status' : 'Invoice Status'}
               </span>
               <div className="flex items-center gap-1">
                 {contract.invoiceId && (
@@ -455,17 +455,20 @@ export default function ServiceContractDetailPage() {
                     <FileText className="h-3.5 w-3.5" />
                   </Button>
                 )}
-                {contract.invoiceId && paymentSummary && paymentSummary.pendingBalance > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={openPayDialog}
-                    title="Record an installment payment"
-                    className="h-6 w-6 text-muted-foreground hover:text-success hover:bg-success/10"
-                  >
-                    <DollarSign className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+                {contract.contractType !== 'FSMA' &&
+                  contract.invoiceId &&
+                  paymentSummary &&
+                  paymentSummary.pendingBalance > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={openPayDialog}
+                      title="Record an installment payment"
+                      className="h-6 w-6 text-muted-foreground hover:text-success hover:bg-success/10"
+                    >
+                      <DollarSign className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
               </div>
             </div>
             {!contract.invoiceId ? (

@@ -227,6 +227,9 @@ export default function ServiceContractsPage() {
     paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
     paymentDate: new Date().toISOString().split('T')[0],
     referenceNumber: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDate: '',
     remarks: '',
   });
 
@@ -242,6 +245,9 @@ export default function ServiceContractsPage() {
     paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
     paymentDate: new Date().toISOString().split('T')[0],
     referenceNumber: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDate: '',
     remarks: '',
   });
   const [savingPayment, setSavingPayment] = useState(false);
@@ -423,6 +429,9 @@ export default function ServiceContractsPage() {
       paymentMode: 'CASH',
       paymentDate: new Date().toISOString().split('T')[0],
       referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDate: '',
       remarks: '',
     });
     setIsModalOpen(true);
@@ -558,9 +567,17 @@ export default function ServiceContractsPage() {
             paymentMode: initialPaymentForm.paymentMode,
             paymentDate: initialPaymentForm.paymentDate,
             referenceNumber: initialPaymentForm.referenceNumber || undefined,
+            chequeNumber: initialPaymentForm.chequeNumber.trim() || undefined,
+            chequeBankName: initialPaymentForm.chequeBankName.trim() || undefined,
+            chequeDate: initialPaymentForm.chequeDate || undefined,
             remarks: initialPaymentForm.remarks || undefined,
           }
         : undefined;
+
+    if (initialPayment?.paymentMode === 'CHEQUE' && !initialPayment.chequeNumber) {
+      toast.error('Enter the cheque number for the payment collected at signing.');
+      return;
+    }
 
     setSavingContract(true);
     try {
@@ -570,9 +587,11 @@ export default function ServiceContractsPage() {
       } else {
         await createServiceContract({ ...payload, initialPayment });
         toast.success(
-          type === 'AMC'
-            ? 'AMC contract registered and invoice raised.'
-            : 'Service contract registered successfully.',
+          type === 'FSMA' && initialPayment
+            ? 'FSMA contract registered. Security deposit sent to Finance for approval.'
+            : type === 'AMC'
+              ? 'AMC contract registered and invoice raised.'
+              : 'Service contract registered successfully.',
         );
       }
       setIsModalOpen(false);
@@ -598,6 +617,9 @@ export default function ServiceContractsPage() {
       paymentMode: 'CASH',
       paymentDate: new Date().toISOString().split('T')[0],
       referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDate: '',
       remarks: '',
     });
   };
@@ -615,6 +637,9 @@ export default function ServiceContractsPage() {
       paymentMode: 'CASH',
       paymentDate: new Date().toISOString().split('T')[0],
       referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDate: '',
       remarks: `FSMA ${securityDeposit ? 'security deposit' : 'bill'} ${bill.invoiceNumber || ''} (${bill.periodStart?.slice(0, 10) || '—'} to ${bill.periodEnd?.slice(0, 10) || '—'})`,
     });
   };
@@ -686,6 +711,10 @@ export default function ServiceContractsPage() {
       toast.error('Enter a payment amount greater than 0.');
       return;
     }
+    if (payingForm.paymentMode === 'CHEQUE' && !payingForm.chequeNumber.trim()) {
+      toast.error('Enter the cheque number.');
+      return;
+    }
     setSavingPayment(true);
     try {
       await recordSalePayment(invoiceId, {
@@ -693,6 +722,9 @@ export default function ServiceContractsPage() {
         paymentMode: payingForm.paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
         paymentDate: payingForm.paymentDate,
         referenceNumber: payingForm.referenceNumber || undefined,
+        chequeNumber: payingForm.chequeNumber.trim() || undefined,
+        chequeBankName: payingForm.chequeBankName.trim() || undefined,
+        chequeDate: payingForm.chequeDate || undefined,
         remarks: payingForm.remarks || undefined,
         paymentContext: payingIsSecurityDeposit
           ? 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
@@ -1481,7 +1513,8 @@ export default function ServiceContractsPage() {
                               <Gauge className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                        {c.invoiceId &&
+                        {c.contractType !== 'FSMA' &&
+                          c.invoiceId &&
                           (contractPaymentSummaries[c.invoiceId]?.pendingBalance ?? 1) > 0 && (
                             <Button
                               variant="ghost"
@@ -1856,22 +1889,26 @@ export default function ServiceContractsPage() {
                 </div>
               </div>
 
-              {/* Every contract is invoiced in full at signing; optional amount collected on the spot */}
+              {/* Contract payment collected at signing; FSMA signing payments are refundable deposits. */}
               {!editingContract && (
                 <div className="col-span-2 border border-border rounded-2xl p-4 bg-success/10 space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-success">
                     <DollarSign className="h-3.5 w-3.5" />
-                    Payment Collected at Signing (optional)
+                    {formState.contractType === 'FSMA'
+                      ? 'Security Deposit Collected at Signing (optional)'
+                      : 'Payment Collected at Signing (optional)'}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    An invoice for the full contract value is raised automatically. If the customer
-                    is paying now — in full or in part — record it here; it lands on that same
-                    invoice. Leave blank to invoice as pending and collect later.
+                    {formState.contractType === 'FSMA'
+                      ? 'FSMA has no fixed contract value. An amount collected now is recorded as a refundable security deposit and sent to Finance for approval. It can be refunded when the contract is completed; meter charges are billed separately.'
+                      : 'An invoice for the full contract value is raised automatically. If the customer is paying now — in full or in part — record it here; it lands on that same invoice. Leave blank to invoice as pending and collect later.'}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        Amount Paid Now ({getActiveCurrency()})
+                        {formState.contractType === 'FSMA'
+                          ? `Security Deposit Amount (${getActiveCurrency()})`
+                          : `Amount Paid Now (${getActiveCurrency()})`}
                       </label>
                       <Input
                         type="number"
@@ -1903,7 +1940,6 @@ export default function ServiceContractsPage() {
                         <option value="CASH">Cash</option>
                         <option value="BANK_TRANSFER">Bank Transfer</option>
                         <option value="CHEQUE">Cheque</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
                       </select>
                     </div>
                     <div className="flex flex-col space-y-1">
@@ -1938,6 +1974,57 @@ export default function ServiceContractsPage() {
                         placeholder="Optional"
                       />
                     </div>
+                    {initialPaymentForm.paymentMode === 'CHEQUE' && (
+                      <>
+                        <div className="flex flex-col space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Cheque Number *
+                          </label>
+                          <Input
+                            value={initialPaymentForm.chequeNumber}
+                            onChange={(e) =>
+                              setInitialPaymentForm((prev) => ({
+                                ...prev,
+                                chequeNumber: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs bg-card border-border rounded-xl"
+                          />
+                        </div>
+                        <div className="flex flex-col space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Cheque Bank
+                          </label>
+                          <Input
+                            value={initialPaymentForm.chequeBankName}
+                            onChange={(e) =>
+                              setInitialPaymentForm((prev) => ({
+                                ...prev,
+                                chequeBankName: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs bg-card border-border rounded-xl"
+                            placeholder="Optional"
+                          />
+                        </div>
+                        <div className="flex flex-col space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Cheque Date
+                          </label>
+                          <Input
+                            type="date"
+                            value={initialPaymentForm.chequeDate}
+                            onChange={(e) =>
+                              setInitialPaymentForm((prev) => ({
+                                ...prev,
+                                chequeDate: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs bg-card border-border rounded-xl"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -2781,7 +2868,7 @@ export default function ServiceContractsPage() {
       />
 
       <Dialog open={!!billsContract} onOpenChange={(open) => !open && setBillsContract(null)}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-5xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{billsContract?.contractType} Bills</DialogTitle>
             <DialogDescription>
@@ -2812,82 +2899,98 @@ export default function ServiceContractsPage() {
                 : 'No monthly bills generated yet.'}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Bill</TableHead>
-                    <TableHead>Billing period</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Collected / pending approval</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contractBills.map((bill) => (
-                    <TableRow key={bill.invoiceId}>
-                      <TableCell className="font-mono text-xs">
+            <div className="space-y-3">
+              {contractBills.map((bill) => (
+                <article
+                  key={bill.invoiceId}
+                  className="min-w-0 rounded-lg border border-border bg-card p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Bill
+                      </div>
+                      <div className="break-all font-mono text-sm font-semibold">
                         {bill.invoiceNumber || '—'}
-                      </TableCell>
-                      <TableCell className="text-xs">
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Amount
+                      </div>
+                      <div className="text-base font-semibold">
+                        {getActiveCurrency()} {bill.amount.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="min-w-0">
+                      <div className="text-xs text-muted-foreground">Billing period</div>
+                      <div className="break-words text-sm">
                         {bill.periodStart?.slice(0, 10) || '—'} –{' '}
                         {bill.periodEnd?.slice(0, 10) || '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {getActiveCurrency()} {bill.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <div>
-                          Approved: {getActiveCurrency()} {Number(bill.paid || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Approved</div>
+                      <div className="text-sm">
+                        {getActiveCurrency()} {Number(bill.paid || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    {Number(bill.pendingApprovalCount || 0) > 0 && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Awaiting Finance</div>
+                        <div className="text-sm text-warning">
+                          {getActiveCurrency()} {Number(bill.pendingApprovalAmount || 0).toFixed(2)}
                         </div>
-                        {Number(bill.pendingApprovalCount || 0) > 0 && (
-                          <div className="text-warning">
-                            Awaiting Finance: {getActiveCurrency()}{' '}
-                            {Number(bill.pendingApprovalAmount || 0).toFixed(2)}
-                          </div>
-                        )}
-                        {bill.outstanding != null && (
-                          <div className="text-muted-foreground">
-                            Outstanding: {getActiveCurrency()} {Number(bill.outstanding).toFixed(2)}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>{bill.status || 'UNKNOWN'}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              openContractInvoice({ ...billsContract!, invoiceId: bill.invoiceId })
-                            }
-                          >
-                            <Eye className="mr-1 h-3.5 w-3.5" /> View bill
-                          </Button>
-                          {bill.status !== 'PAID' && bill.status !== 'CANCELLED' && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => openFsmaBillPayment(billsContract!, bill)}
-                              >
-                                <DollarSign className="mr-1 h-3.5 w-3.5" /> Collect amount
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openFsmaBillPayment(billsContract!, bill, true)}
-                              >
-                                Collect deposit
-                              </Button>
-                            </>
-                          )}
+                      </div>
+                    )}
+                    {bill.outstanding != null && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Outstanding</div>
+                        <div className="text-sm">
+                          {getActiveCurrency()} {Number(bill.outstanding).toFixed(2)}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-xs text-muted-foreground">Status</div>
+                      <div className="text-sm font-medium">{bill.status || 'UNKNOWN'}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="max-w-full"
+                      onClick={() =>
+                        openContractInvoice({ ...billsContract!, invoiceId: bill.invoiceId })
+                      }
+                    >
+                      <Eye className="mr-1 h-3.5 w-3.5 shrink-0" /> View bill
+                    </Button>
+                    {bill.status !== 'PAID' && bill.status !== 'CANCELLED' && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="max-w-full"
+                          onClick={() => openFsmaBillPayment(billsContract!, bill)}
+                        >
+                          <DollarSign className="mr-1 h-3.5 w-3.5 shrink-0" /> Collect amount
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="max-w-full"
+                          onClick={() => openFsmaBillPayment(billsContract!, bill, true)}
+                        >
+                          Collect deposit
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </DialogContent>
@@ -2982,7 +3085,6 @@ export default function ServiceContractsPage() {
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="CHEQUE">Cheque</option>
-                  <option value="CREDIT_CARD">Credit Card</option>
                 </select>
               </div>
               <div className="flex flex-col space-y-1">
@@ -3007,6 +3109,42 @@ export default function ServiceContractsPage() {
                   placeholder="Optional"
                 />
               </div>
+              {payingForm.paymentMode === 'CHEQUE' && (
+                <>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-foreground">Cheque Number *</label>
+                    <Input
+                      value={payingForm.chequeNumber}
+                      onChange={(e) =>
+                        setPayingForm((prev) => ({ ...prev, chequeNumber: e.target.value }))
+                      }
+                      className="h-10 border-border focus-visible:ring-success"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-foreground">Cheque Bank</label>
+                    <Input
+                      value={payingForm.chequeBankName}
+                      onChange={(e) =>
+                        setPayingForm((prev) => ({ ...prev, chequeBankName: e.target.value }))
+                      }
+                      className="h-10 border-border focus-visible:ring-success"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-foreground">Cheque Date</label>
+                    <Input
+                      type="date"
+                      value={payingForm.chequeDate}
+                      onChange={(e) =>
+                        setPayingForm((prev) => ({ ...prev, chequeDate: e.target.value }))
+                      }
+                      className="h-10 border-border focus-visible:ring-success"
+                    />
+                  </div>
+                </>
+              )}
               <div className="col-span-2 flex flex-col space-y-1">
                 <label className="text-xs font-bold text-foreground">Remarks</label>
                 <Input

@@ -83,6 +83,8 @@ export interface InstallationRequest {
 
 export interface SalePaymentRequest {
   isDirectSale?: boolean;
+  /** Contract subtype copied from the linked invoice for the Finance receipt badge. */
+  invoiceBillType?: string | null;
   id: string;
   requestNo: string;
   invoiceId: string;
@@ -155,6 +157,7 @@ export interface SalePaymentRequest {
     | 'SERVICE_CONTRACT_AMC_INSTALLMENT'
     | 'SERVICE_CONTRACT_SMA_INSTALLMENT'
     | 'SERVICE_CONTRACT_FSMA_BILL'
+    | 'SERVICE_CONTRACT_FSMA_ADVANCE'
     | 'SERVICE_CONTRACT_SECURITY_DEPOSIT';
   /** Marks this as a refundable security deposit, not rent/revenue — excluded from
    *  InvoiceLedger and every AR sum; CHEQUE mode routes to GuaranteeCheque, not the
@@ -493,6 +496,7 @@ export const recordSalePayment = async (
       | 'SERVICE_CONTRACT_AMC_INSTALLMENT'
       | 'SERVICE_CONTRACT_SMA_INSTALLMENT'
       | 'SERVICE_CONTRACT_FSMA_BILL'
+      | 'SERVICE_CONTRACT_FSMA_ADVANCE'
       | 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
       | 'SERVICE_COMPLETION';
     isSecurityDeposit?: boolean;

@@ -821,7 +821,7 @@ config (`fsmaBillingMode` `INDIVIDUAL` — `ratePerClickBW/Color` + `startMeterB
 - **SMA** — 1 year + `copyLimit` (whichever first), counted from `startMeterReading`;
   labour + visits + parts free, toner chargeable; only **newly-accrued** overage beyond
   the limit is billed per period; optional monthly base fee.
-- **FSMA** — all-inclusive; billed **monthly per click** by the FSMA billing scheduler.
+- **FSMA** — all-inclusive; billed **monthly per click** by the FSMA billing scheduler. An optional amount collected at signing is tracked as a refundable security deposit, excluded from contract revenue/receivables, and handled through the Finance receipt approval and refund workflow.
 
 **Endpoints:** `POST/GET /service/contracts`, `GET/PUT/DELETE /service/contracts/:id`,
 `POST/GET /service/contracts/:id/meter-readings` (server computes `amountCharged` +

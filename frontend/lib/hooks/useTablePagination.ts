@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 /** Rows per page across the Accounts tables. */
-export const ACCOUNTS_PAGE_SIZE = 6;
+export const ACCOUNTS_PAGE_SIZE = 10;
 
 export interface TablePagination<T> {
   /** The slice to render. */

@@ -348,9 +348,11 @@ const ACTION_BTN =
 
 function PaymentTypeBadges({
   paymentContext,
+  invoiceBillType,
   isSecurityDeposit,
 }: {
   paymentContext?: string | null;
+  invoiceBillType?: string | null;
   isSecurityDeposit?: boolean;
 }) {
   return (
@@ -358,13 +360,17 @@ function PaymentTypeBadges({
       <span className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-primary/10 text-primary">
         {paymentContext === 'SERVICE_CONTRACT_FSMA_BILL'
           ? 'FSMA BILL'
-          : paymentContext === 'SERVICE_CONTRACT_AMC_INSTALLMENT'
-            ? 'AMC'
-            : paymentContext === 'SERVICE_CONTRACT_SMA_INSTALLMENT'
-              ? 'SMA'
-              : paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
-                ? 'FSMA DEPOSIT'
-                : (ctxType(paymentContext) ?? '—')}
+          : paymentContext === 'SERVICE_CONTRACT_FSMA_ADVANCE'
+            ? 'FSMA ADVANCE'
+            : paymentContext === 'SERVICE_CONTRACT_AMC_INSTALLMENT'
+              ? 'AMC'
+              : paymentContext === 'SERVICE_CONTRACT_SMA_INSTALLMENT'
+                ? 'SMA'
+                : paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
+                  ? 'FSMA DEPOSIT'
+                  : ['AMC', 'SMA', 'FSMA'].includes((invoiceBillType || '').toUpperCase())
+                    ? invoiceBillType!.toUpperCase()
+                    : (ctxType(paymentContext) ?? '—')}
       </span>
       {isSecurityDeposit && (
         <span
@@ -938,7 +944,11 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
   const filtered = useMemo(
     () =>
-      filteredBase.filter((p) => (tab === 'ALL' || tab === 'CUSTOMERS' ? true : p.status === tab)),
+      filteredBase
+        .filter((p) => (tab === 'ALL' || tab === 'CUSTOMERS' ? true : p.status === tab))
+        .sort((a, b) =>
+          (b.paymentDate || b.createdAt || '').localeCompare(a.paymentDate || a.createdAt || ''),
+        ),
     [filteredBase, tab],
   );
 
@@ -1010,8 +1020,8 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
         : filtered.map((payment) => ({ kind: 'payment' as const, payment })),
     [tab, pendingEstimates, acceptedEstimates, filtered],
   );
-  const receiptPagination = useTablePagination(receiptRows, paginationResetKey, 6);
-  const customerPagination = useTablePagination(filteredCustomerGroups, paginationResetKey, 6);
+  const receiptPagination = useTablePagination(receiptRows, paginationResetKey, 10);
+  const customerPagination = useTablePagination(filteredCustomerGroups, paginationResetKey, 10);
   const pagePendingEstimates = receiptPagination.pageRows
     .filter((row) => row.kind === 'pending-estimate')
     .map((row) => row.invoice);
@@ -1447,6 +1457,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   <td className="py-1.5 pr-4">
                                     <PaymentTypeBadges
                                       paymentContext={pmt.paymentContext}
+                                      invoiceBillType={pmt.invoiceBillType}
                                       isSecurityDeposit={pmt.isSecurityDeposit}
                                     />
                                   </td>
@@ -1698,6 +1709,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <TableCell>
                         <PaymentTypeBadges
                           paymentContext={pmt.paymentContext}
+                          invoiceBillType={pmt.invoiceBillType}
                           isSecurityDeposit={pmt.isSecurityDeposit}
                         />
                       </TableCell>

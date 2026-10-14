@@ -1459,10 +1459,18 @@ export const getBillsForContract = async (req: Request, res: Response, next: Nex
     // rows. Return them through this same picker so an approved refundable deposit can
     // settle an unpaid FSMA month from the Receipts queue.
     if (invoice.billType === 'FSMA' && invoice.serviceContractId) {
-      const fsmaInvoices = await Source.getRepository(Invoice).find({
-        where: { serviceContractId: invoice.serviceContractId, billType: BillType.FSMA },
-        order: { createdAt: 'DESC' },
-      });
+      const isSigningDepositInvoice = (
+        await Source.getRepository(InvoiceItem).find({
+          where: { invoice: { id: contractId } },
+          select: ['description'],
+        })
+      ).some((item) => item.description?.startsWith('FSMA Security Deposit ('));
+      const fsmaInvoices = (
+        await Source.getRepository(Invoice).find({
+          where: { serviceContractId: invoice.serviceContractId, billType: BillType.FSMA },
+          order: { createdAt: 'DESC' },
+        })
+      ).filter((row) => !isSigningDepositInvoice || row.id !== contractId);
       const ledgers = fsmaInvoices.length
         ? await Source.getRepository(InvoiceLedger).find({
             where: { invoiceId: In(fsmaInvoices.map((row) => row.id)) },
@@ -1948,15 +1956,17 @@ export const getPendingSalePayments = async (req: Request, res: Response, next: 
     const invoices = invoiceIds.length
       ? await Source.getRepository(Invoice).find({
           where: { id: In(invoiceIds) },
-          select: ['id', 'isDirectSale'],
+          select: ['id', 'isDirectSale', 'billType'],
         })
       : [];
     const directSaleIds = new Set(invoices.filter((i) => i.isDirectSale).map((i) => i.id));
+    const invoiceBillTypes = new Map(invoices.map((i) => [i.id, i.billType ?? null]));
     res.json({
       success: true,
       data: (await attachAdvanceBillStatus(payments)).map((p) => ({
         ...p,
         isDirectSale: directSaleIds.has(p.invoiceId),
+        invoiceBillType: invoiceBillTypes.get(p.invoiceId) ?? null,
       })),
     });
   } catch (err) {
@@ -1997,15 +2007,17 @@ export const getAllSalePaymentsForBranch = async (
     const invoices = invoiceIds.length
       ? await Source.getRepository(Invoice).find({
           where: { id: In(invoiceIds) },
-          select: ['id', 'isDirectSale'],
+          select: ['id', 'isDirectSale', 'billType'],
         })
       : [];
     const directSaleIds = new Set(invoices.filter((i) => i.isDirectSale).map((i) => i.id));
+    const invoiceBillTypes = new Map(invoices.map((i) => [i.id, i.billType ?? null]));
     res.json({
       success: true,
       data: (await attachAdvanceBillStatus(payments)).map((p) => ({
         ...p,
         isDirectSale: directSaleIds.has(p.invoiceId),
+        invoiceBillType: invoiceBillTypes.get(p.invoiceId) ?? null,
       })),
     });
   } catch (err) {
@@ -2209,6 +2221,7 @@ function receiptContextLabel(request: SalePaymentRequest): string | undefined {
     SERVICE_VISIT_CHARGE: 'Service — Visit Charge',
     SERVICE_COMPLETION: 'Service — Completion Payment',
     SERVICE_CONTRACT_FSMA_BILL: 'FSMA — Monthly Bill Collection',
+    SERVICE_CONTRACT_FSMA_ADVANCE: 'FSMA — Advance Payment',
     SERVICE_CONTRACT_SECURITY_DEPOSIT: 'FSMA — Security Deposit',
   };
   return map[ctx] ?? ctx.replace(/_/g, ' ');
@@ -2985,14 +2998,20 @@ export const applySecurityDepositToBill = async (
         const targetLedger = await m.findOne(InvoiceLedger, {
           where: { invoiceId: targetInvoice.id },
         });
-        if (targetLedger) {
-          targetLedger.paidAmount = Number(targetLedger.paidAmount) + applyAmount;
-          targetLedger.balanceAmount = Math.max(
-            0,
-            Number(targetLedger.totalAmount) - Number(targetLedger.paidAmount),
-          );
-          await m.save(InvoiceLedger, targetLedger);
-        }
+        const fsmaLedger =
+          targetLedger ??
+          m.create(InvoiceLedger, {
+            invoiceId: targetInvoice.id,
+            totalAmount: Number(targetInvoice.totalAmount),
+            paidAmount: 0,
+            balanceAmount: Number(targetInvoice.totalAmount),
+          });
+        fsmaLedger.paidAmount = Number(fsmaLedger.paidAmount) + applyAmount;
+        fsmaLedger.balanceAmount = Math.max(
+          0,
+          Number(fsmaLedger.totalAmount) - Number(fsmaLedger.paidAmount),
+        );
+        await m.save(InvoiceLedger, fsmaLedger);
         deposit.appliedAmount = Number(deposit.appliedAmount ?? 0) + applyAmount;
         deposit.appliedAt = new Date();
         deposit.appliedById = userId;
