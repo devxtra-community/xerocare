@@ -7,6 +7,7 @@ import {
   ServiceContractDetail,
   ContractCoverage,
   getContractBills,
+  generateContractBill,
   sendInvoiceEmail,
   ContractBill,
 } from '@/lib/serviceContract';
@@ -110,6 +111,7 @@ export default function ServiceContractDetailPage() {
 
   const [bills, setBills] = useState<ContractBill[]>([]);
   const [loadingBills, setLoadingBills] = useState(false);
+  const [generatingFsmaBill, setGeneratingFsmaBill] = useState(false);
   const [sendBillTarget, setSendBillTarget] = useState<ContractBill | null>(null);
   const [sendBillForm, setSendBillForm] = useState({ recipient: '', subject: '', body: '' });
   const [sendingBill, setSendingBill] = useState(false);
@@ -169,6 +171,25 @@ export default function ServiceContractDetailPage() {
     fetchDetail();
   }, [fetchDetail]);
 
+  const unbilledFsmaAmount = (contract?.readings || [])
+    .filter((reading) => !reading.billedAt && !reading.billingInvoiceId)
+    .reduce((sum, reading) => sum + Number(reading.amountCharged || 0), 0);
+
+  const handleGenerateFsmaBill = async () => {
+    setGeneratingFsmaBill(true);
+    try {
+      await generateContractBill(contractId);
+      toast.success('FSMA invoice created and added to Accounts Receivable.');
+      await fetchDetail();
+    } catch (error) {
+      toast.error('Failed to create the FSMA invoice.', {
+        description: getApiErrorMessage(error),
+      });
+    } finally {
+      setGeneratingFsmaBill(false);
+    }
+  };
+
   const openPayDialog = () => {
     setPaymentInvoiceId(null);
     setPayForm({
@@ -206,7 +227,12 @@ export default function ServiceContractDetailPage() {
         paymentDate: payForm.paymentDate,
         referenceNumber: payForm.referenceNumber || undefined,
         remarks: payForm.remarks || undefined,
-        paymentContext: 'SERVICE_CONTRACT_INSTALLMENT',
+        paymentContext:
+          contract?.contractType === 'AMC'
+            ? 'SERVICE_CONTRACT_AMC_INSTALLMENT'
+            : contract?.contractType === 'SMA'
+              ? 'SERVICE_CONTRACT_SMA_INSTALLMENT'
+              : 'SERVICE_CONTRACT_INSTALLMENT',
         // Card facts only — the processing fee is priced server-side from the
         // configured merchant agreement, never sent from here.
         ...(payForm.paymentMode === 'ONLINE_PAYMENT'
@@ -760,6 +786,17 @@ export default function ServiceContractDetailPage() {
                 Next bill due {fmtDate(contract.nextBillingDate)}.
               </p>
             )}
+            {unbilledFsmaAmount > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
+                <span className="text-xs font-semibold">
+                  Unbilled meter charges: {currency} {unbilledFsmaAmount.toFixed(2)}
+                </span>
+                <Button onClick={handleGenerateFsmaBill} disabled={generatingFsmaBill}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  {generatingFsmaBill ? 'Creating invoice…' : 'Create FSMA invoice'}
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {loadingBills ? (
@@ -768,7 +805,9 @@ export default function ServiceContractDetailPage() {
               </p>
             ) : bills.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">
-                No bills generated yet — the monthly billing sweep raises one automatically.
+                {unbilledFsmaAmount > 0
+                  ? 'Create an invoice above to make these meter charges collectible.'
+                  : 'No bills generated yet — the monthly billing sweep raises one automatically.'}
               </p>
             ) : (
               <div className="border border-border rounded-lg overflow-x-auto">

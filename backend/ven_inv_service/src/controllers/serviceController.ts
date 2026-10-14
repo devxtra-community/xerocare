@@ -62,7 +62,7 @@ import axios from 'axios';
 import { sign } from 'jsonwebtoken';
 import { logger } from '../config/logger';
 import { BILLING_ENDPOINTS, CRM_ENDPOINTS } from '../constants/serviceUrls';
-import { firstFsmaBillingDate } from '../utils/dateMath';
+import { addMonthsClamped, firstFsmaBillingDate } from '../utils/dateMath';
 import {
   getFinanceEmployeesByBranch,
   getCustomerName,
@@ -6834,6 +6834,85 @@ Xerocare Technical Services`;
    * contract — one row per billing_service Invoice, grouped from the
    * ContractMeterReading rows it swept up (see fsmaBillingJob.ts).
    */
+  generateContractBill = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const contract = await Source.getRepository(ServiceContract).findOne({
+        where: { id: req.params.id as string },
+      });
+      if (!contract) throw new AppError('Service Contract not found', 404);
+      if (contract.contractType !== ServiceContractType.FSMA) {
+        throw new AppError('Only FSMA contracts have monthly meter bills.', 400);
+      }
+      const role = req.user?.role || '';
+      if (
+        !['ADMIN', 'SUPER_ADMIN'].includes(role) &&
+        req.user?.branchId &&
+        contract.branchId !== req.user.branchId
+      ) {
+        throw new AppError('Access denied', 403);
+      }
+
+      const readingRepo = Source.getRepository(ContractMeterReading);
+      const pending = await readingRepo.find({
+        where: { contractId: contract.id, billedAt: IsNull() },
+        order: { readingDate: 'ASC' },
+      });
+      const amount =
+        Math.round(
+          pending.reduce((sum, reading) => sum + Number(reading.amountCharged || 0), 0) * 100,
+        ) / 100;
+      if (!pending.length || amount <= 0) {
+        throw new AppError('There are no unbilled FSMA meter charges to invoice.', 400);
+      }
+      if (!contract.branchId) throw new AppError('The contract has no branch assigned.', 400);
+
+      const periodStart = pending[0]?.readingDate;
+      const periodEnd = pending[pending.length - 1]?.readingDate;
+      const description = `FSMA Monthly Bill — ${
+        periodStart ? new Date(periodStart).toLocaleDateString() : ''
+      } to ${periodEnd ? new Date(periodEnd).toLocaleDateString() : ''}`;
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+      const response = await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/service-contract`,
+        {
+          customerId: contract.customerId,
+          branchId: contract.branchId,
+          createdBy: req.user?.userId || 'SYSTEM',
+          serviceContractId: contract.id,
+          billType: ServiceContractType.FSMA,
+          description,
+          amount,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.data?.success || !response.data?.data?.id) {
+        throw new AppError('Billing service did not create the FSMA invoice.', 502);
+      }
+
+      const invoiceId = response.data.data.id as string;
+      const billedAt = new Date();
+      for (const reading of pending) {
+        reading.billedAt = billedAt;
+        reading.billingInvoiceId = invoiceId;
+      }
+      await readingRepo.save(pending);
+
+      // A manually raised bill consumes the same readings as the scheduled sweep.
+      // If the cycle was already due, move it forward so the daily job doesn't keep
+      // revisiting this contract after the manual collection.
+      if (contract.nextBillingDate && new Date(contract.nextBillingDate) <= new Date()) {
+        contract.nextBillingDate = addMonthsClamped(new Date(contract.nextBillingDate), 1);
+        await Source.getRepository(ServiceContract).save(contract);
+      }
+
+      return res.status(201).json({ success: true, data: response.data.data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getContractBills = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

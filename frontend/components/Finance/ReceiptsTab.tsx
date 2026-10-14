@@ -358,9 +358,13 @@ function PaymentTypeBadges({
       <span className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-primary/10 text-primary">
         {paymentContext === 'SERVICE_CONTRACT_FSMA_BILL'
           ? 'FSMA BILL'
-          : paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
-            ? 'FSMA DEPOSIT'
-            : (ctxType(paymentContext) ?? '—')}
+          : paymentContext === 'SERVICE_CONTRACT_AMC_INSTALLMENT'
+            ? 'AMC'
+            : paymentContext === 'SERVICE_CONTRACT_SMA_INSTALLMENT'
+              ? 'SMA'
+              : paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
+                ? 'FSMA DEPOSIT'
+                : (ctxType(paymentContext) ?? '—')}
       </span>
       {isSecurityDeposit && (
         <span

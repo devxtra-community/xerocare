@@ -13,10 +13,10 @@ import {
   getServiceContracts,
   createServiceContract,
   updateServiceContract,
-  deleteServiceContract,
   recordContractMeterReading,
   getContractMeterReadings,
   getContractBills,
+  generateContractBill,
   ContractBill,
   registerExternalMachine,
   ServiceContract,
@@ -57,7 +57,6 @@ import {
   FileText,
   Plus,
   Edit2,
-  Trash2,
   Search,
   Calendar,
   DollarSign,
@@ -217,6 +216,7 @@ export default function ServiceContractsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ServiceContract | null>(null);
+  const [savingContract, setSavingContract] = useState(false);
 
   // Form State
   const [formState, setFormState] = useState<ContractFormState>(emptyForm());
@@ -267,6 +267,8 @@ export default function ServiceContractsPage() {
   const [billingContract, setBillingContract] = useState<ServiceContract | null>(null);
   const [billsContract, setBillsContract] = useState<ServiceContract | null>(null);
   const [contractBills, setContractBills] = useState<ContractBill[]>([]);
+  const [unbilledFsmaAmount, setUnbilledFsmaAmount] = useState(0);
+  const [generatingFsmaBill, setGeneratingFsmaBill] = useState(false);
   const [loadingContractBills, setLoadingContractBills] = useState(false);
   const [readings, setReadings] = useState<ContractMeterReading[]>([]);
   const [totalBilled, setTotalBilled] = useState(0);
@@ -455,6 +457,7 @@ export default function ServiceContractsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingContract) return;
     if (!formState.customerId) {
       toast.error('Please select a customer.');
       return;
@@ -559,6 +562,7 @@ export default function ServiceContractsPage() {
           }
         : undefined;
 
+    setSavingContract(true);
     try {
       if (editingContract) {
         await updateServiceContract(editingContract.id, payload);
@@ -579,6 +583,8 @@ export default function ServiceContractsPage() {
         description: getApiErrorMessage(error),
         duration: 8000,
       });
+    } finally {
+      setSavingContract(false);
     }
   };
 
@@ -617,7 +623,15 @@ export default function ServiceContractsPage() {
     setBillsContract(contract);
     setLoadingContractBills(true);
     try {
-      const bills = await getContractBills(contract.id);
+      const [bills, meterData] = await Promise.all([
+        getContractBills(contract.id),
+        getContractMeterReadings(contract.id),
+      ]);
+      setUnbilledFsmaAmount(
+        meterData.readings
+          .filter((reading) => !reading.billedAt && !reading.billingInvoiceId)
+          .reduce((sum, reading) => sum + Number(reading.amountCharged || 0), 0),
+      );
       const withPaymentStatus = await Promise.all(
         bills.map(async (bill) => {
           try {
@@ -637,11 +651,28 @@ export default function ServiceContractsPage() {
       setContractBills(withPaymentStatus);
     } catch (error) {
       setContractBills([]);
+      setUnbilledFsmaAmount(0);
       toast.error('Failed to load FSMA monthly bills.', {
         description: getApiErrorMessage(error),
       });
     } finally {
       setLoadingContractBills(false);
+    }
+  };
+
+  const handleGenerateFsmaBill = async () => {
+    if (!billsContract) return;
+    setGeneratingFsmaBill(true);
+    try {
+      await generateContractBill(billsContract.id);
+      toast.success('FSMA invoice created and added to Accounts Receivable.');
+      await openFsmaBills(billsContract);
+    } catch (error) {
+      toast.error('Failed to create the FSMA invoice.', {
+        description: getApiErrorMessage(error),
+      });
+    } finally {
+      setGeneratingFsmaBill(false);
     }
   };
 
@@ -667,7 +698,11 @@ export default function ServiceContractsPage() {
           ? 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
           : contract.contractType === 'FSMA'
             ? 'SERVICE_CONTRACT_FSMA_BILL'
-            : 'SERVICE_CONTRACT_INSTALLMENT',
+            : contract.contractType === 'AMC'
+              ? 'SERVICE_CONTRACT_AMC_INSTALLMENT'
+              : contract.contractType === 'SMA'
+                ? 'SERVICE_CONTRACT_SMA_INSTALLMENT'
+                : 'SERVICE_CONTRACT_INSTALLMENT',
         isSecurityDeposit: payingIsSecurityDeposit,
       });
       toast.success('Payment submitted for Finance approval.');
@@ -882,18 +917,6 @@ export default function ServiceContractsPage() {
       });
     } finally {
       setSavingExternal(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this contract?')) return;
-    try {
-      await deleteServiceContract(id);
-      toast.success('Contract deleted successfully.');
-      fetchData();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to delete contract.');
     }
   };
 
@@ -1478,17 +1501,6 @@ export default function ServiceContractsPage() {
                             className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           >
                             <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {canManageContracts && !c.invoiceId && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(c.id)}
-                            title="Delete contract"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>
@@ -2253,9 +2265,10 @@ export default function ServiceContractsPage() {
               </Button>
               <Button
                 type="submit"
+                disabled={savingContract}
                 className="h-10 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs shadow-sm"
               >
-                Save Contract
+                {savingContract ? 'Saving...' : 'Save Contract'}
               </Button>
             </DialogFooter>
           </form>
@@ -2776,13 +2789,27 @@ export default function ServiceContractsPage() {
               approval.
             </DialogDescription>
           </DialogHeader>
+          {unbilledFsmaAmount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
+              <div className="text-sm">
+                <span className="font-semibold">Unbilled meter charges:</span> {getActiveCurrency()}{' '}
+                {unbilledFsmaAmount.toFixed(2)}
+              </div>
+              <Button onClick={handleGenerateFsmaBill} disabled={generatingFsmaBill}>
+                <FileText className="mr-2 h-4 w-4" />
+                {generatingFsmaBill ? 'Creating invoice…' : 'Create FSMA invoice'}
+              </Button>
+            </div>
+          )}
           {loadingContractBills ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
               Loading monthly bills…
             </div>
           ) : contractBills.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
-              No monthly bills generated yet.
+              {unbilledFsmaAmount > 0
+                ? 'Create an invoice above to make these meter charges collectible.'
+                : 'No monthly bills generated yet.'}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
