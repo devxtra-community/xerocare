@@ -93,6 +93,7 @@ export default function ServiceContractDetailPage() {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [cardDetails, setCardDetails] = useState<OnlinePaymentDetails>(EMPTY_ONLINE_PAYMENT);
   const [, setCardQuoteError] = useState<string | null>(null);
   const [payForm, setPayForm] = useState({
@@ -169,6 +170,7 @@ export default function ServiceContractDetailPage() {
   }, [fetchDetail]);
 
   const openPayDialog = () => {
+    setPaymentInvoiceId(null);
     setPayForm({
       amount: '',
       paymentMode: 'CASH',
@@ -181,7 +183,8 @@ export default function ServiceContractDetailPage() {
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contract?.invoiceId) return;
+    const invoiceId = paymentInvoiceId || contract?.invoiceId;
+    if (!invoiceId) return;
     const amount = Number(payForm.amount);
     if (!amount || amount <= 0) {
       toast.error('Enter a payment amount greater than 0.');
@@ -197,7 +200,7 @@ export default function ServiceContractDetailPage() {
     }
     setSavingPayment(true);
     try {
-      await recordSalePayment(contract.invoiceId, {
+      await recordSalePayment(invoiceId, {
         amount,
         paymentMode: payForm.paymentMode,
         paymentDate: payForm.paymentDate,
@@ -220,6 +223,7 @@ export default function ServiceContractDetailPage() {
       });
       toast.success('Payment submitted for Finance approval.');
       setPayDialogOpen(false);
+      setPaymentInvoiceId(null);
     } catch (error) {
       console.error(error);
       toast.error('Failed to record payment.', {
@@ -229,6 +233,18 @@ export default function ServiceContractDetailPage() {
     } finally {
       setSavingPayment(false);
     }
+  };
+
+  const openBillPayment = (invoiceId: string, amount: number) => {
+    setPaymentInvoiceId(invoiceId);
+    setPayForm({
+      amount: String(amount),
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      referenceNumber: '',
+      remarks: '',
+    });
+    setPayDialogOpen(true);
   };
 
   const openInvoice = async (invoiceId?: string | null) => {
@@ -813,6 +829,16 @@ export default function ServiceContractDetailPage() {
                             >
                               <Eye className="h-3 w-3 mr-1" /> View
                             </Button>
+                            {b.status !== 'PAID' && b.status !== 'CANCELLED' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[10px]"
+                                onClick={() => openBillPayment(b.invoiceId, b.amount)}
+                              >
+                                <DollarSign className="h-3 w-3 mr-1" /> Collect
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               className="h-7 px-2 text-[10px] bg-primary hover:bg-primary/90"
@@ -889,7 +915,13 @@ export default function ServiceContractDetailPage() {
       </Dialog>
 
       {/* AMC INSTALLMENT PAYMENT DIALOG */}
-      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+      <Dialog
+        open={payDialogOpen}
+        onOpenChange={(open) => {
+          setPayDialogOpen(open);
+          if (!open) setPaymentInvoiceId(null);
+        }}
+      >
         <DialogContent className="max-w-md w-full p-0 bg-card rounded-xl shadow-2xl border border-border">
           <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
             <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -897,7 +929,7 @@ export default function ServiceContractDetailPage() {
               Record Payment
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-xs">
-              Recorded against the same invoice raised at signing.
+              Collected amounts stay pending until Finance approves the receipt.
             </DialogDescription>
           </DialogHeader>
 

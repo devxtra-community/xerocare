@@ -356,7 +356,11 @@ function PaymentTypeBadges({
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <span className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-primary/10 text-primary">
-        {ctxType(paymentContext) ?? '—'}
+        {paymentContext === 'SERVICE_CONTRACT_FSMA_BILL'
+          ? 'FSMA BILL'
+          : paymentContext === 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
+            ? 'FSMA DEPOSIT'
+            : (ctxType(paymentContext) ?? '—')}
       </span>
       {isSecurityDeposit && (
         <span
@@ -1424,7 +1428,18 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   <td className="py-1.5 pr-4 font-mono font-bold text-foreground">
                                     {pmt.requestNo}
                                   </td>
-                                  <td className="py-1.5 pr-4 font-bold">{pmt.invoiceNumber}</td>
+                                  <td className="py-1.5 pr-4 font-bold">
+                                    {pmt.invoiceNumber}
+                                    {pmt.paymentContext?.startsWith('SERVICE_CONTRACT_FSMA') &&
+                                      pmt.remarks && (
+                                        <span
+                                          className="block max-w-[260px] truncate text-[10px] font-medium text-muted-foreground"
+                                          title={pmt.remarks}
+                                        >
+                                          {pmt.remarks}
+                                        </span>
+                                      )}
+                                  </td>
                                   <td className="py-1.5 pr-4">
                                     <PaymentTypeBadges
                                       paymentContext={pmt.paymentContext}
@@ -1664,6 +1679,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </TableCell>
                       <TableCell className="font-bold text-foreground text-sm whitespace-nowrap">
                         {pmt.invoiceNumber}
+                        {pmt.paymentContext?.startsWith('SERVICE_CONTRACT_FSMA') && pmt.remarks && (
+                          <span
+                            className="block max-w-[260px] truncate text-[10px] font-medium text-muted-foreground"
+                            title={pmt.remarks}
+                          >
+                            {pmt.remarks}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="font-bold text-foreground text-sm">
                         {pmt.customerName}
@@ -2064,17 +2087,26 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         }`}
                       >
                         <p className="text-xs font-black text-foreground">
-                          {b.billType === 'ADVANCE' ? 'Advance Bill' : 'Usage Bill'} ·{' '}
-                          {new Date(b.billingPeriodStart).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                          })}{' '}
-                          –{' '}
-                          {new Date(b.billingPeriodEnd).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
+                          {b.billType === 'ADVANCE'
+                            ? 'Advance Bill'
+                            : b.billType === 'FSMA'
+                              ? b.billCreatedByName || 'FSMA Monthly Bill'
+                              : 'Usage Bill'}{' '}
+                          ·{' '}
+                          {b.billType !== 'FSMA' && (
+                            <>
+                              {new Date(b.billingPeriodStart).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                              })}{' '}
+                              –{' '}
+                              {new Date(b.billingPeriodEnd).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </>
+                          )}
                         </p>
                         <p className="text-[11px] font-bold text-muted-foreground">
                           Outstanding {actionTarget.currency} {Number(b.amountPending).toFixed(2)}

@@ -795,18 +795,6 @@ export class ServiceController {
         .leftJoinAndSelect('estimate.items', 'items')
         .where('estimate.status = :status', {
           status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL,
-        })
-        .andWhere((query) => {
-          const newer = query
-            .subQuery()
-            .select('newer.id')
-            .from(ServiceEstimate, 'newer')
-            .where('newer.ticketId = estimate.ticketId')
-            .andWhere(
-              '(newer.version > estimate.version OR (newer.version = estimate.version AND newer.created_at > estimate.created_at))',
-            )
-            .getQuery();
-          return `NOT EXISTS ${newer}`;
         });
 
       if (req.user?.role !== 'ADMIN' && req.user?.branchId) {
@@ -820,19 +808,7 @@ export class ServiceController {
         .leftJoinAndSelect('revision.items', 'items')
         .where('revision.status = :status', { status: 'WAITING_ADDITIONAL_APPROVAL' })
         .andWhere('revision.financeDecision IS NULL')
-        .andWhere('revision.invoiceId IS NULL')
-        .andWhere((query) => {
-          const newer = query
-            .subQuery()
-            .select('newer.id')
-            .from(ServiceEstimateRevision, 'newer')
-            .where('newer.ticketId = revision.ticketId')
-            .andWhere(
-              '(newer.version > revision.version OR (newer.version = revision.version AND newer.revisionNumber > revision.revisionNumber) OR (newer.version = revision.version AND newer.revisionNumber = revision.revisionNumber AND newer.submittedAt > revision.submittedAt))',
-            )
-            .getQuery();
-          return `NOT EXISTS ${newer}`;
-        });
+        .andWhere('revision.invoiceId IS NULL');
 
       if (req.user?.role !== 'ADMIN' && req.user?.branchId) {
         revisionQuery.andWhere('ticket.branchId = :branchId', { branchId: req.user.branchId });

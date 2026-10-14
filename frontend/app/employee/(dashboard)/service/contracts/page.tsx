@@ -16,6 +16,8 @@ import {
   deleteServiceContract,
   recordContractMeterReading,
   getContractMeterReadings,
+  getContractBills,
+  ContractBill,
   registerExternalMachine,
   ServiceContract,
   ContractMeterReading,
@@ -233,6 +235,8 @@ export default function ServiceContractsPage() {
     Record<string, PaymentSummary>
   >({});
   const [payingContract, setPayingContract] = useState<ServiceContract | null>(null);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [payingIsSecurityDeposit, setPayingIsSecurityDeposit] = useState(false);
   const [payingForm, setPayingForm] = useState({
     amount: '',
     paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
@@ -261,6 +265,9 @@ export default function ServiceContractsPage() {
 
   // Meter reading / monthly billing dialog
   const [billingContract, setBillingContract] = useState<ServiceContract | null>(null);
+  const [billsContract, setBillsContract] = useState<ServiceContract | null>(null);
+  const [contractBills, setContractBills] = useState<ContractBill[]>([]);
+  const [loadingContractBills, setLoadingContractBills] = useState(false);
   const [readings, setReadings] = useState<ContractMeterReading[]>([]);
   const [totalBilled, setTotalBilled] = useState(0);
   const [loadingReadings, setLoadingReadings] = useState(false);
@@ -578,6 +585,8 @@ export default function ServiceContractsPage() {
   // ── AMC installment payments (against the invoice raised at signing) ──
   const openPaymentDialog = (contract: ServiceContract) => {
     setPayingContract(contract);
+    setPayingInvoiceId(contract.invoiceId || null);
+    setPayingIsSecurityDeposit(false);
     setPayingForm({
       amount: '',
       paymentMode: 'CASH',
@@ -587,9 +596,60 @@ export default function ServiceContractsPage() {
     });
   };
 
+  const openFsmaBillPayment = (
+    contract: ServiceContract,
+    bill: ContractBill,
+    securityDeposit = false,
+  ) => {
+    setPayingContract(contract);
+    setPayingInvoiceId(bill.invoiceId);
+    setPayingIsSecurityDeposit(securityDeposit);
+    setPayingForm({
+      amount: securityDeposit ? '' : String(bill.outstanding ?? bill.amount),
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      referenceNumber: '',
+      remarks: `FSMA ${securityDeposit ? 'security deposit' : 'bill'} ${bill.invoiceNumber || ''} (${bill.periodStart?.slice(0, 10) || '—'} to ${bill.periodEnd?.slice(0, 10) || '—'})`,
+    });
+  };
+
+  const openFsmaBills = async (contract: ServiceContract) => {
+    setBillsContract(contract);
+    setLoadingContractBills(true);
+    try {
+      const bills = await getContractBills(contract.id);
+      const withPaymentStatus = await Promise.all(
+        bills.map(async (bill) => {
+          try {
+            const summary = await getAccountSummary(bill.invoiceId);
+            return {
+              ...bill,
+              paid: summary.totalPaid,
+              outstanding: summary.pendingBalance,
+              pendingApprovalAmount: summary.pendingApprovalAmount,
+              pendingApprovalCount: summary.pendingApprovalCount,
+            };
+          } catch {
+            return bill;
+          }
+        }),
+      );
+      setContractBills(withPaymentStatus);
+    } catch (error) {
+      setContractBills([]);
+      toast.error('Failed to load FSMA monthly bills.', {
+        description: getApiErrorMessage(error),
+      });
+    } finally {
+      setLoadingContractBills(false);
+    }
+  };
+
   const handleRecordContractPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payingContract?.invoiceId) return;
+    const contract = payingContract;
+    const invoiceId = payingInvoiceId || payingContract?.invoiceId;
+    if (!invoiceId || !contract) return;
     const amount = Number(payingForm.amount);
     if (!amount || amount <= 0) {
       toast.error('Enter a payment amount greater than 0.');
@@ -597,16 +657,26 @@ export default function ServiceContractsPage() {
     }
     setSavingPayment(true);
     try {
-      await recordSalePayment(payingContract.invoiceId!, {
+      await recordSalePayment(invoiceId, {
         amount,
         paymentMode: payingForm.paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
         paymentDate: payingForm.paymentDate,
         referenceNumber: payingForm.referenceNumber || undefined,
         remarks: payingForm.remarks || undefined,
-        paymentContext: 'SERVICE_CONTRACT_INSTALLMENT',
+        paymentContext: payingIsSecurityDeposit
+          ? 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
+          : contract.contractType === 'FSMA'
+            ? 'SERVICE_CONTRACT_FSMA_BILL'
+            : 'SERVICE_CONTRACT_INSTALLMENT',
+        isSecurityDeposit: payingIsSecurityDeposit,
       });
       toast.success('Payment submitted for Finance approval.');
+      if (contract.contractType === 'FSMA' && billsContract?.id === contract.id) {
+        void openFsmaBills(contract);
+      }
       setPayingContract(null);
+      setPayingInvoiceId(null);
+      setPayingIsSecurityDeposit(false);
     } catch (error) {
       console.error(error);
       toast.error('Failed to record payment.', {
@@ -1353,6 +1423,17 @@ export default function ServiceContractsPage() {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
+                        {c.contractType === 'FSMA' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openFsmaBills(c)}
+                            title="View FSMA monthly bills and collections"
+                            className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {c.invoiceId && (
                           <Button
                             variant="ghost"
@@ -2686,8 +2767,116 @@ export default function ServiceContractsPage() {
         onSuccess={handleModelCreated}
       />
 
-      {/* AMC INSTALLMENT PAYMENT DIALOG */}
-      <Dialog open={!!payingContract} onOpenChange={(open) => !open && setPayingContract(null)}>
+      <Dialog open={!!billsContract} onOpenChange={(open) => !open && setBillsContract(null)}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{billsContract?.contractType} Bills</DialogTitle>
+            <DialogDescription>
+              Monthly invoices and employee collections. Each collection is sent to Finance for
+              approval.
+            </DialogDescription>
+          </DialogHeader>
+          {loadingContractBills ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Loading monthly bills…
+            </div>
+          ) : contractBills.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              No monthly bills generated yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bill</TableHead>
+                    <TableHead>Billing period</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Collected / pending approval</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contractBills.map((bill) => (
+                    <TableRow key={bill.invoiceId}>
+                      <TableCell className="font-mono text-xs">
+                        {bill.invoiceNumber || '—'}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {bill.periodStart?.slice(0, 10) || '—'} –{' '}
+                        {bill.periodEnd?.slice(0, 10) || '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {getActiveCurrency()} {bill.amount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div>
+                          Approved: {getActiveCurrency()} {Number(bill.paid || 0).toFixed(2)}
+                        </div>
+                        {Number(bill.pendingApprovalCount || 0) > 0 && (
+                          <div className="text-warning">
+                            Awaiting Finance: {getActiveCurrency()}{' '}
+                            {Number(bill.pendingApprovalAmount || 0).toFixed(2)}
+                          </div>
+                        )}
+                        {bill.outstanding != null && (
+                          <div className="text-muted-foreground">
+                            Outstanding: {getActiveCurrency()} {Number(bill.outstanding).toFixed(2)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>{bill.status || 'UNKNOWN'}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              openContractInvoice({ ...billsContract!, invoiceId: bill.invoiceId })
+                            }
+                          >
+                            <Eye className="mr-1 h-3.5 w-3.5" /> View bill
+                          </Button>
+                          {bill.status !== 'PAID' && bill.status !== 'CANCELLED' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => openFsmaBillPayment(billsContract!, bill)}
+                              >
+                                <DollarSign className="mr-1 h-3.5 w-3.5" /> Collect amount
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openFsmaBillPayment(billsContract!, bill, true)}
+                              >
+                                Collect deposit
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Service contract payment collection — Finance approves from Receipts. */}
+      <Dialog
+        open={!!payingContract}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPayingContract(null);
+            setPayingInvoiceId(null);
+            setPayingIsSecurityDeposit(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-md w-full p-0 bg-card rounded-xl shadow-2xl border border-border">
           <DialogHeader className="px-6 pt-6 pb-3 border-b border-border">
             <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -2695,8 +2884,11 @@ export default function ServiceContractsPage() {
               Record Payment
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-xs">
-              Recorded against the same invoice raised at signing — an updated receipt reflecting
-              this payment can be sent from the invoice.
+              {payingIsSecurityDeposit
+                ? 'Refundable security deposit collected for this FSMA contract. Finance must approve the receipt.'
+                : payingContract?.contractType === 'FSMA'
+                  ? 'FSMA monthly bill collection. Finance must approve the receipt before it is posted to Accounts.'
+                  : 'Collected against the contract invoice. Finance must approve the receipt before it is posted to Accounts.'}
             </DialogDescription>
           </DialogHeader>
 

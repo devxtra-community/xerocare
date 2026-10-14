@@ -229,6 +229,10 @@ export interface ContractBill {
   status: string | null;
   emailSentAt: string | null;
   totalAmount: number | null;
+  paid?: number;
+  outstanding?: number;
+  pendingApprovalAmount?: number;
+  pendingApprovalCount?: number;
 }
 
 export const getContractBills = async (contractId: string): Promise<ContractBill[]> => {

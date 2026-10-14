@@ -151,7 +151,9 @@ export interface SalePaymentRequest {
     | 'SERVICE_COMPLETION'
     | 'SERVICE_VISIT_CHARGE'
     | 'SERVICE_CONTRACT_SIGNING'
-    | 'SERVICE_CONTRACT_INSTALLMENT';
+    | 'SERVICE_CONTRACT_INSTALLMENT'
+    | 'SERVICE_CONTRACT_FSMA_BILL'
+    | 'SERVICE_CONTRACT_SECURITY_DEPOSIT';
   /** Marks this as a refundable security deposit, not rent/revenue — excluded from
    *  InvoiceLedger and every AR sum; CHEQUE mode routes to GuaranteeCheque, not the
    *  regular Cheque table, on approval. */
@@ -486,6 +488,8 @@ export const recordSalePayment = async (
       | 'LEASE_PERIODIC'
       | 'SERVICE_CONTRACT_SIGNING'
       | 'SERVICE_CONTRACT_INSTALLMENT'
+      | 'SERVICE_CONTRACT_FSMA_BILL'
+      | 'SERVICE_CONTRACT_SECURITY_DEPOSIT'
       | 'SERVICE_COMPLETION';
     isSecurityDeposit?: boolean;
 
@@ -656,7 +660,7 @@ export type BillApprovalMethod = 'REMOTE_LINK' | 'FINANCE_MANUAL';
  *  only — no period, no readings, same entity/pipeline either way. SECURITY_DEPOSIT
  *  mirrors ADVANCE exactly, wrapping the RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT
  *  payment instead. */
-export type BillType = 'USAGE' | 'ADVANCE' | 'SECURITY_DEPOSIT';
+export type BillType = 'USAGE' | 'ADVANCE' | 'SECURITY_DEPOSIT' | 'FSMA';
 
 /** Last period's figures, sent alongside a USAGE bill so the document can show
  *  previous-month usage next to the current month. Null on the first bill of a

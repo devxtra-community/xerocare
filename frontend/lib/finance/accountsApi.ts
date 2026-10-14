@@ -1659,6 +1659,7 @@ export interface ReceivableRow {
   invoiceNumber: string;
   customerName: string;
   saleType: string;
+  billType?: string | null;
   date: string;
   /** Outstanding balance (totalAmount - paid) — 0 for a fully-settled invoice. */
   amount: number;

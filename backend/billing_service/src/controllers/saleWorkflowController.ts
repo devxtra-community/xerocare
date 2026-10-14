@@ -25,6 +25,7 @@ import {
 } from '../services/installationReportService';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { BillType } from '../entities/enums/billType';
 import { ExpenseEntry } from '../entities/expenseEntryEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { DeliveryStatus } from '../entities/enums/deliveryStatus';
@@ -1454,6 +1455,44 @@ export const getBillsForContract = async (req: Request, res: Response, next: Nex
       throw new AppError('Access denied', 403);
     }
 
+    // FSMA bills are ordinary invoices linked to the service contract, not UsageRecord
+    // rows. Return them through this same picker so an approved refundable deposit can
+    // settle an unpaid FSMA month from the Receipts queue.
+    if (invoice.billType === 'FSMA' && invoice.serviceContractId) {
+      const fsmaInvoices = await Source.getRepository(Invoice).find({
+        where: { serviceContractId: invoice.serviceContractId, billType: BillType.FSMA },
+        order: { createdAt: 'DESC' },
+      });
+      const ledgers = fsmaInvoices.length
+        ? await Source.getRepository(InvoiceLedger).find({
+            where: { invoiceId: In(fsmaInvoices.map((row) => row.id)) },
+          })
+        : [];
+      const ledgerByInvoice = new Map(ledgers.map((row) => [row.invoiceId, row]));
+      const result = fsmaInvoices.map((row) => {
+        const ledger = ledgerByInvoice.get(row.id);
+        const outstanding = Math.max(0, Number(ledger?.balanceAmount ?? row.totalAmount));
+        return {
+          usageRecordId: row.id,
+          billType: 'FSMA',
+          billingPeriodStart: row.createdAt,
+          billingPeriodEnd: row.createdAt,
+          totalCharge: Number(row.totalAmount),
+          amountGiven: Math.max(0, Number(row.totalAmount) - outstanding),
+          amountPending: outstanding,
+          depositApplied: 0,
+          billStatus: outstanding > 0.001 ? 'CUSTOMER_APPROVED' : 'PAID',
+          billCreatedByName: row.invoiceNumber,
+          customerApprovedByName: null,
+          customerApprovedAt: null,
+          customerApprovalMethod: null,
+          customerRejectionReason: null,
+          createdAt: row.createdAt,
+        };
+      });
+      return res.json({ success: true, data: result });
+    }
+
     const usageRecords = await Source.getRepository(UsageRecord)
       .createQueryBuilder('ur')
       .where('ur."contractId" = :contractId', { contractId })
@@ -2169,6 +2208,8 @@ function receiptContextLabel(request: SalePaymentRequest): string | undefined {
     LEASE_SECURITY_DEPOSIT: 'Lease — Security Deposit',
     SERVICE_VISIT_CHARGE: 'Service — Visit Charge',
     SERVICE_COMPLETION: 'Service — Completion Payment',
+    SERVICE_CONTRACT_FSMA_BILL: 'FSMA — Monthly Bill Collection',
+    SERVICE_CONTRACT_SECURITY_DEPOSIT: 'FSMA — Security Deposit',
   };
   return map[ctx] ?? ctx.replace(/_/g, ' ');
 }
@@ -2872,6 +2913,103 @@ export const applySecurityDepositToBill = async (
     const depositRemaining = Number(deposit.amount) - Number(deposit.appliedAmount ?? 0);
     if (depositRemaining <= 0.001) {
       throw new AppError('This security deposit has already been fully applied', 400);
+    }
+
+    // FSMA uses billing invoices for each month, whereas Rent/Lease uses UsageRecord.
+    // The invoice's serviceContractId is the stable link joining every month's bill.
+    const targetInvoice = await Source.getRepository(Invoice).findOne({
+      where: { id: usageRecordId, billType: BillType.FSMA },
+    });
+    if (targetInvoice) {
+      const depositInvoice = await Source.getRepository(Invoice).findOne({
+        where: { id: deposit.invoiceId, billType: BillType.FSMA },
+      });
+      if (
+        !depositInvoice?.serviceContractId ||
+        targetInvoice.serviceContractId !== depositInvoice.serviceContractId
+      ) {
+        throw new AppError('That FSMA bill belongs to a different contract', 400);
+      }
+      if (targetInvoice.branchId !== branchId && !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+        throw new AppError('Access denied', 403);
+      }
+      const ledger = await Source.getRepository(InvoiceLedger).findOne({
+        where: { invoiceId: targetInvoice.id },
+      });
+      const billOutstanding = Math.max(
+        0,
+        Number(ledger?.balanceAmount ?? targetInvoice.totalAmount),
+      );
+      if (billOutstanding <= 0.001) throw new AppError('That bill is already fully settled', 400);
+      const applyAmount = Math.min(depositRemaining, billOutstanding);
+      const applierName = await fetchEmployeeName(userId);
+      const note =
+        remarks?.trim() ||
+        `Settled from security deposit ${deposit.requestNo} — FSMA bill ${targetInvoice.invoiceNumber}`;
+
+      await Source.transaction(async (m) => {
+        const settlement = m.create(SalePaymentRequest, {
+          requestNo: await generateSalePaymentRequestNo(),
+          invoiceId: targetInvoice.id,
+          invoiceNumber: targetInvoice.invoiceNumber,
+          branchId: targetInvoice.branchId,
+          recordedByEmployeeId: userId,
+          recordedByEmployeeName: applierName,
+          customerName: deposit.customerName,
+          amount: applyAmount,
+          currency: deposit.currency,
+          paymentMode: DEPOSIT_ADJUSTMENT_MODE,
+          paymentDate: new Date(),
+          paymentContext: 'SERVICE_CONTRACT_FSMA_BILL',
+          remarks: note,
+          status: 'APPROVED',
+          approvedById: userId,
+          approvedByName: applierName,
+          approvedAt: new Date(),
+          isSecurityDeposit: false,
+        } as Partial<SalePaymentRequest>);
+        await m.save(SalePaymentRequest, settlement);
+        await m.save(
+          m.create(PaymentTransaction, {
+            invoiceId: targetInvoice.id,
+            transactionDate: new Date(),
+            paymentMode: 'SECURITY_DEPOSIT_ADJUSTMENT',
+            referenceNumber: settlement.requestNo,
+            amount: applyAmount,
+            recordedBy: userId,
+            remarks: note,
+            currencyCode: deposit.currency,
+            isSecurityDeposit: false,
+          } as Partial<PaymentTransaction>),
+        );
+        const targetLedger = await m.findOne(InvoiceLedger, {
+          where: { invoiceId: targetInvoice.id },
+        });
+        if (targetLedger) {
+          targetLedger.paidAmount = Number(targetLedger.paidAmount) + applyAmount;
+          targetLedger.balanceAmount = Math.max(
+            0,
+            Number(targetLedger.totalAmount) - Number(targetLedger.paidAmount),
+          );
+          await m.save(InvoiceLedger, targetLedger);
+        }
+        deposit.appliedAmount = Number(deposit.appliedAmount ?? 0) + applyAmount;
+        deposit.appliedAt = new Date();
+        deposit.appliedById = userId;
+        deposit.appliedByName = applierName;
+        deposit.appliedToUsageRecordId = targetInvoice.id;
+        await m.save(SalePaymentRequest, deposit);
+      });
+      const refreshed = await repo.findOne({ where: { id } });
+      return res.json({
+        success: true,
+        data: {
+          deposit: refreshed,
+          applied: applyAmount,
+          billOutstandingAfter: billOutstanding - applyAmount,
+          depositRemainingAfter: depositRemaining - applyAmount,
+        },
+      });
     }
 
     // The bill must belong to the same contract — a deposit secures its own contract and

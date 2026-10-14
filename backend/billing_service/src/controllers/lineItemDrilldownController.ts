@@ -71,6 +71,7 @@ export const getAccountsReceivableTransactions = async (
         invoiceNumber: string;
         customer_name: string | null;
         saleType: string;
+        billType: string | null;
         createdAt: string;
         currency_code: string | null;
         branchId: string;
@@ -79,7 +80,7 @@ export const getAccountsReceivableTransactions = async (
         isOpeningEntry: boolean;
       }[]
     >(`
-      SELECT i.id, i."invoiceNumber", i.customer_name, i."saleType",
+      SELECT i.id, i."invoiceNumber", i.customer_name, i."saleType", i."billType",
              TO_CHAR(i."createdAt", 'YYYY-MM-DD') AS "createdAt",
              i.currency_code, i."branchId",
              CASE
@@ -145,7 +146,8 @@ export const getAccountsReceivableTransactions = async (
         id: r.id,
         invoiceNumber: r.invoiceNumber,
         customerName: r.customer_name ?? 'Unknown Customer',
-        saleType: r.saleType,
+        saleType:
+          r.billType && ['AMC', 'SMA', 'FSMA'].includes(r.billType) ? r.billType : r.saleType,
         date: r.createdAt,
         amount: outstanding,
         totalAmount,
