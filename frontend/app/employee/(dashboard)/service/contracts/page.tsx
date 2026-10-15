@@ -237,6 +237,9 @@ export default function ServiceContractsPage() {
   const [contractPaymentSummaries, setContractPaymentSummaries] = useState<
     Record<string, PaymentSummary>
   >({});
+  const [contractSecurityDeposits, setContractSecurityDeposits] = useState<Record<string, number>>(
+    {},
+  );
   const [payingContract, setPayingContract] = useState<ServiceContract | null>(null);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [payingIsSecurityDeposit, setPayingIsSecurityDeposit] = useState(false);
@@ -360,16 +363,26 @@ export default function ServiceContractsPage() {
         ...new Set(contractsData.filter((c) => c.invoiceId).map((c) => c.invoiceId as string)),
       ];
       if (contractInvoiceIds.length > 0) {
-        const summaries = await Promise.all(
-          contractInvoiceIds.map((invId) => getAccountSummary(invId).catch(() => null)),
-        );
+        const [summaries, invoices] = await Promise.all([
+          Promise.all(
+            contractInvoiceIds.map((invId) => getAccountSummary(invId).catch(() => null)),
+          ),
+          Promise.all(contractInvoiceIds.map((invId) => getInvoiceById(invId).catch(() => null))),
+        ]);
         const map: Record<string, PaymentSummary> = {};
         summaries.forEach((s, idx) => {
           if (s) map[contractInvoiceIds[idx]] = s;
         });
         setContractPaymentSummaries(map);
+        const depositMap: Record<string, number> = {};
+        invoices.forEach((invoice, idx) => {
+          if (invoice)
+            depositMap[contractInvoiceIds[idx]] = Number(invoice.securityDepositAmount || 0);
+        });
+        setContractSecurityDeposits(depositMap);
       } else {
         setContractPaymentSummaries({});
+        setContractSecurityDeposits({});
       }
     } catch (error) {
       console.error(error);
@@ -1464,7 +1477,8 @@ export default function ServiceContractsPage() {
                             size="icon"
                             onClick={() => setViewProductId(c.productId)}
                             title="View machine details"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
+                            aria-label="View machine details"
+                            className="h-8 w-8 rounded-md border border-transparent text-muted-foreground shadow-sm transition-colors hover:border-border hover:bg-muted hover:text-foreground"
                           >
                             <Package className="h-3.5 w-3.5" />
                           </Button>
@@ -1474,7 +1488,8 @@ export default function ServiceContractsPage() {
                           size="icon"
                           onClick={() => router.push(`/employee/service/contracts/${c.id}`)}
                           title="View contract details"
-                          className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          aria-label="View contract details"
+                          className="h-8 w-8 rounded-md border border-transparent text-primary shadow-sm transition-colors hover:border-primary/20 hover:bg-primary/10"
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
@@ -1484,19 +1499,21 @@ export default function ServiceContractsPage() {
                             size="icon"
                             onClick={() => openFsmaBills(c)}
                             title="View FSMA monthly bills and collections"
-                            className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
+                            aria-label="View FSMA monthly bills and collections"
+                            className="h-8 w-8 rounded-md border border-transparent text-success shadow-sm transition-colors hover:border-success/20 hover:bg-success/10"
                           >
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        {c.invoiceId && (
+                        {c.invoiceId && Number(contractSecurityDeposits[c.invoiceId] || 0) > 0 && (
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => openContractInvoice(c)}
                             disabled={loadingInvoiceView}
-                            title="View / download / send invoice"
-                            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            title="View security deposit invoice"
+                            aria-label="View security deposit invoice"
+                            className="h-8 w-8 rounded-md border border-transparent text-amber-600 shadow-sm transition-colors hover:border-amber-500/20 hover:bg-amber-500/10"
                           >
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
@@ -1508,7 +1525,8 @@ export default function ServiceContractsPage() {
                               size="icon"
                               onClick={() => openBillingDialog(c)}
                               title="Meter readings & monthly billing"
-                              className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
+                              aria-label="Meter readings and monthly billing"
+                              className="h-8 w-8 rounded-md border border-transparent text-success shadow-sm transition-colors hover:border-success/20 hover:bg-success/10"
                             >
                               <Gauge className="h-3.5 w-3.5" />
                             </Button>
@@ -1521,7 +1539,8 @@ export default function ServiceContractsPage() {
                               size="icon"
                               onClick={() => openPaymentDialog(c)}
                               title="Record an installment payment"
-                              className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
+                              aria-label="Record an installment payment"
+                              className="h-8 w-8 rounded-md border border-transparent text-success shadow-sm transition-colors hover:border-success/20 hover:bg-success/10"
                             >
                               <DollarSign className="h-3.5 w-3.5" />
                             </Button>
@@ -1531,7 +1550,9 @@ export default function ServiceContractsPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenEditModal(c)}
-                            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            title="Edit service contract"
+                            aria-label="Edit service contract"
+                            className="h-8 w-8 rounded-md border border-transparent text-muted-foreground shadow-sm transition-colors hover:border-border hover:bg-muted hover:text-foreground"
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
@@ -2977,14 +2998,6 @@ export default function ServiceContractsPage() {
                           onClick={() => openFsmaBillPayment(billsContract!, bill)}
                         >
                           <DollarSign className="mr-1 h-3.5 w-3.5 shrink-0" /> Collect amount
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="max-w-full"
-                          onClick={() => openFsmaBillPayment(billsContract!, bill, true)}
-                        >
-                          Collect deposit
                         </Button>
                       </>
                     )}
