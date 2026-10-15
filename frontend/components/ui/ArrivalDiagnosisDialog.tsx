@@ -120,7 +120,7 @@ export function ArrivalDiagnosisDialog({
                 variant="success"
                 onClick={handleStart}
                 disabled={isLoading}
-                className="min-w-[150px] h-9 bg-success hover:bg-[var(--success-foreground)] text-success-foreground gap-1.5"
+                className="min-w-[150px] h-9 bg-success text-success-foreground hover:bg-success/90 hover:text-success-foreground gap-1.5"
               >
                 {isLoading ? (
                   <>

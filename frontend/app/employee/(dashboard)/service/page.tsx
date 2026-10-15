@@ -2646,7 +2646,10 @@ export default function ServiceDashboardPage() {
                                       notes: '',
                                       problemFound: '',
                                       rootCause: '',
-                                      meterReading: 0,
+                                      meterReading:
+                                        ticket.meterReadingAtService ??
+                                        ticket.meterReadingAtCreation ??
+                                        0,
                                       labourCost: 0,
                                       visitChargeAmount: Number(ticket.visitChargeAmount) || 0,
                                       visitChargeMethod: 'ADDED_TO_ESTIMATE',
@@ -4602,7 +4605,7 @@ export default function ServiceDashboardPage() {
 
                       {item.itemSource === 'CUSTOM' && (
                         <div className="space-y-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
                                 Brand
@@ -4640,33 +4643,12 @@ export default function ServiceDashboardPage() {
                                 className="h-9 text-xs bg-card border-border rounded-lg"
                               />
                             </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">
-                                Custom Service Cost (what we paid)
-                              </label>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                placeholder="0.00"
-                                value={item.customPartCost || ''}
-                                onChange={(e) =>
-                                  updateDiagnosisItem(
-                                    idx,
-                                    'customPartCost',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="h-9 text-xs bg-card border-border rounded-lg"
-                              />
-                            </div>
                           </div>
                           <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                             <Info className="size-3 shrink-0" />
                             Brand and Model Name are pre-filled from the machine on this ticket —
-                            edit if the part differs. This cost applies to off-catalog parts and is
-                            never shown to the customer; it flags the branch manager to consider
-                            stocking the part via RFQ.
+                            edit if the part differs. Set the customer estimate using Unit Price
+                            below. The branch manager will be notified to arrange vendor purchase.
                           </p>
                         </div>
                       )}
@@ -5875,7 +5857,10 @@ export default function ServiceDashboardPage() {
                                   notes: '',
                                   problemFound: '',
                                   rootCause: '',
-                                  meterReading: 0,
+                                  meterReading:
+                                    selectedTicket.meterReadingAtService ??
+                                    selectedTicket.meterReadingAtCreation ??
+                                    0,
                                   labourCost: 0,
                                   visitChargeAmount: selectedTicket.visitChargeAmount || 0,
                                   visitChargeMethod: 'ADDED_TO_ESTIMATE',

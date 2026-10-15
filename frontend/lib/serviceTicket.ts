@@ -26,7 +26,7 @@ export interface ServiceTicketItem {
   customPartName?: string;
   customPartBrand?: string;
   customPartDescription?: string;
-  /** CUSTOM (off-catalog) items only — technician-entered internal cost, since there's no catalog price to pull from. */
+  /** CUSTOM (off-catalog) items only — optional estimated average purchase price; vendor price may vary. */
   customPartCost?: number;
   /** Brand of the part (from spare part record, or technician-entered for custom parts). */
   partBrand?: string | null;

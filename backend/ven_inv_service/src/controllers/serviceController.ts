@@ -1843,7 +1843,7 @@ Xerocare Technical Services`;
       if (hasCustomItem) {
         await this.notifyBranchManager(ticket.branchId, {
           title: 'Spare Part Procurement Needed',
-          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
+          message: `A technician requested an unregistered spare part for ticket ${ticket.ticketNumber}. Please review the estimate and arrange purchase from a vendor.`,
           type: 'ACTION_REQUIRED',
           referenceId: ticket.id,
           referenceType: 'CUSTOM_PART_REQUEST',
