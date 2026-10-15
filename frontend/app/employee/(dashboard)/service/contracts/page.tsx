@@ -370,11 +370,14 @@ export default function ServiceContractsPage() {
         ...new Set(contractsData.filter((c) => c.invoiceId).map((c) => c.invoiceId as string)),
       ];
       if (contractInvoiceIds.length > 0) {
-        const [summaries, invoices] = await Promise.all([
+        const [summaries, invoices, paymentRequests] = await Promise.all([
           Promise.all(
             contractInvoiceIds.map((invId) => getAccountSummary(invId).catch(() => null)),
           ),
           Promise.all(contractInvoiceIds.map((invId) => getInvoiceById(invId).catch(() => null))),
+          Promise.all(
+            contractInvoiceIds.map((invId) => getSalePaymentsForInvoice(invId).catch(() => [])),
+          ),
         ]);
         const map: Record<string, PaymentSummary> = {};
         summaries.forEach((s, idx) => {
@@ -383,8 +386,21 @@ export default function ServiceContractsPage() {
         setContractPaymentSummaries(map);
         const depositMap: Record<string, number> = {};
         invoices.forEach((invoice, idx) => {
-          if (invoice)
-            depositMap[contractInvoiceIds[idx]] = Number(invoice.securityDepositAmount || 0);
+          const depositRequests = paymentRequests[idx].filter(
+            (payment) => payment.isSecurityDeposit,
+          );
+          const requestedAmount = depositRequests.reduce(
+            (sum, payment) => sum + Number(payment.amount || 0),
+            0,
+          );
+          const isDepositInvoice = invoice?.items?.some((item) =>
+            item.description?.toLowerCase().includes('security deposit'),
+          );
+          depositMap[contractInvoiceIds[idx]] = Math.max(
+            Number(invoice?.securityDepositAmount || 0),
+            requestedAmount,
+            isDepositInvoice ? Number(invoice?.totalAmount || 0) : 0,
+          );
         });
         setContractSecurityDeposits(depositMap);
       } else {
@@ -674,12 +690,23 @@ export default function ServiceContractsPage() {
         contract.invoiceId
           ? getInvoiceById(contract.invoiceId)
               .then(async (invoice) => {
-                const amount = Number(invoice.securityDepositAmount || 0);
-                if (amount <= 0) return null;
                 const payments = await getSalePaymentsForInvoice(contract.invoiceId!).catch(
                   () => [],
                 );
                 const deposits = payments.filter((payment) => payment.isSecurityDeposit);
+                const requestedAmount = deposits.reduce(
+                  (sum, payment) => sum + Number(payment.amount || 0),
+                  0,
+                );
+                const isDepositInvoice = invoice.items?.some((item) =>
+                  item.description?.toLowerCase().includes('security deposit'),
+                );
+                const amount = Math.max(
+                  Number(invoice.securityDepositAmount || 0),
+                  requestedAmount,
+                  isDepositInvoice ? Number(invoice.totalAmount || 0) : 0,
+                );
+                if (amount <= 0) return null;
                 return {
                   invoiceId: contract.invoiceId!,
                   invoiceNumber: invoice.invoiceNumber || '—',
@@ -2958,7 +2985,7 @@ export default function ServiceContractsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
                     <div className="min-w-0">
                       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Security deposit
+                        Bill type · FSMA security deposit
                       </div>
                       <div className="break-all font-mono text-sm font-semibold">
                         {securityDepositBill.invoiceNumber}
@@ -3028,7 +3055,7 @@ export default function ServiceContractsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
                     <div className="min-w-0">
                       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Bill
+                        Bill · FSMA monthly
                       </div>
                       <div className="break-all font-mono text-sm font-semibold">
                         {bill.invoiceNumber || '—'}
