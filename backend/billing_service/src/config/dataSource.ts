@@ -1290,7 +1290,8 @@ async function runPreMigrations() {
           ALTER TABLE replacement_requests
             ADD COLUMN IF NOT EXISTS "workStartedAt" TIMESTAMP NULL,
             ADD COLUMN IF NOT EXISTS "workEndedAt" TIMESTAMP NULL,
-            ADD COLUMN IF NOT EXISTS "workDurationSeconds" INTEGER NULL;
+            ADD COLUMN IF NOT EXISTS "workDurationSeconds" INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS "newAllocationId" UUID NULL;
         END IF;
       END $$;
     `);

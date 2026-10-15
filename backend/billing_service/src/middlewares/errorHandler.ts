@@ -18,6 +18,10 @@ export const errorHandler = (err: Error, req: Request, res: Response, _next: Nex
     statusCode,
     errorType: err.name,
     errorCode,
+    // Preserve the database/driver reason in server logs while keeping request
+    // bodies and internal error details out of the API response.
+    errorMessage: err.message,
+    stack: err.stack,
   });
 
   if (err instanceof AppError) {
