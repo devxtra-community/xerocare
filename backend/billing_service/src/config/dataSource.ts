@@ -2365,9 +2365,11 @@ async function runPreMigrations() {
     // was always a real machine.
     await client.query(`
       ALTER TABLE product_allocations
-      ADD COLUMN IF NOT EXISTS "itemType" VARCHAR NOT NULL DEFAULT 'PRODUCT';
+      ADD COLUMN IF NOT EXISTS "itemType" VARCHAR NOT NULL DEFAULT 'PRODUCT',
+      ADD COLUMN IF NOT EXISTS "replacementOfAllocationId" UUID NULL,
+      ADD COLUMN IF NOT EXISTS "replacementReason" TEXT NULL;
     `);
-    logger.info('itemType column ensured on product_allocations.');
+    logger.info('itemType and replacement tracking columns ensured on product_allocations.');
 
     // The column above defaults every pre-existing row to PRODUCT, which is wrong for
     // any accessory that was already allocated before this column existed (allocating
