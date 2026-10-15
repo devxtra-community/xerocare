@@ -27,7 +27,7 @@ import {
   ContractInitialPayment,
 } from '@/lib/serviceContract';
 import { getAccountSummary, PaymentSummary } from '@/lib/payment';
-import { recordSalePayment } from '@/lib/saleWorkflow';
+import { getSalePaymentsForInvoice, recordSalePayment } from '@/lib/saleWorkflow';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import { InvoiceViewDialog } from '@/components/employeeComponents/InvoiceViewDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -276,6 +276,13 @@ export default function ServiceContractsPage() {
   const [billingContract, setBillingContract] = useState<ServiceContract | null>(null);
   const [billsContract, setBillsContract] = useState<ServiceContract | null>(null);
   const [contractBills, setContractBills] = useState<ContractBill[]>([]);
+  const [securityDepositBill, setSecurityDepositBill] = useState<{
+    invoiceId: string;
+    invoiceNumber: string;
+    amount: number;
+    approved: number;
+    pending: number;
+  } | null>(null);
   const [unbilledFsmaAmount, setUnbilledFsmaAmount] = useState(0);
   const [generatingFsmaBill, setGeneratingFsmaBill] = useState(false);
   const [loadingContractBills, setLoadingContractBills] = useState(false);
@@ -661,10 +668,34 @@ export default function ServiceContractsPage() {
     setBillsContract(contract);
     setLoadingContractBills(true);
     try {
-      const [bills, meterData] = await Promise.all([
+      const [bills, meterData, depositBill] = await Promise.all([
         getContractBills(contract.id),
         getContractMeterReadings(contract.id),
+        contract.invoiceId
+          ? getInvoiceById(contract.invoiceId)
+              .then(async (invoice) => {
+                const amount = Number(invoice.securityDepositAmount || 0);
+                if (amount <= 0) return null;
+                const payments = await getSalePaymentsForInvoice(contract.invoiceId!).catch(
+                  () => [],
+                );
+                const deposits = payments.filter((payment) => payment.isSecurityDeposit);
+                return {
+                  invoiceId: contract.invoiceId!,
+                  invoiceNumber: invoice.invoiceNumber || '—',
+                  amount,
+                  approved: deposits
+                    .filter((payment) => payment.status === 'APPROVED')
+                    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+                  pending: deposits
+                    .filter((payment) => payment.status === 'PENDING')
+                    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+                };
+              })
+              .catch(() => null)
+          : Promise.resolve(null),
       ]);
+      setSecurityDepositBill(depositBill);
       setUnbilledFsmaAmount(
         meterData.readings
           .filter((reading) => !reading.billedAt && !reading.billingInvoiceId)
@@ -689,6 +720,7 @@ export default function ServiceContractsPage() {
       setContractBills(withPaymentStatus);
     } catch (error) {
       setContractBills([]);
+      setSecurityDepositBill(null);
       setUnbilledFsmaAmount(0);
       toast.error('Failed to load FSMA monthly bills.', {
         description: getApiErrorMessage(error),
@@ -2893,8 +2925,8 @@ export default function ServiceContractsPage() {
           <DialogHeader>
             <DialogTitle>{billsContract?.contractType} Bills</DialogTitle>
             <DialogDescription>
-              Monthly invoices and employee collections. Each collection is sent to Finance for
-              approval.
+              View monthly bills and collections, then print, download PDF, email, or send each
+              invoice on WhatsApp. Employee collections go to Finance for approval.
             </DialogDescription>
           </DialogHeader>
           {unbilledFsmaAmount > 0 && (
@@ -2913,7 +2945,7 @@ export default function ServiceContractsPage() {
             <div className="py-10 text-center text-sm text-muted-foreground">
               Loading monthly bills…
             </div>
-          ) : contractBills.length === 0 ? (
+          ) : contractBills.length === 0 && !securityDepositBill ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
               {unbilledFsmaAmount > 0
                 ? 'Create an invoice above to make these meter charges collectible.'
@@ -2921,6 +2953,73 @@ export default function ServiceContractsPage() {
             </div>
           ) : (
             <div className="space-y-3">
+              {securityDepositBill && (
+                <article className="min-w-0 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Security deposit
+                      </div>
+                      <div className="break-all font-mono text-sm font-semibold">
+                        {securityDepositBill.invoiceNumber}
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Deposit amount
+                      </div>
+                      <div className="text-base font-semibold">
+                        {getActiveCurrency()} {securityDepositBill.amount.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 py-3 sm:grid-cols-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Approved collection</div>
+                      <div className="text-sm">
+                        {getActiveCurrency()} {securityDepositBill.approved.toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Awaiting Finance</div>
+                      <div className="text-sm text-warning">
+                        {getActiveCurrency()} {securityDepositBill.pending.toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Uncollected</div>
+                      <div className="text-sm">
+                        {getActiveCurrency()}{' '}
+                        {Math.max(
+                          0,
+                          securityDepositBill.amount -
+                            securityDepositBill.approved -
+                            securityDepositBill.pending,
+                        ).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t border-border pt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        openContractInvoice({
+                          ...billsContract!,
+                          invoiceId: securityDepositBill.invoiceId,
+                        })
+                      }
+                    >
+                      <Eye className="mr-1 h-3.5 w-3.5" /> View / print / share deposit bill
+                    </Button>
+                  </div>
+                </article>
+              )}
+              {contractBills.length === 0 && (
+                <div className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
+                  No monthly bills generated yet.
+                </div>
+              )}
               {contractBills.map((bill) => (
                 <article
                   key={bill.invoiceId}
@@ -2988,7 +3087,7 @@ export default function ServiceContractsPage() {
                         openContractInvoice({ ...billsContract!, invoiceId: bill.invoiceId })
                       }
                     >
-                      <Eye className="mr-1 h-3.5 w-3.5 shrink-0" /> View bill
+                      <Eye className="mr-1 h-3.5 w-3.5 shrink-0" /> View / print / share bill
                     </Button>
                     {bill.status !== 'PAID' && bill.status !== 'CANCELLED' && (
                       <>
@@ -3193,7 +3292,11 @@ export default function ServiceContractsPage() {
       </Dialog>
 
       {viewingInvoice && (
-        <InvoiceViewDialog invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} />
+        <InvoiceViewDialog
+          invoice={viewingInvoice}
+          onClose={() => setViewingInvoice(null)}
+          showDistribution
+        />
       )}
 
       <CustomerFormDialog
