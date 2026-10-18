@@ -745,6 +745,7 @@ export interface Bill {
     allocation?: {
       serialNumber: string;
       modelId: string;
+      productId?: string;
       /** ALLOCATED | RETURNED | REPLACED — REPLACED marks the outgoing machine. */
       status?: string;
       /** When this machine went on the contract. On a replacement unit this is the

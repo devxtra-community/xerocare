@@ -5,6 +5,8 @@ import { Invoice, InvoiceItem } from '@/lib/invoice';
 import { Bill, SalePaymentRequest, PreviousBillSummary } from '@/lib/saleWorkflow';
 import { Letterhead, BANK } from '@/components/shared/documentTemplate';
 import { numberToWords } from '@/lib/numberToWords';
+import { getProductById } from '@/lib/product';
+import { formatModelLabel } from '@/lib/model';
 
 interface Props {
   invoice: Invoice;
@@ -265,8 +267,45 @@ type BillItem = NonNullable<Bill['items']>[number];
  * the swap onwards on its replacement — so both are listed with their own readings
  * rather than collapsed into one line the customer cannot reconcile.
  */
-function MachinesSection({ bill }: { bill: Partial<Bill> }) {
-  const items = bill.items || [];
+function MachinesSection({ bill, invoice }: { bill: Partial<Bill>; invoice: Invoice }) {
+  const items = React.useMemo(() => bill.items || [], [bill.items]);
+  const [modelNames, setModelNames] = React.useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const allocations = invoice.productAllocations || [];
+    const machines = items
+      .map((item) => {
+        const allocation = allocations.find((candidate) => candidate.id === item.allocationId);
+        return { allocationId: item.allocationId, productId: allocation?.productId };
+      })
+      .filter(
+        (machine): machine is { allocationId: string; productId: string } => !!machine.productId,
+      );
+
+    Promise.all(
+      machines.map(async ({ allocationId, productId }) => {
+        try {
+          const product = await getProductById(productId, { silent: true });
+          const label = product.model
+            ? formatModelLabel(product.model) || product.name
+            : product.name;
+          return [allocationId, label] as const;
+        } catch {
+          return [allocationId, ''] as const;
+        }
+      }),
+    ).then((results) => {
+      if (!cancelled) {
+        setModelNames(Object.fromEntries(results.filter(([, label]) => Boolean(label))));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, invoice.productAllocations]);
+
   if (items.length === 0) return null;
 
   const outgoing = items.find((it) => it.allocation?.status === 'REPLACED');
@@ -279,6 +318,18 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
     if (it.allocation?.replacementOfAllocationId) return 'Current (installed)';
     return 'Current';
   };
+  const modelOf = (it?: BillItem) => {
+    if (!it) return '—';
+    return (
+      modelNames[it.allocationId] ||
+      invoice.items?.find(
+        (line) =>
+          line.modelId === it.allocation?.modelId &&
+          (line.itemType === 'PRODUCT' || !line.itemType),
+      )?.description ||
+      'Model details unavailable'
+    );
+  };
 
   return (
     <div>
@@ -290,10 +341,15 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
             Machine replaced during this period — {fmtShortDate(replacedOn)}
           </p>
           <p className="mt-1 text-[10px] text-warning leading-relaxed">
-            Both machines are billed here: usage up to the swap on{' '}
-            <span className="font-bold font-mono">{outgoing?.allocation?.serialNumber}</span>, and
-            from the swap onwards on{' '}
-            <span className="font-bold font-mono">{incoming?.allocation?.serialNumber}</span>.
+            Previous machine:{' '}
+            <span className="font-bold">
+              {outgoing?.allocation?.serialNumber} · {modelOf(outgoing)}
+            </span>{' '}
+            (readings through the replacement date); current machine:{' '}
+            <span className="font-bold">
+              {incoming?.allocation?.serialNumber} · {modelOf(incoming)}
+            </span>{' '}
+            (readings from installation onward).
             {incoming?.allocation?.replacementReason
               ? ` Reason: ${incoming.allocation.replacementReason}.`
               : ''}
@@ -334,7 +390,12 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
               <React.Fragment key={it.allocationId || idx}>
                 <tr>
                   <td rowSpan={3} className="p-1.5 align-top font-bold text-foreground font-mono">
-                    {it.allocation?.serialNumber || `Machine ${idx + 1}`}
+                    <span className="block">
+                      {it.allocation?.serialNumber || `Machine ${idx + 1}`}
+                    </span>
+                    <span className="mt-1 block font-sans text-[9px] font-semibold text-muted-foreground">
+                      {modelOf(it)}
+                    </span>
                   </td>
                   <td rowSpan={3} className="p-1.5 align-top text-foreground">
                     {roleOf(it)}
@@ -1190,7 +1251,7 @@ export function BillDocumentBody({
           </>
         ) : (
           <>
-            <MachinesSection bill={bill} />
+            <MachinesSection bill={bill} invoice={invoice} />
             <UsageSection
               bill={bill}
               invoice={invoice}
