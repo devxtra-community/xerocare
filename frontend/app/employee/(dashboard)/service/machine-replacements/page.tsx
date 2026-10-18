@@ -35,13 +35,12 @@ import {
   type ReplacementRequest,
 } from '@/lib/replacement';
 import { ReplacementViewDialog } from '@/components/replacement/ReplacementViewDialog';
+import { getUserFromToken } from '@/lib/auth';
+import { EmployeeJob } from '@/lib/employeeJob';
 
 /**
- * Stages 04–05 — the service desk's leg of the replacement chain.
- *
- * Two decisions live here and nowhere else: whether the replacement machine actually
- * reached the customer, and which technician performs the swap. Assignment is gated on
- * delivery because a technician cannot install a machine that has not arrived.
+ * Employee-facing replacement list. Delivery and technician assignment are managed by
+ * the service desk; this page is read-only apart from opening the replacement details.
  */
 
 const fmt = (v?: string | null) => {
@@ -69,13 +68,18 @@ function MachineReplacementsContent() {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<ReplacementRequest | null>(null);
   const [technicianId, setTechnicianId] = useState('');
+  const [isServiceHelpDesk, setIsServiceHelpDesk] = useState(false);
+
+  useEffect(() => {
+    setIsServiceHelpDesk(getUserFromToken()?.employeeJob === EmployeeJob.SERVICE_HELP_DESK);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [reqs, techs] = await Promise.all([
         listReplacements({ status: DESK_STATUSES }),
-        getTechnicians().catch(() => [] as ServiceTechnicianInfo[]),
+        isServiceHelpDesk ? getTechnicians().catch(() => [] as ServiceTechnicianInfo[]) : [],
       ]);
       setRows(reqs);
       setTechnicians(techs);
@@ -84,7 +88,7 @@ function MachineReplacementsContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isServiceHelpDesk]);
 
   useEffect(() => {
     load();
@@ -160,7 +164,9 @@ function MachineReplacementsContent() {
                 <TableHead className="text-primary font-bold">TECHNICIAN</TableHead>
                 <TableHead className="text-primary font-bold">TIME TAKEN</TableHead>
                 <TableHead className="text-primary font-bold">STATUS</TableHead>
-                <TableHead className="text-primary font-bold text-center">ACTIONS</TableHead>
+                <TableHead className="text-primary font-bold text-center">
+                  {isServiceHelpDesk ? 'ACTIONS' : 'VIEW'}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -233,8 +239,7 @@ function MachineReplacementsContent() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-
-                        {r.status === 'UNIT_SELECTED' && (
+                        {isServiceHelpDesk && r.status === 'UNIT_SELECTED' && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -250,38 +255,38 @@ function MachineReplacementsContent() {
                             )}
                           </Button>
                         )}
-
-                        {(r.status === 'DELIVERED' || r.status === 'TECHNICIAN_ASSIGNED') && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busyId === r.id}
-                              className="h-8 w-8 p-0 rounded-lg text-lease hover:bg-lease/10"
-                              title={
-                                r.status === 'TECHNICIAN_ASSIGNED'
-                                  ? 'Reassign technician'
-                                  : 'Assign technician'
-                              }
-                              onClick={() => {
-                                setAssignTarget(r);
-                                setTechnicianId(r.technicianId ?? '');
-                              }}
-                            >
-                              <UserPlus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busyId === r.id}
-                              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted"
-                              title="Not delivered — undo"
-                              onClick={() => setDelivered(r, false)}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                        {isServiceHelpDesk &&
+                          (r.status === 'DELIVERED' || r.status === 'TECHNICIAN_ASSIGNED') && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={busyId === r.id}
+                                className="h-8 w-8 p-0 rounded-lg text-lease hover:bg-lease/10"
+                                title={
+                                  r.status === 'TECHNICIAN_ASSIGNED'
+                                    ? 'Reassign technician'
+                                    : 'Assign technician'
+                                }
+                                onClick={() => {
+                                  setAssignTarget(r);
+                                  setTechnicianId(r.technicianId ?? '');
+                                }}
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={busyId === r.id}
+                                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted"
+                                title="Not delivered — undo"
+                                onClick={() => setDelivered(r, false)}
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -296,38 +301,40 @@ function MachineReplacementsContent() {
         <ReplacementViewDialog requestId={viewingId} onClose={() => setViewingId(null)} />
       )}
 
-      <Dialog open={!!assignTarget} onOpenChange={(v) => !v && setAssignTarget(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign technician — {assignTarget?.requestNo}</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            The technician records both meter readings on site. That is the moment the contract
-            moves onto the new machine, so only assign someone who is going out to do the swap.
-          </p>
-          <div className="space-y-1.5">
-            <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-              Technician
-            </Label>
-            <SearchableSelect
-              value={technicianId}
-              onValueChange={setTechnicianId}
-              options={techOptions}
-              placeholder="Search technicians…"
-              emptyText="No service technicians found"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignTarget(null)}>
-              Cancel
-            </Button>
-            <Button disabled={!technicianId || !!busyId} onClick={assign}>
-              {busyId ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
-              Assign
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {isServiceHelpDesk && (
+        <Dialog open={!!assignTarget} onOpenChange={(v) => !v && setAssignTarget(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Assign technician — {assignTarget?.requestNo}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              The technician records both meter readings on site. That is the moment the contract
+              moves onto the new machine, so only assign someone who is going out to do the swap.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                Technician
+              </Label>
+              <SearchableSelect
+                value={technicianId}
+                onValueChange={setTechnicianId}
+                options={techOptions}
+                placeholder="Search technicians…"
+                emptyText="No service technicians found"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAssignTarget(null)}>
+                Cancel
+              </Button>
+              <Button disabled={!technicianId || !!busyId} onClick={assign}>
+                {busyId ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+                Assign
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
