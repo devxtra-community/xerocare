@@ -96,6 +96,97 @@ interface SlabRange {
   rate: number;
 }
 
+type ReplacedMachineUsage = {
+  allocationId: string;
+  serialNumber?: string;
+  startBwA4: number;
+  endBwA4: number;
+  startBwA3: number;
+  endBwA3: number;
+  startColorA4: number;
+  endColorA4: number;
+  startColorA3: number;
+  endColorA3: number;
+  bwDelta: number;
+  clrDelta: number;
+};
+
+function ReplacedMachineUsageCard({
+  machine,
+  mode,
+  rate,
+}: {
+  machine: ReplacedMachineUsage;
+  mode: 'combined' | 'bw' | 'color';
+  rate: number;
+}) {
+  const readings = [
+    {
+      label: 'B&W A4',
+      start: machine.startBwA4,
+      end: machine.endBwA4,
+      delta: machine.endBwA4 - machine.startBwA4,
+      type: 'bw',
+    },
+    {
+      label: 'B&W A3',
+      start: machine.startBwA3,
+      end: machine.endBwA3,
+      delta: machine.endBwA3 - machine.startBwA3,
+      type: 'bw',
+    },
+    {
+      label: 'Color A4',
+      start: machine.startColorA4,
+      end: machine.endColorA4,
+      delta: machine.endColorA4 - machine.startColorA4,
+      type: 'color',
+    },
+    {
+      label: 'Color A3',
+      start: machine.startColorA3,
+      end: machine.endColorA3,
+      delta: machine.endColorA3 - machine.startColorA3,
+      type: 'color',
+    },
+  ].filter((reading) => mode === 'combined' || reading.type === mode);
+  const usage =
+    mode === 'bw'
+      ? machine.bwDelta
+      : mode === 'color'
+        ? machine.clrDelta
+        : machine.bwDelta + machine.clrDelta;
+
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50/70 p-3 text-xs text-foreground">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="font-bold">Replaced machine · SN: {machine.serialNumber || '—'}</span>
+        <span className="font-semibold text-amber-800">
+          {usage.toLocaleString()} usage units · {getActiveCurrency()} {(usage * rate).toFixed(2)}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {readings.map((reading) => (
+          <div key={reading.label} className="rounded border border-amber-200 bg-white px-2.5 py-2">
+            <p className="font-semibold">{reading.label}</p>
+            <p className="mt-1 text-muted-foreground">
+              Start{' '}
+              <span className="font-medium text-foreground">{reading.start.toLocaleString()}</span>
+            </p>
+            <p className="text-muted-foreground">
+              End{' '}
+              <span className="font-medium text-foreground">{reading.end.toLocaleString()}</span>
+            </p>
+            <p className="mt-1 font-bold text-primary">
+              Usage {Math.max(0, reading.delta).toLocaleString()}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const parseSlabs = (ranges: unknown): SlabRange[] => {
   if (Array.isArray(ranges)) return ranges;
   if (typeof ranges === 'string') {
@@ -677,7 +768,16 @@ export default function UsageRecordingModal({
       clrA4,
       clrA3,
       machines: rItems.map((i) => ({
+        allocationId: i.allocationId || i.serialNumber || 'replaced-machine',
         serialNumber: i.serialNumber,
+        startBwA4: i.startBwA4 || 0,
+        endBwA4: i.endBwA4 || 0,
+        startBwA3: i.startBwA3 || 0,
+        endBwA3: i.endBwA3 || 0,
+        startColorA4: i.startColorA4 || 0,
+        endColorA4: i.endColorA4 || 0,
+        startColorA3: i.startColorA3 || 0,
+        endColorA3: i.endColorA3 || 0,
         bwDelta:
           Math.max(0, (i.endBwA4 || 0) - i.startBwA4) +
           Math.max(0, (i.endBwA3 || 0) - i.startBwA3) * 2,
@@ -2540,25 +2640,13 @@ export default function UsageRecordingModal({
                                       {currentDeltaClrA3.toLocaleString()})
                                     </div>
                                   </div>
-                                  {replacedDeltas.machines.map((m, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex flex-col border-b border-border last:border-0 pb-1 mb-1"
-                                    >
-                                      <div className="flex justify-between text-[10px]">
-                                        <span>• Replaced Device (SN: {m.serialNumber})</span>
-                                        <span>
-                                          {(m.bwDelta + m.clrDelta).toLocaleString()} units (
-                                          {getActiveCurrency()}{' '}
-                                          {((m.bwDelta + m.clrDelta) * applicableRate).toFixed(2)})
-                                        </span>
-                                      </div>
-                                      <div className="text-[9px] text-muted-foreground italic pl-2">
-                                        (BW A4: {m.bwA4.toLocaleString()}, A3:{' '}
-                                        {m.bwA3.toLocaleString()} | Color A4:{' '}
-                                        {m.clrA4.toLocaleString()}, A3: {m.clrA3.toLocaleString()})
-                                      </div>
-                                    </div>
+                                  {replacedDeltas.machines.map((m) => (
+                                    <ReplacedMachineUsageCard
+                                      key={m.allocationId}
+                                      machine={m}
+                                      mode="combined"
+                                      rate={applicableRate}
+                                    />
                                   ))}
                                 </div>
 
@@ -2684,24 +2772,13 @@ export default function UsageRecordingModal({
                                       </div>
                                       {replacedDeltas.machines
                                         .filter((m) => m.bwDelta > 0)
-                                        .map((m, i) => (
-                                          <div
-                                            key={i}
-                                            className="flex flex-col border-b border-border last:border-0 pb-1 mb-1"
-                                          >
-                                            <div className="flex justify-between text-[10px]">
-                                              <span>• Replaced Device (SN: {m.serialNumber})</span>
-                                              <span>
-                                                {m.bwDelta.toLocaleString()} units (
-                                                {getActiveCurrency()}{' '}
-                                                {(m.bwDelta * applicableRate).toFixed(2)})
-                                              </span>
-                                            </div>
-                                            <div className="text-[9px] text-muted-foreground italic pl-2">
-                                              (BW A4: {m.bwA4.toLocaleString()}, A3:{' '}
-                                              {m.bwA3.toLocaleString()})
-                                            </div>
-                                          </div>
+                                        .map((m) => (
+                                          <ReplacedMachineUsageCard
+                                            key={m.allocationId}
+                                            machine={m}
+                                            mode="bw"
+                                            rate={applicableRate}
+                                          />
                                         ))}
                                     </div>
 
@@ -2826,24 +2903,13 @@ export default function UsageRecordingModal({
                                       </div>
                                       {replacedDeltas.machines
                                         .filter((m) => m.clrDelta > 0)
-                                        .map((m, i) => (
-                                          <div
-                                            key={i}
-                                            className="flex flex-col border-b border-border last:border-0 pb-1 mb-1"
-                                          >
-                                            <div className="flex justify-between text-[10px]">
-                                              <span>• Replaced Device (SN: {m.serialNumber})</span>
-                                              <span>
-                                                {m.clrDelta.toLocaleString()} units (
-                                                {getActiveCurrency()}{' '}
-                                                {(m.clrDelta * applicableRate).toFixed(2)})
-                                              </span>
-                                            </div>
-                                            <div className="text-[9px] text-muted-foreground italic pl-2">
-                                              (Color A4: {m.clrA4.toLocaleString()}, A3:{' '}
-                                              {m.clrA3.toLocaleString()})
-                                            </div>
-                                          </div>
+                                        .map((m) => (
+                                          <ReplacedMachineUsageCard
+                                            key={m.allocationId}
+                                            machine={m}
+                                            mode="color"
+                                            rate={applicableRate}
+                                          />
                                         ))}
                                     </div>
 
