@@ -337,6 +337,11 @@ export function QuotationViewDialog({
       // ── Force a fixed width for capture so PDF is always A4-sharp on any device ──
       const TARGET_WIDTH = 900; // pixels — enough for A4 readability
       const originalStyle = element.getAttribute('style') || '';
+      const originalImages = Array.from(element.querySelectorAll('img')).map((image) => ({
+        image,
+        src: image.getAttribute('src'),
+        crossOrigin: image.getAttribute('crossorigin'),
+      }));
       element.setAttribute(
         'style',
         `${originalStyle}; width: ${TARGET_WIDTH}px !important; max-width: ${TARGET_WIDTH}px !important; overflow: visible !important;`,
@@ -346,6 +351,54 @@ export function QuotationViewDialog({
 
       let dataUrl: string;
       try {
+        // R2 product photos are visible in the preview but are hosted on another
+        // origin, so the browser will not let html-to-image draw them into a canvas.
+        // Relay those image requests through this app's same-origin route first.
+        await Promise.all(
+          originalImages.map(async ({ image }) => {
+            const source = image.currentSrc || image.src;
+            if (!source) return;
+            let replacementSource: string | undefined;
+            if (!source.startsWith('data:') && !source.startsWith('blob:')) {
+              const sourceUrl = new URL(source, window.location.href);
+              if (sourceUrl.origin !== window.location.origin) {
+                replacementSource = `/api/quotation-image?source=${encodeURIComponent(sourceUrl.href)}`;
+              }
+            }
+
+            if (!replacementSource && image.complete && image.naturalWidth > 0) return;
+            await new Promise<void>((resolve, reject) => {
+              let settled = false;
+              const finish = (error?: Error) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeout);
+                image.removeEventListener('load', onLoad);
+                image.removeEventListener('error', onError);
+                if (error) reject(error);
+                else resolve();
+              };
+              const onLoad = () => finish();
+              const onError = () =>
+                finish(new Error('A quotation image could not be loaded for the PDF'));
+              const timeout = window.setTimeout(
+                () => finish(new Error('A quotation image did not load in time')),
+                15000,
+              );
+              image.addEventListener('load', onLoad, { once: true });
+              image.addEventListener('error', onError, { once: true });
+              if (replacementSource) {
+                image.removeAttribute('crossorigin');
+                image.src = replacementSource;
+              }
+              if (image.complete) {
+                if (image.naturalWidth > 0) finish();
+                else onError();
+              }
+            });
+          }),
+        );
+
         dataUrl = await toPng(element, {
           quality: 1,
           pixelRatio: 2,
@@ -355,6 +408,12 @@ export function QuotationViewDialog({
       } finally {
         // Always restore original style
         element.setAttribute('style', originalStyle);
+        originalImages.forEach(({ image, src, crossOrigin }) => {
+          if (src === null) image.removeAttribute('src');
+          else image.setAttribute('src', src);
+          if (crossOrigin === null) image.removeAttribute('crossorigin');
+          else image.setAttribute('crossorigin', crossOrigin);
+        });
       }
 
       // Create PDF — if the image is taller than one A4 page, add extra pages
