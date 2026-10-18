@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { publicAppLink } from '@/lib/publicAppUrl';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { printDocument } from '@/lib/printDocument';
 import { ESignatureCanvas } from '@/components/employeeComponents/ESignatureCanvas';
 import { InstallationReportView } from './InstallationReportView';
 import {
@@ -137,7 +138,7 @@ export function InstallationReportModal({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.print()}
+              onClick={() => printDocument(document.getElementById('installation-report-document'))}
               className="h-8 w-full border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground print:hidden"
             >
               <Printer size={12} className="mr-1" /> Print / Save PDF
