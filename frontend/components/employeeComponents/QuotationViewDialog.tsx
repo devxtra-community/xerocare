@@ -34,6 +34,7 @@ import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayo
 import {
   Invoice,
   getLatestCompletedCreditNote,
+  getQuotationImage,
   sendEmailNotification,
   sendWhatsappNotification,
   requestValidityExtension,
@@ -350,6 +351,7 @@ export function QuotationViewDialog({
       await new Promise<void>((r) => setTimeout(r, 120));
 
       let dataUrl: string;
+      const proxyObjectUrls: string[] = [];
       try {
         // R2 product photos are visible in the preview but are hosted on another
         // origin, so the browser will not let html-to-image draw them into a canvas.
@@ -362,7 +364,9 @@ export function QuotationViewDialog({
             if (!source.startsWith('data:') && !source.startsWith('blob:')) {
               const sourceUrl = new URL(source, window.location.href);
               if (sourceUrl.origin !== window.location.origin) {
-                replacementSource = `/api/quotation-image?source=${encodeURIComponent(sourceUrl.href)}`;
+                const imageBlob = await getQuotationImage(sourceUrl.href);
+                replacementSource = URL.createObjectURL(imageBlob);
+                proxyObjectUrls.push(replacementSource);
               }
             }
 
@@ -414,6 +418,7 @@ export function QuotationViewDialog({
           if (crossOrigin === null) image.removeAttribute('crossorigin');
           else image.setAttribute('crossorigin', crossOrigin);
         });
+        proxyObjectUrls.forEach((url) => URL.revokeObjectURL(url));
       }
 
       // Create PDF — if the image is taller than one A4 page, add extra pages

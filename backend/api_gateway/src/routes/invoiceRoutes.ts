@@ -52,6 +52,7 @@ import {
   deleteInvoice,
   getAuditLogs,
   getNavCounts,
+  getQuotationImage,
 } from '../controllers/invoiceController';
 
 /**
@@ -430,6 +431,13 @@ router.post(
 router.get('/quotation/assigned', requireRole(UserRole.EMPLOYEE), getEmployeeAssignedQuotations);
 
 // --- 4. Notifications ---
+
+/** Same-origin, authenticated relay for R2 images embedded in quotation PDFs. */
+router.post(
+  '/quotation-image',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  getQuotationImage,
+);
 
 /**
  * Send a notification to the customer via Email.

@@ -1142,6 +1142,16 @@ export const downloadConsolidatedInvoice = async (contractId: string): Promise<B
   return response.data;
 };
 
+/** Returns an R2 product photo through the authenticated API gateway for PDF capture. */
+export const getQuotationImage = async (source: string): Promise<Blob> => {
+  const response = await api.post(
+    '/b/invoices/quotation-image',
+    { source },
+    { responseType: 'blob' },
+  );
+  return response.data;
+};
+
 /**
  * Sends a consolidated statement to the customer.
  */

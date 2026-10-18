@@ -12,6 +12,49 @@ interface AuthenticatedRequest extends Request {
 
 const invoiceAggregationService = new InvoiceAggregationService();
 
+/** Fetch an approved R2 product image server-side for canvas-safe quotation PDFs. */
+export const getQuotationImage = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const source = req.body?.source;
+    if (typeof source !== 'string') throw new AppError('Image source is required', 400);
+
+    let imageUrl: URL;
+    try {
+      imageUrl = new URL(source);
+    } catch {
+      throw new AppError('Invalid image source', 400);
+    }
+
+    const trustedR2Host =
+      imageUrl.hostname.endsWith('.r2.dev') ||
+      imageUrl.hostname.endsWith('.r2.cloudflarestorage.com');
+    const allowedObjectPath = /(?:^|\/)(?:products|spare-parts)\//.test(imageUrl.pathname);
+    if (imageUrl.protocol !== 'https:' || !trustedR2Host || !allowedObjectPath) {
+      throw new AppError('Image host or path is not allowed', 400);
+    }
+
+    const upstream = await fetch(imageUrl, { redirect: 'error' });
+    if (!upstream.ok) throw new AppError(`Image host returned ${upstream.status}`, 502);
+    const contentType = upstream.headers.get('content-type') || '';
+    if (!contentType.startsWith('image/'))
+      throw new AppError('The URL did not return an image', 502);
+
+    const maxImageBytes = 10 * 1024 * 1024;
+    const declaredLength = Number(upstream.headers.get('content-length') || 0);
+    if (declaredLength > maxImageBytes) throw new AppError('Image is too large', 413);
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    if (bytes.length > maxImageBytes) throw new AppError('Image is too large', 413);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', bytes.length);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.status(200).send(bytes);
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * Lists all the invoices (bills) in the system.
  *
