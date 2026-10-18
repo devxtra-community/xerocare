@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import StatCard from '@/components/StatCard';
 import { ContractActionsMenu } from '@/components/employeeComponents/ContractActionsMenu';
+import { ContractDocumentBody } from '@/components/employeeComponents/ContractDocumentBody';
 import {
   ContractDocMark,
   ViewProductMark,
@@ -59,6 +60,7 @@ import { CollectSecurityDepositModal } from '@/components/employeeComponents/Col
 import { InstallationReportModal } from '@/components/installation/InstallationReportModal';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
+import { getActiveCurrency } from '@/lib/currency';
 
 export default function InstallationRequestsPage() {
   // Vendor purchasing/contact info isn't relevant here (Service Desk); Lot info is
@@ -100,7 +102,10 @@ export default function InstallationRequestsPage() {
   const [warehouseCache, setWarehouseCache] = useState<Record<string, string>>({});
 
   // Contract view dialog
-  const [viewContract, setViewContract] = useState<ContractAgreement | null>(null);
+  const [viewContract, setViewContract] = useState<{
+    agreement: ContractAgreement;
+    invoice: Invoice;
+  } | null>(null);
   const [contractLoading, setContractLoading] = useState<string | null>(null);
 
   // Collect Security Deposit — shown when the Employee didn't collect it at conversion
@@ -141,8 +146,15 @@ export default function InstallationRequestsPage() {
   const handleViewContract = async (req: InstallationRequest) => {
     setContractLoading(req.id);
     try {
-      const agreement = await getContractAgreement(req.invoiceId);
-      setViewContract(agreement);
+      const [agreement, invoice] = await Promise.all([
+        getContractAgreement(req.invoiceId),
+        getInvoiceById(req.invoiceId),
+      ]);
+      if (!agreement) {
+        toast.error('Contract agreement not found');
+        return;
+      }
+      setViewContract({ agreement, invoice });
     } catch (err) {
       toast.error('Failed to load contract', { description: getApiErrorMessage(err) });
     } finally {
@@ -758,107 +770,37 @@ export default function InstallationRequestsPage() {
       <Dialog open={!!viewContract} onOpenChange={(v) => !v && setViewContract(null)}>
         <DialogContent
           showCloseButton={false}
-          className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl"
+          className="w-[96vw] max-w-5xl h-[92vh] max-h-[92vh] rounded-2xl p-0 overflow-hidden border-0 shadow-2xl flex flex-col"
         >
           <DialogTitle className="sr-only">Contract Agreement</DialogTitle>
           {viewContract && (
             <>
-              <div className="bg-gradient-to-r from-primary to-primary p-5 text-primary-foreground flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-card flex items-center justify-center flex-shrink-0">
-                    <FileText size={18} />
-                  </div>
+              <div className="shrink-0 border-b border-border bg-card px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText size={16} className="text-primary" />
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
-                      Contract Agreement
-                    </p>
-                    <p className="text-base font-black">{viewContract.agreementNumber}</p>
-                    <p className="text-[10px] opacity-70">
-                      {new Date(viewContract.contractDate).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
+                    <p className="text-xs font-black text-foreground">Full Contract Agreement</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {viewContract.agreement.agreementNumber} · Read only
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => setViewContract(null)}
-                  className="text-primary-foreground hover:text-primary-foreground mt-0.5"
+                  className="h-8 text-xs font-black"
                 >
-                  <X size={16} />
-                </button>
+                  <X size={14} className="mr-1" /> Close
+                </Button>
               </div>
-              <div className="p-5 space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
-                      Customer
-                    </p>
-                    <p className="font-bold text-foreground">{viewContract.customerName || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
-                      Created By
-                    </p>
-                    <p className="font-bold text-foreground">
-                      {viewContract.createdByEmployeeName || '—'}
-                    </p>
-                  </div>
-                  {viewContract.customerPhone && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
-                        Phone
-                      </p>
-                      <p className="font-bold text-foreground">{viewContract.customerPhone}</p>
-                    </div>
-                  )}
-                  {viewContract.customerEmail && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-0.5">
-                        Email
-                      </p>
-                      <p className="font-bold text-foreground">{viewContract.customerEmail}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="border-t border-border pt-3 space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Signatures
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground font-bold text-xs">Employee</span>
-                    {viewContract.employeeSignatureData ? (
-                      <span className="flex items-center gap-1 text-success text-xs font-black">
-                        <CheckCircle2 size={12} />
-                        {viewContract.employeeSignedByName ?? 'Signed'}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs font-bold">Pending</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground font-bold text-xs">Customer</span>
-                    {viewContract.customerSignatureData ||
-                    viewContract.customerSignedDocumentUrl ? (
-                      <span className="flex items-center gap-1 text-success text-xs font-black">
-                        <CheckCircle2 size={12} />
-                        {viewContract.customerSignedByName ?? 'Signed'}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs font-bold">Pending</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setViewContract(null)}
-                    className="h-8 text-xs font-black"
-                  >
-                    Close
-                  </Button>
+              <div className="flex-1 overflow-y-auto bg-muted/40 p-3 sm:p-6">
+                <div className="mx-auto max-w-[900px] bg-white shadow-lg">
+                  <ContractDocumentBody
+                    invoice={viewContract.invoice}
+                    agreement={viewContract.agreement}
+                    currency={getActiveCurrency()}
+                  />
                 </div>
               </div>
             </>
