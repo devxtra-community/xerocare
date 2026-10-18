@@ -298,6 +298,10 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
               ? ` Reason: ${incoming.allocation.replacementReason}.`
               : ''}
           </p>
+          <p className="mt-1 text-[10px] font-semibold text-foreground">
+            Each machine&apos;s opening, closing, and period usage are listed below. The charge
+            breakdown uses the combined period usage from both machines.
+          </p>
         </div>
       )}
 
@@ -329,10 +333,10 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
             {items.map((it, idx) => (
               <React.Fragment key={it.allocationId || idx}>
                 <tr>
-                  <td rowSpan={2} className="p-1.5 align-top font-bold text-foreground font-mono">
+                  <td rowSpan={3} className="p-1.5 align-top font-bold text-foreground font-mono">
                     {it.allocation?.serialNumber || `Machine ${idx + 1}`}
                   </td>
-                  <td rowSpan={2} className="p-1.5 align-top text-foreground">
+                  <td rowSpan={3} className="p-1.5 align-top text-foreground">
                     {roleOf(it)}
                     {it.allocation?.status === 'REPLACED' && it.allocation.endTimestamp && (
                       <span className="block text-[9px] text-warning">
@@ -388,9 +392,64 @@ function MachinesSection({ bill }: { bill: Partial<Bill> }) {
                     {fmtNum(it.endColorA3)}
                   </td>
                 </tr>
+                <tr className="border-b border-border/60 bg-muted/30">
+                  <td className="p-1.5 text-right font-semibold text-primary">
+                    Usage {fmtNum(it.deltaBwA4 ?? Math.max(0, it.endBwA4 - it.startBwA4))}
+                  </td>
+                  <td className="p-1.5 text-right font-semibold text-primary">
+                    Usage {fmtNum(it.deltaBwA3 ?? Math.max(0, it.endBwA3 - it.startBwA3))}
+                  </td>
+                  <td className="p-1.5 text-right font-semibold text-primary">
+                    Usage {fmtNum(it.deltaColorA4 ?? Math.max(0, it.endColorA4 - it.startColorA4))}
+                  </td>
+                  <td className="p-1.5 text-right font-semibold text-primary">
+                    Usage {fmtNum(it.deltaColorA3 ?? Math.max(0, it.endColorA3 - it.startColorA3))}
+                  </td>
+                </tr>
               </React.Fragment>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-foreground/20 bg-muted/50 font-black text-foreground">
+              <td colSpan={2} className="p-1.5">
+                Combined usage — all machines
+              </td>
+              <td className="p-1.5 text-right">
+                {fmtNum(
+                  items.reduce(
+                    (sum, it) => sum + (it.deltaBwA4 ?? Math.max(0, it.endBwA4 - it.startBwA4)),
+                    0,
+                  ),
+                )}
+              </td>
+              <td className="p-1.5 text-right">
+                {fmtNum(
+                  items.reduce(
+                    (sum, it) => sum + (it.deltaBwA3 ?? Math.max(0, it.endBwA3 - it.startBwA3)),
+                    0,
+                  ),
+                )}
+              </td>
+              <td className="p-1.5 text-right">
+                {fmtNum(
+                  items.reduce(
+                    (sum, it) =>
+                      sum + (it.deltaColorA4 ?? Math.max(0, it.endColorA4 - it.startColorA4)),
+                    0,
+                  ),
+                )}
+              </td>
+              <td className="p-1.5 text-right">
+                {fmtNum(
+                  items.reduce(
+                    (sum, it) =>
+                      sum + (it.deltaColorA3 ?? Math.max(0, it.endColorA3 - it.startColorA3)),
+                    0,
+                  ),
+                )}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
