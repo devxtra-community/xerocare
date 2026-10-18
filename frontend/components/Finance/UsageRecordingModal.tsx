@@ -692,6 +692,85 @@ export default function UsageRecordingModal({
     };
   }, [formData.items, contract?.productAllocations]);
 
+  const replacementReadingPairs = React.useMemo(() => {
+    const allocations = contract?.productAllocations || [];
+    const periodStart = new Date(formData.billingPeriodStart).getTime();
+    const periodEnd = new Date(formData.billingPeriodEnd).getTime();
+    return allocations
+      .filter((allocation) => {
+        const replacementTime = allocation.endTimestamp
+          ? new Date(allocation.endTimestamp).getTime()
+          : NaN;
+        return (
+          allocation.status === 'REPLACED' &&
+          replacementTime >= periodStart &&
+          replacementTime <= periodEnd + 24 * 60 * 60 * 1000 - 1
+        );
+      })
+      .map((oldAllocation) => {
+        const oldItem = formData.items.find((item) => item.allocationId === oldAllocation.id);
+        const newAllocation = allocations.find(
+          (allocation) => allocation.replacementOfAllocationId === oldAllocation.id,
+        );
+        const newItem = newAllocation
+          ? formData.items.find((item) => item.allocationId === newAllocation.id)
+          : undefined;
+        if (!oldItem || !newAllocation || !newItem) return null;
+
+        const counters = [
+          {
+            label: 'B&W A4',
+            oldStart: oldItem.startBwA4,
+            oldEnd: oldItem.endBwA4 || 0,
+            newStart: newAllocation.initialBwA4 || 0,
+            newEnd: newItem.endBwA4 || 0,
+          },
+          {
+            label: 'B&W A3',
+            oldStart: oldItem.startBwA3,
+            oldEnd: oldItem.endBwA3 || 0,
+            newStart: newAllocation.initialBwA3 || 0,
+            newEnd: newItem.endBwA3 || 0,
+          },
+          {
+            label: 'Colour A4',
+            oldStart: oldItem.startColorA4,
+            oldEnd: oldItem.endColorA4 || 0,
+            newStart: newAllocation.initialColorA4 || 0,
+            newEnd: newItem.endColorA4 || 0,
+          },
+          {
+            label: 'Colour A3',
+            oldStart: oldItem.startColorA3,
+            oldEnd: oldItem.endColorA3 || 0,
+            newStart: newAllocation.initialColorA3 || 0,
+            newEnd: newItem.endColorA3 || 0,
+          },
+        ].map((counter) => ({
+          ...counter,
+          oldUsage: Math.max(0, counter.oldEnd - counter.oldStart),
+          newUsage: Math.max(0, counter.newEnd - counter.newStart),
+        }));
+
+        return {
+          oldSerial: oldAllocation.serialNumber,
+          newSerial: newAllocation.serialNumber,
+          counters,
+          combinedA4Equivalent: counters.reduce(
+            (sum, counter) =>
+              sum + (counter.oldUsage + counter.newUsage) * (counter.label.endsWith('A3') ? 2 : 1),
+            0,
+          ),
+        };
+      })
+      .filter((pair): pair is NonNullable<typeof pair> => pair !== null);
+  }, [
+    contract?.productAllocations,
+    formData.billingPeriodEnd,
+    formData.billingPeriodStart,
+    formData.items,
+  ]);
+
   // Fetch product details when contract changes
   React.useEffect(() => {
     if (!contract?.items) return;
@@ -2018,22 +2097,88 @@ export default function UsageRecordingModal({
             )}
 
             {!isSimplifiedLease &&
-              (() => {
-                // Deduplicate by serialNumber for the visibility count
-                const allocatedItems = formData.items.filter((i) => {
-                  const a = contract?.productAllocations?.find((pa) => pa.id === i.allocationId);
-                  return a?.status === 'ALLOCATED';
-                });
-                const uniqueSerials = new Set(
-                  allocatedItems.map((i) => i.serialNumber || i.allocationId),
-                );
-                return uniqueSerials.size > 1;
-              })() && (
+              (replacementReadingPairs.length > 0 ||
+                (() => {
+                  // Deduplicate by serialNumber for the visibility count
+                  const allocatedItems = formData.items.filter((i) => {
+                    const a = contract?.productAllocations?.find((pa) => pa.id === i.allocationId);
+                    return a?.status === 'ALLOCATED';
+                  });
+                  const uniqueSerials = new Set(
+                    allocatedItems.map((i) => i.serialNumber || i.allocationId),
+                  );
+                  return uniqueSerials.size > 1;
+                })()) && (
                 <div className="space-y-4 p-4 rounded-xl bg-muted border border-border">
                   <h3 className="text-sm font-bold text-foreground pb-2 border-b flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-primary" />
-                    Machine-Wise Readings (Required)
+                    Machine-Wise Readings & Replacement Usage
                   </h3>
+                  {replacementReadingPairs.map((pair) => (
+                    <div
+                      key={`${pair.oldSerial}-${pair.newSerial}`}
+                      className="rounded-lg border border-warning/30 bg-card p-3 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-foreground">
+                          Replacement: {pair.oldSerial} → {pair.newSerial}
+                        </div>
+                        <div className="text-xs font-black text-primary">
+                          Combined usage: {pair.combinedA4Equivalent.toLocaleString()} A4-equivalent
+                          copies
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Old machine usage + new machine usage. A3 copies count as two A4-equivalent
+                        copies, matching the contract billing calculation.
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[620px] text-[10px]">
+                          <thead>
+                            <tr className="border-b border-border text-muted-foreground">
+                              <th className="py-1.5 text-left font-bold">Counter</th>
+                              <th className="py-1.5 text-right font-bold">Old start</th>
+                              <th className="py-1.5 text-right font-bold">Old final</th>
+                              <th className="py-1.5 text-right font-bold">Old usage</th>
+                              <th className="py-1.5 text-right font-bold">New initial</th>
+                              <th className="py-1.5 text-right font-bold">New current</th>
+                              <th className="py-1.5 text-right font-bold">New usage</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pair.counters.map((counter) => (
+                              <tr
+                                key={counter.label}
+                                className="border-b border-border/60 last:border-0"
+                              >
+                                <td className="py-1.5 font-semibold text-foreground">
+                                  {counter.label}
+                                </td>
+                                <td className="py-1.5 text-right font-mono">
+                                  {counter.oldStart.toLocaleString()}
+                                </td>
+                                <td className="py-1.5 text-right font-mono">
+                                  {counter.oldEnd.toLocaleString()}
+                                </td>
+                                <td className="py-1.5 text-right font-mono font-bold text-warning">
+                                  {counter.oldUsage.toLocaleString()}
+                                </td>
+                                <td className="py-1.5 text-right font-mono">
+                                  {counter.newStart.toLocaleString()}
+                                </td>
+                                <td className="py-1.5 text-right font-mono">
+                                  {counter.newEnd.toLocaleString()}
+                                </td>
+                                <td className="py-1.5 text-right font-mono font-bold text-success">
+                                  {counter.newUsage.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     {(() => {
                       // Deduplicate items by serialNumber — keep ALLOCATED over REPLACED for same serial

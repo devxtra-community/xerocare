@@ -133,6 +133,17 @@ export const getAvailableProductsByModel = async (modelId: string): Promise<Prod
   return allProducts.filter((p) => allowed.includes(p.product_status));
 };
 
+/** Free serialized machines from every model under the selected machine's brand. */
+export const getAvailableProductsByBrand = async (brand: string): Promise<Product[]> => {
+  const allProducts = await getAllProducts({ limit: 1000 });
+  const allowed = [ProductStatus.AVAILABLE, ProductStatus.RETURNED];
+  const normalizedBrand = brand.trim().toLocaleLowerCase();
+  return allProducts.filter(
+    (p) =>
+      p.brand?.trim().toLocaleLowerCase() === normalizedBrand && allowed.includes(p.product_status),
+  );
+};
+
 /**
  * Registers a new product in the inventory.
  * @param data Product creation data including model, warehouse, and vendor IDs

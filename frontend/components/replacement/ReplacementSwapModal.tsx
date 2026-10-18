@@ -10,7 +10,7 @@ import { Loader2, ArrowRight, PackageCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { getAvailableProductsByModel, Product } from '@/lib/product';
+import { getAvailableProductsByBrand, Product } from '@/lib/product';
 import { getReplacement, selectReplacementUnit, type ReplacementDetail } from '@/lib/replacement';
 
 /**
@@ -20,7 +20,7 @@ import { getReplacement, selectReplacementUnit, type ReplacementDetail } from '@
  * allocation itself only changes when the technician reads both meters on site
  * (installReplacement), because that reading is what sets the billing boundary.
  *
- * The picker is fed by getAvailableProductsByModel, which admits AVAILABLE and RETURNED
+ * The picker is fed by available inventory from the outgoing machine's brand, which admits AVAILABLE and RETURNED
  * only — never DAMAGED. Offering a damaged unit as the fix for a faulty one is the
  * defect this flow was rebuilt to avoid.
  */
@@ -93,8 +93,9 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
         if (cancelled) return;
         setDetail(d);
 
-        if (d.request.modelId) {
-          const list = await getAvailableProductsByModel(d.request.modelId);
+        const outgoingBrand = d.oldProduct?.brand;
+        if (outgoingBrand) {
+          const list = await getAvailableProductsByBrand(outgoingBrand);
           if (cancelled) return;
           // Never offer the machine being replaced back as its own replacement.
           setCandidates(list.filter((p) => p.id !== d.request.oldProductId));
@@ -181,13 +182,13 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
 
               <Panel
                 tone="in"
-                heading="Coming in — same model"
+                heading="Coming in — same brand"
                 serial={chosen?.serial_no}
                 product={chosen as never}
               >
                 <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                    Available machines on this model
+                    Available machines from this brand (all models)
                   </Label>
                   <SearchableSelect
                     value={chosenId}
@@ -213,7 +214,7 @@ export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }
                   />
                   {candidates.length === 0 && (
                     <p className="text-[11px] font-semibold text-warning">
-                      No spare unit of this model is free right now. Add stock or return a unit
+                      No spare unit from this brand is free right now. Add stock or return a unit
                       before proceeding.
                     </p>
                   )}
