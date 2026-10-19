@@ -1491,8 +1491,19 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
+    if (invoice.type !== InvoiceType.QUOTATION) {
+      throw new AppError('This link is not for a customer quotation response', 400);
+    }
+
     // Only allow response on quotations that have been sent to the customer
-    const respondableStatuses = [InvoiceStatus.SENT, InvoiceStatus.DRAFT];
+    // Finance-approved quotations are commonly emailed to the customer directly, so
+    // their response must also be accepted without changing the finance decision first.
+    const respondableStatuses = [
+      InvoiceStatus.SENT,
+      InvoiceStatus.DRAFT,
+      InvoiceStatus.EMPLOYEE_APPROVED,
+      InvoiceStatus.FINANCE_APPROVED,
+    ];
     if (
       !respondableStatuses.includes(invoice.status as InvoiceStatus) &&
       (invoice.status as string) !== 'SENT_TO_CUSTOMER'

@@ -22,7 +22,6 @@ import {
   type InputTaxLocalRow,
   type InputTaxInternationalRow,
   type CountryBreakdownRow,
-  updatePurchaseTaxStatus,
 } from '@/lib/finance/accountsApi';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { fetchBranches } from '@/lib/finance/accounts';
@@ -377,60 +376,6 @@ function OutputTaxTab({
   );
 }
 
-/** Same control as the Finance tax report — see that file for why this exists. */
-function TaxStatusControl({
-  purchaseId,
-  status,
-  onChanged,
-}: {
-  purchaseId: string;
-  status: string;
-  onChanged: () => void;
-}) {
-  const [saving, setSaving] = useState(false);
-  const change = async (next: 'PENDING' | 'RECORDED' | 'FILED') => {
-    if (next === status) return;
-    setSaving(true);
-    try {
-      await updatePurchaseTaxStatus(purchaseId, next);
-      toast.success(`Input VAT marked ${next.toLowerCase()}`);
-      onChanged();
-    } catch {
-      toast.error('Could not update the tax status');
-    } finally {
-      setSaving(false);
-    }
-  };
-  // The control IS the badge. Showing a read-only badge next to a separate picker said
-  // the same thing twice and squeezed both into one narrow column; colouring the select
-  // itself keeps the status just as scannable while leaving room to actually read and
-  // click it.
-  // The trigger keeps the status colour so it still reads as a badge; the menu itself is
-  // the app's styled Select, so the options highlight in the theme accent rather than the
-  // browser's own blue — a native <option> cannot be told to do that.
-  return (
-    <Select
-      disabled={saving}
-      value={status}
-      onValueChange={(v) => change(v as 'PENDING' | 'RECORDED' | 'FILED')}
-    >
-      <SelectTrigger
-        aria-label="Tax status"
-        className={`h-8 w-[120px] border-0 text-xs font-semibold ring-1 ring-inset ring-ring transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-          TAX_STATUS_COLORS[status] ?? 'bg-muted text-foreground'
-        }`}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="PENDING">Pending</SelectItem>
-        <SelectItem value="RECORDED">Recorded</SelectItem>
-        <SelectItem value="FILED">Filed</SelectItem>
-      </SelectContent>
-    </Select>
-  );
-}
-
 function InputTaxLocalTab({
   filters,
   periodReady,
@@ -592,13 +537,13 @@ function InputTaxLocalTab({
                         </span>
                       </TableCell>
                       <TableCell className="pr-4">
-                        <TaxStatusControl
-                          purchaseId={r.id}
-                          status={r.taxStatus}
-                          onChanged={() =>
-                            queryClient.invalidateQueries({ queryKey: ['admin-tax-input-local'] })
-                          }
-                        />
+                        <span
+                          className={`inline-flex rounded-md px-2.5 py-1.5 text-xs font-semibold ${
+                            TAX_STATUS_COLORS[r.taxStatus] ?? 'bg-muted text-foreground'
+                          }`}
+                        >
+                          {r.taxStatus}
+                        </span>
                       </TableCell>
                       <TableCell className="pr-4">
                         {/* Proceed raises the payment request. Hidden once the tax is
@@ -839,13 +784,13 @@ function InputTaxInternationalTab({
                         </span>
                       </TableCell>
                       <TableCell className="pr-4">
-                        <TaxStatusControl
-                          purchaseId={r.id}
-                          status={r.taxStatus}
-                          onChanged={() =>
-                            queryClient.invalidateQueries({ queryKey: ['admin-tax-input-intl'] })
-                          }
-                        />
+                        <span
+                          className={`inline-flex rounded-md px-2.5 py-1.5 text-xs font-semibold ${
+                            TAX_STATUS_COLORS[r.taxStatus] ?? 'bg-muted text-foreground'
+                          }`}
+                        >
+                          {r.taxStatus}
+                        </span>
                       </TableCell>
                       <TableCell className="pr-4">
                         <button

@@ -4,6 +4,19 @@ import { logger } from '../config/logger';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { InvoiceType } from '../entities/enums/invoiceType';
+import { publicAppUrl } from '../utils/publicAppUrl';
+import { encodeShortPublicId } from '../utils/shortPublicId';
+
+function quotationResponseLink(invoiceId: string, action: 'accept' | 'reject'): string {
+  const appBase = publicAppUrl();
+  if (appBase) return `${appBase}/q/${encodeShortPublicId(invoiceId)}?action=${action}`;
+
+  const billingBase =
+    process.env.BILLING_SERVICE_PUBLIC_URL || `http://localhost:${process.env.PORT || 3004}`;
+  return `${billingBase}/invoices/${encodeURIComponent(invoiceId)}/respond?action=${action}`;
+}
 
 export class NotificationService {
   private invoiceRepo = new InvoiceRepository();
@@ -323,17 +336,39 @@ export class NotificationService {
     const contract = await this.invoiceRepo.findById(contractId);
     if (!contract) throw new AppError('Contract not found', 404);
 
+    const customerRespondableStatuses: string[] = [
+      'DRAFT',
+      'SENT',
+      'EMPLOYEE_APPROVED',
+      'FINANCE_APPROVED',
+      'SENT_TO_CUSTOMER',
+    ];
+    const canAskForCustomerDecision =
+      contract.type === InvoiceType.QUOTATION &&
+      customerRespondableStatuses.includes(contract.status);
+    const responseActions = canAskForCustomerDecision
+      ? `
+        <div style="margin:28px 0;padding:24px;border:1px solid #e2e8f0;border-radius:14px;text-align:center;background:#f8fafc;">
+          <p style="margin:0 0 16px;font-size:16px;font-weight:700;color:#0f172a;">Please review and respond to quotation ${contract.invoiceNumber}</p>
+          <a href="${quotationResponseLink(contract.id, 'accept')}" style="display:inline-block;margin:6px;padding:12px 22px;border-radius:8px;background:#15803d;color:#fff;text-decoration:none;font-weight:700;">Approve Quotation</a>
+          <a href="${quotationResponseLink(contract.id, 'reject')}" style="display:inline-block;margin:6px;padding:12px 22px;border-radius:8px;background:#b91c1c;color:#fff;text-decoration:none;font-weight:700;">Reject Quotation</a>
+        </div>`
+      : '';
+
     const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
 
     await NotificationPublisher.publishEmailRequest({
       recipient,
       subject,
-      body,
+      body: `${body}${responseActions}`,
       invoiceId: contract.id,
       attachments,
     });
 
     contract.emailSentAt = new Date();
+    if (canAskForCustomerDecision && contract.status === 'DRAFT') {
+      contract.status = InvoiceStatus.SENT;
+    }
     await this.invoiceRepo.save(contract);
   }
 
