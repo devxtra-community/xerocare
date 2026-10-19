@@ -229,7 +229,9 @@ export default function FinanceQuotationTable({
       q.status === 'EMPLOYEE_APPROVED' ||
       q.status === 'PENDING' ||
       q.status === 'VALIDITY_EXTENSION_REQUESTED' ||
-      q.status === 'WAITING_FINANCE_APPROVAL',
+      q.status === 'WAITING_FINANCE_APPROVAL' ||
+      q.status === 'CUSTOMER_ACCEPTED' ||
+      q.status === 'CUSTOMER_REJECTED',
   ).length;
   const approved = quotations.filter(
     (q) =>
@@ -449,7 +451,9 @@ export default function FinanceQuotationTable({
                     q.status === 'EMPLOYEE_APPROVED' ||
                     q.status === 'TRANSACTION_COMPLETED' ||
                     q.status === 'VALIDITY_EXTENSION_REQUESTED' ||
-                    q.status === 'WAITING_FINANCE_APPROVAL';
+                    q.status === 'WAITING_FINANCE_APPROVAL' ||
+                    q.status === 'CUSTOMER_ACCEPTED' ||
+                    q.status === 'CUSTOMER_REJECTED';
                   return (
                     <TableRow
                       key={q.id}

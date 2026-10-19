@@ -111,7 +111,10 @@ export class BillingService {
       if (actorRole !== 'ADMIN' && (!actorBranchId || invoice.branchId !== actorBranchId)) {
         throw new AppError('You are not authorized to decide quotations for this branch', 403);
       }
-      if (!canDecideServiceQuotation(invoice.status)) {
+      const customerRespondedBeforeFinanceReview =
+        invoice.status === InvoiceStatus.CUSTOMER_ACCEPTED ||
+        invoice.status === InvoiceStatus.CUSTOMER_REJECTED;
+      if (!canDecideServiceQuotation(invoice.status) && !customerRespondedBeforeFinanceReview) {
         throw new AppError('Quotation must be in a pending Finance approval state', 409);
       }
       if (decision === 'REJECTED' && !reason?.trim()) {
