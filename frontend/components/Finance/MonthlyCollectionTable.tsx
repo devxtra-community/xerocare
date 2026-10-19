@@ -608,14 +608,18 @@ export default function MonthlyCollectionTable({
     },
   ];
 
-  // Sort the complete filtered collection set before pagination so invoice
-  // numbers stay in natural ascending order across every page (INV-2 before INV-10).
-  const sortedAlerts = [...alerts].sort((a, b) =>
-    a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, {
+  // Sort the complete collection set before pagination so the most recent
+  // billing period (or contract start for items without a usage period) appears first.
+  const sortedAlerts = [...alerts].sort((a, b) => {
+    const dateA = a.usageData?.billingPeriodEnd || a.effectiveFrom || a.dueDate || '';
+    const dateB = b.usageData?.billingPeriodEnd || b.effectiveFrom || b.dueDate || '';
+    const dateDiff = new Date(dateB).getTime() - new Date(dateA).getTime();
+    if (Number.isFinite(dateDiff) && dateDiff !== 0) return dateDiff;
+    return b.invoiceNumber.localeCompare(a.invoiceNumber, undefined, {
       numeric: true,
       sensitivity: 'base',
-    }),
-  );
+    });
+  });
   const paginatedAlerts = sortedAlerts.slice((page - 1) * limit, page * limit);
 
   return (
