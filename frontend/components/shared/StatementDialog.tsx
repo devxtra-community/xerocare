@@ -110,7 +110,7 @@ const loadImageDataUrl = (src: string) =>
 
 async function generateRunningBalancePdf(data: RunningBalanceStatementData, branch: BranchInfo) {
   const { jsPDF } = await import('jspdf');
-  const pdf = new jsPDF('landscape', 'mm', 'a4');
+  const pdf = new jsPDF('portrait', 'mm', 'a4');
   const [letterheadTop, letterheadFooter, watermark] = await Promise.all([
     loadImageDataUrl(LETTERHEAD_TOP_SRC),
     loadImageDataUrl(LETTERHEAD_FOOTER_SRC),
@@ -123,7 +123,8 @@ async function generateRunningBalancePdf(data: RunningBalanceStatementData, bran
   const topHeight = (pageWidth * 620) / 4960;
   const footerHeight = (pageWidth * 736) / 4960;
   const footerY = pageHeight - footerHeight;
-  const columnWidths = [25, 39, 100, 34, 34, 41];
+  // A4 portrait provides 186mm between the 12mm side margins.
+  const columnWidths = [20, 27, 65, 24, 24, 26];
   const columnTitles = ['DATE', 'REFERENCE', 'DESCRIPTION', 'DEBIT', 'CREDIT', 'BALANCE'];
   const rightAligned = new Set([3, 4, 5]);
   const fmt = (amount: number) => formatCurrency(amount, data.currency);
@@ -524,7 +525,14 @@ export default function StatementDialog({
     const element = printRef.current;
     if (!element) throw new Error('Document not found');
     if (data.kind === 'running-balance') return generateRunningBalancePdf(data, branch);
-    return generateDocPdf(element, { orientation: 'landscape', targetWidth: 1200 });
+    // Wait for the letterhead image elements before html-to-image snapshots the
+    // statement; otherwise the PDF can capture the page before artwork is ready.
+    await Promise.all(
+      Array.from(element.querySelectorAll('img')).map((image) =>
+        image.decode().catch(() => undefined),
+      ),
+    );
+    return generateDocPdf(element, { orientation: 'portrait', targetWidth: 800 });
   };
 
   const filenameBase = () =>
@@ -548,14 +556,28 @@ export default function StatementDialog({
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(
-      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}@page{size:A4 landscape;margin:10mm;}html,body{width:277mm;margin:0;padding:0;}.print-document{width:277mm!important;max-width:none!important;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
+      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}@page{size:A4 portrait;margin:10mm;}html,body{width:190mm;margin:0;padding:0;}.print-document{width:190mm!important;max-width:none!important;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
     );
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
-    win.focus();
-    win.print();
-    win.close();
+    // The statement artwork is loaded as images. Printing immediately after
+    // document.close() races those requests, leaving the letterhead blank.
+    const printWhenReady = async () => {
+      await Promise.all(
+        Array.from(win.document.images).map(async (image) => {
+          if (image.complete) return;
+          await new Promise((resolve) => {
+            image.onload = resolve;
+            image.onerror = resolve;
+          });
+        }),
+      );
+      win.focus();
+      win.print();
+      win.close();
+    };
+    void printWhenReady();
   };
 
   const handleEmail = async () => {
