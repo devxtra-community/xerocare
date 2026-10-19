@@ -190,7 +190,11 @@ export default function FinanceQuotationTable({
           isFirstLoad.current = false;
         }
 
-        setQuotations(onlyQuotations);
+        setQuotations(
+          onlyQuotations.sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+          ),
+        );
       } catch (error) {
         console.error(error);
         if (!silent) toast.error('Failed to load quotations.');

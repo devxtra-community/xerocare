@@ -158,14 +158,16 @@ export default function EmployeeOrdersTable({
     return name.split('(')[0].trim();
   };
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const matchesSearch =
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
+  const filteredInvoices = invoices
+    .filter((inv) => {
+      const matchesSearch =
+        inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+        inv.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.items?.some((item) => item.description.toLowerCase().includes(search.toLowerCase()));
 
-    return matchesSearch;
-  });
+      return matchesSearch;
+    })
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   const aggregateTotal = filteredInvoices
     .filter((inv) => !['REJECTED', 'CANCELLED'].includes(inv.status))

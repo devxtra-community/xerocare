@@ -617,7 +617,7 @@ function GeneralLedgerContent() {
                   </TableCell>
                 </TableRow>
               ) : (
-                withBalance.map((e, i) => (
+                [...withBalance].reverse().map((e, i) => (
                   <TableRow key={i} className="hover:bg-primary/10 transition-colors">
                     <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
                       {e.date}

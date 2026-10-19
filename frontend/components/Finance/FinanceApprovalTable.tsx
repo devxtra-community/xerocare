@@ -89,7 +89,9 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
           return type === target;
         });
       }
-      return filtered;
+      return filtered.sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+      );
     },
   });
 
