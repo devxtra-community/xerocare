@@ -234,6 +234,13 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     const errorCode = error.response?.data?.code;
 
+    // Customer bill links are public bearer-token flows. Even if one of their
+    // endpoints returns 401, show the bill page's own error instead of forcing
+    // the customer into the staff login flow.
+    if (originalRequest?.url?.includes('/b/bill/sign/')) {
+      return Promise.reject(error);
+    }
+
     // Safety First: If the Digital ID Card is expired or invalid,
     // we immediately log the user out to protect their account.
     if (status === 401 && (errorCode === 'TOKEN_REVOKED' || errorCode === 'TOKEN_INVALID')) {

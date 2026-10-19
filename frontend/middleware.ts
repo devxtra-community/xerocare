@@ -11,6 +11,13 @@ interface JwtPayload {
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  // Bill approval links are bearer-token public pages. Keep these explicit
+  // exemptions ahead of every staff route guard so phone/email browsers never
+  // get redirected to the employee login flow.
+  if (path.startsWith('/public/bill/sign/') || path.startsWith('/s/b/')) {
+    return NextResponse.next();
+  }
+
   // Define protected routes and their allowed roles.
   // MANAGER has branch-wide authority: full access to HR, employee and finance sections.
   // ADMIN is the organisation-wide superuser and reaches every section — it
@@ -133,5 +140,7 @@ export const config = {
     '/manager/:path*',
     '/employee/:path*',
     '/finance/:path*',
+    '/public/bill/sign/:path*',
+    '/s/b/:path*',
   ],
 };
