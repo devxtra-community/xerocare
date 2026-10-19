@@ -139,7 +139,7 @@ export function BillModal({
       // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
       // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
       // which is unreachable for the customer the link is being sent to.
-      setRemoteLink(result.link || publicAppLink(`/s/b/${result.token}`));
+      setRemoteLink(result.link || publicAppLink(`/public/bill/sign/${result.token}`));
     } catch (err) {
       toast.error('Failed to generate bill link', { description: getApiErrorMessage(err) });
     } finally {

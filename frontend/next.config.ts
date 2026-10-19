@@ -34,10 +34,6 @@ const nextConfig: NextConfig = {
         destination: '/public/contract/sign/:token',
       },
       {
-        source: '/s/b/:token',
-        destination: '/public/bill/sign/:token',
-      },
-      {
         source: '/s/q/:id',
         destination: 'http://localhost:3001/b/invoices/:id/respond',
       },

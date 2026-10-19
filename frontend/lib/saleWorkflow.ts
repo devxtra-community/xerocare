@@ -1,3 +1,4 @@
+import axios from 'axios';
 import api from './api';
 import { toast } from 'sonner';
 import type { Invoice } from './invoice';
@@ -925,6 +926,14 @@ export const markBillApprovedManually = async (
 };
 
 // Public (no auth header needed — for the remote bill-approval page).
+// Use a separate client so a customer device's stale staff session cannot turn
+// an otherwise public bill link into an automatic redirect to /login.
+const publicBillApi = axios.create({
+  baseURL: api.defaults.baseURL,
+  timeout: 30_000,
+  withCredentials: false,
+});
+
 export interface BillForSigning {
   usage: Partial<Bill>;
   invoice: Invoice | null;
@@ -937,7 +946,7 @@ export interface BillForSigning {
 }
 
 export const getBillForSigning = async (token: string): Promise<BillForSigning> => {
-  const res = await api.get<ApiResponse<BillForSigning>>(`/b/bill/sign/${token}`);
+  const res = await publicBillApi.get<ApiResponse<BillForSigning>>(`/b/bill/sign/${token}`);
   return res.data.data;
 };
 
@@ -945,10 +954,9 @@ export const approveBillRemote = async (
   token: string,
   customerName: string,
 ): Promise<{ billingPeriodEnd: string; approvedAt: string }> => {
-  const res = await api.post<ApiResponse<{ billingPeriodEnd: string; approvedAt: string }>>(
-    `/b/bill/sign/${token}/approve`,
-    { customerName },
-  );
+  const res = await publicBillApi.post<
+    ApiResponse<{ billingPeriodEnd: string; approvedAt: string }>
+  >(`/b/bill/sign/${token}/approve`, { customerName });
   return res.data.data;
 };
 
@@ -956,9 +964,10 @@ export const rejectBillRemote = async (
   token: string,
   reason: string,
 ): Promise<{ rejectedAt: string }> => {
-  const res = await api.post<ApiResponse<{ rejectedAt: string }>>(`/b/bill/sign/${token}/reject`, {
-    reason,
-  });
+  const res = await publicBillApi.post<ApiResponse<{ rejectedAt: string }>>(
+    `/b/bill/sign/${token}/reject`,
+    { reason },
+  );
   return res.data.data;
 };
 

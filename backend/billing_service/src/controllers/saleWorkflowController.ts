@@ -662,7 +662,7 @@ export const getContractForSigning = async (req: Request, res: Response, next: N
 // period's Bill) rather than a dedicated agreement entity.
 
 function billSigningLinkUrl(token: string): string {
-  return `${requirePublicBase()}/s/b/${token}`;
+  return `${requirePublicBase()}/public/bill/sign/${token}`;
 }
 
 async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: string }> {
