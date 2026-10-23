@@ -1596,10 +1596,86 @@ export class UsageService {
     // therefore totalCharge) were silently calculated from zero usage and saved as such, even
     // though the correct per-machine deltas were computed and persisted correctly right below.
     if (payload.items && payload.items.length > 0) {
-      const existingItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
+      let existingItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
         where: { usageRecordId: usage.id },
         relations: ['allocation'],
       });
+
+      // A replacement may be installed after this bill was first created. In that
+      // case its UsageRecordItem does not exist yet, even though the technician has
+      // now recorded both the outgoing and incoming meters. Add the missing rows so
+      // an edited bill can charge the whole period across both machines.
+      const allocationIdsOnBill = new Set(existingItems.map((item) => item.allocationId));
+      const missingPayloadItems = payload.items.filter(
+        (item) => !allocationIdsOnBill.has(item.allocationId),
+      );
+      if (missingPayloadItems.length > 0) {
+        const allocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+          where: { contractId: usage.contractId },
+        });
+        const previousItems = previousRecord
+          ? await this.invoiceRepo.manager.find(UsageRecordItem, {
+              where: { usageRecordId: previousRecord.id },
+            })
+          : [];
+        const additions: UsageRecordItem[] = [];
+
+        for (const payloadItem of missingPayloadItems) {
+          const allocation = allocations.find((item) => item.id === payloadItem.allocationId);
+          if (!allocation || allocation.itemType === 'ACCESSORY') continue;
+
+          const previousItem = previousItems.find((item) => item.allocationId === allocation.id);
+          const startBwA4 = previousItem?.endBwA4 ?? allocation.initialBwA4 ?? 0;
+          const startBwA3 = previousItem?.endBwA3 ?? allocation.initialBwA3 ?? 0;
+          const startColorA4 = previousItem?.endColorA4 ?? allocation.initialColorA4 ?? 0;
+          const startColorA3 = previousItem?.endColorA3 ?? allocation.initialColorA3 ?? 0;
+          const endBwA4 =
+            allocation.status === AllocationStatus.REPLACED
+              ? (allocation.currentBwA4 ?? startBwA4)
+              : payloadItem.endBwA4;
+          const endBwA3 =
+            allocation.status === AllocationStatus.REPLACED
+              ? (allocation.currentBwA3 ?? startBwA3)
+              : payloadItem.endBwA3;
+          const endColorA4 =
+            allocation.status === AllocationStatus.REPLACED
+              ? (allocation.currentColorA4 ?? startColorA4)
+              : payloadItem.endColorA4;
+          const endColorA3 =
+            allocation.status === AllocationStatus.REPLACED
+              ? (allocation.currentColorA3 ?? startColorA3)
+              : payloadItem.endColorA3;
+
+          additions.push(
+            this.invoiceRepo.manager.create(UsageRecordItem, {
+              usageRecord: { id: usage.id } as UsageRecord,
+              allocation,
+              periodStart: usage.billingPeriodStart,
+              periodEnd: usage.billingPeriodEnd,
+              startBwA4,
+              startBwA3,
+              startColorA4,
+              startColorA3,
+              endBwA4,
+              endBwA3,
+              endColorA4,
+              endColorA3,
+              deltaBwA4: Math.max(0, endBwA4 - startBwA4),
+              deltaBwA3: Math.max(0, endBwA3 - startBwA3),
+              deltaColorA4: Math.max(0, endColorA4 - startColorA4),
+              deltaColorA3: Math.max(0, endColorA3 - startColorA3),
+            }),
+          );
+        }
+
+        if (additions.length > 0) {
+          await this.invoiceRepo.manager.save(UsageRecordItem, additions);
+          existingItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
+            where: { usageRecordId: usage.id },
+            relations: ['allocation'],
+          });
+        }
+      }
 
       // Reset deltas for recalculation from items
       bwA4Delta = 0;
@@ -1610,16 +1686,17 @@ export class UsageService {
       for (const existingItem of existingItems) {
         const payloadItem = payload.items.find((i) => i.allocationId === existingItem.allocationId);
 
-        if (payloadItem && existingItem.allocation) {
+        if (existingItem.allocation && existingItem.allocation.itemType !== 'ACCESSORY') {
           const alloc = existingItem.allocation;
 
           if (alloc.status === AllocationStatus.REPLACED) {
-            // Replaced machines usage is already settled. Skip their delta for current billing.
-            existingItem.endBwA4 = alloc.currentBwA4 || existingItem.startBwA4;
-            existingItem.endBwA3 = alloc.currentBwA3 || existingItem.startBwA3;
-            existingItem.endColorA4 = alloc.currentColorA4 || existingItem.endColorA4;
-            existingItem.endColorA3 = alloc.currentColorA3 || existingItem.endColorA3;
-          } else {
+            // Keep the closing meter recorded at the swap; it contributes usage
+            // from the start of this billing period through replacement day.
+            existingItem.endBwA4 = alloc.currentBwA4 ?? existingItem.startBwA4;
+            existingItem.endBwA3 = alloc.currentBwA3 ?? existingItem.startBwA3;
+            existingItem.endColorA4 = alloc.currentColorA4 ?? existingItem.startColorA4;
+            existingItem.endColorA3 = alloc.currentColorA3 ?? existingItem.startColorA3;
+          } else if (payloadItem) {
             existingItem.endBwA4 = payloadItem.endBwA4;
             existingItem.endBwA3 = payloadItem.endBwA3;
             existingItem.endColorA4 = payloadItem.endColorA4;

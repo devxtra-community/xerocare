@@ -510,6 +510,42 @@ export default function UsageRecordingModal({
           uniqueItemsMap.set(item.allocationId, item);
         }
       });
+      // A bill may have been created before a machine was replaced. Include every
+      // metered allocation that overlapped this bill's period so editing it can
+      // capture the outgoing machine's final reading and the replacement's usage.
+      const periodStart = start ? new Date(`${start}T00:00:00`).getTime() : NaN;
+      const periodEnd = end ? new Date(`${end}T23:59:59.999`).getTime() : NaN;
+      const priorUsageItems = prevUsage?.items || [];
+      (contract.productAllocations || []).forEach((allocation) => {
+        if (allocation.itemType === 'ACCESSORY' || uniqueItemsMap.has(allocation.id)) return;
+        const allocationStart = allocation.startTimestamp
+          ? new Date(allocation.startTimestamp).getTime()
+          : 0;
+        const allocationEnd = allocation.endTimestamp
+          ? new Date(allocation.endTimestamp).getTime()
+          : Infinity;
+        const overlapsPeriod = allocationStart <= periodEnd && allocationEnd >= periodStart;
+        if (!overlapsPeriod) return;
+
+        const priorItem = priorUsageItems.find((item) => item.allocationId === allocation.id);
+        const startBwA4 = priorItem?.endBwA4 ?? allocation.initialBwA4 ?? 0;
+        const startBwA3 = priorItem?.endBwA3 ?? allocation.initialBwA3 ?? 0;
+        const startColorA4 = priorItem?.endColorA4 ?? allocation.initialColorA4 ?? 0;
+        const startColorA3 = priorItem?.endColorA3 ?? allocation.initialColorA3 ?? 0;
+        uniqueItemsMap.set(allocation.id, {
+          description: allocation.serialNumber || 'Machine',
+          allocationId: allocation.id,
+          allocation,
+          startBwA4,
+          startBwA3,
+          startColorA4,
+          startColorA3,
+          endBwA4: allocation.currentBwA4 ?? startBwA4,
+          endBwA3: allocation.currentBwA3 ?? startBwA3,
+          endColorA4: allocation.currentColorA4 ?? startColorA4,
+          endColorA3: allocation.currentColorA3 ?? startColorA3,
+        } as UsageInvoiceItem);
+      });
       const uniqueItemsList = Array.from(uniqueItemsMap.values()).map((item) => ({
         allocationId: item.allocationId || '',
         serialNumber: item.allocation?.serialNumber,
@@ -748,6 +784,7 @@ export default function UsageRecordingModal({
     historyFetching,
     editingInvoice,
     effectivePrevCounts,
+    prevUsage?.items,
     formData,
   ]);
 
