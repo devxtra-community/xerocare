@@ -43,11 +43,23 @@ export default function Dashboard() {
         setTotalSales(salesData.totalSales);
 
         // Set sales by type
-        salesData.salesByType.forEach((item) => {
-          if (item.saleType === 'SALE') setSaleAmount(item.total);
-          else if (item.saleType === 'RENT') setRentAmount(item.total);
-          else if (item.saleType === 'LEASE') setLeaseAmount(item.total);
-        });
+        // The sales card represents all direct sale revenue. These are stored
+        // as separate invoice types, so include product and spare part sales.
+        setSaleAmount(
+          salesData.salesByType
+            .filter((item) => ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(item.saleType))
+            .reduce((total, item) => total + Number(item.total || 0), 0),
+        );
+        setRentAmount(
+          salesData.salesByType
+            .filter((item) => item.saleType === 'RENT')
+            .reduce((total, item) => total + Number(item.total || 0), 0),
+        );
+        setLeaseAmount(
+          salesData.salesByType
+            .filter((item) => item.saleType === 'LEASE')
+            .reduce((total, item) => total + Number(item.total || 0), 0),
+        );
 
         // Filter expiring / expired contracts
         const now = new Date();

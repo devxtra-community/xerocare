@@ -62,14 +62,15 @@ export default function BranchSalesChart({
           const amount = curr.totalSales;
           const type = curr.saleType.toUpperCase();
 
+          const isSale = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(type);
           if (existing) {
-            if (type === 'SALE') existing.sale = (existing.sale || 0) + amount;
+            if (isSale) existing.sale = (existing.sale || 0) + amount;
             else if (type === 'RENT') existing.rent = (existing.rent || 0) + amount;
             else if (type === 'LEASE') existing.lease = (existing.lease || 0) + amount;
           } else {
             acc.push({
               date,
-              sale: type === 'SALE' ? amount : 0,
+              sale: isSale ? amount : 0,
               rent: type === 'RENT' ? amount : 0,
               lease: type === 'LEASE' ? amount : 0,
             });
