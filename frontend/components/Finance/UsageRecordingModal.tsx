@@ -867,10 +867,21 @@ export default function UsageRecordingModal({
         const replacementTime = allocation.endTimestamp
           ? new Date(allocation.endTimestamp).getTime()
           : NaN;
+        const oldItem = formData.items.find((item) => item.allocationId === allocation.id);
+        const carriesUnbilledUsage =
+          !!editingInvoice &&
+          !!oldItem &&
+          [
+            [oldItem.startBwA4, oldItem.endBwA4],
+            [oldItem.startBwA3, oldItem.endBwA3],
+            [oldItem.startColorA4, oldItem.endColorA4],
+            [oldItem.startColorA3, oldItem.endColorA3],
+          ].some(([start, end]) => Number(end || 0) > Number(start || 0));
         return (
           allocation.status === 'REPLACED' &&
-          replacementTime >= periodStart &&
-          replacementTime <= periodEnd + 24 * 60 * 60 * 1000 - 1
+          ((replacementTime >= periodStart &&
+            replacementTime <= periodEnd + 24 * 60 * 60 * 1000 - 1) ||
+            carriesUnbilledUsage)
         );
       })
       .map((oldAllocation) => {
@@ -2358,7 +2369,15 @@ export default function UsageRecordingModal({
                         const startPeriod = new Date(formData.billingPeriodStart).getTime();
                         const endPeriod = new Date(formData.billingPeriodEnd).getTime();
                         const endTs = a.endTimestamp ? new Date(a.endTimestamp).getTime() : 0;
-                        return endTs >= startPeriod && endTs <= endPeriod;
+                        const carriesUnbilledUsage =
+                          !!editingInvoice &&
+                          [
+                            [item.startBwA4, item.endBwA4],
+                            [item.startBwA3, item.endBwA3],
+                            [item.startColorA4, item.endColorA4],
+                            [item.startColorA3, item.endColorA3],
+                          ].some(([start, end]) => Number(end || 0) > Number(start || 0));
+                        return (endTs >= startPeriod && endTs <= endPeriod) || carriesUnbilledUsage;
                       });
                       // Deduplicate by serialNumber — prefer ALLOCATED, then first seen
                       const seenSerials = new Map<string, (typeof filtered)[0]>();
