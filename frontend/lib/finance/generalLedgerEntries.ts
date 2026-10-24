@@ -121,6 +121,7 @@ export const EXPENSE_CATEGORY_ACCOUNT: Record<string, { code: string; name: stri
   MAINTENANCE: { code: '5007', name: 'Maintenance & Repair Expense' },
   INSURANCE: { code: '5013', name: 'Insurance Expense' },
   DEPRECIATION: { code: '5003', name: 'Depreciation Expense' },
+  CARD_PROCESSING_FEE: { code: '5016', name: 'Card Processing Fees' },
   OTHER: { code: '5008', name: 'Office & Admin Expense' },
 };
 const DEFAULT_EXPENSE_ACCOUNT = { code: '5008', name: 'Office & Admin Expense' };

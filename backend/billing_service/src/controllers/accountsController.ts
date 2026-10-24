@@ -525,7 +525,11 @@ export const getDayBook = async (req: Request, res: Response, next: NextFunction
     applyBranchQB(expQb as never, 'exp', branchFilter);
     const paidExpenses = await expQb.getMany();
     const synthPayments: CashbookEntry[] = paidExpenses
-      .filter((exp) => !postedExpenseIds.has(exp.id))
+      // Card-processing fees are withheld by the acquirer. Their ExpenseEntry is
+      // linked to the settlement bank account for audit/GL, while the corresponding
+      // net receipt is the sole cashbook movement; synthesizing an expense payment
+      // here would show a second bank outflow that never occurred.
+      .filter((exp) => exp.category !== 'CARD_PROCESSING_FEE' && !postedExpenseIds.has(exp.id))
       .map((exp) => {
         const e = new CashbookEntry();
         e.id = exp.id;

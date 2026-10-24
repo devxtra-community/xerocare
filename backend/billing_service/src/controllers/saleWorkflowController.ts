@@ -2748,12 +2748,10 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
           account.currentBalance = Number(account.currentBalance) + bankMovement;
           await queryRunner.manager.save(CashBankAccount, account);
 
-          // The MDR itself, as a merchant expense against 5016 Card Processing Fees.
-          //
-          // Recorded APPROVED with no paidFrom on purpose: the money never left a bank
-          // account of ours, it was withheld at source, and the cashbook entry above is
-          // already net of it. Giving it a paidFrom would deduct the same fee a second
-          // time and put the bank balance out by the fee on every card sale.
+          // The MDR is paid by withholding it from the gross card receipt. Link the
+          // expense to the settlement bank account and mark it paid, but do not post a
+          // separate cashbook payment: the receipt above already represents gross less
+          // fee, so another outflow would reduce the bank balance twice.
           if (isOnlineCard && commission > 0) {
             const expenseNo = `CPF-${request.requestNo}`;
             const already = await queryRunner.manager.findOne(ExpenseEntry, {
@@ -2775,7 +2773,10 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
                 vatAmount: 0,
                 netAmount: commission,
                 currency: request.currency,
-                status: 'APPROVED',
+                status: 'PAID',
+                paidFrom: account.id,
+                paymentDate: new Date(request.paymentDate),
+                paymentMode: 'ONLINE_PAYMENT',
                 referenceNo: request.transactionReference ?? request.referenceNumber,
                 approvedBy: userId,
                 createdBy: userId,

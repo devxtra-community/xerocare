@@ -385,6 +385,19 @@ export const processDirectSaleCardSettlement = async (
       where: { sourceType: 'DIRECT_SALE_CARD_SETTLEMENT', sourceId: txn.id },
     });
     if (prior) {
+      // The net receipt is already posted. Keep the withheld commission expense in
+      // sync with that settlement without posting a second cash movement.
+      const priorExpense = await runner.manager.findOne(ExpenseEntry, {
+        where: { expenseNo: `CPF-${txn.id}` },
+      });
+      if (priorExpense && priorExpense.status !== 'PAID') {
+        priorExpense.status = 'PAID';
+        priorExpense.paidFrom = prior.accountId;
+        priorExpense.paymentDate = prior.date;
+        priorExpense.paymentMode = 'ONLINE_PAYMENT';
+        priorExpense.referenceNo = prior.referenceNo;
+        await runner.manager.save(ExpenseEntry, priorExpense);
+      }
       await runner.commitTransaction();
       res.json({ success: true, data: { transactionId: txn.id, alreadyProcessed: true } });
       return;
@@ -510,8 +523,11 @@ export const processDirectSaleCardSettlement = async (
         vatAmount: 0,
         netAmount: commission,
         currency,
-        status: 'APPROVED',
-        referenceNo: txn.transactionReference,
+        status: 'PAID',
+        paidFrom: account.id,
+        paymentDate: new Date(),
+        paymentMode: 'ONLINE_PAYMENT',
+        referenceNo: `CSET-${txn.id}`,
         approvedBy: userId,
         createdBy: userId,
       });
