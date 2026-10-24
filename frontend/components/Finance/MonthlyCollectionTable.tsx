@@ -608,11 +608,11 @@ export default function MonthlyCollectionTable({
     },
   ];
 
-  // Sort the complete collection set before pagination so the most recent
-  // billing period (or contract start for items without a usage period) appears first.
+  // Sort by contract creation time so newly created contracts appear first,
+  // regardless of whether their billing periods begin in the future.
   const sortedAlerts = [...alerts].sort((a, b) => {
-    const dateA = a.usageData?.billingPeriodEnd || a.effectiveFrom || a.dueDate || '';
-    const dateB = b.usageData?.billingPeriodEnd || b.effectiveFrom || b.dueDate || '';
+    const dateA = a.createdAt || a.effectiveFrom || a.dueDate || '';
+    const dateB = b.createdAt || b.effectiveFrom || b.dueDate || '';
     const dateDiff = new Date(dateB).getTime() - new Date(dateA).getTime();
     if (Number.isFinite(dateDiff) && dateDiff !== 0) return dateDiff;
     return b.invoiceNumber.localeCompare(a.invoiceNumber, undefined, {

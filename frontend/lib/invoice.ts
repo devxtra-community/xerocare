@@ -890,6 +890,7 @@ export interface CollectionAlert {
   type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING' | 'SUMMARY_PENDING';
   saleType: string;
   dueDate: string;
+  createdAt?: string;
   finalInvoiceId?: string;
   effectiveFrom?: string;
   effectiveTo?: string;

@@ -41,6 +41,7 @@ interface CollectionAlert {
   type: string;
   saleType: string;
   dueDate: string;
+  createdAt?: string;
 }
 
 interface InvoiceItem {
