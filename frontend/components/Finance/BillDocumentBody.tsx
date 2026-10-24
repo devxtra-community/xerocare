@@ -653,6 +653,35 @@ function UsageSection({
 
   const months = PERIOD_MONTHS[invoice.rentPeriod || 'MONTHLY'] ?? 1;
 
+  // For a bill that spans a machine replacement, the per-allocation rows are the
+  // authoritative source for usage. Older records (and records created while the
+  // replacement was being finalized) can have contract-level deltas containing only
+  // the currently installed machine's usage even though both machine rows are present.
+  // Rebuild the period deltas from those rows so the printed usage matches the form's
+  // combined total and the Machines section above.
+  const hasReplacementUsage = (bill.items ?? []).some(
+    (item) => item.allocation?.status === 'REPLACED',
+  );
+  const itemDeltas = hasReplacementUsage
+    ? (bill.items ?? []).reduce(
+        (sum, item) => ({
+          bwA4: sum.bwA4 + Number(item.deltaBwA4 ?? Math.max(0, item.endBwA4 - item.startBwA4)),
+          bwA3: sum.bwA3 + Number(item.deltaBwA3 ?? Math.max(0, item.endBwA3 - item.startBwA3)),
+          colorA4:
+            sum.colorA4 +
+            Number(item.deltaColorA4 ?? Math.max(0, item.endColorA4 - item.startColorA4)),
+          colorA3:
+            sum.colorA3 +
+            Number(item.deltaColorA3 ?? Math.max(0, item.endColorA3 - item.startColorA3)),
+        }),
+        { bwA4: 0, bwA3: 0, colorA4: 0, colorA3: 0 },
+      )
+    : null;
+  const bwA4Delta = itemDeltas?.bwA4 ?? Number(bill.bwA4Delta ?? 0);
+  const bwA3Delta = itemDeltas?.bwA3 ?? Number(bill.bwA3Delta ?? 0);
+  const colorA4Delta = itemDeltas?.colorA4 ?? Number(bill.colorA4Delta ?? 0);
+  const colorA3Delta = itemDeltas?.colorA3 ?? Number(bill.colorA3Delta ?? 0);
+
   // Opening side of this period: the previous bill's closing counters. On a contract's
   // very first bill there is none, so fall back to the installation readings captured on
   // the machine allocations — the same starting point the usage engine measures from.
@@ -780,8 +809,8 @@ function UsageSection({
         prevA3: prev.bwA3 + prev.colorA3,
         curA4: Number(bill.bwA4Count ?? 0) + Number(bill.colorA4Count ?? 0),
         curA3: Number(bill.bwA3Count ?? 0) + Number(bill.colorA3Count ?? 0),
-        deltaA4: Number(bill.bwA4Delta ?? 0) + Number(bill.colorA4Delta ?? 0),
-        deltaA3: Number(bill.bwA3Delta ?? 0) + Number(bill.colorA3Delta ?? 0),
+        deltaA4: bwA4Delta + colorA4Delta,
+        deltaA3: bwA3Delta + colorA3Delta,
         discountCopies: discountBw + discountColor,
         limit,
         rate,
@@ -792,13 +821,11 @@ function UsageSection({
     const slabbed = !isFixedLimit; // CPC / CPC_COMBO price off slab tables, not an allowance
     const bwExcess = Math.max(
       0,
-      a4eq(Number(bill.bwA4Delta ?? 0), Number(bill.bwA3Delta ?? 0)) -
-        discountBw -
-        Number(rule.bw?.bwIncludedLimit ?? 0),
+      a4eq(bwA4Delta, bwA3Delta) - discountBw - Number(rule.bw?.bwIncludedLimit ?? 0),
     );
     const colorExcess = Math.max(
       0,
-      a4eq(Number(bill.colorA4Delta ?? 0), Number(bill.colorA3Delta ?? 0)) -
+      a4eq(colorA4Delta, colorA3Delta) -
         discountColor -
         Number(rule.color?.colorIncludedLimit ?? 0),
     );
@@ -810,8 +837,8 @@ function UsageSection({
         prevA3: prev.bwA3,
         curA4: Number(bill.bwA4Count ?? 0),
         curA3: Number(bill.bwA3Count ?? 0),
-        deltaA4: Number(bill.bwA4Delta ?? 0),
-        deltaA3: Number(bill.bwA3Delta ?? 0),
+        deltaA4: bwA4Delta,
+        deltaA3: bwA3Delta,
         discountCopies: discountBw,
         limit: Number(rule.bw?.bwIncludedLimit ?? 0),
         rate: Number(rule.bw?.bwExcessRate ?? 0),
@@ -824,8 +851,8 @@ function UsageSection({
     });
 
     const hasColour =
-      Number(bill.colorA4Delta ?? 0) > 0 ||
-      Number(bill.colorA3Delta ?? 0) > 0 ||
+      colorA4Delta > 0 ||
+      colorA3Delta > 0 ||
       Number(rule.color?.colorIncludedLimit ?? 0) > 0 ||
       Number(rule.color?.colorExcessRate ?? 0) > 0;
     if (hasColour) {
@@ -836,8 +863,8 @@ function UsageSection({
           prevA3: prev.colorA3,
           curA4: Number(bill.colorA4Count ?? 0),
           curA3: Number(bill.colorA3Count ?? 0),
-          deltaA4: Number(bill.colorA4Delta ?? 0),
-          deltaA3: Number(bill.colorA3Delta ?? 0),
+          deltaA4: colorA4Delta,
+          deltaA3: colorA3Delta,
           discountCopies: discountColor,
           limit: Number(rule.color?.colorIncludedLimit ?? 0),
           rate: Number(rule.color?.colorExcessRate ?? 0),

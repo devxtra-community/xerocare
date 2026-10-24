@@ -759,7 +759,7 @@ export const getBill = async (req: Request, res: Response, next: NextFunction) =
         // ADMIN/SUPER_ADMIN can view any branch's bill — retry without the branch check.
         const usage = await Source.getRepository(UsageRecord).findOne({
           where: { id: req.params.id as string },
-          relations: ['items'],
+          relations: ['items', 'items.allocation'],
         });
         if (!usage) throw new AppError('Bill not found', 404);
         const invoice = await Source.getRepository(Invoice).findOne({
