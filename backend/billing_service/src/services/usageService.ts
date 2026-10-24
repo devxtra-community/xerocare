@@ -19,7 +19,7 @@ import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent'
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { withBillNumber } from '../utils/billNumber';
 import { PaymentTiming } from '../entities/enums/paymentTiming';
-import { MoreThanOrEqual, In } from 'typeorm';
+import { In } from 'typeorm';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
@@ -208,31 +208,50 @@ export class UsageService {
     // usage record is saved (see utils/meterReadingSync).
     const meterPushes: MeterReadingPush[] = [];
 
-    // Fetch Overlapping Allocations for this billing period
-    const submittedAllocationIds = (payload.items || [])
-      .map((item) => item.allocationId)
-      .filter(Boolean);
-    const overlappingAllocations = await this.invoiceRepo.manager.find(ProductAllocation, {
-      where: [
-        { contractId: payload.contractId, status: AllocationStatus.ALLOCATED },
-        {
-          contractId: payload.contractId,
-          status: AllocationStatus.REPLACED,
-          endTimestamp: MoreThanOrEqual(new Date(payload.billingPeriodStart)),
-        },
-        // The usage form can carry an outgoing machine's final reading into the first
-        // bill recorded after the swap, even when the swap date precedes this period.
-        // Include those submitted replaced allocations so their usage is charged once.
-        ...(submittedAllocationIds.length > 0
-          ? [
-              {
-                contractId: payload.contractId,
-                status: AllocationStatus.REPLACED,
-                id: In(submittedAllocationIds),
-              },
-            ]
-          : []),
-      ],
+    // Fetch the contract's metered allocations. A replaced machine's final reading may
+    // need to be carried into this bill even when its swap date was before the period.
+    const periodStart = new Date(payload.billingPeriodStart).getTime();
+    const periodEnd = new Date(`${payload.billingPeriodEnd}T23:59:59.999`).getTime();
+    const contractAllocations = await this.invoiceRepo.manager.find(ProductAllocation, {
+      where: {
+        contractId: payload.contractId,
+        status: In([AllocationStatus.ALLOCATED, AllocationStatus.REPLACED]),
+      },
+    });
+    const overlappingAllocations = contractAllocations.filter((allocation) => {
+      if (allocation.status === AllocationStatus.ALLOCATED) return true;
+
+      const replacementTime = allocation.endTimestamp?.getTime() ?? NaN;
+      if (!Number.isFinite(replacementTime) || replacementTime > periodEnd) return false;
+      const previousItem = previousItems.find((item) => item.allocationId === allocation.id);
+      const priorReadings = previousItem
+        ? [
+            previousItem.endBwA4,
+            previousItem.endBwA3,
+            previousItem.endColorA4,
+            previousItem.endColorA3,
+          ]
+        : [
+            allocation.initialBwA4,
+            allocation.initialBwA3,
+            allocation.initialColorA4,
+            allocation.initialColorA3,
+          ];
+      const closingReadings = [
+        allocation.currentBwA4,
+        allocation.currentBwA3,
+        allocation.currentColorA4,
+        allocation.currentColorA3,
+      ];
+      const hasUnbilledFinalReading = closingReadings.some(
+        (reading, index) => Number(reading || 0) > Number(priorReadings[index] || 0),
+      );
+      const wasReplacedDuringPeriod = replacementTime >= periodStart;
+
+      // Include a replacement-period reading, or carry any final meter increase that
+      // was not included in the immediately preceding bill. A final reading already
+      // billed in a previous period is not charged again.
+      return wasReplacedDuringPeriod || hasUnbilledFinalReading;
     });
 
     let bwA4Delta = 0;

@@ -530,17 +530,33 @@ export default function UsageRecordingModal({
         const allocationEndDay = String(allocation.endTimestamp || '').slice(0, 10) || '9999-12-31';
         const overlapsPeriod =
           allocationStartDay <= periodEndDay && allocationEndDay >= periodStartDay;
-        const wasAlreadyBilled = priorUsageItems.some(
-          (item) => item.allocationId === allocation.id,
+        const priorItem = priorUsageItems.find((item) => item.allocationId === allocation.id);
+        const priorReadings = priorItem
+          ? [priorItem.endBwA4, priorItem.endBwA3, priorItem.endColorA4, priorItem.endColorA3]
+          : [
+              allocation.initialBwA4,
+              allocation.initialBwA3,
+              allocation.initialColorA4,
+              allocation.initialColorA3,
+            ];
+        const closingReadings = [
+          allocation.currentBwA4,
+          allocation.currentBwA3,
+          allocation.currentColorA4,
+          allocation.currentColorA3,
+        ];
+        const hasUnbilledFinalReading = closingReadings.some(
+          (reading, index) => Number(reading || 0) > Number(priorReadings[index] || 0),
         );
         // If the outgoing machine's final usage was missed by the bill created at
         // replacement time, carry it into the first later bill that ends after the swap.
         // The previous period's item list makes this a one-time carry-forward.
         const firstBillAfterReplacement =
-          allocation.status === 'REPLACED' && allocationEndDay <= periodEndDay && !wasAlreadyBilled;
+          allocation.status === 'REPLACED' &&
+          allocationEndDay <= periodEndDay &&
+          hasUnbilledFinalReading;
         if (!overlapsPeriod && !firstBillAfterReplacement) return;
 
-        const priorItem = priorUsageItems.find((item) => item.allocationId === allocation.id);
         const startBwA4 = priorItem?.endBwA4 ?? allocation.initialBwA4 ?? 0;
         const startBwA3 = priorItem?.endBwA3 ?? allocation.initialBwA3 ?? 0;
         const startColorA4 = priorItem?.endColorA4 ?? allocation.initialColorA4 ?? 0;
