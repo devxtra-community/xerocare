@@ -51,7 +51,6 @@ import { ContractActionsMenu } from './ContractActionsMenu';
 import { ActionGroup, ActionIconButton } from '@/components/ui/ActionIconButton';
 import {
   SignContractMark,
-  ActivateContractMark,
   AdvancePaymentMark,
   SecurityBillMark,
   SendMark,
@@ -372,6 +371,8 @@ export default function EmployeeRentTable({
         description: `${inv.invoiceNumber} is now active on the service desk.`,
       });
       fetchInvoices();
+      onRefresh?.();
+      setContractInvoice(null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message || 'Failed to activate contract');
@@ -610,15 +611,6 @@ export default function EmployeeRentTable({
                                     description: 'Capture the customer signature',
                                     onClick: () => setContractInvoice(inv),
                                   },
-                                  {
-                                    key: 'activate',
-                                    icon: <ActivateContractMark />,
-                                    label: 'Activate Contract',
-                                    description: 'Allocate machines and go live',
-                                    loading: activatingContractId === inv.id,
-                                    closeOnSelect: false,
-                                    onClick: () => handleActivateContract(inv),
-                                  },
                                 ]
                               : []),
                             ...(inv.contractStatus === 'ACTIVE'
@@ -805,6 +797,8 @@ export default function EmployeeRentTable({
               // only closes when the user explicitly clicks Close.
               fetchInvoices();
             }}
+            onActivate={() => handleActivateContract(contractInvoice)}
+            isActivating={activatingContractId === contractInvoice.id}
           />
         )}
 

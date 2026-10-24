@@ -55,6 +55,8 @@ interface ContractAgreementModalProps {
   open: boolean;
   onClose: () => void;
   onSigned?: (agreement: ContractAgreement) => void;
+  onActivate?: () => void | Promise<void>;
+  isActivating?: boolean;
 }
 
 type SignTab = 'view' | 'employee-sign' | 'customer-sign' | 'remote-sign';
@@ -68,6 +70,8 @@ export function ContractAgreementModal({
   open,
   onClose,
   onSigned,
+  onActivate,
+  isActivating = false,
 }: ContractAgreementModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -804,6 +808,20 @@ export function ContractAgreementModal({
                 )}
               </Button>
             </div>
+          )}
+          {onActivate && invoice.contractStatus === 'PENDING_CONFIRMATION' && (
+            <Button
+              onClick={() => void onActivate()}
+              disabled={isActivating}
+              className="h-9 bg-primary text-[10px] font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90"
+            >
+              {isActivating ? (
+                <Loader2 size={14} className="mr-1 animate-spin" />
+              ) : (
+                <CheckCircle2 size={14} className="mr-1" />
+              )}
+              Activate Contract
+            </Button>
           )}
           <Button
             variant="ghost"

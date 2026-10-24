@@ -301,21 +301,71 @@ export function TotalsBlock({
 
 export async function generateDocPdf(
   element: HTMLElement,
-  options: { orientation?: 'portrait' | 'landscape'; targetWidth?: number } = {},
+  options: {
+    orientation?: 'portrait' | 'landscape';
+    targetWidth?: number;
+    resolveExternalImage?: (source: string) => Promise<Blob>;
+  } = {},
 ) {
   const { toPng } = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
 
   const TARGET_WIDTH = options.targetWidth ?? 900;
   const orig = element.getAttribute('style') || '';
+  const originalImages = Array.from(element.querySelectorAll('img')).map((image) => ({
+    image,
+    src: image.getAttribute('src'),
+    srcSet: image.getAttribute('srcset'),
+    crossOrigin: image.getAttribute('crossorigin'),
+  }));
+  const objectUrls: string[] = [];
   element.setAttribute(
     'style',
     `${orig}; width:${TARGET_WIDTH}px !important; max-width:${TARGET_WIDTH}px !important; overflow:visible !important;`,
   );
-  await new Promise<void>((r) => setTimeout(r, 120));
 
   let dataUrl: string;
   try {
+    if (options.resolveExternalImage) {
+      await Promise.all(
+        originalImages.map(async ({ image }) => {
+          const source = image.currentSrc || image.src;
+          if (!source || source.startsWith('data:') || source.startsWith('blob:')) return;
+          const sourceUrl = new URL(source, window.location.href);
+          if (sourceUrl.origin === window.location.origin) return;
+
+          const blob = await options.resolveExternalImage!(sourceUrl.href);
+          const objectUrl = URL.createObjectURL(blob);
+          objectUrls.push(objectUrl);
+          image.removeAttribute('srcset');
+          image.removeAttribute('crossorigin');
+          image.src = objectUrl;
+          await new Promise<void>((resolve, reject) => {
+            if (image.complete && image.naturalWidth > 0) return resolve();
+            const timeout = window.setTimeout(() => {
+              cleanup();
+              reject(new Error('An external document image did not load in time'));
+            }, 15000);
+            const cleanup = () => {
+              window.clearTimeout(timeout);
+              image.removeEventListener('load', onLoad);
+              image.removeEventListener('error', onError);
+            };
+            const onLoad = () => {
+              cleanup();
+              resolve();
+            };
+            const onError = () => {
+              cleanup();
+              reject(new Error('An external document image could not be loaded'));
+            };
+            image.addEventListener('load', onLoad, { once: true });
+            image.addEventListener('error', onError, { once: true });
+          });
+        }),
+      );
+    }
+    await new Promise<void>((r) => setTimeout(r, 120));
     dataUrl = await toPng(element, {
       quality: 1,
       pixelRatio: 2,
@@ -324,6 +374,15 @@ export async function generateDocPdf(
     });
   } finally {
     element.setAttribute('style', orig);
+    originalImages.forEach(({ image, src, srcSet, crossOrigin }) => {
+      if (src === null) image.removeAttribute('src');
+      else image.setAttribute('src', src);
+      if (srcSet === null) image.removeAttribute('srcset');
+      else image.setAttribute('srcset', srcSet);
+      if (crossOrigin === null) image.removeAttribute('crossorigin');
+      else image.setAttribute('crossorigin', crossOrigin);
+    });
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
   }
 
   const pdf = new jsPDF(options.orientation === 'landscape' ? 'l' : 'p', 'mm', 'a4');

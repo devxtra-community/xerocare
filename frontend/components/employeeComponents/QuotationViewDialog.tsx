@@ -525,7 +525,7 @@ export function QuotationViewDialog({
     }
     setIsDownloadingPdf(true);
     try {
-      const pdf = await generateDocPdf(element);
+      const pdf = await generateDocPdf(element, { resolveExternalImage: getQuotationImage });
       pdf.save(`Quotation-${quotation.invoiceNumber || quotation.id}.pdf`);
       toast.success('Quotation PDF downloaded');
     } catch {

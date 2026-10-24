@@ -43,7 +43,6 @@ import {
   SecurityBillMark,
   SendMark,
   SignContractMark,
-  ActivateContractMark,
 } from '@/components/ui/BrandMarks';
 import {
   Dialog,
@@ -276,6 +275,7 @@ export default function EmployeeLeaseTable({
       });
       fetchInvoices();
       onRefresh?.();
+      setContractInvoice(null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message || 'Failed to activate contract');
@@ -613,15 +613,6 @@ export default function EmployeeLeaseTable({
                                     description: 'Capture the customer signature',
                                     onClick: () => setContractInvoice(inv),
                                   },
-                                  {
-                                    key: 'activate',
-                                    icon: <ActivateContractMark />,
-                                    label: 'Activate Contract',
-                                    description: 'Allocate machines and go live',
-                                    loading: activatingContractId === inv.id,
-                                    closeOnSelect: false,
-                                    onClick: () => handleActivateContract(inv),
-                                  },
                                 ]
                               : []),
                             ...(inv.contractStatus === 'ACTIVE'
@@ -764,6 +755,8 @@ export default function EmployeeLeaseTable({
           invoice={contractInvoice}
           onClose={() => setContractInvoice(null)}
           onSigned={() => fetchInvoices()}
+          onActivate={() => handleActivateContract(contractInvoice)}
+          isActivating={activatingContractId === contractInvoice.id}
         />
       )}
       {isConverterOpen && (
