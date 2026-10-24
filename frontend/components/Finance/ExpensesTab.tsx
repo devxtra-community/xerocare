@@ -184,6 +184,13 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
     staleTime: 5 * 60_000,
   });
   const categoryOptions = useMemo(() => expenseCategoryOptions(coaRows), [coaRows]);
+  const expenseFilterCategories = useMemo(() => {
+    const labels = new Map(EXPENSE_CATEGORIES_LIST.map(({ value, label }) => [value, label]));
+    categoryOptions.forEach(({ key, label }) => {
+      if (!labels.has(key)) labels.set(key, label);
+    });
+    return Array.from(labels, ([value, label]) => ({ value, label }));
+  }, [categoryOptions]);
   const accounts = accountsRaw as {
     id: string;
     name: string;
@@ -242,7 +249,14 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
     });
   }, [expenseRequests, statusFilter, categoryFilter, roleFilter, dateFrom, dateTo, search]);
 
-  const ownExpensePaging = useTablePagination(ownExpenses, branchIds ?? '');
+  const filteredOwnExpenses = useMemo(
+    () =>
+      ownExpenses.filter(
+        (expense) => categoryFilter === 'ALL' || expense.category === categoryFilter,
+      ),
+    [ownExpenses, categoryFilter],
+  );
+  const ownExpensePaging = useTablePagination(filteredOwnExpenses, branchIds ?? '');
   const requestPaging = useTablePagination(
     filtered,
     `${statusFilter}|${categoryFilter}|${roleFilter}|${dateFrom}|${dateTo}|${search}`,
@@ -319,7 +333,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Categories</SelectItem>
-              {EXPENSE_CATEGORIES_LIST.map((c) => (
+              {expenseFilterCategories.map((c) => (
                 <SelectItem key={c.value} value={c.value}>
                   {c.label}
                 </SelectItem>

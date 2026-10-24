@@ -1340,7 +1340,7 @@ function HistoryDrawer({
 
   return (
     <Sheet open onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl p-0 flex flex-col">
+      <SheetContent side="right" className="w-[96vw] sm:max-w-[1400px] p-0 flex flex-col">
         <SheetHeader className="px-6 py-4 border-b shrink-0">
           <SheetTitle className="text-base">{account.name} — Transaction History</SheetTitle>
           <div className="text-sm text-muted-foreground mt-1 flex items-center gap-4">
@@ -1430,7 +1430,7 @@ function HistoryDrawer({
                     <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
                       {String(e.date).slice(0, 10)}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground break-all">
                       {e.referenceNo}
                     </td>
                     <td className="px-4 py-2.5">
@@ -1439,7 +1439,7 @@ function HistoryDrawer({
                       </span>
                     </td>
                     <td
-                      className="px-4 py-2.5 max-w-[200px] truncate text-foreground"
+                      className="px-3 py-2.5 max-w-[280px] truncate text-foreground"
                       title={e.description}
                     >
                       {e.description || e.category}
