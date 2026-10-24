@@ -510,22 +510,35 @@ export default function UsageRecordingModal({
           uniqueItemsMap.set(item.allocationId, item);
         }
       });
-      // A bill may have been created before a machine was replaced. Include every
-      // metered allocation that overlapped this bill's period so editing it can
-      // capture the outgoing machine's final reading and the replacement's usage.
-      const periodStart = start ? new Date(`${start}T00:00:00`).getTime() : NaN;
-      const periodEnd = end ? new Date(`${end}T23:59:59.999`).getTime() : NaN;
-      const priorUsageItems = prevUsage?.items || [];
+      // Include meter allocations that overlap this bill and any outgoing machine
+      // whose final usage has not yet appeared in an earlier bill.
+      const periodStartDay = start.slice(0, 10);
+      const periodEndDay = end.slice(0, 10);
+      const priorUsage = history
+        .filter(
+          (record) =>
+            record.id !== inv.id &&
+            (record.billType === undefined || record.billType === 'USAGE') &&
+            String(record.periodStart).slice(0, 10) < periodStartDay,
+        )
+        .sort((a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime())[0];
+      const priorUsageItems = priorUsage?.items || [];
       (contract.productAllocations || []).forEach((allocation) => {
         if (allocation.itemType === 'ACCESSORY' || uniqueItemsMap.has(allocation.id)) return;
-        const allocationStart = allocation.startTimestamp
-          ? new Date(allocation.startTimestamp).getTime()
-          : 0;
-        const allocationEnd = allocation.endTimestamp
-          ? new Date(allocation.endTimestamp).getTime()
-          : Infinity;
-        const overlapsPeriod = allocationStart <= periodEnd && allocationEnd >= periodStart;
-        if (!overlapsPeriod) return;
+        const allocationStartDay =
+          String(allocation.startTimestamp || '').slice(0, 10) || '0000-00-00';
+        const allocationEndDay = String(allocation.endTimestamp || '').slice(0, 10) || '9999-12-31';
+        const overlapsPeriod =
+          allocationStartDay <= periodEndDay && allocationEndDay >= periodStartDay;
+        const wasAlreadyBilled = priorUsageItems.some(
+          (item) => item.allocationId === allocation.id,
+        );
+        // If the outgoing machine's final usage was missed by the bill created at
+        // replacement time, carry it into the first later bill that ends after the swap.
+        // The previous period's item list makes this a one-time carry-forward.
+        const firstBillAfterReplacement =
+          allocation.status === 'REPLACED' && allocationEndDay <= periodEndDay && !wasAlreadyBilled;
+        if (!overlapsPeriod && !firstBillAfterReplacement) return;
 
         const priorItem = priorUsageItems.find((item) => item.allocationId === allocation.id);
         const startBwA4 = priorItem?.endBwA4 ?? allocation.initialBwA4 ?? 0;
