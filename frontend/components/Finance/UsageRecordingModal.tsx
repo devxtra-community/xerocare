@@ -654,7 +654,25 @@ export default function UsageRecordingModal({
             // blindly here would re-propagate it into every subsequent period forever — the
             // merge loop's accessory skip never gets a chance to remove it, since an
             // allocation "already in items" is left as-is, not re-validated.
-            .filter((item) => item.allocation?.itemType !== 'ACCESSORY')
+            .filter((item) => {
+              if (item.allocation?.itemType === 'ACCESSORY') return false;
+
+              // Keep a replaced unit in the next bill only when its final meter has
+              // not yet been billed. Once the prior bill already contains the closing
+              // reading, carrying this row forward makes the old machine reappear in
+              // every later month's usage form.
+              const allocation = contract.productAllocations?.find(
+                (candidate) => candidate.id === item.allocationId,
+              );
+              if (allocation?.status !== 'REPLACED') return true;
+
+              return [
+                [allocation.currentBwA4, item.endBwA4],
+                [allocation.currentBwA3, item.endBwA3],
+                [allocation.currentColorA4, item.endColorA4],
+                [allocation.currentColorA3, item.endColorA3],
+              ].some(([closing, billed]) => Number(closing || 0) > Number(billed || 0));
+            })
             .map((item) => ({
               allocationId: item.allocationId,
               serialNumber: item.allocation?.serialNumber,
