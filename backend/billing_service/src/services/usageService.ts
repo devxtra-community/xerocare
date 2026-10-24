@@ -209,6 +209,9 @@ export class UsageService {
     const meterPushes: MeterReadingPush[] = [];
 
     // Fetch Overlapping Allocations for this billing period
+    const submittedAllocationIds = (payload.items || [])
+      .map((item) => item.allocationId)
+      .filter(Boolean);
     const overlappingAllocations = await this.invoiceRepo.manager.find(ProductAllocation, {
       where: [
         { contractId: payload.contractId, status: AllocationStatus.ALLOCATED },
@@ -217,6 +220,18 @@ export class UsageService {
           status: AllocationStatus.REPLACED,
           endTimestamp: MoreThanOrEqual(new Date(payload.billingPeriodStart)),
         },
+        // The usage form can carry an outgoing machine's final reading into the first
+        // bill recorded after the swap, even when the swap date precedes this period.
+        // Include those submitted replaced allocations so their usage is charged once.
+        ...(submittedAllocationIds.length > 0
+          ? [
+              {
+                contractId: payload.contractId,
+                status: AllocationStatus.REPLACED,
+                id: In(submittedAllocationIds),
+              },
+            ]
+          : []),
       ],
     });
 
@@ -253,6 +268,7 @@ export class UsageService {
           startColorA3 = prevItem.endColorA3;
         } else if (
           previousRecord &&
+          alloc.status !== AllocationStatus.REPLACED &&
           new Date(alloc.startTimestamp) < new Date(payload.billingPeriodStart)
         ) {
           // Legacy fallback: device was active in previous period, but per-unit items are missing.
