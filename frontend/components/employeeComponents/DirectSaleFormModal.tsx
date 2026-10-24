@@ -824,6 +824,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 <ProductSelect
                   onSelect={handleAddItem}
                   mode="BOTH"
+                  excludeAllocatedProducts
                   selectedQuantities={selectedQuantities}
                   placeholder="Search by name, model or serial — add as many as you need"
                   className="rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary w-full"

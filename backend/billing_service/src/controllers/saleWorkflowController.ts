@@ -3338,6 +3338,33 @@ export const refundSecurityDeposit = async (req: Request, res: Response, next: N
 
 // ─── Sale Contracts list (Customer Contracts page) ────────────────────────────
 
+/** Product ids already held by an active contract or completed direct sale.
+ * Inventory status updates are event-driven, so this allocation check is the reliable
+ * source for hiding units that must not be selected for another sale. */
+export const getUnavailableDirectSaleProductIds = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const rows: Array<{ productId: string | null; serialNumber: string | null }> =
+      await Source.query(`
+      SELECT DISTINCT "productId" AS "productId", "serialNumber" AS "serialNumber"
+      FROM product_allocations
+      WHERE status = 'ALLOCATED'
+    `);
+    res.json({
+      success: true,
+      data: {
+        productIds: rows.map((row) => row.productId).filter(Boolean),
+        serialNumbers: rows.map((row) => row.serialNumber).filter(Boolean),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getSaleContracts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { branchId, role } = req.user!;

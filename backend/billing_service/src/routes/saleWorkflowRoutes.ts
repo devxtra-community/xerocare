@@ -39,6 +39,7 @@ import {
   applySecurityDepositToBill,
   reverseDepositApplication,
   getSaleContracts,
+  getUnavailableDirectSaleProductIds,
   updateDeliveryStatus,
   getPendingUsagePayments,
   collectPendingUsagePayment,
@@ -87,6 +88,11 @@ import {
 const router = Router();
 
 // ─── Sale Contracts list ──────────────────────────────────────────────────────
+router.get(
+  '/direct-sale/unavailable-product-ids',
+  authMiddleware,
+  getUnavailableDirectSaleProductIds,
+);
 router.get('/sale-contracts', authMiddleware, getSaleContracts);
 router.patch(
   '/sale-contracts/:id/delivery-status',

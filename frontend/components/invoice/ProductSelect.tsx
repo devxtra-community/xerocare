@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getAllProducts, Product, ProductStatus } from '@/lib/product';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
+import api from '@/lib/api';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -14,6 +15,8 @@ interface ProductSelectProps {
   className?: string;
   onlyAvailable?: boolean;
   selectedQuantities?: Record<string, number>;
+  /** Hide serialized units already assigned to an active contract or direct sale. */
+  excludeAllocatedProducts?: boolean;
 }
 
 /**
@@ -27,6 +30,7 @@ export function ProductSelect({
   className,
   onlyAvailable = true,
   selectedQuantities,
+  excludeAllocatedProducts = false,
 }: ProductSelectProps & { placeholder?: string }) {
   const [items, setItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,6 +46,29 @@ export function ProductSelect({
           const fetchParams: { limit?: number; status?: string } = { limit: 10000 };
           // Fetch all products for the branch to handle local filtering of multi-status (AVAILABLE, RETURNED, DAMAGED)
           productsData = await getAllProducts(fetchParams);
+
+          if (excludeAllocatedProducts) {
+            try {
+              const response = await api.get('/b/direct-sale/unavailable-product-ids');
+              const unavailableIds = new Set<string>(response.data?.data?.productIds ?? []);
+              const unavailableSerials = new Set<string>(
+                (response.data?.data?.serialNumbers ?? []).map((serial: string) =>
+                  serial.trim().toLocaleLowerCase(),
+                ),
+              );
+              productsData = productsData.filter(
+                (product) =>
+                  !unavailableIds.has(product.id) &&
+                  !unavailableSerials.has((product.serial_no || '').trim().toLocaleLowerCase()),
+              );
+            } catch (error) {
+              // Fail closed for serialized products. Inventory status can lag behind
+              // contract allocation events, so offering the unfiltered list could let
+              // a user select a machine already on a rent, lease, or sale contract.
+              console.error('Could not verify product allocations for direct sale', error);
+              productsData = [];
+            }
+          }
 
           if (onlyAvailable) {
             const allowedStatuses = [
@@ -71,7 +98,7 @@ export function ProductSelect({
       }
     };
     fetchData();
-  }, [mode, onlyAvailable]);
+  }, [mode, onlyAvailable, excludeAllocatedProducts]);
 
   const handleValueChange = (val: string) => {
     const selected = items.find((item) => item.id === val);

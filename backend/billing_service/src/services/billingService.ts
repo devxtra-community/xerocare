@@ -3938,6 +3938,23 @@ export class BillingService {
             400,
           );
         }
+
+        // Inventory status changes are event-driven and can lag behind Billing's
+        // active allocation. Treat the allocation as authoritative so a rented,
+        // leased, or already-sold unit is rejected before creating the invoice.
+        const activeAllocation = await this.invoiceRepo.manager.findOne(ProductAllocation, {
+          where: [
+            { productId: item.productId, status: AllocationStatus.ALLOCATED },
+            { serialNumber: item.serialNumber, status: AllocationStatus.ALLOCATED },
+          ],
+          select: ['id'],
+        });
+        if (activeAllocation) {
+          throw new AppError(
+            `Product ${item.serialNumber} is already assigned to a contract or sale. Choose another unit.`,
+            409,
+          );
+        }
       }
 
       if (item.itemType === 'SPARE_PART') {
@@ -4077,24 +4094,34 @@ export class BillingService {
           });
 
           // Create ProductAllocation for safety/billing tracking
-          await queryRunner.manager.insert(ProductAllocation, {
-            contractId: savedInvoice.id,
-            modelId: item.modelId,
-            productId: item.productId,
-            serialNumber: item.serialNumber,
-            // Guaranteed PRODUCT — this whole branch is gated on item.itemType === 'PRODUCT'
-            // above; accessories are a Rent/Lease-only concept this Sale path never sees.
-            itemType: 'PRODUCT',
-            status: AllocationStatus.ALLOCATED,
-            initialBwA4: 0,
-            initialBwA3: 0,
-            initialColorA4: 0,
-            initialColorA3: 0,
-            currentBwA4: 0,
-            currentBwA3: 0,
-            currentColorA4: 0,
-            currentColorA3: 0,
-          });
+          try {
+            await queryRunner.manager.insert(ProductAllocation, {
+              contractId: savedInvoice.id,
+              modelId: item.modelId,
+              productId: item.productId,
+              serialNumber: item.serialNumber,
+              // Guaranteed PRODUCT — this whole branch is gated on item.itemType === 'PRODUCT'
+              // above; accessories are a Rent/Lease-only concept this Sale path never sees.
+              itemType: 'PRODUCT',
+              status: AllocationStatus.ALLOCATED,
+              initialBwA4: 0,
+              initialBwA3: 0,
+              initialColorA4: 0,
+              initialColorA3: 0,
+              currentBwA4: 0,
+              currentBwA3: 0,
+              currentColorA4: 0,
+              currentColorA3: 0,
+            });
+          } catch (err) {
+            if ((err as { code?: string }).code === '23505') {
+              throw new AppError(
+                `Product ${item.serialNumber} was assigned to another contract while this sale was being created. Choose another unit.`,
+                409,
+              );
+            }
+            throw err;
+          }
         } else if (item.itemType === 'SPARE_PART') {
           reductionsToEmit.push({
             sparePartId: item.sparePartId!,
