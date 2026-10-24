@@ -191,6 +191,24 @@ function PausedTimer({
   );
 }
 
+const UI_CONSUMABLE_CATEGORIES = new Set([
+  'TONER',
+  'CONSUMABLE',
+  'INK',
+  'DRUM',
+  'FUSER',
+  'TRANSFER_BELT',
+  'PAPER_FEED_ROLLER',
+  'ROLLER',
+]);
+
+const isUiConsumable = (item: { partCategory?: string | null; partName?: string | null }) =>
+  item.partCategory
+    ? UI_CONSUMABLE_CATEGORIES.has(item.partCategory.toUpperCase())
+    : /toner|cartridge|ink\b|developer|drum|fuser|transfer belt|paper feed roller/i.test(
+        item.partName || '',
+      );
+
 interface VisitLog {
   ticketNumber: string;
   serviceContext: string;
@@ -306,6 +324,7 @@ export default function ServiceDashboardPage() {
     technicianRemarks: '',
     customerSignature: 'Customer Signed',
     technicianSignature: 'Technician Signed',
+    usedItems: [] as Array<{ ticketItemId?: string; sparePartId?: string; quantity: number }>,
   });
 
   // Arrival guard before the diagnosis timer starts (two-step confirm)
@@ -608,6 +627,7 @@ export default function ServiceDashboardPage() {
       quantity: number;
       unitPrice: number;
       isFree: boolean;
+      partCategory?: string | null;
     }>;
   }>({
     notes: '',
@@ -1394,6 +1414,7 @@ export default function ServiceDashboardPage() {
         chequeNumber: collectMode === 'CHEQUE' ? collectChequeNo : undefined,
         chequeBankName: collectMode === 'CHEQUE' ? collectChequeBank : undefined,
         chequeDate: collectMode === 'CHEQUE' ? collectChequeDate : undefined,
+        usedItems: completeForm.usedItems,
       });
       setShowCompleteModal(false);
       setCompleteForm({
@@ -1404,6 +1425,7 @@ export default function ServiceDashboardPage() {
         technicianRemarks: '',
         customerSignature: 'Customer Signed',
         technicianSignature: 'Technician Signed',
+        usedItems: [],
       });
       setCompletionNotes('');
       setCollectAmount('');
@@ -2060,7 +2082,11 @@ export default function ServiceDashboardPage() {
           partName: '',
           quantity: 1,
           unitPrice: 0,
-          isFree: false,
+          isFree:
+            selectedTicket?.focPolicy === 'LOCKED'
+              ? (selectedTicket.coverage?.spareParts ?? true)
+              : false,
+          partCategory: null,
         },
       ],
     }));
@@ -2077,6 +2103,25 @@ export default function ServiceDashboardPage() {
             sparePartId: value as string,
             partName: part.part_name,
             unitPrice: Number(part.base_price) || 0,
+            partCategory: part.part_category || null,
+            isFree: (() => {
+              if (selectedTicket?.focPolicy !== 'LOCKED') return updated[index].isFree;
+              const consumable = [
+                'TONER',
+                'CONSUMABLE',
+                'INK',
+                'DRUM',
+                'FUSER',
+                'TRANSFER_BELT',
+                'PAPER_FEED_ROLLER',
+                'ROLLER',
+              ].includes((part.part_category || '').toUpperCase());
+              return selectedTicket.coverage
+                ? consumable
+                  ? selectedTicket.coverage.toner
+                  : selectedTicket.coverage.spareParts
+                : true;
+            })(),
           };
         }
       } else if (key === 'itemSource' && value === 'CUSTOM') {
@@ -2789,6 +2834,11 @@ export default function ServiceDashboardPage() {
                                       technicianRemarks: '',
                                       customerSignature: 'Customer Signed',
                                       technicianSignature: 'Technician Signed',
+                                      usedItems: (ticket.items || []).map((item) => ({
+                                        ticketItemId: item.id,
+                                        sparePartId: item.sparePartId,
+                                        quantity: item.quantity,
+                                      })),
                                     });
                                     setCompletionNotes('');
                                     setShowCompleteModal(true);
@@ -4362,6 +4412,14 @@ export default function ServiceDashboardPage() {
                   <CardDescription className="text-xs">
                     Record issue diagnosis notes and declare parts that need to be replaced.
                   </CardDescription>
+                  {selectedTicket.focPolicy === 'LOCKED' && (
+                    <div className="mt-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-[11px] font-semibold text-success">
+                      {selectedTicket.serviceContext.replace(/_/g, ' ')} coverage is active. Covered
+                      items are automatically FOC and locked; no estimate is required for routine
+                      covered work. Any out-of-coverage item is routed through the normal estimate
+                      review.
+                    </div>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -4688,11 +4746,36 @@ export default function ServiceDashboardPage() {
                         <label className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-border bg-card cursor-pointer select-none">
                           <input
                             type="checkbox"
-                            checked={item.isFree}
+                            checked={
+                              item.isFree ||
+                              (selectedTicket.focPolicy === 'LOCKED' &&
+                                (selectedTicket.coverage
+                                  ? isUiConsumable(item)
+                                    ? selectedTicket.coverage.toner
+                                    : selectedTicket.coverage.spareParts
+                                  : true))
+                            }
+                            disabled={
+                              selectedTicket.focPolicy === 'LOCKED' &&
+                              (selectedTicket.coverage
+                                ? isUiConsumable(item)
+                                  ? selectedTicket.coverage.toner
+                                  : selectedTicket.coverage.spareParts
+                                : true)
+                            }
                             onChange={(e) => updateDiagnosisItem(idx, 'isFree', e.target.checked)}
                             className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                           />
-                          <span className="text-[11px] font-bold text-foreground">Free / FOC</span>
+                          <span className="text-[11px] font-bold text-foreground">
+                            Free / FOC
+                            {selectedTicket.focPolicy === 'LOCKED' &&
+                              (selectedTicket.coverage
+                                ? isUiConsumable(item)
+                                  ? selectedTicket.coverage.toner
+                                  : selectedTicket.coverage.spareParts
+                                : true) &&
+                              ' (locked)'}
+                          </span>
                         </label>
                       </div>
                     </div>
@@ -5212,6 +5295,88 @@ export default function ServiceDashboardPage() {
                     />
                   </div>
                 </div>
+
+                {selectedTicket.items?.length > 0 && (
+                  <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-foreground">
+                        Actual parts and consumables used
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Confirm the quantity actually used. Unused reserved stock is returned to
+                        availability; selling price and customer charge remain separate.
+                      </p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px]">
+                        <thead>
+                          <tr className="border-b border-border text-muted-foreground">
+                            <th className="py-2 text-left font-bold">Item</th>
+                            <th className="py-2 text-right font-bold">Selling price</th>
+                            <th className="py-2 text-right font-bold">Customer charge</th>
+                            <th className="py-2 text-right font-bold">Used qty</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedTicket.items.map((item, index) => {
+                            const usedIndex = completeForm.usedItems.findIndex(
+                              (used) => used.ticketItemId === item.id,
+                            );
+                            const used = usedIndex >= 0 ? completeForm.usedItems[usedIndex] : null;
+                            return (
+                              <tr
+                                key={item.id || `${item.partName}-${index}`}
+                                className="border-b border-border/60"
+                              >
+                                <td className="py-2 pr-2 font-semibold text-foreground">
+                                  {item.partName}
+                                </td>
+                                <td className="py-2 text-right text-foreground">
+                                  {getActiveCurrency()}{' '}
+                                  {Number(item.listUnitPrice ?? item.unitPrice).toFixed(2)}
+                                </td>
+                                <td className="py-2 text-right font-bold text-success">
+                                  {item.isFree
+                                    ? `${getActiveCurrency()} 0.00 — FOC`
+                                    : `${getActiveCurrency()} ${Number(item.unitPrice).toFixed(2)}`}
+                                </td>
+                                <td className="py-2 pl-2 text-right">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    value={used?.quantity ?? item.quantity}
+                                    onChange={(e) => {
+                                      const quantity = Math.max(
+                                        0,
+                                        parseInt(e.target.value, 10) || 0,
+                                      );
+                                      setCompleteForm((prev) => {
+                                        const next = [...prev.usedItems];
+                                        const at = next.findIndex(
+                                          (row) => row.ticketItemId === item.id,
+                                        );
+                                        const row = {
+                                          ticketItemId: item.id,
+                                          sparePartId: item.sparePartId,
+                                          quantity,
+                                        };
+                                        if (at >= 0) next[at] = row;
+                                        else next.push(row);
+                                        return { ...prev, usedItems: next };
+                                      });
+                                    }}
+                                    className="ml-auto h-8 w-20 text-xs bg-card border-border rounded-lg text-right"
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
@@ -5947,6 +6112,11 @@ export default function ServiceDashboardPage() {
                                   technicianRemarks: '',
                                   customerSignature: 'Customer Signed',
                                   technicianSignature: 'Technician Signed',
+                                  usedItems: (selectedTicket.items || []).map((item) => ({
+                                    ticketItemId: item.id,
+                                    sparePartId: item.sparePartId,
+                                    quantity: item.quantity,
+                                  })),
                                 });
                                 setCompletionNotes('');
                                 setShowCompleteModal(true);

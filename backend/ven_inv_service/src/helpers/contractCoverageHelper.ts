@@ -119,6 +119,26 @@ export const coverageForServiceContext = (
   return { ...NO_COVERAGE };
 };
 
+/**
+ * Contexts whose routine service is allowed to skip the estimate workflow.
+ * Warranty/SMA/AMC coverage remains governed by the existing estimate rules;
+ * this list is deliberately limited to the covered-service paths requested by
+ * the service workflow.
+ */
+export const isEstimateFreeServiceContext = (serviceContext: string): boolean =>
+  ['RENT', 'LEASE_CPC', 'FSMA'].includes(serviceContext);
+
+/**
+ * Whether an item is mandatory FOC for the covered-service path. The caller
+ * must provide the server-resolved coverage; context labels alone are not
+ * sufficient when a contract has item-level rules.
+ */
+export const isMandatoryCoveredItem = (
+  serviceContext: string,
+  coverage: ContractCoverage,
+  opts: { partCategory?: string | null; partName?: string | null },
+): boolean => isEstimateFreeServiceContext(serviceContext) && coverageAllowsItem(coverage, opts);
+
 /** True when the given part/item category is paid for by the contract. */
 export const coverageAllowsItem = (
   coverage: ContractCoverage,

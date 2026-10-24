@@ -106,6 +106,13 @@ export interface ServiceTicket {
   branchName?: string;
   branchId?: string;
   linkedInvoiceId?: string | null;
+  coverage?: {
+    labour: boolean;
+    spareParts: boolean;
+    toner: boolean;
+    travel: boolean;
+  };
+  focPolicy?: 'LOCKED' | 'EDITABLE';
 }
 
 export const getServiceTickets = async (branchId?: string): Promise<ServiceTicket[]> => {
@@ -283,6 +290,11 @@ export const completeServiceTicket = async (
     chequeNumber?: string;
     chequeBankName?: string;
     chequeDate?: string;
+    usedItems?: Array<{
+      ticketItemId?: string;
+      sparePartId?: string;
+      quantity: number;
+    }>;
   },
 ): Promise<ServiceTicket> => {
   const response = await api.post(`/i/service/tickets/${id}/complete`, payload);

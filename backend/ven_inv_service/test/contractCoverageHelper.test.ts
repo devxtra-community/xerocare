@@ -5,6 +5,8 @@ import {
   coverageAllowsItem,
   coverageForServiceContext,
   inferCatalogPartCategory,
+  isEstimateFreeServiceContext,
+  isMandatoryCoveredItem,
 } from '../src/helpers/contractCoverageHelper';
 import { selectPendingServiceEstimateQueue } from '../src/helpers/financeServiceEstimateQueue';
 
@@ -76,6 +78,32 @@ test('resolved contract coverage overrides context defaults', () => {
     travel: false,
   };
   assert.deepEqual(coverageForServiceContext('RENT', customCoverage), customCoverage);
+});
+
+test('covered-service FOC is mandatory only for rental, lease CPC, and FSMA contexts', () => {
+  const full = coverageForServiceContext('RENT');
+  assert.equal(isEstimateFreeServiceContext('RENT'), true);
+  assert.equal(isEstimateFreeServiceContext('LEASE_CPC'), true);
+  assert.equal(isEstimateFreeServiceContext('FSMA'), true);
+  assert.equal(isEstimateFreeServiceContext('SMA'), false);
+  assert.equal(isMandatoryCoveredItem('RENT', full, { partCategory: 'SPARE_PART' }), true);
+  assert.equal(isMandatoryCoveredItem('LEASE_CPC', full, { partCategory: 'TONER' }), true);
+  assert.equal(isMandatoryCoveredItem('FSMA', full, { partCategory: 'CONSUMABLE' }), true);
+  assert.equal(
+    isMandatoryCoveredItem('FSMA', { ...full, toner: false }, { partCategory: 'TONER' }),
+    false,
+  );
+  assert.equal(
+    coverageAllowsItem({ ...full, toner: false }, { partCategory: 'TONER' }),
+    false,
+    'mixed coverage must route an excluded toner line for review',
+  );
+  assert.equal(
+    isMandatoryCoveredItem('FSMA', { ...full, toner: false }, { partCategory: 'SPARE_PART' }),
+    true,
+    'mixed coverage still enforces FOC for covered spare parts',
+  );
+  assert.equal(isMandatoryCoveredItem('SMA', full, { partCategory: 'SPARE_PART' }), false);
 });
 
 test('Finance queue includes zero and positive customer totals without requiring an invoice', () => {

@@ -2136,6 +2136,11 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
   try {
     const productId = req.params.productId as string;
     const serialNumber = req.query.serialNumber as string;
+    const requestedServiceDate = req.query.serviceDate as string | undefined;
+    const serviceDate = requestedServiceDate ? new Date(requestedServiceDate) : new Date();
+    if (Number.isNaN(serviceDate.getTime())) {
+      throw new AppError('Invalid serviceDate supplied for machine billing context.', 400);
+    }
 
     // A Rent/Lease contract is identified by saleType. billType is NULL on every contract
     // created through the normal flow (only opening-balance imports set it), so matching
@@ -2155,13 +2160,13 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
         AND (i."billType" = 'RENT' OR (i."billType" IS NULL AND i."saleType" = 'RENT'))
         AND i."contractStatus" = 'ACTIVE'
         AND pa.status = 'ALLOCATED'
-        AND pa."startTimestamp" <= CURRENT_TIMESTAMP
-        AND (pa."endTimestamp" IS NULL OR pa."endTimestamp" > CURRENT_TIMESTAMP)
+        AND pa."startTimestamp" <= $3::timestamp
+        AND (pa."endTimestamp" IS NULL OR pa."endTimestamp" > $3::timestamp)
         AND (pa."productId" = $1 OR pa."serialNumber" = $2)
       ORDER BY pa."startTimestamp" DESC, pa."createdAt" DESC
       LIMIT 2;
     `,
-      [productId, serialNumber],
+      [productId, serialNumber, serviceDate],
     );
 
     const saleInvoice = await Source.query(
@@ -2191,13 +2196,13 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
         AND (i."billType" = 'LEASE' OR (i."billType" IS NULL AND i."saleType" = 'LEASE'))
         AND i."contractStatus" = 'ACTIVE'
         AND pa.status = 'ALLOCATED'
-        AND pa."startTimestamp" <= CURRENT_TIMESTAMP
-        AND (pa."endTimestamp" IS NULL OR pa."endTimestamp" > CURRENT_TIMESTAMP)
+        AND pa."startTimestamp" <= $3::timestamp
+        AND (pa."endTimestamp" IS NULL OR pa."endTimestamp" > $3::timestamp)
         AND (pa."productId" = $1 OR pa."serialNumber" = $2)
       ORDER BY pa."startTimestamp" DESC, pa."createdAt" DESC
       LIMIT 2;
     `,
-      [productId, serialNumber],
+      [productId, serialNumber, serviceDate],
     );
 
     // A service context must never be selected arbitrarily when the same

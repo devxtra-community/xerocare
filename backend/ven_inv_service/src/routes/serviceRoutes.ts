@@ -161,11 +161,7 @@ router.get('/tickets/:id/quotation-pdf', controller.getQuotationPdf);
 router.get('/tickets/:id/completion-bill-pdf', controller.getCompletionBillPdf);
 router.post('/tickets/:id/send-quotation', controller.sendQuotation);
 router.post('/tickets/:id/send-completion-bill', controller.sendCompletionBill);
-router.post(
-  '/tickets/:id/cancel',
-  requireServiceRole([], false), // Only ADMIN and MANAGER
-  controller.cancelTicket,
-);
+router.post('/tickets/:id/cancel', roleMiddleware(['ADMIN', 'MANAGER']), controller.cancelTicket);
 router.get('/technicians', controller.getTechnicians);
 router.get('/accounts/cash-bank', controller.listCashBankAccounts);
 router.get('/technicians/:technicianId/performance', controller.getTechnicianPerformance);

@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { ServiceTicketItem } from './serviceTicketItemEntity';
 import { MachineType } from './enums/machineType';
+import type { ContractCoverage } from '../helpers/contractCoverageHelper';
 
 export { MachineType };
 
@@ -302,4 +303,8 @@ export class ServiceTicket {
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  /** Response-only metadata used by the service UI; never persisted. */
+  coverage?: ContractCoverage;
+  focPolicy?: 'LOCKED' | 'EDITABLE';
 }

@@ -22,6 +22,8 @@ export interface WarrantyEvaluationInput {
   fallbackMonths?: number;
   /** Legacy fallback when no explicit copy limit: maxCopyLimit or warranty_max_pages. */
   fallbackCopyLimit?: number;
+  /** Evaluate the warranty at this service event time instead of wall-clock now. */
+  asOf?: Date;
 }
 
 export interface WarrantyEvaluation {
@@ -49,7 +51,7 @@ export interface WarrantyEvaluation {
  */
 export function evaluateWarranty(input: WarrantyEvaluationInput): WarrantyEvaluation {
   const warrantyType = (input.warrantyType || 'duration').toLowerCase();
-  const now = new Date();
+  const now = input.asOf ? new Date(input.asOf) : new Date();
 
   let warrantyEndDate: Date | null = null;
   let copyLimit: number | null = null;

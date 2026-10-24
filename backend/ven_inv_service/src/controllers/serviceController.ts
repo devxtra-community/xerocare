@@ -50,6 +50,8 @@ import {
   normalizeCoverage,
   coverageAllowsItem,
   isConsumableCategory,
+  isEstimateFreeServiceContext,
+  isMandatoryCoveredItem,
 } from '../helpers/contractCoverageHelper';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
@@ -658,44 +660,190 @@ export class ServiceController {
    * Helper to release reserved parts.
    */
   private async releaseReservations(ticketId: string): Promise<void> {
-    const sparePartRepo = Source.getRepository(SparePart);
-    const reservationRepo = Source.getRepository(InventoryReservation);
-
-    const reservations = await reservationRepo.find({
-      where: { ticketId, status: 'RESERVED' },
-    });
-    for (const res of reservations) {
-      const part = await sparePartRepo.findOne({ where: { id: res.sparePartId } });
-      if (part) {
-        part.quantity += res.reservedQuantity;
-        part.reserved_quantity = Math.max(0, part.reserved_quantity - res.reservedQuantity);
+    const runner = Source.createQueryRunner();
+    const changedPartIds = new Set<string>();
+    try {
+      await runner.connect();
+      await runner.startTransaction();
+      const sparePartRepo = runner.manager.getRepository(SparePart);
+      const reservationRepo = runner.manager.getRepository(InventoryReservation);
+      const reservations = await reservationRepo.find({
+        where: { ticketId, status: 'RESERVED' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      for (const reservation of reservations) {
+        const part = await sparePartRepo.findOne({
+          where: { id: reservation.sparePartId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!part) throw new AppError(`Spare part not found: ${reservation.sparePartId}`, 404);
+        part.quantity += reservation.reservedQuantity;
+        part.reserved_quantity = Math.max(0, part.reserved_quantity - reservation.reservedQuantity);
         await sparePartRepo.save(part);
-        await deleteCached(`sparepart:${part.id}`);
+        changedPartIds.add(part.id);
+
+        reservation.status = 'RELEASED';
+        await reservationRepo.save(reservation);
       }
-      res.status = 'RELEASED';
-      await reservationRepo.save(res);
+      await runner.commitTransaction();
+    } catch (error) {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
+    for (const sparePartId of changedPartIds) {
+      await deleteCached(`sparepart:${sparePartId}`);
     }
   }
 
   /**
-   * Helper to consume reserved parts on ticket completion.
+   * Atomically reconcile the technician's confirmed usage and consume the
+   * resulting reservations. A retry after a later usage/history failure sees
+   * CONSUMED quantities and only applies the remaining delta; it cannot issue
+   * the same stock twice.
    */
-  private async consumeReservations(ticketId: string): Promise<void> {
-    const sparePartRepo = Source.getRepository(SparePart);
-    const reservationRepo = Source.getRepository(InventoryReservation);
+  private async reconcileAndConsumeReservations(
+    ticketId: string,
+    desiredByPart: Map<string, number>,
+  ): Promise<void> {
+    const runner = Source.createQueryRunner();
+    const changedPartIds = new Set<string>();
+    try {
+      await runner.connect();
+      await runner.startTransaction();
 
-    const reservations = await reservationRepo.find({
-      where: { ticketId, status: 'RESERVED' },
-    });
-    for (const res of reservations) {
-      const part = await sparePartRepo.findOne({ where: { id: res.sparePartId } });
-      if (part) {
-        part.reserved_quantity = Math.max(0, part.reserved_quantity - res.reservedQuantity);
-        part.consumed_quantity += res.reservedQuantity;
-        await sparePartRepo.save(part);
+      const reservationRepo = runner.manager.getRepository(InventoryReservation);
+      const reservations = await reservationRepo.find({
+        where: { ticketId, status: In(['RESERVED', 'CONSUMED']) },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const currentByPart = new Map<string, number>();
+      const consumedByPart = new Map<string, number>();
+      for (const reservation of reservations) {
+        if (reservation.status === 'CONSUMED') {
+          consumedByPart.set(
+            reservation.sparePartId,
+            (consumedByPart.get(reservation.sparePartId) || 0) + reservation.reservedQuantity,
+          );
+        } else {
+          currentByPart.set(
+            reservation.sparePartId,
+            (currentByPart.get(reservation.sparePartId) || 0) + reservation.reservedQuantity,
+          );
+        }
       }
-      res.status = 'CONSUMED';
-      await reservationRepo.save(res);
+
+      for (const [sparePartId, desired] of desiredByPart) {
+        const consumed = consumedByPart.get(sparePartId) || 0;
+        if (desired < consumed) {
+          throw new AppError(
+            `The ticket has already consumed ${consumed} unit(s) of part ${sparePartId}; a lower completion quantity cannot be applied retroactively.`,
+            409,
+          );
+        }
+      }
+
+      const sparePartRepo = runner.manager.getRepository(SparePart);
+      for (const reservation of reservations.filter((item) => item.status === 'RESERVED')) {
+        const desired = desiredByPart.get(reservation.sparePartId) || 0;
+        const consumed = consumedByPart.get(reservation.sparePartId) || 0;
+        const current = currentByPart.get(reservation.sparePartId) || 0;
+        const desiredStillReserved = Math.max(0, desired - consumed);
+        const release = Math.min(
+          reservation.reservedQuantity,
+          Math.max(0, current - desiredStillReserved),
+        );
+        if (release <= 0) continue;
+
+        const part = await sparePartRepo.findOne({
+          where: { id: reservation.sparePartId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!part) throw new AppError(`Spare part not found: ${reservation.sparePartId}`, 404);
+        part.quantity += release;
+        part.reserved_quantity = Math.max(0, part.reserved_quantity - release);
+        await sparePartRepo.save(part);
+        changedPartIds.add(part.id);
+
+        reservation.reservedQuantity -= release;
+        if (reservation.reservedQuantity === 0) reservation.status = 'RELEASED';
+        await reservationRepo.save(reservation);
+        currentByPart.set(reservation.sparePartId, current - release);
+      }
+
+      for (const [sparePartId, desired] of desiredByPart) {
+        const consumed = consumedByPart.get(sparePartId) || 0;
+        const current = currentByPart.get(sparePartId) || 0;
+        const desiredStillReserved = Math.max(0, desired - consumed);
+        const delta = Math.max(0, desiredStillReserved - current);
+        if (delta === 0) continue;
+
+        const part = await sparePartRepo.findOne({
+          where: { id: sparePartId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!part) throw new AppError(`Spare part not found: ${sparePartId}`, 404);
+        if (part.quantity < delta) {
+          throw new AppError(
+            `Insufficient inventory for part: ${part.part_name}. Available: ${part.quantity}, Requested: ${delta}`,
+            400,
+          );
+        }
+        part.quantity -= delta;
+        part.reserved_quantity += delta;
+        await sparePartRepo.save(part);
+        changedPartIds.add(part.id);
+
+        const reservation = reservations.find(
+          (item) => item.status === 'RESERVED' && item.sparePartId === sparePartId,
+        );
+        if (reservation) {
+          reservation.reservedQuantity += delta;
+          await reservationRepo.save(reservation);
+        } else {
+          await reservationRepo.save(
+            reservationRepo.create({
+              ticketId,
+              sparePartId,
+              reservedQuantity: delta,
+              status: 'RESERVED',
+            }),
+          );
+        }
+        currentByPart.set(sparePartId, current + delta);
+      }
+
+      const reservationsToConsume = await reservationRepo.find({
+        where: { ticketId, status: 'RESERVED' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      for (const reservation of reservationsToConsume) {
+        const part = await sparePartRepo.findOne({
+          where: { id: reservation.sparePartId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!part) throw new AppError(`Spare part not found: ${reservation.sparePartId}`, 404);
+        part.reserved_quantity = Math.max(0, part.reserved_quantity - reservation.reservedQuantity);
+        part.consumed_quantity += reservation.reservedQuantity;
+        await sparePartRepo.save(part);
+        changedPartIds.add(part.id);
+
+        reservation.status = 'CONSUMED';
+        reservation.consumedAt = new Date();
+        await reservationRepo.save(reservation);
+      }
+
+      await runner.commitTransaction();
+    } catch (error) {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
+
+    for (const sparePartId of changedPartIds) {
+      await deleteCached(`sparepart:${sparePartId}`);
     }
   }
 
@@ -734,18 +882,97 @@ export class ServiceController {
   }
 
   /**
+   * Re-resolve the machine at the service event rather than trusting the
+   * context captured when the ticket was opened. This catches expired,
+   * cancelled, replaced, or ambiguous allocations before a line is made FOC.
+   */
+  private async revalidateTicketCoverage(
+    ticket: ServiceTicket,
+    serviceDate = new Date(),
+  ): Promise<{ coverage: ContractCoverage; changed: boolean }> {
+    const details = await this.determineServiceContextAndJobType(
+      ticket.serialNumber,
+      ticket.meterReadingAtService ?? ticket.meterReadingAtCreation ?? undefined,
+      ticket.machineType,
+      serviceDate,
+      ticket.customerId,
+    );
+    if (details.coverageUnverified) {
+      throw new AppError(
+        'Coverage could not be verified for this machine. FOC and covered-service completion are blocked until the contract/allocation can be checked.',
+        503,
+      );
+    }
+
+    const changed =
+      details.serviceContext !== ticket.serviceContext ||
+      (details.contractReferenceId || null) !== (ticket.contractReferenceId || null) ||
+      (details.linkedInvoiceId || null) !== (ticket.linkedInvoiceId || null);
+    if (changed) {
+      ticket.serviceContext = details.serviceContext;
+      ticket.contractReferenceId = details.contractReferenceId;
+      ticket.linkedInvoiceId = details.linkedInvoiceId;
+      ticket.track = details.track;
+      if (details.productId) ticket.productId = details.productId;
+      await Source.getRepository(ServiceTicket).save(ticket);
+    }
+
+    return {
+      coverage: await this.resolveItemCoverage({
+        serviceContext: details.serviceContext,
+        contractReferenceId: details.contractReferenceId,
+      }),
+      changed,
+    };
+  }
+
+  private isCoveredRoutineService(
+    ticket: Pick<ServiceTicket, 'serviceContext'>,
+    coverage: ContractCoverage,
+    items: Array<{ partCategory?: string | null; partName?: string | null }>,
+  ): boolean {
+    return (
+      isEstimateFreeServiceContext(ticket.serviceContext) &&
+      coverage.labour &&
+      coverage.travel &&
+      items.every((item) =>
+        isMandatoryCoveredItem(ticket.serviceContext, coverage, {
+          partCategory: item.partCategory,
+          partName: item.partName,
+        }),
+      )
+    );
+  }
+
+  private async withCoverageMetadata(ticket: ServiceTicket): Promise<ServiceTicket> {
+    ticket.coverage = await this.resolveItemCoverage(ticket);
+    ticket.focPolicy = isEstimateFreeServiceContext(ticket.serviceContext) ? 'LOCKED' : 'EDITABLE';
+    return ticket;
+  }
+
+  /**
    * An item is free when its category is covered by contract/warranty rules,
-   * OR when staff explicitly flagged it free (a one-way override — this can
-   * only ever add extra free items on top of coverage, never take coverage
-   * away from an item the rules say should be covered).
+   * or when staff explicitly flagged it free in the ordinary chargeable
+   * workflow. Covered RENT/LEASE_CPC/FSMA tickets are stricter: a line that
+   * the server says is outside coverage cannot be made FOC by the client.
    */
   private resolveItemIsFree(
     coverage: ContractCoverage,
-    item: { partCategory?: string | null; partName?: string | null; isFree?: boolean },
+    item: {
+      partCategory?: string | null;
+      partName?: string | null;
+      isFree?: boolean;
+      serviceContext?: string;
+    },
   ): boolean {
+    const mandatory = item.serviceContext
+      ? isMandatoryCoveredItem(item.serviceContext, coverage, item)
+      : false;
     return (
       coverageAllowsItem(coverage, { partCategory: item.partCategory, partName: item.partName }) ||
-      !!item.isFree
+      (isEstimateFreeServiceContext(item.serviceContext || '') && !mandatory
+        ? false
+        : !!item.isFree)
     );
   }
 
@@ -845,6 +1072,18 @@ export class ServiceController {
     return map;
   }
 
+  private async getTicketCoverageItems(
+    ticket: Pick<ServiceTicket, 'items'>,
+  ): Promise<Array<{ partCategory?: string | null; partName?: string | null }>> {
+    const categories = await this.getPartCategories(
+      (ticket.items || []).map((item) => item.sparePartId),
+    );
+    return (ticket.items || []).map((item) => ({
+      partCategory: item.sparePartId ? categories.get(item.sparePartId) : null,
+      partName: item.partName,
+    }));
+  }
+
   /**
    * Automated Context and Job Type Identification.
    *
@@ -856,6 +1095,8 @@ export class ServiceController {
     serialNumber: string,
     meterReading?: number,
     machineTypeHint?: string | null,
+    serviceDate: Date = new Date(),
+    customerId?: string | null,
   ): Promise<{
     serviceContext: ServiceContext;
     contractReferenceId: string | null;
@@ -918,7 +1159,7 @@ export class ServiceController {
 
       try {
         const billingRes = await axios.get(
-          `${BILLING_SERVICE_URL}/invoices/machine/${productId}/billing-context?serialNumber=${encodeURIComponent(serialNumber)}`,
+          `${BILLING_SERVICE_URL}/invoices/machine/${productId}/billing-context?serialNumber=${encodeURIComponent(serialNumber)}&serviceDate=${encodeURIComponent(serviceDate.toISOString())}`,
           { headers: { 'x-internal-service': 'ven-inv' } },
         );
         if (billingRes.data && billingRes.data.success) {
@@ -963,6 +1204,7 @@ export class ServiceController {
             // Legacy fallback: item-level warranty string or product.warranty (months)
             fallbackMonths: parseInt(saleInvoice.warranty || product.warranty || '12', 10) || 12,
             fallbackCopyLimit: product.warranty_max_pages || 200000,
+            asOf: serviceDate,
           });
 
           if (warrantyInfo.isUnderWarranty) {
@@ -998,6 +1240,7 @@ export class ServiceController {
                 fallbackMonths: Number(leaseInvoice.leaseTenureMonths) || 0,
                 fallbackCopyLimit:
                   Number(leaseInvoice.maxCopyLimit) || product.warranty_max_pages || 200000,
+                asOf: serviceDate,
               });
 
               if (warrantyInfo.isUnderWarranty) {
@@ -1021,19 +1264,29 @@ export class ServiceController {
             serviceContext !== ServiceContext.LEASE_EXPIRED
           ) {
             const contractRepo = Source.getRepository(ServiceContract);
-            const activeContract = await contractRepo.findOne({
+            const activeContracts = await contractRepo.find({
               where: {
                 productId: productId,
+                ...(customerId ? { customerId } : {}),
                 status: 'ACTIVE',
               },
+              order: { startDate: 'DESC' },
             });
+            const applicableContracts = activeContracts.filter(
+              (candidate) => serviceDate >= candidate.startDate && serviceDate <= candidate.endDate,
+            );
+            if (applicableContracts.length > 1) {
+              throw new AppError(
+                `Machine ${serialNumber} has multiple active service contracts for ${serviceDate.toISOString()}; resolve the contract data before creating a service ticket.`,
+                409,
+              );
+            }
+            const activeContract = applicableContracts[0];
             if (activeContract) {
-              const now = new Date();
-              const withinTerm = now >= activeContract.startDate && now <= activeContract.endDate;
               // COMPUTER / OTHER only ever run under AMC — SMA/FSMA are
               // per-click printer contracts and are ignored for them.
               const contractApplies = metered || activeContract.contractType === 'AMC';
-              if (withinTerm && contractApplies) {
+              if (contractApplies) {
                 contractReferenceId = activeContract.id;
                 if (metered && activeContract.contractType === 'FSMA') {
                   serviceContext = ServiceContext.FSMA;
@@ -1068,11 +1321,6 @@ export class ServiceController {
                     overagePerCopyRate: Number(activeContract.overagePerCopyRate) || 0,
                   };
                 }
-              } else if (!withinTerm && now > activeContract.endDate) {
-                // Term is over — flip the stale ACTIVE status so lists and
-                // stats stop counting it.
-                activeContract.status = 'EXPIRED';
-                await contractRepo.save(activeContract);
               }
             }
           }
@@ -1145,6 +1393,11 @@ export class ServiceController {
         throw new AppError('Invalid meter reading provided', 400);
       }
 
+      const serviceDate = scheduledVisitDate ? new Date(scheduledVisitDate) : new Date();
+      if (Number.isNaN(serviceDate.getTime())) {
+        throw new AppError('Invalid scheduled visit date', 400);
+      }
+
       const {
         serviceContext,
         contractReferenceId,
@@ -1159,6 +1412,8 @@ export class ServiceController {
         serialNumber,
         reportedMeterReading,
         machineTypeInput,
+        serviceDate,
+        customerId || null,
       );
 
       // Never open a ticket on a guess: a machine we could not check might be on Rent or a
@@ -1449,7 +1704,6 @@ Xerocare Technical Services`;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
-
       if (
         ticket.status === ServiceTicketStatus.COMPLETED ||
         ticket.status === ServiceTicketStatus.CANCELLED
@@ -1672,10 +1926,15 @@ Xerocare Technical Services`;
         }
       }
 
+      // Re-check the machine and contract at the service event. The ticket's
+      // creation-time context is only a snapshot and must not grant FOC after
+      // an agreement or allocation has expired or been cancelled.
+      const coverageCheck = await this.revalidateTicketCoverage(ticket, new Date());
+      const contractCoverage = coverageCheck.coverage;
+
       // Visit + transportation are free whenever the machine is covered by a
       // service contract (AMC/SMA/FSMA — all include travel), by warranty, or is
       // a company-owned RENT machine. Only uncovered machines pay these charges.
-      const contractCoverage = await this.resolveItemCoverage(ticket);
       const travelCoveredContext = contractCoverage.travel;
       // Fall back to whatever was already quoted on the ticket (e.g. at
       // creation) when the diagnosis form doesn't resend an amount — so an
@@ -1720,10 +1979,10 @@ Xerocare Technical Services`;
         ticket.meterReadingAtService = meterReading || 0;
       }
 
-      // Every context now goes through the same finance-approval pipeline —
-      // covered items still price at 0, finance just reviews/marks them FOC
-      // instead of the ticket silently bypassing finance entirely.
-      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+      // Keep the ticket in a diagnosable state until its parts are classified.
+      // Covered routine service is promoted to FREE_SERVICE below; mixed or
+      // chargeable work is promoted to the existing estimate path.
+      ticket.status = ServiceTicketStatus.DIAGNOSED;
       ticket.visitChargeAmount = effectiveVisitCharge;
       ticket.visitChargeMethod = visitChargeMethod || null;
       ticket.transportChargeAmount = effectiveTransportCharge;
@@ -1761,10 +2020,15 @@ Xerocare Technical Services`;
       const itemRepo = Source.getRepository(ServiceTicketItem);
       const ticketItems: ServiceTicketItem[] = [];
       let hasCustomItem = false;
+      let allItemsMandatoryCovered = true;
 
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
         for (const itemData of items) {
+          const quantity = Number(itemData.quantity ?? 1);
+          if (!Number.isInteger(quantity) || quantity <= 0) {
+            throw new AppError('Part quantity must be a positive whole number', 400);
+          }
           let partName = itemData.partName;
           let sku = itemData.sku || null;
           let barcodeId = itemData.barcodeId || null;
@@ -1778,40 +2042,53 @@ Xerocare Technical Services`;
             const part = await sparePartRepo.findOne({
               where: { id: String(itemData.sparePartId) },
             });
-            if (part) {
-              partName = part.part_name;
-              sku = part.sku;
-              barcodeId = part.barcode_id || null;
-              unitPrice = Number(part.base_price) || 0;
-              partCategory = part.part_category || null;
-              partBrand = part.brand || null;
-              mpn = part.mpn || null;
-              unitCost = calculateCatalogServicePartCost(part.base_price, 1).unitCost;
+            if (!part) throw new AppError(`Spare part not found: ${itemData.sparePartId}`, 404);
+            partName = part.part_name;
+            sku = part.sku;
+            barcodeId = part.barcode_id || null;
+            unitPrice = Number(part.base_price) || 0;
+            partCategory = part.part_category || null;
+            partBrand = part.brand || null;
+            mpn = part.mpn || null;
+            unitCost = calculateCatalogServicePartCost(part.base_price, 1).unitCost;
 
-              // Check stock warnings
-              if (part.quantity <= 5) {
-                await this.notifyBranchManager(ticket.branchId, {
-                  title: 'Low Stock Alert (Service Diagnosis)',
-                  message: `Spare part "${part.part_name}" (SKU: ${part.sku}) is low in stock (Qty: ${part.quantity}). Procurement needed for ticket ${ticket.ticketNumber}.`,
-                  type: 'WARNING',
-                  referenceId: ticket.id,
-                  referenceType: 'SERVICE',
-                });
-              }
+            // Check stock warnings
+            if (part.quantity <= 5) {
+              await this.notifyBranchManager(ticket.branchId, {
+                title: 'Low Stock Alert (Service Diagnosis)',
+                message: `Spare part "${part.part_name}" (SKU: ${part.sku}) is low in stock (Qty: ${part.quantity}). Procurement needed for ticket ${ticket.ticketNumber}.`,
+                type: 'WARNING',
+                referenceId: ticket.id,
+                referenceType: 'SERVICE',
+              });
             }
           } else if (itemData.itemSource === ServiceItemSource.CUSTOM) {
             unitCost = Number(itemData.customPartCost) || 0;
             hasCustomItem = true;
+          } else {
+            throw new AppError('A registered spare part or valid custom item is required', 400);
           }
+
+          const mandatoryFoc = isMandatoryCoveredItem(ticket.serviceContext, contractCoverage, {
+            partCategory,
+            partName,
+          });
+          if (!mandatoryFoc) allItemsMandatoryCovered = false;
 
           const isItemFree = this.resolveItemIsFree(contractCoverage, {
             partCategory,
             partName,
-            isFree: itemData.isFree,
+            // A line outside the item-level rules of a covered service cannot
+            // be made FOC by a client checkbox; it must enter estimate review.
+            // The existing optional FOC override remains available for the
+            // ordinary non-covered workflow.
+            isFree:
+              isEstimateFreeServiceContext(ticket.serviceContext) && !mandatoryFoc
+                ? false
+                : itemData.isFree,
+            serviceContext: ticket.serviceContext,
           });
           const finalPrice = isItemFree ? 0 : unitPrice;
-          const quantity = itemData.quantity || 1;
-
           const serviceItem = itemRepo.create({
             ticketId: ticket.id,
             itemSource: itemData.itemSource,
@@ -1840,6 +2117,48 @@ Xerocare Technical Services`;
       ticket.items = ticketItems;
       await ticketRepo.save(ticket);
 
+      const coveredRoutineService =
+        this.isCoveredRoutineService(
+          ticket,
+          contractCoverage,
+          ticketItems.map((item) => ({ partName: item.partName })),
+        ) && allItemsMandatoryCovered;
+
+      if (coveredRoutineService) {
+        // There is no estimate approval step on a covered routine ticket, so
+        // reserve catalog stock as soon as the technician declares the work.
+        // The existing reservation mechanism still owns the stock movement;
+        // completion will consume it and unused quantities can be released.
+        const reserveQuantities = new Map<string, number>();
+        for (const item of ticketItems) {
+          if (item.sparePartId) {
+            reserveQuantities.set(
+              item.sparePartId,
+              (reserveQuantities.get(item.sparePartId) || 0) + item.quantity,
+            );
+          }
+        }
+        try {
+          for (const [sparePartId, quantity] of reserveQuantities) {
+            await this.reserveSparePart(ticket.id, sparePartId, quantity);
+          }
+        } catch (error) {
+          await this.releaseReservations(ticket.id);
+          throw error;
+        }
+        ticket.status = ServiceTicketStatus.FREE_SERVICE;
+        await ticketRepo.save(ticket);
+        await this.logActivity(
+          ticket.id,
+          'FOC_COVERAGE_ENFORCED',
+          `Covered-service path selected for ${ticket.serviceContext}; mandatory FOC applied to all declared covered items. No estimate required.`,
+          req.user?.userId,
+        );
+      } else {
+        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+        await ticketRepo.save(ticket);
+      }
+
       if (hasCustomItem) {
         await this.notifyBranchManager(ticket.branchId, {
           title: 'Spare Part Procurement Needed',
@@ -1854,17 +2173,18 @@ Xerocare Technical Services`;
       // estimates) actually approves the estimate — not here — so a rejected
       // estimate never leaves stock wrongly held.
 
-      // Automatically generate a WAITING_FINANCE_APPROVAL Estimate whenever
-      // there's anything to estimate. Covered items are already priced at 0
-      // above — finance reviews and approves the FOC estimate like any other.
+      // Generate the existing estimate only when the ticket contains chargeable
+      // work or is outside the direct covered-service contexts. Covered routine
+      // tickets above intentionally have no estimate at all.
       const inputLabour = Number(labourCost) || 0;
       const finalLabourCost = contractCoverage.labour ? 0 : inputLabour;
 
       if (
-        (ticketItems && ticketItems.length > 0) ||
-        finalLabourCost > 0 ||
-        effectiveVisitCharge > 0 ||
-        effectiveTransportCharge > 0
+        !coveredRoutineService &&
+        ((ticketItems && ticketItems.length > 0) ||
+          finalLabourCost > 0 ||
+          effectiveVisitCharge > 0 ||
+          effectiveTransportCharge > 0)
       ) {
         // Discount is a discount on the labour/service charge only — it
         // cannot exceed the labour cost, regardless of parts/transport/visit charge.
@@ -2060,6 +2380,10 @@ Xerocare Technical Services`;
         referenceType: 'SERVICE',
       });
 
+      ticket.coverage = contractCoverage;
+      ticket.focPolicy = isEstimateFreeServiceContext(ticket.serviceContext)
+        ? 'LOCKED'
+        : 'EDITABLE';
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
@@ -2076,6 +2400,12 @@ Xerocare Technical Services`;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        throw new AppError(
+          'Covered routine service does not use an estimate. Route additional work through the review workflow.',
+          409,
+        );
+      }
 
       const coverage = await this.resolveItemCoverage(ticket);
       const finalLabourCost = coverage.labour ? 0 : Number(labourCost) || 0;
@@ -2132,6 +2462,7 @@ Xerocare Technical Services`;
             partCategory,
             partName,
             isFree: it.isFree,
+            serviceContext: ticket.serviceContext,
           });
 
           const finalPrice = isItemFree ? 0 : basePrice;
@@ -2200,6 +2531,9 @@ Xerocare Technical Services`;
           lock: { mode: 'pessimistic_write' },
         })) as ServiceTicket;
         if (!ticket) throw new AppError('Service ticket not found', 404);
+        if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+          throw new AppError('Covered routine service does not require an estimate.', 409);
+        }
 
         const estimateRepo = runner.manager.getRepository(ServiceEstimate);
         const draft = await estimateRepo.findOne({
@@ -2908,6 +3242,12 @@ Xerocare Technical Services`;
         lock: { mode: 'pessimistic_write' },
       });
       if (!ticket) throw new Error('Ticket not found');
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        throw new AppError(
+          'Covered routine service has no estimate to revise. Route additional work for review.',
+          409,
+        );
+      }
 
       // A row lock serializes attempts for this ticket, including the pending
       // check and all revision writes. Later, legitimate revisions are allowed
@@ -2970,6 +3310,7 @@ Xerocare Technical Services`;
             partCategory,
             partName,
             isFree: it.isFree,
+            serviceContext: ticket.serviceContext,
           });
           const finalPrice = isItemFree ? 0 : basePrice;
           const quantity = it.quantity || 1;
@@ -3359,8 +3700,34 @@ Xerocare Technical Services`;
     try {
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      const ticket = await ticketRepo.findOne({
+        where: { id: String(id) },
+        relations: ['items'],
+      });
       if (!ticket) throw new Error('Ticket not found');
+
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        const coverageCheck = await this.revalidateTicketCoverage(ticket, new Date());
+        const covered = this.isCoveredRoutineService(
+          ticket,
+          coverageCheck.coverage,
+          await this.getTicketCoverageItems(ticket),
+        );
+        if (!covered) {
+          ticket.status = ServiceTicketStatus.DIAGNOSED;
+          await ticketRepo.save(ticket);
+          await this.logActivity(
+            ticket.id,
+            'FOC_COVERAGE_REVIEW_REQUIRED',
+            'Coverage changed or no longer covers all declared work. Estimate review is required before repair can start.',
+            req.user?.userId,
+          );
+          throw new AppError(
+            'Coverage could not be confirmed for all declared work. The ticket was returned for estimate review.',
+            409,
+          );
+        }
+      }
 
       let financeApprovedFreeWork = false;
       if (
@@ -3497,7 +3864,14 @@ Xerocare Technical Services`;
    * POST /service/tickets/:id/complete
    */
   completeService = async (req: Request, res: Response, next: NextFunction) => {
+    const completionLock = Source.createQueryRunner();
+    const id = req.params.id as string;
     try {
+      await completionLock.connect();
+      // Serialize completion attempts for one ticket. This protects the
+      // reservation consumption, usage log, yield, and lifetime-history writes
+      // when a mobile client retries or two tabs submit together.
+      await completionLock.query('SELECT pg_advisory_lock(hashtext($1))', [String(id)]);
       const {
         workPerformed,
         resolutionDetails,
@@ -3514,15 +3888,51 @@ Xerocare Technical Services`;
         chequeNumber,
         chequeBankName,
         chequeDate,
+        usedItems,
       } = req.body;
 
-      const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({
         where: { id: String(id) },
         relations: ['items'],
       });
       if (!ticket) throw new Error('Ticket not found');
+
+      // Inventory, usage, yield, and machine-history writes intentionally
+      // happen before the final report/status save. If a mobile retry arrives
+      // after those operational writes but before the report was persisted,
+      // this marker lets the retry finish the report without issuing stock or
+      // incrementing machine history a second time.
+      const completionActivityRepo = Source.getRepository(ServiceTicketActivity);
+      const operationsApplied = await completionActivityRepo.findOne({
+        where: { ticketId: ticket.id, activityType: 'COMPLETION_OPERATIONS_APPLIED' },
+        order: { created_at: 'DESC' },
+      });
+      if (operationsApplied) {
+        const reportRepo = Source.getRepository(ServiceReport);
+        let report = await reportRepo.findOne({ where: { ticketId: ticket.id } });
+        if (!report) {
+          report = reportRepo.create({
+            ticketId: ticket.id,
+            workPerformed,
+            resolutionDetails,
+            meterReading: meterReading || 0,
+            startTime: ticket.repairStartedAt || new Date(),
+            endTime: ticket.repairCompletedAt || new Date(),
+            totalTimeSpent: ticket.repairDuration || 0,
+            customerRemarks,
+            technicianRemarks,
+            customerSignature,
+            technicianSignature,
+          });
+          await reportRepo.save(report);
+        }
+        ticket.status = ServiceTicketStatus.COMPLETED;
+        ticket.completedAt = ticket.repairCompletedAt || new Date();
+        ticket.reportUrl = `/i/service/tickets/${ticket.id}/report`;
+        await ticketRepo.save(ticket);
+        return res.status(200).json({ success: true, data: ticket });
+      }
 
       const allowedCompleteStatuses: ServiceTicketStatus[] = [ServiceTicketStatus.IN_PROGRESS];
       if (!allowedCompleteStatuses.includes(ticket.status)) {
@@ -3531,6 +3941,72 @@ Xerocare Technical Services`;
       if (ticket.repairPausedAt) {
         throw new AppError('Resume the repair before completing the job.', 400);
       }
+
+      const hasEstimateForTicket = await Source.getRepository(ServiceEstimate).exist({
+        where: { ticketId: ticket.id },
+      });
+      const isDirectCoveredTicket =
+        isEstimateFreeServiceContext(ticket.serviceContext) &&
+        !ticket.serviceQuotationId &&
+        !hasEstimateForTicket;
+      if (isDirectCoveredTicket) {
+        const coverageCheck = await this.revalidateTicketCoverage(ticket, new Date());
+        const covered = this.isCoveredRoutineService(
+          ticket,
+          coverageCheck.coverage,
+          await this.getTicketCoverageItems(ticket),
+        );
+        if (!covered) {
+          throw new AppError(
+            'Coverage could not be confirmed for all work at completion. Route the additional or out-of-contract work for estimate review.',
+            409,
+          );
+        }
+      }
+
+      const actualQuantityByTicketItem = new Map<string, number>();
+      const actualQuantityBySparePart = new Map<string, number>();
+      if (usedItems !== undefined) {
+        if (!Array.isArray(usedItems)) {
+          throw new AppError('usedItems must be an array when supplied', 400);
+        }
+        for (const usedItem of usedItems) {
+          const quantity = Number(usedItem?.quantity);
+          if (!Number.isInteger(quantity) || quantity < 0) {
+            throw new AppError('Actual used quantity must be a non-negative whole number', 400);
+          }
+          if (usedItem.ticketItemId) {
+            if (!(ticket.items || []).some((item) => item.id === String(usedItem.ticketItemId))) {
+              throw new AppError('A completion item does not belong to this service ticket', 400);
+            }
+            actualQuantityByTicketItem.set(String(usedItem.ticketItemId), quantity);
+          }
+          if (usedItem.sparePartId) {
+            actualQuantityBySparePart.set(
+              String(usedItem.sparePartId),
+              (actualQuantityBySparePart.get(String(usedItem.sparePartId)) || 0) + quantity,
+            );
+          }
+        }
+        for (const item of ticket.items || []) {
+          if (item.id && !actualQuantityByTicketItem.has(item.id) && item.sparePartId) {
+            throw new AppError(
+              `Actual quantity is required for ${item.partName}; review the completion items before submitting.`,
+              400,
+            );
+          }
+        }
+      }
+
+      const actualQuantityForTicketItem = (item: ServiceTicketItem): number => {
+        if (usedItems === undefined) return item.quantity;
+        if (item.id && actualQuantityByTicketItem.has(item.id)) {
+          return actualQuantityByTicketItem.get(item.id) || 0;
+        }
+        return item.sparePartId
+          ? actualQuantityBySparePart.get(item.sparePartId) || 0
+          : item.quantity;
+      };
 
       if (
         isMeteredMachine(ticket.machineType) &&
@@ -3570,30 +4046,14 @@ Xerocare Technical Services`;
         );
         ticket.repairDuration = Math.max(0, rawMinutes - (ticket.repairPausedDurationMinutes || 0));
       }
-      ticket.status = ServiceTicketStatus.COMPLETED;
-      ticket.completedAt = new Date();
       ticket.completionNotes = resolutionDetails;
       if (!ticket.completionBillNumber) {
         ticket.completionBillNumber = await this.generateBillNumber();
       }
-      await ticketRepo.save(ticket);
 
-      // Save Service Report
-      const reportRepo = Source.getRepository(ServiceReport);
-      const report = reportRepo.create({
-        ticketId: ticket.id,
-        workPerformed,
-        resolutionDetails,
-        meterReading: meterReading || 0,
-        startTime: ticket.repairStartedAt || new Date(),
-        endTime: ticket.repairCompletedAt || new Date(),
-        totalTimeSpent: ticket.repairDuration || 0,
-        customerRemarks,
-        technicianRemarks,
-        customerSignature,
-        technicianSignature,
-      });
-      await reportRepo.save(report);
+      // Keep the completion payload recoverable while the ticket remains
+      // IN_PROGRESS. The status is only changed after all operational writes.
+      await ticketRepo.save(ticket);
 
       // Payment taken at the door, if any. Best-effort: the job IS finished, and failing
       // the completion because the collection could not be raised would leave the
@@ -3638,9 +4098,6 @@ Xerocare Technical Services`;
         }
       }
 
-      // Consume Reserved Parts
-      await this.consumeReservations(ticket.id);
-
       const sparePartRepo = Source.getRepository(SparePart);
       const estimateRepo = Source.getRepository(ServiceEstimate);
 
@@ -3648,6 +4105,29 @@ Xerocare Technical Services`;
         where: { ticketId: ticket.id, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
         relations: ['items'],
       });
+
+      // Reconcile reservations to the technician's confirmed usage before
+      // consuming them. Omitting usedItems preserves the legacy behaviour for
+      // older clients; the current completion screen always sends it.
+      const desiredByPart = new Map<string, number>();
+      for (const item of ticket.items || []) {
+        if (item.sparePartId) {
+          const actualQuantity = actualQuantityForTicketItem(item);
+          desiredByPart.set(
+            item.sparePartId,
+            (desiredByPart.get(item.sparePartId) || 0) + actualQuantity,
+          );
+          if (usedItems !== undefined) {
+            item.quantity = actualQuantity;
+            item.totalPrice = (Number(item.unitPrice) || 0) * actualQuantity;
+            item.totalCost = (Number(item.unitCost) || 0) * actualQuantity;
+          }
+        }
+      }
+      if (usedItems !== undefined && ticket.items?.length) {
+        await ticketRepo.save(ticket);
+      }
+      await this.reconcileAndConsumeReservations(ticket.id, desiredByPart);
 
       // The customer didn't (fully) pay on the spot — remind this branch's
       // Finance team so they can chase it down, rather than it silently
@@ -3684,7 +4164,17 @@ Xerocare Technical Services`;
       const itemsToInspect = estimate ? estimate.items : ticket.items;
       const usageLogRepo = Source.getRepository(ServicePartUsageLog);
 
-      for (const item of itemsToInspect) {
+      for (const [itemIndex, item] of itemsToInspect.entries()) {
+        const actualQuantity = estimate
+          ? usedItems !== undefined
+            ? ticket.items?.[itemIndex]
+              ? actualQuantityForTicketItem(ticket.items[itemIndex])
+              : item.sparePartId
+                ? actualQuantityBySparePart.get(item.sparePartId) || 0
+                : 0
+            : Number(item.quantity) || 0
+          : actualQuantityForTicketItem(item as ServiceTicketItem);
+        if (actualQuantity <= 0) continue;
         // Prefer the cost captured at diagnosis/estimate time (covers CUSTOM
         // items, which have no catalog price to re-derive here) — only fall
         // back to a fresh SparePart lookup for items that predate that column.
@@ -3709,45 +4199,78 @@ Xerocare Technical Services`;
         }
         const isConsumableItem = this.isConsumable(partNameForLog, skuForLog, catalogPartCategory);
 
-        const itemCost =
-          item.totalCost != null
-            ? Number(item.totalCost) || 0
-            : calculateCatalogServicePartCost(serviceUnitCost, item.quantity).totalCost;
+        const existingUsage = ticket.serialNumber
+          ? await usageLogRepo.findOne({
+              where: {
+                ticketId: ticket.id,
+                sparePartId: item.sparePartId || IsNull(),
+                partName: partNameForLog,
+                sku: skuForLog || IsNull(),
+              },
+            })
+          : null;
+        if (existingUsage) {
+          // A retry may arrive after usage logging succeeded but before the
+          // history transaction. Reuse the persisted cost so history remains
+          // complete even though the usage row is not inserted twice.
+          totalPartsCostInternal += Number(existingUsage.totalCost) || 0;
+          continue;
+        }
+
+        const itemCost = calculateCatalogServicePartCost(serviceUnitCost, actualQuantity).totalCost;
         totalPartsCostInternal += itemCost;
 
-        // Yield page calculation for consumables if replaced
-        let yieldPages = 0;
-        if (isConsumableItem) {
+        // Yield page calculation for consumables requires a reliable ending
+        // counter. Do not close or install a yield record with a synthetic 0
+        // when an older client did not send a completion reading.
+        let yieldPages: number | null = null;
+        const completionMeterReading =
+          meterReading !== undefined &&
+          meterReading !== null &&
+          Number.isFinite(Number(meterReading))
+            ? Number(meterReading)
+            : null;
+        if (isConsumableItem && completionMeterReading !== null) {
           const yieldRepo = Source.getRepository(ConsumableYieldHistory);
-          const activeYield = await yieldRepo.findOne({
-            where: {
+          const ticketYield = await yieldRepo.findOne({
+            where: { ticketId: ticket.id, tonerSku: skuForLog || '' },
+          });
+          if (ticketYield) {
+            // A prior attempt already recorded this ticket's cartridge
+            // installation. Do not close the newly installed cartridge again
+            // if the retry arrived after usage logging but before finalization.
+            yieldPages = ticketYield.yieldPages ?? null;
+          } else {
+            const activeYield = await yieldRepo.findOne({
+              where: {
+                serialNumber: ticket.serialNumber,
+                tonerSku: skuForLog || '',
+                replacedMeterReading: IsNull(),
+              },
+              order: { installedDate: 'DESC' },
+            });
+
+            if (activeYield) {
+              activeYield.replacedDate = new Date();
+              activeYield.replacedMeterReading = completionMeterReading;
+              activeYield.yieldPages = Math.max(
+                0,
+                completionMeterReading - activeYield.installedMeterReading,
+              );
+              await yieldRepo.save(activeYield);
+              yieldPages = activeYield.yieldPages;
+            }
+
+            const newYield = yieldRepo.create({
+              productId: ticket.productId || undefined,
               serialNumber: ticket.serialNumber,
               tonerSku: skuForLog || '',
-              replacedMeterReading: IsNull(),
-            },
-            order: { installedDate: 'DESC' },
-          });
-
-          if (activeYield) {
-            activeYield.replacedDate = new Date();
-            activeYield.replacedMeterReading = meterReading || 0;
-            activeYield.yieldPages = Math.max(
-              0,
-              (meterReading || 0) - activeYield.installedMeterReading,
-            );
-            await yieldRepo.save(activeYield);
-            yieldPages = activeYield.yieldPages;
+              installedDate: new Date(),
+              installedMeterReading: completionMeterReading,
+              ticketId: ticket.id,
+            });
+            await yieldRepo.save(newYield);
           }
-
-          const newYield = yieldRepo.create({
-            productId: ticket.productId || undefined,
-            serialNumber: ticket.serialNumber,
-            tonerSku: skuForLog || '',
-            installedDate: new Date(),
-            installedMeterReading: meterReading || 0,
-            ticketId: ticket.id,
-          });
-          await yieldRepo.save(newYield);
         }
 
         // Store usage by serial even when this is an external machine with no
@@ -3760,14 +4283,14 @@ Xerocare Technical Services`;
             sparePartId: item.sparePartId || null,
             sku: skuForLog,
             partName: partNameForLog,
-            quantityUsed: item.quantity,
+            quantityUsed: actualQuantity,
             unitCost: serviceUnitCost,
             totalCost: itemCost,
             replacedAt: new Date(),
-            calculatedYield: yieldPages || null,
+            calculatedYield: yieldPages,
             isFree: item.isFree,
             isConsumable: isConsumableItem,
-            meterReadingAtReplacement: meterReading || null,
+            meterReadingAtReplacement: completionMeterReading,
             linkedInvoiceId: ticket.linkedInvoiceId || null,
           });
           await usageLogRepo.save(usageLog);
@@ -3788,55 +4311,103 @@ Xerocare Technical Services`;
       // Keyed by serialNumber (not productId) so external machines — never
       // purchased from us, no matching Product row — still get a lifetime
       // spend/service-count record; productId is attached when we have it.
-      if (ticket.serialNumber) {
-        const historyRepo = Source.getRepository(MachineServiceHistory);
-        let historyRecord = await historyRepo.findOne({
-          where: { serialNumber: ticket.serialNumber },
+      const historyAlreadyApplied = await completionActivityRepo.findOne({
+        where: { ticketId: ticket.id, activityType: 'COMPLETION_HISTORY_APPLIED' },
+      });
+      if (!historyAlreadyApplied) {
+        await Source.transaction(async (manager) => {
+          if (ticket.serialNumber) {
+            const historyRepo = manager.getRepository(MachineServiceHistory);
+            let historyRecord = await historyRepo.findOne({
+              where: { serialNumber: ticket.serialNumber },
+              lock: { mode: 'pessimistic_write' },
+            });
+
+            let nextScheduledMaintenanceDate: Date | null = null;
+            if (
+              ticket.serviceContext === ServiceContext.RENT ||
+              ticket.serviceContext === ServiceContext.LEASE_CPC
+            ) {
+              nextScheduledMaintenanceDate = new Date();
+              nextScheduledMaintenanceDate.setMonth(nextScheduledMaintenanceDate.getMonth() + 2);
+            }
+
+            if (historyRecord) {
+              historyRecord.totalServiceVisits += 1;
+              if (ticket.ticketType === 'PREVENTATIVE_MAINTENANCE') {
+                historyRecord.totalPreventativeVisits += 1;
+              }
+              historyRecord.lastServiceDate = new Date();
+              historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
+              historyRecord.totalPartsSpend =
+                Number(historyRecord.totalPartsSpend) + totalPartsCostInternal;
+              historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
+              historyRecord.totalLifetimeCost =
+                Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
+              // Backfill productId if this machine was matched to the catalog
+              // after its history row was first created as an external machine.
+              if (!historyRecord.productId && ticket.productId) {
+                historyRecord.productId = ticket.productId;
+              }
+            } else {
+              historyRecord = historyRepo.create({
+                productId: ticket.productId || null,
+                serialNumber: ticket.serialNumber,
+                totalServiceVisits: 1,
+                totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
+                lastServiceDate: new Date(),
+                nextScheduledMaintenanceDate,
+                totalPartsSpend: totalPartsCostInternal,
+                totalLabourSpend: labourCost,
+                totalLifetimeCost: totalPartsCostInternal + labourCost,
+              });
+            }
+            await historyRepo.save(historyRecord);
+          }
+
+          await manager.getRepository(ServiceTicketActivity).save(
+            manager.getRepository(ServiceTicketActivity).create({
+              ticketId: ticket.id,
+              activityType: 'COMPLETION_HISTORY_APPLIED',
+              description: 'Machine service history updated for service completion.',
+              performedBy: req.user?.userId || null,
+            }),
+          );
         });
-
-        let nextScheduledMaintenanceDate: Date | null = null;
-        if (
-          ticket.serviceContext === ServiceContext.RENT ||
-          ticket.serviceContext === ServiceContext.LEASE_CPC
-        ) {
-          nextScheduledMaintenanceDate = new Date();
-          nextScheduledMaintenanceDate.setMonth(nextScheduledMaintenanceDate.getMonth() + 2);
-        }
-
-        if (historyRecord) {
-          historyRecord.totalServiceVisits += 1;
-          if (ticket.ticketType === 'PREVENTATIVE_MAINTENANCE') {
-            historyRecord.totalPreventativeVisits += 1;
-          }
-          historyRecord.lastServiceDate = new Date();
-          historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
-          historyRecord.totalPartsSpend =
-            Number(historyRecord.totalPartsSpend) + totalPartsCostInternal;
-          historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
-          historyRecord.totalLifetimeCost =
-            Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
-          // Backfill productId if this machine was matched to the catalog
-          // after its history row was first created as an external machine.
-          if (!historyRecord.productId && ticket.productId) {
-            historyRecord.productId = ticket.productId;
-          }
-        } else {
-          historyRecord = historyRepo.create({
-            productId: ticket.productId || null,
-            serialNumber: ticket.serialNumber,
-            totalServiceVisits: 1,
-            totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
-            lastServiceDate: new Date(),
-            nextScheduledMaintenanceDate,
-            totalPartsSpend: totalPartsCostInternal,
-            totalLabourSpend: labourCost,
-            totalLifetimeCost: totalPartsCostInternal + labourCost,
-          });
-        }
-        await historyRepo.save(historyRecord);
       }
 
-      // Save report URL to ticket
+      await completionActivityRepo.save(
+        completionActivityRepo.create({
+          ticketId: ticket.id,
+          activityType: 'COMPLETION_OPERATIONS_APPLIED',
+          description:
+            'Inventory consumption, usage, yield, and machine-history updates applied for service completion.',
+          performedBy: req.user?.userId || null,
+        }),
+      );
+
+      // Persist the completion marker only after inventory, usage, yield, and
+      // machine-history writes have succeeded. A retry after a failed stock or
+      // history operation must remain recoverable rather than leaving a ticket
+      // marked complete with missing operational records.
+      const reportRepo = Source.getRepository(ServiceReport);
+      const report = reportRepo.create({
+        ticketId: ticket.id,
+        workPerformed,
+        resolutionDetails,
+        meterReading: meterReading || 0,
+        startTime: ticket.repairStartedAt || new Date(),
+        endTime: ticket.repairCompletedAt || new Date(),
+        totalTimeSpent: ticket.repairDuration || 0,
+        customerRemarks,
+        technicianRemarks,
+        customerSignature,
+        technicianSignature,
+      });
+      await reportRepo.save(report);
+
+      ticket.status = ServiceTicketStatus.COMPLETED;
+      ticket.completedAt = ticket.repairCompletedAt || new Date();
       ticket.reportUrl = `/i/service/tickets/${ticket.id}/report`;
       await ticketRepo.save(ticket);
 
@@ -3858,6 +4429,15 @@ Xerocare Technical Services`;
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
+    } finally {
+      if (!completionLock.isReleased) {
+        try {
+          await completionLock.query('SELECT pg_advisory_unlock(hashtext($1))', [String(id)]);
+        } catch (unlockError) {
+          logger.warn('Failed to release service completion lock:', unlockError);
+        }
+        await completionLock.release();
+      }
     }
   };
 
@@ -3865,16 +4445,43 @@ Xerocare Technical Services`;
    * POST /service/tickets/:id/cancel
    */
   cancelTicket = async (req: Request, res: Response, next: NextFunction) => {
+    const cancellationLock = Source.createQueryRunner();
+    const id = req.params.id as string;
     try {
-      const id = req.params.id as string;
+      await cancellationLock.connect();
+      await cancellationLock.query('SELECT pg_advisory_lock(hashtext($1))', [String(id)]);
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      if (
+        ticket.status === ServiceTicketStatus.COMPLETED ||
+        ticket.status === ServiceTicketStatus.CANCELLED
+      ) {
+        throw new AppError(`Cannot cancel a ${ticket.status.toLowerCase()} ticket`, 400);
+      }
+      if (ticket.status === ServiceTicketStatus.IN_PROGRESS || ticket.repairStartedAt) {
+        throw new AppError(
+          'A repair that has started cannot be cancelled; complete the service record or escalate it for review.',
+          409,
+        );
+      }
+      const completionOperations = await Source.getRepository(ServiceTicketActivity).findOne({
+        where: { ticketId: ticket.id, activityType: 'COMPLETION_OPERATIONS_APPLIED' },
+      });
+      if (completionOperations) {
+        throw new AppError(
+          'This ticket has already applied completion inventory and history operations and cannot be cancelled.',
+          409,
+        );
+      }
+
+      // Return reserved stock first. If this fails, the ticket remains in its
+      // prior state and can be retried without presenting a cancelled ticket
+      // whose inventory is still held.
+      await this.releaseReservations(ticket.id);
       ticket.status = ServiceTicketStatus.CANCELLED;
       await ticketRepo.save(ticket);
-
-      await this.releaseReservations(ticket.id);
 
       await this.logActivity(
         ticket.id,
@@ -3897,6 +4504,15 @@ Xerocare Technical Services`;
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
+    } finally {
+      if (!cancellationLock.isReleased) {
+        try {
+          await cancellationLock.query('SELECT pg_advisory_unlock(hashtext($1))', [String(id)]);
+        } catch (unlockError) {
+          logger.warn('Failed to release service cancellation lock:', unlockError);
+        }
+        await cancellationLock.release();
+      }
     }
   };
 
@@ -3927,20 +4543,23 @@ Xerocare Technical Services`;
       }
 
       const tickets = await query.orderBy('ticket.created_at', 'DESC').getMany();
+      const ticketsWithCoverage = await Promise.all(
+        tickets.map((ticket) => this.withCoverageMetadata(ticket)),
+      );
 
-      if (req.user.role === 'ADMIN' && tickets.length > 0) {
-        const branchIds = [...new Set(tickets.map((t) => t.branchId).filter(Boolean))];
+      if (req.user.role === 'ADMIN' && ticketsWithCoverage.length > 0) {
+        const branchIds = [...new Set(ticketsWithCoverage.map((t) => t.branchId).filter(Boolean))];
         const branchRepo = Source.getRepository(Branch);
         const branches = await branchRepo.find({ where: { id: In(branchIds) } });
         const branchMap = new Map(branches.map((b) => [b.id, b.name]));
-        const enriched = tickets.map((t) => ({
+        const enriched = ticketsWithCoverage.map((t) => ({
           ...t,
           branchName: branchMap.get(t.branchId) ?? '',
         }));
         return res.status(200).json({ success: true, data: enriched });
       }
 
-      res.status(200).json({ success: true, data: tickets });
+      res.status(200).json({ success: true, data: ticketsWithCoverage });
     } catch (error) {
       next(error);
     }
@@ -3972,6 +4591,7 @@ Xerocare Technical Services`;
         }
       }
 
+      await this.withCoverageMetadata(ticket);
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
@@ -4685,6 +5305,12 @@ Xerocare Technical Services`;
         relations: ['items'],
       });
       if (!ticket) throw new Error('Ticket not found');
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        throw new AppError(
+          'Covered routine service does not use a quotation. Route additional work through review.',
+          409,
+        );
+      }
 
       // Validate discount <= total maxDiscountableAmount across parts
       let totalMaxDiscount = 0;
@@ -4713,6 +5339,7 @@ Xerocare Technical Services`;
           partCategory: it.sparePartId ? partCategories.get(it.sparePartId) : null,
           partName: it.partName,
           isFree: it.isFree,
+          serviceContext: ticket.serviceContext,
         });
         return {
           description: it.partName,
@@ -4888,6 +5515,13 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Covered tickets intentionally have no Finance estimate. Billing may
+      // still retry a stale callback; acknowledge it without changing the
+      // direct-service state or creating an approval dependency.
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        return res.status(200).json({ success: true, data: ticket, ignored: 'covered-service' });
+      }
+
       if (
         [
           ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2,
@@ -5020,13 +5654,19 @@ Xerocare Technical Services`;
   financeRejected = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+      // Covered tickets intentionally have no Finance estimate. Billing may
+      // still retry a stale rejection callback; acknowledge it without
+      // converting the ticket into a chargeable rejection path.
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        return res.status(200).json({ success: true, data: ticket, ignored: 'covered-service' });
+      }
       const { reason } = req.body;
       if (!reason || !reason.trim()) {
         throw new AppError('Rejection reason is required', 400);
       }
-      const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
-      if (!ticket) throw new Error('Ticket not found');
 
       if (
         [
@@ -7700,6 +8340,13 @@ For queries contact us at +974 4455 6677`;
       });
       if (!ticket) throw new AppError('Ticket not found', 404);
 
+      if (ticket.status === ServiceTicketStatus.FREE_SERVICE) {
+        throw new AppError(
+          'Covered routine service has no estimate to revise. Route additional work for review.',
+          409,
+        );
+      }
+
       if (!ticket.serviceQuotationId) {
         throw new AppError('Ticket does not have an active estimate to revise', 400);
       }
@@ -7843,6 +8490,7 @@ For queries contact us at +974 4455 6677`;
           partCategory: it.sparePartId ? revisePartCategories.get(it.sparePartId) : null,
           partName: it.partName || it.description,
           isFree: it.isFree,
+          serviceContext: ticket.serviceContext,
         });
         const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
         const brand = part?.brand || it.customPartBrand || null;
