@@ -380,6 +380,7 @@ export class BillingReportService {
       type: 'USAGE_PENDING' | 'INVOICE_PENDING' | 'SEND_PENDING' | 'SUMMARY_PENDING';
       saleType: string;
       dueDate: Date;
+      createdAt?: Date;
       effectiveFrom?: Date;
       effectiveTo?: Date;
       monthlyRent?: number;
@@ -417,6 +418,7 @@ export class BillingReportService {
           type: 'SUMMARY_PENDING',
           saleType: contract.saleType,
           dueDate: new Date(),
+          createdAt: contract.createdAt,
           effectiveFrom: contract.effectiveFrom,
           effectiveTo: contract.effectiveTo,
           monthlyRent: contract.monthlyRent,
@@ -459,6 +461,7 @@ export class BillingReportService {
         type: 'USAGE_PENDING',
         saleType: contract.saleType,
         dueDate: due,
+        createdAt: contract.createdAt,
         effectiveFrom: contract.effectiveFrom,
         effectiveTo: contract.effectiveTo,
         monthlyRent: contract.monthlyRent,
@@ -493,6 +496,7 @@ export class BillingReportService {
         type: 'INVOICE_PENDING',
         saleType: inv.saleType,
         dueDate: inv.createdAt,
+        createdAt: inv.createdAt,
         effectiveFrom: inv.effectiveFrom,
         effectiveTo: inv.effectiveTo,
         monthlyRent: inv.monthlyRent,

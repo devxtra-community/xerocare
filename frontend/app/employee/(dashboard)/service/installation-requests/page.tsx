@@ -770,7 +770,7 @@ export default function InstallationRequestsPage() {
       <Dialog open={!!viewContract} onOpenChange={(v) => !v && setViewContract(null)}>
         <DialogContent
           showCloseButton={false}
-          className="w-[96vw] max-w-5xl h-[92vh] max-h-[92vh] rounded-2xl p-0 overflow-hidden border-0 shadow-2xl flex flex-col"
+          className="w-[96vw] max-w-5xl sm:max-w-5xl h-[92vh] max-h-[92vh] rounded-2xl p-0 overflow-hidden border-0 shadow-2xl flex flex-col"
         >
           <DialogTitle className="sr-only">Contract Agreement</DialogTitle>
           {viewContract && (

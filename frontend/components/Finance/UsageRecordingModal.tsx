@@ -510,24 +510,53 @@ export default function UsageRecordingModal({
           uniqueItemsMap.set(item.allocationId, item);
         }
       });
-      // A bill may have been created before a machine was replaced. Include every
-      // metered allocation that overlapped this bill's period so editing it can
-      // capture the outgoing machine's final reading and the replacement's usage.
-      const periodStart = start ? new Date(`${start}T00:00:00`).getTime() : NaN;
-      const periodEnd = end ? new Date(`${end}T23:59:59.999`).getTime() : NaN;
-      const priorUsageItems = prevUsage?.items || [];
+      // Include meter allocations that overlap this bill and any outgoing machine
+      // whose final usage has not yet appeared in an earlier bill.
+      const periodStartDay = start.slice(0, 10);
+      const periodEndDay = end.slice(0, 10);
+      const priorUsage = history
+        .filter(
+          (record) =>
+            record.id !== inv.id &&
+            (record.billType === undefined || record.billType === 'USAGE') &&
+            String(record.periodStart).slice(0, 10) < periodStartDay,
+        )
+        .sort((a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime())[0];
+      const priorUsageItems = priorUsage?.items || [];
       (contract.productAllocations || []).forEach((allocation) => {
         if (allocation.itemType === 'ACCESSORY' || uniqueItemsMap.has(allocation.id)) return;
-        const allocationStart = allocation.startTimestamp
-          ? new Date(allocation.startTimestamp).getTime()
-          : 0;
-        const allocationEnd = allocation.endTimestamp
-          ? new Date(allocation.endTimestamp).getTime()
-          : Infinity;
-        const overlapsPeriod = allocationStart <= periodEnd && allocationEnd >= periodStart;
-        if (!overlapsPeriod) return;
-
+        const allocationStartDay =
+          String(allocation.startTimestamp || '').slice(0, 10) || '0000-00-00';
+        const allocationEndDay = String(allocation.endTimestamp || '').slice(0, 10) || '9999-12-31';
+        const overlapsPeriod =
+          allocationStartDay <= periodEndDay && allocationEndDay >= periodStartDay;
         const priorItem = priorUsageItems.find((item) => item.allocationId === allocation.id);
+        const priorReadings = priorItem
+          ? [priorItem.endBwA4, priorItem.endBwA3, priorItem.endColorA4, priorItem.endColorA3]
+          : [
+              allocation.initialBwA4,
+              allocation.initialBwA3,
+              allocation.initialColorA4,
+              allocation.initialColorA3,
+            ];
+        const closingReadings = [
+          allocation.currentBwA4,
+          allocation.currentBwA3,
+          allocation.currentColorA4,
+          allocation.currentColorA3,
+        ];
+        const hasUnbilledFinalReading = closingReadings.some(
+          (reading, index) => Number(reading || 0) > Number(priorReadings[index] || 0),
+        );
+        // If the outgoing machine's final usage was missed by the bill created at
+        // replacement time, carry it into the first later bill that ends after the swap.
+        // The previous period's item list makes this a one-time carry-forward.
+        const firstBillAfterReplacement =
+          allocation.status === 'REPLACED' &&
+          allocationEndDay <= periodEndDay &&
+          hasUnbilledFinalReading;
+        if (!overlapsPeriod && !firstBillAfterReplacement) return;
+
         const startBwA4 = priorItem?.endBwA4 ?? allocation.initialBwA4 ?? 0;
         const startBwA3 = priorItem?.endBwA3 ?? allocation.initialBwA3 ?? 0;
         const startColorA4 = priorItem?.endColorA4 ?? allocation.initialColorA4 ?? 0;
@@ -625,7 +654,25 @@ export default function UsageRecordingModal({
             // blindly here would re-propagate it into every subsequent period forever — the
             // merge loop's accessory skip never gets a chance to remove it, since an
             // allocation "already in items" is left as-is, not re-validated.
-            .filter((item) => item.allocation?.itemType !== 'ACCESSORY')
+            .filter((item) => {
+              if (item.allocation?.itemType === 'ACCESSORY') return false;
+
+              // Keep a replaced unit in the next bill only when its final meter has
+              // not yet been billed. Once the prior bill already contains the closing
+              // reading, carrying this row forward makes the old machine reappear in
+              // every later month's usage form.
+              const allocation = contract.productAllocations?.find(
+                (candidate) => candidate.id === item.allocationId,
+              );
+              if (allocation?.status !== 'REPLACED') return true;
+
+              return [
+                [allocation.currentBwA4, item.endBwA4],
+                [allocation.currentBwA3, item.endBwA3],
+                [allocation.currentColorA4, item.endColorA4],
+                [allocation.currentColorA3, item.endColorA3],
+              ].some(([closing, billed]) => Number(closing || 0) > Number(billed || 0));
+            })
             .map((item) => ({
               allocationId: item.allocationId,
               serialNumber: item.allocation?.serialNumber,
@@ -838,10 +885,21 @@ export default function UsageRecordingModal({
         const replacementTime = allocation.endTimestamp
           ? new Date(allocation.endTimestamp).getTime()
           : NaN;
+        const oldItem = formData.items.find((item) => item.allocationId === allocation.id);
+        const carriesUnbilledUsage =
+          !!editingInvoice &&
+          !!oldItem &&
+          [
+            [oldItem.startBwA4, oldItem.endBwA4],
+            [oldItem.startBwA3, oldItem.endBwA3],
+            [oldItem.startColorA4, oldItem.endColorA4],
+            [oldItem.startColorA3, oldItem.endColorA3],
+          ].some(([start, end]) => Number(end || 0) > Number(start || 0));
         return (
           allocation.status === 'REPLACED' &&
-          replacementTime >= periodStart &&
-          replacementTime <= periodEnd + 24 * 60 * 60 * 1000 - 1
+          ((replacementTime >= periodStart &&
+            replacementTime <= periodEnd + 24 * 60 * 60 * 1000 - 1) ||
+            carriesUnbilledUsage)
         );
       })
       .map((oldAllocation) => {
@@ -2329,7 +2387,15 @@ export default function UsageRecordingModal({
                         const startPeriod = new Date(formData.billingPeriodStart).getTime();
                         const endPeriod = new Date(formData.billingPeriodEnd).getTime();
                         const endTs = a.endTimestamp ? new Date(a.endTimestamp).getTime() : 0;
-                        return endTs >= startPeriod && endTs <= endPeriod;
+                        const carriesUnbilledUsage =
+                          !!editingInvoice &&
+                          [
+                            [item.startBwA4, item.endBwA4],
+                            [item.startBwA3, item.endBwA3],
+                            [item.startColorA4, item.endColorA4],
+                            [item.startColorA3, item.endColorA3],
+                          ].some(([start, end]) => Number(end || 0) > Number(start || 0));
+                        return (endTs >= startPeriod && endTs <= endPeriod) || carriesUnbilledUsage;
                       });
                       // Deduplicate by serialNumber — prefer ALLOCATED, then first seen
                       const seenSerials = new Map<string, (typeof filtered)[0]>();

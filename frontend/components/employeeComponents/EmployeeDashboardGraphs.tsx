@@ -45,8 +45,11 @@ export default function EmployeeDashboardGraphs() {
         // Fetch customers and invoices in parallel
         const [customers, invoices] = await Promise.all([getCustomers(), getMyInvoices()]);
 
+        // Direct product and spare-part invoices use their own saleType values;
+        // counting only the legacy mixed SALE type left this chart empty for them.
+        const saleTypes = new Set(['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE']);
         const salesInvoices = invoices.filter(
-          (inv) => inv.saleType === 'SALE' && inv.status !== 'REJECTED',
+          (inv) => saleTypes.has(inv.saleType) && inv.status !== 'REJECTED',
         );
         const rentInvoices = invoices.filter(
           (inv) => inv.saleType === 'RENT' && inv.status !== 'REJECTED',
